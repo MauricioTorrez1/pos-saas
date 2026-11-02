@@ -1,0 +1,14 @@
+{
+  "name": "pos-saas",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Offline-first point of sale for small retail, designed to grow into a multi-tenant SaaS.",
+  "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "check:repo": "bash scripts/check-ignored-files.sh"
+  }
+}

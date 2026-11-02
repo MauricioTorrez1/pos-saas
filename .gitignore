@@ -1,0 +1,76 @@
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.cer
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Private business data: Eleventa exports, supplier lists, backups
+/private/
+backups/
+*.dump
+*.bak
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+*.duckdb
+*.duckdb.wal
+
+# Node and TypeScript
+node_modules/
+.pnpm-store/
+.next/
+dist/
+out/
+release/
+coverage/
+*.tsbuildinfo
+
+# Test reports
+playwright-report/
+test-results/
+
+# Java
+target/
+build/
+.gradle/
+*.class
+
+# Python and dbt
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dbt_packages/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+
+# Logs
+logs/
+*.log
+
+# Editors and operating systems
+.idea/
+.vscode/
+.claude/settings.local.json
+.DS_Store
+Thumbs.db
