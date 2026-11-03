@@ -3,7 +3,7 @@
 Actualizado: 2026-11-02. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** F0-04 está en revisión. Falta su primera corrida en CI y fusionar su PR.
+- **Tarea en curso:** ninguna.
 - **Siguiente:** F0-05.
 - **Rellenos temporales:** `CiSmoke` lo reemplaza F0-07, `ci_smoke` lo reemplaza F0-06 y `ci-smoke` lo reemplaza E1-05.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar. Los pendientes de la tienda están en una nota local, fuera de Git.
@@ -14,7 +14,7 @@ Actualizado: 2026-11-02. Estados: Pendiente, En curso, En revisión, Terminada, 
 | F0-01 | Inicializar repositorio y monorepo | 2 | Terminada |
 | F0-02 | CI base en GitHub Actions | 3 | Terminada |
 | F0-03 | Escaneo de secretos y dependencias | 2 | Terminada |
-| F0-04 | Compose: perfil `core` | 4 | En revisión |
+| F0-04 | Compose: perfil `core` | 4 | Terminada |
 | F0-05 | Compose: perfil `observability` | 5 | Pendiente |
 | F0-06 | Compose: perfiles `automation` y `analytics` | 4 | Pendiente |
 | F0-07 | Esqueleto de Spring Boot 4.1 | 4 | Pendiente |
@@ -197,4 +197,4 @@ Actualizado: 2026-11-02. Estados: Pendiente, En curso, En revisión, Terminada, 
 | 2026-11-02 | F0-02 terminada. PR 1: los tres trabajos en verde en 24 segundos. PR 2: `Java` en rojo por una prueba rota, `TypeScript` y `Python` en verde, y se cerró sin fusionar. `main` en verde en 30 segundos tras fusionar | Terminar F0-03 |
 | 2026-11-02 | F0-03 terminada: Gitleaks, OSV-Scanner y Dependabot (ADR 0015), y regla `protect-main` con cinco checks obligatorios. PR 3: seis checks en verde, con 1, 96 y 7 paquetes revisados por OSV-Scanner. PR 4: con un secreto falso, `Secret scan` en rojo, los demás en verde y fusión bloqueada; se cerró sin fusionar | Empezar F0-04 |
 | 2026-11-02 | F0-03 en `main`: en verde tras fusionar, con CI en 18 segundos, Repository checks en 7 y Security en 10. Dependabot corrió bien en los cuatro ecosistemas. Su PR 5 se cerró sin fusionar porque rompía la alineación con Spring Boot 4.1.2 | Terminar F0-04 |
-| 2026-11-02 | F0-04 en revisión: perfil `core` con cuatro servicios y `healthcheck`, Keycloak con base propia (ADR 0016) y trabajo `Compose core` en CI. En local, primer arranque sano en 49 segundos, reinicio en 27 y 907 MiB en reposo. Los datos sobreviven a `down` y `up` | Fusionar F0-04 y empezar F0-05 en una sesión nueva |
+| 2026-11-02 | F0-04 terminada: perfil `core` con cuatro servicios y `healthcheck`, Keycloak con base propia (ADR 0016) y `Compose core` como sexto check obligatorio. En local, primer arranque sano en 49 segundos, reinicio en 27 y 907 MiB en reposo. Los datos sobreviven a `down` y `up`. Con una contraseña equivocada, el script falla y los logs no muestran contraseñas. PR 6: siete checks en verde, con `Compose core` en 62 segundos | Empezar F0-05 en una sesión nueva |
