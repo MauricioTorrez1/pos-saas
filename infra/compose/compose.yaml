@@ -1,5 +1,6 @@
 # Local development stack. With COMPOSE_FILE set in .env, run it from the repository root:
 #   docker compose --profile core up
+#   docker compose --profile observability up
 name: pos-saas
 
 # Ports listen on 127.0.0.1 only, so the stack is not reachable from the local network.
@@ -108,7 +109,125 @@ services:
       timeout: 5s
       retries: 20
 
+  # The Loki and collector images have no shell or HTTP client, so a health check cannot call them.
+  # This one-shot service copies a static busybox to a shared volume for those checks, and then exits.
+  health-tools:
+    image: busybox:1.38.0-uclibc@sha256:b2e35951f72501f6a99f1bf45bcfe6d4795be08c518c2f97d0ed2fe776958a3b
+    profiles: [observability]
+    command: ["cp", "/bin/busybox", "/health-tools/busybox"]
+    volumes:
+      - health-tools:/health-tools
+
+  prometheus:
+    image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
+    profiles: [observability]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-otlp-receiver
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: wget -q -O /dev/null http://127.0.0.1:9090/-/ready
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Grafana reads Loki and Tempo inside the Compose network, so their ports are not published.
+  loki:
+    image: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+    profiles: [observability]
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./loki/config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+      - health-tools:/health-tools:ro
+    depends_on:
+      health-tools:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/health-tools/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3100/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  tempo:
+    image: grafana/tempo:3.1.1@sha256:64e2fbd56d9c2b3412a4b430a58ea59e91a670b1e75f920a0c702213ad145044
+    profiles: [observability]
+    command: ["-config.file=/etc/tempo/config.yaml"]
+    volumes:
+      - ./tempo/config.yaml:/etc/tempo/config.yaml:ro
+      - tempo-data:/var/tempo
+    healthcheck:
+      # The Tempo binary can check its own /ready endpoint.
+      test: ["CMD", "/tempo", "-health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Applications send traces, metrics, and logs here: port 4317 for gRPC and 4318 for HTTP.
+  otel-collector:
+    image: otel/opentelemetry-collector:0.164.0@sha256:28b6d41ac51bff6b41ba5e8fe503569ffb9d6a1ea90f7a78419e86f34e44f750
+    profiles: [observability]
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+      - health-tools:/health-tools:ro
+    depends_on:
+      health-tools:
+        condition: service_completed_successfully
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/health-tools/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:13133/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Port 3000 stays free for the Next.js panel. It has no data volume: what it shows comes from Git.
+  grafana:
+    image: grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
+    profiles: [observability]
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?Run bash scripts/create-dev-env.sh to add it to .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Run bash scripts/create-dev-env.sh to add it to .env}
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - ../grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ../grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      test: wget -q -O - http://127.0.0.1:3000/api/health | grep -q '"ok"'
+      interval: 5s
+      timeout: 3s
+      retries: 24
+
 volumes:
   postgres-data:
   redis-data:
   redpanda-data:
+  health-tools:
+  prometheus-data:
+  loki-data:
+  tempo-data:

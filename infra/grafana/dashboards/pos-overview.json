@@ -1,0 +1,205 @@
+{
+  "uid": "pos-overview",
+  "title": "POS overview (test data)",
+  "description": "Simulated sales from scripts/send-test-telemetry.sh. Real services arrive with task F0-11.",
+  "tags": ["pos-saas"],
+  "editable": false,
+  "refresh": "10s",
+  "schemaVersion": 41,
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Sales per minute",
+      "description": "Simulated sales per minute, averaged over the last minute.",
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "No data",
+          "color": { "mode": "fixed", "fixedColor": "blue" }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pos_demo_sales_total[1m])) * 60"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Error rate",
+      "description": "Share of failed sales in the last 5 minutes.",
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "noValue": "No data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.02 },
+              { "color": "red", "value": 0.1 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pos_demo_sales_total{status=\"error\"}[5m])) / sum(rate(pos_demo_sales_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "p95 sale duration",
+      "description": "95th percentile of sale duration in the last 5 minutes, estimated from histogram buckets. It turns yellow above the 300 ms goal of RNF-03.",
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "noValue": "No data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 300 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(pos_demo_sale_duration_milliseconds_bucket[5m])))"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Sale duration",
+      "description": "Median and 95th percentile of sale duration.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "p50",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(pos_demo_sale_duration_milliseconds_bucket[1m])))"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "p95",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(pos_demo_sale_duration_milliseconds_bucket[1m])))"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Sales by status",
+      "description": "Simulated sales per minute, split into completed and failed.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{status}}",
+          "expr": "sum by (status) (rate(pos_demo_sales_total[1m])) * 60"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Slow sales (traces over 400 ms)",
+      "description": "Select a trace ID to see where the time went.",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 13 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "traceql",
+          "tableType": "traces",
+          "limit": 20,
+          "query": "{ resource.service.name = \"pos-demo\" && duration > 400ms }"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "logs",
+      "title": "Logs",
+      "description": "Expand a line and follow its trace link.",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 13 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": { "showTime": true, "sortOrder": "Descending", "enableLogDetails": true },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "range",
+          "expr": "{service_name=\"pos-demo\"}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Collector: accepted items per second",
+      "description": "Items that applications delivered to the collector.",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 22 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "accepted spans",
+          "expr": "sum(rate(otelcol_receiver_accepted_spans[1m]))"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "accepted metric points",
+          "expr": "sum(rate(otelcol_receiver_accepted_metric_points[1m]))"
+        },
+        {
+          "refId": "C",
+          "legendFormat": "accepted log records",
+          "expr": "sum(rate(otelcol_receiver_accepted_log_records[1m]))"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Collector: delivery problems",
+      "description": "While a store is down, data waits in a queue. After 5 minutes of retries it is lost. Both lines should stay at zero.",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 22 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "batches waiting",
+          "expr": "sum(otelcol_exporter_queue_size) or vector(0)"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "items lost since the collector started",
+          "expr": "sum({__name__=~\"otelcol_exporter_send_failed_.+\"}) or vector(0)"
+        }
+      ]
+    }
+  ]
+}
