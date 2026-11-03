@@ -63,13 +63,25 @@ pnpm check:repo
 The `core` profile runs PostgreSQL 16, Keycloak, Redis, and Redpanda. This command starts it in the background and fails unless every service is healthy within two minutes. The first run also downloads the images, about 560 MiB, and that time does not count:
 
 ```bash
-bash scripts/wait-for-core.sh
+bash scripts/wait-for-profile.sh core
 ```
 
 Stop it and keep the data:
 
 ```bash
 docker compose --profile core down
+```
+
+The `observability` profile runs the OpenTelemetry Collector, Prometheus, Loki, Tempo, and Grafana. Start it only when you need it, with or without `core`. Its first run downloads about 720 MiB. If you already have a `.env`, run `bash scripts/create-dev-env.sh` first, which adds the new variables and keeps your values:
+
+```bash
+bash scripts/wait-for-profile.sh observability
+```
+
+This command fills the [Grafana dashboard](http://localhost:3001/d/pos-overview) with about two minutes of simulated sales. The Grafana user and password are in your `.env`:
+
+```bash
+bash scripts/send-test-telemetry.sh
 ```
 
 [`infra/compose`](infra/compose/README.md) lists the addresses and how to start over with empty data.
@@ -98,7 +110,7 @@ uv run pytest
 ```
 
 ### Continuous integration
-Every pull request and every push to `main` runs [three jobs](.github/workflows/ci.yml), one each for Java, TypeScript, and Python. Each job compiles and tests its project, and a single failing test turns it red. Until their real code arrives, `services/core`, `services/analytics`, and `packages/money` each hold a small placeholder with one test. A fourth job, `Compose core`, starts the local stack and fails unless every service is healthy within two minutes.
+Every pull request and every push to `main` runs [three jobs](.github/workflows/ci.yml), one each for Java, TypeScript, and Python. Each job compiles and tests its project, and a single failing test turns it red. Until their real code arrives, `services/core`, `services/analytics`, and `packages/money` each hold a small placeholder with one test. A fourth job, `Compose core`, starts the local stack and fails unless every service is healthy within two minutes. A fifth job, `Compose observability`, does the same with its profile, sends test telemetry, and fails unless Grafana can read the trace, the metrics, and the log.
 
 ### Security checks
 GitHub secret scanning and push protection stop known secret formats at `git push`. The [security workflow](.github/workflows/security.yml) adds two jobs on every pull request, on every push to `main`, and once a week:
@@ -110,7 +122,7 @@ GitHub secret scanning and push protection stop known secret formats at `git pus
 
 [Dependabot](.github/dependabot.yml) opens weekly update pull requests for Maven, pnpm, uv, GitHub Actions, and the Compose images. Its alerts appear in the **Security** tab, next to the secret scanning alerts. They do not cover the two-document lockfile of pnpm 12 and can miss transitive Maven dependencies, which is why OSV-Scanner runs too. [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explains the choice.
 
-`main` only accepts pull requests, and `Java`, `TypeScript`, `Python`, `Compose core`, `Sensitive files stay out of Git`, and `Secret scan` must pass before a merge.
+`main` only accepts pull requests, and `Java`, `TypeScript`, `Python`, `Compose core`, `Compose observability`, `Sensitive files stay out of Git`, and `Secret scan` must pass before a merge.
 
 **If a secret leaks:** revoke it first, because deleting the commit does not help once it has been pushed. Then check the provider's logs for unauthorized use, issue a new secret, and remove the old one from the code.
 
@@ -189,13 +201,25 @@ pnpm check:repo
 El perfil `core` corre PostgreSQL 16, Keycloak, Redis y Redpanda. Este comando lo arranca en segundo plano y falla si algún servicio no está sano en dos minutos. La primera vez también descarga las imágenes, unos 560 MiB, y ese tiempo no cuenta:
 
 ```bash
-bash scripts/wait-for-core.sh
+bash scripts/wait-for-profile.sh core
 ```
 
 Para detenerlo sin perder los datos:
 
 ```bash
 docker compose --profile core down
+```
+
+El perfil `observability` corre el colector de OpenTelemetry, Prometheus, Loki, Tempo y Grafana. Arráncalo solo cuando lo necesites, con `core` o sin él. La primera vez descarga unos 720 MiB. Si ya tienes un `.env`, corre primero `bash scripts/create-dev-env.sh`, que agrega las variables nuevas y conserva tus valores:
+
+```bash
+bash scripts/wait-for-profile.sh observability
+```
+
+Este comando llena el [tablero de Grafana](http://localhost:3001/d/pos-overview) con unos dos minutos de ventas simuladas. El usuario y la contraseña de Grafana están en tu `.env`:
+
+```bash
+bash scripts/send-test-telemetry.sh
 ```
 
 [`infra/compose`](infra/compose/README.md) indica las direcciones y cómo empezar de nuevo con datos vacíos.
@@ -224,7 +248,7 @@ uv run pytest
 ```
 
 ### Integración continua
-Cada pull request y cada push a `main` corren [tres trabajos](.github/workflows/ci.yml), uno para Java, otro para TypeScript y otro para Python. Cada trabajo compila y prueba su proyecto, y una sola prueba rota lo pone en rojo. Mientras llega su código real, `services/core`, `services/analytics` y `packages/money` tienen un relleno pequeño con una prueba. Un cuarto trabajo, `Compose core`, arranca el stack local y falla si algún servicio no está sano en dos minutos.
+Cada pull request y cada push a `main` corren [tres trabajos](.github/workflows/ci.yml), uno para Java, otro para TypeScript y otro para Python. Cada trabajo compila y prueba su proyecto, y una sola prueba rota lo pone en rojo. Mientras llega su código real, `services/core`, `services/analytics` y `packages/money` tienen un relleno pequeño con una prueba. Un cuarto trabajo, `Compose core`, arranca el stack local y falla si algún servicio no está sano en dos minutos. Un quinto trabajo, `Compose observability`, hace lo mismo con su perfil, envía telemetría de prueba y falla si Grafana no puede leer la traza, las métricas y el log.
 
 ### Revisiones de seguridad
 El escaneo de secretos y la protección al subir de GitHub detienen en el `git push` los secretos con formato conocido. El [workflow de seguridad](.github/workflows/security.yml) agrega dos trabajos en cada pull request, en cada push a `main` y una vez por semana:
@@ -236,7 +260,7 @@ El escaneo de secretos y la protección al subir de GitHub detienen en el `git p
 
 [Dependabot](.github/dependabot.yml) abre cada semana pull requests de actualización para Maven, pnpm, uv, GitHub Actions y las imágenes de Compose. Sus alertas aparecen en la pestaña **Security**, junto a las del escaneo de secretos. No cubren el lockfile de dos documentos de pnpm 12 y pueden omitir dependencias transitivas de Maven, por eso también corre OSV-Scanner. El [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explica la decisión.
 
-`main` solo acepta pull requests, y `Java`, `TypeScript`, `Python`, `Compose core`, `Sensitive files stay out of Git` y `Secret scan` deben pasar antes de fusionar.
+`main` solo acepta pull requests, y `Java`, `TypeScript`, `Python`, `Compose core`, `Compose observability`, `Sensitive files stay out of Git` y `Secret scan` deben pasar antes de fusionar.
 
 **Si se filtra un secreto:** primero revócalo, porque borrar el commit no sirve una vez que se subió. Después revisa en los registros del proveedor si alguien lo usó, genera uno nuevo y quita el anterior del código.
 

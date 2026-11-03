@@ -88,4 +88,19 @@ jobs:
       - name: Create a throwaway environment file
         run: bash scripts/create-dev-env.sh
       - name: Start the core profile and check its health
-        run: bash scripts/wait-for-core.sh
+        run: bash scripts/wait-for-profile.sh core
+
+  compose-observability:
+    name: Compose observability
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create a throwaway environment file
+        run: bash scripts/create-dev-env.sh
+      - name: Start the observability profile and check its health
+        run: bash scripts/wait-for-profile.sh observability
+      - name: Send test telemetry and find it in Grafana
+        run: bash scripts/check-observability.sh

@@ -1,0 +1,10 @@
+# Dashboards come from Git. Changes made in the browser cannot be saved over them.
+apiVersion: 1
+
+providers:
+  - name: pos-saas
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

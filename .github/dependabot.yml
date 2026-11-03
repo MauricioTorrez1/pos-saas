@@ -44,8 +44,12 @@ updates:
     directory: /infra/compose
     schedule:
       interval: weekly
+    # Each profile updates apart, so a breaking collector update cannot hold back a database patch.
     groups:
-      minor-and-patch:
+      observability-minor-and-patch:
+        patterns: ["grafana/*", "prom/*", "otel/*", "busybox"]
+        update-types: [minor, patch]
+      core-minor-and-patch:
         patterns: ["*"]
         update-types: [minor, patch]
     # The stack is decided on PostgreSQL 16. A new major version needs its own ADR.

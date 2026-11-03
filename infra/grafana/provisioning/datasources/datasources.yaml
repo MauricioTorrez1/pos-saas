@@ -1,0 +1,45 @@
+# Fixed uids let the dashboards and scripts find each data source.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      # Adds a link from each log line to its trace.
+      derivedFields:
+        - name: Trace
+          matcherType: label
+          matcherRegex: trace_id
+          datasourceUid: tempo
+          url: $${__value.raw}
+          urlDisplayLabel: View trace
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: false
+    jsonData:
+      # Adds a link from each span to the logs of the same trace.
+      # A log can be written right at the edge of its span, so the search looks around it.
+      tracesToLogsV2:
+        datasourceUid: loki
+        filterByTraceID: true
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m
+        tags:
+          - key: service.name
+            value: service_name
