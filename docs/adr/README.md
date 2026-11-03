@@ -18,3 +18,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0012](0012-entregas-y-factura.md) | Factura en la Entrega 1 y terminal integrada en la 2 | Aceptada |
 | [0013](0013-stack-completo.md) | Stack completo desde el inicio | Aceptada, precio por confirmar |
 | [0014](0014-maven-uv-junit.md) | Maven, uv y JUnit 6 | Aceptada |
+| [0015](0015-escaneo-de-seguridad.md) | Gitleaks, OSV-Scanner y Dependabot | Aceptada |
