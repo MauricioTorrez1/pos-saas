@@ -1,0 +1,32 @@
+models:
+  - name: daily_sales
+    description: Number of sales and total in cents, by tenant and day.
+    columns:
+      - name: tenant_id
+        data_tests:
+          - not_null
+      - name: sold_on
+        data_tests:
+          - not_null
+      - name: sales_count
+        data_tests:
+          - not_null
+      - name: total_cents
+        data_tests:
+          - not_null
+
+unit_tests:
+  - name: daily_sales_keeps_tenants_and_days_apart
+    model: daily_sales
+    given:
+      - input: ref('stg_sales')
+        rows:
+          - { tenant_id: 019a4c00-0000-7000-8000-00000000000a, sold_on: 2026-11-01, total_cents: 100 }
+          - { tenant_id: 019a4c00-0000-7000-8000-00000000000a, sold_on: 2026-11-01, total_cents: 250 }
+          - { tenant_id: 019a4c00-0000-7000-8000-00000000000a, sold_on: 2026-11-02, total_cents: 40 }
+          - { tenant_id: 019a4c00-0000-7000-8000-00000000000b, sold_on: 2026-11-01, total_cents: 7 }
+    expect:
+      rows:
+        - { tenant_id: 019a4c00-0000-7000-8000-00000000000a, sold_on: 2026-11-01, sales_count: 2, total_cents: 350 }
+        - { tenant_id: 019a4c00-0000-7000-8000-00000000000a, sold_on: 2026-11-02, sales_count: 1, total_cents: 40 }
+        - { tenant_id: 019a4c00-0000-7000-8000-00000000000b, sold_on: 2026-11-01, sales_count: 1, total_cents: 7 }

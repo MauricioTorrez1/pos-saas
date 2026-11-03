@@ -1,0 +1,23 @@
+models:
+  - name: stg_sales
+    description: Example sales with synthetic data. Real sales arrive in task F5-02.
+    columns:
+      - name: sale_id
+        data_tests:
+          - not_null
+          - unique
+      - name: tenant_id
+        data_tests:
+          - not_null
+      - name: sold_on
+        data_tests:
+          - not_null
+      - name: payment_method
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [cash, transfer, card]
+      - name: total_cents
+        description: Sale total in cents. Money is always an integer.
+        data_tests:
+          - not_null

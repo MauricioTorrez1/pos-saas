@@ -14,6 +14,7 @@ readonly GENERATED_PASSWORDS=(
   "KEYCLOAK_ADMIN_PASSWORD"
   "REDIS_PASSWORD"
   "GRAFANA_ADMIN_PASSWORD"
+  "N8N_ENCRYPTION_KEY"
 )
 
 # Prints a line of the template, with a random password if its variable needs one.

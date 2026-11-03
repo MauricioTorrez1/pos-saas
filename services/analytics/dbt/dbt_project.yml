@@ -1,0 +1,20 @@
+name: pos_analytics
+version: "0.0.0"
+profile: pos_analytics
+
+models:
+  pos_analytics:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
+
+seeds:
+  pos_analytics:
+    sample_sales:
+      +column_types:
+        sale_id: uuid
+        tenant_id: uuid
+        sold_on: date
+        payment_method: varchar
+        total_cents: bigint

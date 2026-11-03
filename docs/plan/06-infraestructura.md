@@ -15,7 +15,7 @@ Mientras el presupuesto no alcance para dos servidores, staging y producción co
 | `core` | PostgreSQL 16, Keycloak, Redis, Redpanda, núcleo | Siempre |
 | `observability` | Colector OpenTelemetry, Prometheus, Loki, Tempo, Grafana | Al diagnosticar |
 | `automation` | n8n | Al trabajar con WhatsApp y redes |
-| `analytics` | FastAPI, dbt, DuckDB | Al trabajar con datos |
+| `analytics` | FastAPI, y dbt con DuckDB bajo pedido | Al trabajar con datos |
 
 Tu PC tiene 16 GB de RAM: levanta solo lo que uses. Docker Desktop ve 7.6 GiB de esos 16 GB, y el perfil `core`, todavía sin el núcleo, usa unos 900 MiB en reposo ([medición](../../infra/compose/README.md#measured-resources)).
 
