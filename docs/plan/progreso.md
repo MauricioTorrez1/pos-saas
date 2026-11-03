@@ -3,8 +3,8 @@
 Actualizado: 2026-11-02. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** ninguna.
-- **Siguiente:** F0-05.
+- **Tarea en curso:** F0-05.
+- **Siguiente:** F0-06.
 - **Rellenos temporales:** `CiSmoke` lo reemplaza F0-07, `ci_smoke` lo reemplaza F0-06 y `ci-smoke` lo reemplaza E1-05.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar. Los pendientes de la tienda están en una nota local, fuera de Git.
 
@@ -15,7 +15,7 @@ Actualizado: 2026-11-02. Estados: Pendiente, En curso, En revisión, Terminada, 
 | F0-02 | CI base en GitHub Actions | 3 | Terminada |
 | F0-03 | Escaneo de secretos y dependencias | 2 | Terminada |
 | F0-04 | Compose: perfil `core` | 4 | Terminada |
-| F0-05 | Compose: perfil `observability` | 5 | Pendiente |
+| F0-05 | Compose: perfil `observability` | 5 | En revisión |
 | F0-06 | Compose: perfiles `automation` y `analytics` | 4 | Pendiente |
 | F0-07 | Esqueleto de Spring Boot 4.1 | 4 | Pendiente |
 | F0-08 | Flyway y modelo base | 4 | Pendiente |
@@ -198,3 +198,6 @@ Actualizado: 2026-11-02. Estados: Pendiente, En curso, En revisión, Terminada, 
 | 2026-11-02 | F0-03 terminada: Gitleaks, OSV-Scanner y Dependabot (ADR 0015), y regla `protect-main` con cinco checks obligatorios. PR 3: seis checks en verde, con 1, 96 y 7 paquetes revisados por OSV-Scanner. PR 4: con un secreto falso, `Secret scan` en rojo, los demás en verde y fusión bloqueada; se cerró sin fusionar | Empezar F0-04 |
 | 2026-11-02 | F0-03 en `main`: en verde tras fusionar, con CI en 18 segundos, Repository checks en 7 y Security en 10. Dependabot corrió bien en los cuatro ecosistemas. Su PR 5 se cerró sin fusionar porque rompía la alineación con Spring Boot 4.1.2 | Terminar F0-04 |
 | 2026-11-02 | F0-04 terminada: perfil `core` con cuatro servicios y `healthcheck`, Keycloak con base propia (ADR 0016) y `Compose core` como sexto check obligatorio. En local, primer arranque sano en 49 segundos, reinicio en 27 y 907 MiB en reposo. Los datos sobreviven a `down` y `up`. Con una contraseña equivocada, el script falla y los logs no muestran contraseñas. PR 6: siete checks en verde, con `Compose core` en 62 segundos | Empezar F0-05 en una sesión nueva |
+| 2026-11-02 | F0-04 en `main`: PR 6 fusionado con el commit `e8b1c2d`, y CI, Repository checks y Security en verde tras fusionar, con `Compose core` en 51 segundos. La primera corrida de Dependabot para `docker-compose` terminó en verde y abrió el PR 7, que subió Redis de 8.8.4 a 8.10.3. El PR 7 ya se fusionó con el commit `59aa130`, con los tres workflows en verde y `Compose core` en 56 segundos | Terminar F0-05 |
+| 2026-11-02 | F0-05 en curso, todavía sin código. Decisiones: revisión de salud de Loki y del colector con `busybox` copiado por un servicio de un solo uso, datos de prueba con un script bajo pedido, Grafana con contraseña, y el trabajo `Compose observability` en cada PR y obligatorio tras su primera corrida | Escribir el perfil `observability` y su prueba |
+| 2026-11-03 | F0-05 en revisión: perfil `observability` con cinco servicios y `healthcheck`, tablero provisionado y prueba de punta a punta. En local, primer arranque sano en 35 segundos y reinicio en 34. Mauricio midió 1,323 MiB con el tablero en uso y encontró en Grafana una traza lenta y una con error. La prueba falló, como debía, al apagar Tempo, el colector o Prometheus. CI todavía no corre | Abrir el PR y agregar `Compose observability` a `protect-main` |
