@@ -3,8 +3,8 @@
 Actualizado: 2026-11-02. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** F0-02, en revisión. Faltan el PR con los tres trabajos en verde y el PR con la prueba rota en rojo.
-- **Siguiente:** F0-03.
+- **Tarea en curso:** F0-03, en curso. Faltan activar las opciones del repositorio, la regla que protege `main` y el PR de prueba con un secreto falso.
+- **Siguiente:** F0-04.
 - **Rellenos temporales:** `CiSmoke` lo reemplaza F0-07, `ci_smoke` lo reemplaza F0-06 y `ci-smoke` lo reemplaza E1-05.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar. Los pendientes de la tienda están en una nota local, fuera de Git.
 
@@ -12,8 +12,8 @@ Actualizado: 2026-11-02. Estados: Pendiente, En curso, En revisión, Terminada, 
 | Tarea | Título | Horas | Estado |
 | --- | --- | --- | --- |
 | F0-01 | Inicializar repositorio y monorepo | 2 | Terminada |
-| F0-02 | CI base en GitHub Actions | 3 | En revisión |
-| F0-03 | Escaneo de secretos y dependencias | 2 | Pendiente |
+| F0-02 | CI base en GitHub Actions | 3 | Terminada |
+| F0-03 | Escaneo de secretos y dependencias | 2 | En curso |
 | F0-04 | Compose: perfil `core` | 4 | Pendiente |
 | F0-05 | Compose: perfil `observability` | 5 | Pendiente |
 | F0-06 | Compose: perfiles `automation` y `analytics` | 4 | Pendiente |
@@ -194,3 +194,4 @@ Actualizado: 2026-11-02. Estados: Pendiente, En curso, En revisión, Terminada, 
 | --- | --- | --- |
 | 2026-11-02 | Plan completo, ADR y roadmap | Aprobar Issues y empezar F0-01 |
 | 2026-11-02 | F0-01 terminada. F0-02: CI con tres trabajos, Maven, uv y JUnit 6 (ADR 0014) | Abrir los dos PR de F0-02 y seguir con F0-03 |
+| 2026-11-02 | F0-02 terminada. PR 1: los tres trabajos en verde en 24 segundos. PR 2: `Java` en rojo por una prueba rota, `TypeScript` y `Python` en verde, y se cerró sin fusionar. `main` en verde en 30 segundos tras fusionar | Terminar F0-03 |
