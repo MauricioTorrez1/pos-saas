@@ -1,0 +1,23 @@
+# Rules for the secret scan: the Gitleaks defaults plus what this project adds.
+# To accept a false alarm, add its fingerprint from the scan log to .gitleaksignore.
+
+[extend]
+useDefault = true
+
+# Card numbers must never enter the repository (RNF-08). Gitleaks cannot run the Luhn check,
+# so these rules match the prefix and length of Visa, Mastercard, and American Express.
+# Separators must be consistent, so UUIDs do not match. EAN-13 barcodes are too short to match.
+[[rules]]
+id = "card-number"
+description = "Payment card number without separators"
+regex = '''\b(?:4\d{15}|5[1-5]\d{14}|2[2-7]\d{14}|3[47]\d{13})\b'''
+
+[[rules]]
+id = "card-number-spaces"
+description = "Payment card number separated by spaces"
+regex = '''\b(?:(?:4\d{3}|5[1-5]\d{2}|2[2-7]\d{2}) \d{4} \d{4} \d{4}|3[47]\d{2} \d{6} \d{5})\b'''
+
+[[rules]]
+id = "card-number-dashes"
+description = "Payment card number separated by dashes"
+regex = '''\b(?:(?:4\d{3}|5[1-5]\d{2}|2[2-7]\d{2})-\d{4}-\d{4}-\d{4}|3[47]\d{2}-\d{6}-\d{5})\b'''
