@@ -8,6 +8,6 @@ class CiSmokeTest {
 
     @Test
     void returnsServiceName() {
-        assertEquals("core", CiSmoke.serviceName());
+        assertEquals("broken", CiSmoke.serviceName());
     }
 }
