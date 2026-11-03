@@ -1,5 +1,7 @@
 # POS SaaS
 
+[![CI](https://github.com/MauricioTorrez1/pos-saas/actions/workflows/ci.yml/badge.svg)](https://github.com/MauricioTorrez1/pos-saas/actions/workflows/ci.yml)
+
 Offline-first point of sale for small retail. It starts with a family hardware store in Mexico and is designed to grow into a multi-tenant SaaS.
 
 **Status:** early development. The plan is complete and the repository is being set up, so there is no usable release yet.
@@ -30,15 +32,15 @@ A hardware store sells by the piece, the meter, and the kilo. One customer can a
 ### Stack
 | Area | Technology |
 | --- | --- |
-| Core | Java 21, Spring Boot 4.1, Spring Modulith, PostgreSQL 16, Flyway |
+| Core | Java 21, Maven, Spring Boot 4.1, Spring Modulith, PostgreSQL 16, Flyway |
 | Register | Electron, React, TypeScript, SQLite |
 | Web | Next.js, React, TypeScript |
-| Analytics and AI | Python 3.12, FastAPI, Polars, dbt, DuckDB, Claude API |
+| Analytics and AI | Python 3.12, uv, FastAPI, Polars, dbt, DuckDB, Claude API |
 | Platform | Docker Compose, Keycloak, Redis, Redpanda, n8n |
 | Operations | GitHub Actions, Terraform, OpenTelemetry, Prometheus, Loki, Tempo, Grafana, Sentry |
 
 ### Getting started
-You need Node.js 24 or later, and Git. The applications are added in upcoming tasks.
+You need Git, Node.js 24 or later, JDK 21, and [uv](https://docs.astral.sh/uv/). The applications are added in upcoming tasks.
 
 ```bash
 npm install -g pnpm@12.16.1
@@ -55,6 +57,32 @@ cp .env.example .env
 ```bash
 pnpm check:repo
 ```
+
+### Running the tests
+TypeScript, from the repository root:
+
+```bash
+pnpm typecheck
+```
+
+```bash
+pnpm test
+```
+
+Java, from `services/core` (in PowerShell or CMD, use `mvnw.cmd`):
+
+```bash
+./mvnw verify
+```
+
+Python, from `services/analytics`:
+
+```bash
+uv run pytest
+```
+
+### Continuous integration
+Every pull request and every push to `main` runs [three jobs](.github/workflows/ci.yml), one each for Java, TypeScript, and Python. Each job compiles and tests its project, and a single failing test turns it red. Until their real code arrives, `services/core`, `services/analytics`, and `packages/money` each hold a small placeholder with one test.
 
 ### Repository layout
 | Path | Contents |
@@ -99,15 +127,15 @@ Una tlapalería vende por pieza, por metro y por kilo. Un mismo cliente puede pe
 ### Stack
 | Área | Tecnología |
 | --- | --- |
-| Núcleo | Java 21, Spring Boot 4.1, Spring Modulith, PostgreSQL 16, Flyway |
+| Núcleo | Java 21, Maven, Spring Boot 4.1, Spring Modulith, PostgreSQL 16, Flyway |
 | Caja | Electron, React, TypeScript, SQLite |
 | Web | Next.js, React, TypeScript |
-| Analítica e IA | Python 3.12, FastAPI, Polars, dbt, DuckDB, API de Claude |
+| Analítica e IA | Python 3.12, uv, FastAPI, Polars, dbt, DuckDB, API de Claude |
 | Plataforma | Docker Compose, Keycloak, Redis, Redpanda, n8n |
 | Operación | GitHub Actions, Terraform, OpenTelemetry, Prometheus, Loki, Tempo, Grafana, Sentry |
 
 ### Cómo empezar
-Necesitas Node.js 24 o posterior, y Git. Las aplicaciones se agregan en las siguientes tareas.
+Necesitas Git, Node.js 24 o posterior, JDK 21 y [uv](https://docs.astral.sh/uv/). Las aplicaciones se agregan en las siguientes tareas.
 
 ```bash
 npm install -g pnpm@12.16.1
@@ -124,6 +152,32 @@ cp .env.example .env
 ```bash
 pnpm check:repo
 ```
+
+### Cómo correr las pruebas
+TypeScript, desde la raíz del repositorio:
+
+```bash
+pnpm typecheck
+```
+
+```bash
+pnpm test
+```
+
+Java, desde `services/core` (en PowerShell o CMD, usa `mvnw.cmd`):
+
+```bash
+./mvnw verify
+```
+
+Python, desde `services/analytics`:
+
+```bash
+uv run pytest
+```
+
+### Integración continua
+Cada pull request y cada push a `main` corren [tres trabajos](.github/workflows/ci.yml), uno para Java, otro para TypeScript y otro para Python. Cada trabajo compila y prueba su proyecto, y una sola prueba rota lo pone en rojo. Mientras llega su código real, `services/core`, `services/analytics` y `packages/money` tienen un relleno pequeño con una prueba.
 
 ### Estructura del repositorio
 | Ruta | Contenido |

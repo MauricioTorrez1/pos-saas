@@ -9,6 +9,8 @@
     "node": ">=24"
   },
   "scripts": {
-    "check:repo": "bash scripts/check-ignored-files.sh"
+    "check:repo": "bash scripts/check-ignored-files.sh",
+    "typecheck": "pnpm --recursive typecheck",
+    "test": "pnpm --recursive test"
   }
 }

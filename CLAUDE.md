@@ -46,7 +46,7 @@ Al terminar la tarea E1-38 vuelve el modo mentor.
 ## Convenciones
 - Código, nombres de tablas, endpoints y commits en inglés (Conventional Commits). Documentación de estudio en español; README bilingüe.
 - Ramas `feat/<id-tarea>-<descripción>`; un PR por tarea con descripción, pruebas y capturas si hay UI.
-- Pruebas: JUnit 5 + Testcontainers (Java), pytest (Python), Vitest + Playwright (TypeScript). Nada se fusiona sin pruebas en verde en CI.
+- Pruebas: JUnit 6 + Testcontainers (Java), pytest (Python), Vitest + Playwright (TypeScript). Nada se fusiona sin pruebas en verde en CI.
 - Secretos solo en variables de entorno o gestor de secretos; `.env.example` sin valores reales.
 
 ## Definición de terminado
