@@ -3,15 +3,16 @@
 Actualizado: 2026-11-02. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** F0-01, en revisión. Falta tu push; la revisión de CI corre al subirlo.
-- **Siguiente:** F0-02, que necesita el repositorio ya en GitHub.
+- **Tarea en curso:** F0-02, en revisión. Faltan el PR con los tres trabajos en verde y el PR con la prueba rota en rojo.
+- **Siguiente:** F0-03.
+- **Rellenos temporales:** `CiSmoke` lo reemplaza F0-07, `ci_smoke` lo reemplaza F0-06 y `ci-smoke` lo reemplaza E1-05.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar. Los pendientes de la tienda están en una nota local, fuera de Git.
 
 ## Fase 0
 | Tarea | Título | Horas | Estado |
 | --- | --- | --- | --- |
-| F0-01 | Inicializar repositorio y monorepo | 2 | En revisión |
-| F0-02 | CI base en GitHub Actions | 3 | Pendiente |
+| F0-01 | Inicializar repositorio y monorepo | 2 | Terminada |
+| F0-02 | CI base en GitHub Actions | 3 | En revisión |
 | F0-03 | Escaneo de secretos y dependencias | 2 | Pendiente |
 | F0-04 | Compose: perfil `core` | 4 | Pendiente |
 | F0-05 | Compose: perfil `observability` | 5 | Pendiente |
@@ -192,3 +193,4 @@ Actualizado: 2026-11-02. Estados: Pendiente, En curso, En revisión, Terminada, 
 | Fecha | Qué se hizo | Siguiente |
 | --- | --- | --- |
 | 2026-11-02 | Plan completo, ADR y roadmap | Aprobar Issues y empezar F0-01 |
+| 2026-11-02 | F0-01 terminada. F0-02: CI con tres trabajos, Maven, uv y JUnit 6 (ADR 0014) | Abrir los dos PR de F0-02 y seguir con F0-03 |

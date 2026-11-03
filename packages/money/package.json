@@ -1,0 +1,16 @@
+{
+  "name": "@pos-saas/money",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Money and quantity logic in TypeScript, using integers only.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
