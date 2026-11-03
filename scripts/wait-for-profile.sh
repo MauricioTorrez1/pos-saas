@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Starts a Compose profile and fails unless every service is healthy within the time limit.
-# Images are downloaded first, because the download time only depends on the network.
-# Usage: bash scripts/wait-for-profile.sh <core|observability>
+# Images are downloaded and built first, because that time only depends on the network and the cache.
+# Usage: bash scripts/wait-for-profile.sh <core|observability|automation|analytics>
 
 set -euo pipefail
 
@@ -13,8 +13,10 @@ readonly profile
 case "$profile" in
   core) readonly PROFILE_SERVICES=("postgres" "keycloak" "redis" "redpanda") ;;
   observability) readonly PROFILE_SERVICES=("prometheus" "loki" "tempo" "otel-collector" "grafana") ;;
+  automation) readonly PROFILE_SERVICES=("n8n") ;;
+  analytics) readonly PROFILE_SERVICES=("analytics-api") ;;
   *)
-    echo "Usage: bash scripts/wait-for-profile.sh <core|observability>" >&2
+    echo "Usage: bash scripts/wait-for-profile.sh <core|observability|automation|analytics>" >&2
     exit 2
     ;;
 esac
@@ -56,6 +58,7 @@ if [[ ! -f .env ]]; then
 fi
 
 docker compose --profile "$profile" pull --policy missing --quiet
+docker compose --profile "$profile" build --quiet
 
 started_at=$SECONDS
 if ! docker compose --profile "$profile" up --detach --wait --wait-timeout "$HEALTH_LIMIT_SECONDS"; then

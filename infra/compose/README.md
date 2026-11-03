@@ -1,6 +1,6 @@
 # Compose
 
-Docker Compose profiles for the local stack. `core` and `observability` are ready, and each one starts without the other. `automation` and `analytics` are added in later tasks of the [roadmap](../../docs/plan/04-roadmap.md).
+Docker Compose profiles for the local stack: `core`, `observability`, `automation`, and `analytics`. Each one starts without the others.
 
 ## Profile `core`
 | Service | From your PC | From another container | Data |
@@ -30,6 +30,25 @@ Two things that look wrong and are not:
 - `health-tools` shows `Exited (0)` in `docker compose ps --all`. The Loki and collector images have no shell or HTTP client, so this service copies a static BusyBox to a shared volume for their health checks and then exits.
 - Tempo logs `no jobs found` every 15 seconds while it has nothing to compact.
 
+## Profile `automation`
+| Service | From your PC | From another container | Data |
+| --- | --- | --- | --- |
+| n8n | <http://localhost:5678> | `http://n8n:5678` | `n8n-data` volume, with SQLite |
+
+The first visit asks you to create the owner account, which only exists on that volume. `N8N_ENCRYPTION_KEY` encrypts the credentials stored there. If you change the key, n8n cannot read them, so delete the volume too.
+
+Compose uses the version that n8n tags as `stable`. Its prereleases have normal-looking Docker tags, so before you merge a Dependabot update, check that `stable` already points to that version.
+
+n8n lists some deprecated settings when it starts. None of them affects local use today.
+
+## Profile `analytics`
+| Service | From your PC | From another container | Data |
+| --- | --- | --- | --- |
+| Analytics API | <http://localhost:8000/health> | `http://analytics-api:8000` | None |
+| dbt with DuckDB | A command, not a server | Not applicable | `analytics-data` volume |
+
+dbt does not start with the profile, because it runs and then exits. A failed run leaves its data on the volume until the next `dbt build` with correct data. The [analytics service](../../services/analytics/README.md) lists its commands.
+
 ## Commands
 Run them from the repository root, after `bash scripts/create-dev-env.sh`.
 
@@ -45,6 +64,16 @@ bash scripts/wait-for-profile.sh core
 bash scripts/wait-for-profile.sh observability
 ```
 
+```bash
+bash scripts/wait-for-profile.sh automation
+```
+
+```bash
+bash scripts/wait-for-profile.sh analytics
+```
+
+The script also builds the images of the profile. It prints `No services to build` for a profile that only uses published images.
+
 Fill the [Grafana dashboard](http://localhost:3001/d/pos-overview) with about two minutes of simulated sales:
 
 ```bash
@@ -57,7 +86,7 @@ Check the whole route. This sends a trace, metrics, and a log, and fails unless 
 bash scripts/check-observability.sh
 ```
 
-Stop a profile and keep its data. If the other profile is still running, `Resource is still in use` only means that it still needs the network:
+Stop a profile and keep its data. If another profile is still running, `Resource is still in use` only means that it still needs the network:
 
 ```bash
 docker compose --profile core down
@@ -67,10 +96,18 @@ docker compose --profile core down
 docker compose --profile observability down
 ```
 
+```bash
+docker compose --profile automation down
+```
+
+```bash
+docker compose --profile analytics down
+```
+
 Stop everything and delete all local data. `--volumes` only deletes the volumes of the profiles you name:
 
 ```bash
-docker compose --profile core --profile observability down --volumes
+docker compose --profile core --profile observability --profile automation --profile analytics down --volumes
 ```
 
 The Keycloak database and role are created only when the PostgreSQL volume is empty. If you replace `.env`, delete the volumes too, because they still expect the old passwords.
@@ -104,3 +141,21 @@ Measured on 2026-11-03, shortly after two minutes of simulated sales, with the d
 | **Total** | **1,323 MiB** |
 
 Grafana and Tempo vary the most: a shorter session on a throwaway stack gave 343 MiB and 89 MiB. With `core` running too, the local stack uses about 2.2 GiB of the 7.6 GiB that Docker sees. The first start took 35 seconds, and a restart with existing data took 34. Neither includes the image download.
+
+### Profiles `automation` and `analytics`
+Measured on 2026-11-03 on a throwaway stack. Both profiles were idle, and n8n had no workflows:
+
+| Service | Memory |
+| --- | --- |
+| n8n | 383 MiB |
+| Analytics API | 43 MiB |
+| **Total** | **426 MiB** |
+
+n8n varies the most: it used 897 MiB shortly after a first start with empty data. dbt only uses memory while it runs.
+
+| Profile | First start | Restart with existing data |
+| --- | --- | --- |
+| `automation` | 27 seconds | 11 to 17 seconds |
+| `analytics` | 6 seconds | 7 seconds |
+
+Neither column includes downloading or building the images. The n8n download is about 300 MiB, and the two analytics images take about 760 MB of disk.

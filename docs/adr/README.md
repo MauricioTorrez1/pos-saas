@@ -20,3 +20,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0014](0014-maven-uv-junit.md) | Maven, uv y JUnit 6 | Aceptada |
 | [0015](0015-escaneo-de-seguridad.md) | Gitleaks, OSV-Scanner y Dependabot | Aceptada |
 | [0016](0016-keycloak-en-postgresql.md) | Keycloak con base propia y stack local probado en cada PR | Aceptada |
+| [0017](0017-n8n-y-dbt-locales.md) | n8n con SQLite y dbt v2 OSS bajo pedido | Aceptada |

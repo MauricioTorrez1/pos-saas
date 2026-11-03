@@ -104,3 +104,35 @@ jobs:
         run: bash scripts/wait-for-profile.sh observability
       - name: Send test telemetry and find it in Grafana
         run: bash scripts/check-observability.sh
+
+  compose-automation:
+    name: Compose automation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create a throwaway environment file
+        run: bash scripts/create-dev-env.sh
+      - name: Start the automation profile and check its health
+        run: bash scripts/wait-for-profile.sh automation
+      - name: Reach n8n through its published port
+        run: curl --fail --silent --show-error http://127.0.0.1:5678/healthz/readiness
+
+  compose-analytics:
+    name: Compose analytics
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create a throwaway environment file
+        run: bash scripts/create-dev-env.sh
+      - name: Start the analytics profile and check its health
+        run: bash scripts/wait-for-profile.sh analytics
+      - name: Reach the API through its published port
+        run: curl --fail --silent --show-error http://127.0.0.1:8000/health
+      - name: Build the dbt models and run their tests
+        run: docker compose run --rm dbt build

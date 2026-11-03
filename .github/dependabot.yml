@@ -49,6 +49,9 @@ updates:
       observability-minor-and-patch:
         patterns: ["grafana/*", "prom/*", "otel/*", "busybox"]
         update-types: [minor, patch]
+      automation-minor-and-patch:
+        patterns: ["n8nio/*"]
+        update-types: [minor, patch]
       core-minor-and-patch:
         patterns: ["*"]
         update-types: [minor, patch]
@@ -56,3 +59,19 @@ updates:
     ignore:
       - dependency-name: postgres
         update-types: ["version-update:semver-major"]
+      # A new major version of n8n starts as a prerelease, and its Docker tags do not say so.
+      - dependency-name: n8nio/n8n
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: docker
+    directory: /services/analytics
+    schedule:
+      interval: weekly
+    groups:
+      analytics-images-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    # The stack is decided on Python 3.12, and a new minor version of Python can break packages.
+    ignore:
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

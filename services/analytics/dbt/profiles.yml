@@ -1,0 +1,7 @@
+# This file has no credentials: DuckDB is a local file, and the image sets its path.
+pos_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH') }}"

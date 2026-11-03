@@ -5,10 +5,12 @@ description = "Analytics and AI service for the point of sale, with no business 
 readme = "README.md"
 license = "AGPL-3.0-only"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = ["fastapi>=0.162,<0.163", "uvicorn>=0.54,<0.55"]
 
 [dependency-groups]
-dev = ["pytest>=9,<10"]
+dev = ["httpx2>=2.16,<3", "pytest>=9,<10"]
+# Only the dbt image installs this group, because dbt runs in Docker.
+dbt = ["dbt-oss==2.0.11"]
 
 [build-system]
 requires = ["uv_build>=0.13.6,<0.14"]

@@ -84,6 +84,30 @@ This command fills the [Grafana dashboard](http://localhost:3001/d/pos-overview)
 bash scripts/send-test-telemetry.sh
 ```
 
+The `automation` profile runs n8n on its own, without `core`. Its first run downloads about 300 MiB:
+
+```bash
+bash scripts/wait-for-profile.sh automation
+```
+
+The `analytics` profile runs a minimal FastAPI service, also on its own. Its first run builds two images:
+
+```bash
+bash scripts/wait-for-profile.sh analytics
+```
+
+dbt with DuckDB does not start with that profile, because it runs on demand and then exits. This command loads the sample sales, creates the models, and runs their tests:
+
+```bash
+docker compose run --rm dbt build
+```
+
+This one shows the result of a model:
+
+```bash
+docker compose run --rm dbt show --select daily_sales
+```
+
 [`infra/compose`](infra/compose/README.md) lists the addresses and how to start over with empty data.
 
 ### Running the tests
@@ -109,8 +133,14 @@ Python, from `services/analytics`:
 uv run pytest
 ```
 
+dbt, from the repository root:
+
+```bash
+docker compose run --rm dbt build
+```
+
 ### Continuous integration
-Every pull request and every push to `main` runs [three jobs](.github/workflows/ci.yml), one each for Java, TypeScript, and Python. Each job compiles and tests its project, and a single failing test turns it red. Until their real code arrives, `services/core`, `services/analytics`, and `packages/money` each hold a small placeholder with one test. A fourth job, `Compose core`, starts the local stack and fails unless every service is healthy within two minutes. A fifth job, `Compose observability`, does the same with its profile, sends test telemetry, and fails unless Grafana can read the trace, the metrics, and the log.
+Every pull request and every push to `main` runs [three jobs](.github/workflows/ci.yml), one each for Java, TypeScript, and Python. Each job compiles and tests its project, and a single failing test turns it red. Until their real code arrives, `services/core` and `packages/money` each hold a small placeholder with one test. A fourth job, `Compose core`, starts the local stack and fails unless every service is healthy within two minutes. A fifth job, `Compose observability`, does the same with its profile, sends test telemetry, and fails unless Grafana can read the trace, the metrics, and the log. A sixth job, `Compose automation`, does the same with n8n. A seventh job, `Compose analytics`, does the same with the API, and also runs the dbt models and their tests.
 
 ### Security checks
 GitHub secret scanning and push protection stop known secret formats at `git push`. The [security workflow](.github/workflows/security.yml) adds two jobs on every pull request, on every push to `main`, and once a week:
@@ -120,9 +150,9 @@ GitHub secret scanning and push protection stop known secret formats at `git pus
 | `Secret scan` | [Gitleaks](https://github.com/gitleaks/gitleaks) | Every commit of the change, with the default rules plus [card number rules](.gitleaks.toml) | Fails, and `main` rejects the merge |
 | `Dependency scan` | [OSV-Scanner](https://google.github.io/osv-scanner/) | `pom.xml`, `pnpm-lock.yaml`, and `uv.lock` | Warns on a pull request. Fails on `main` and on the weekly run, so GitHub notifies the owner |
 
-[Dependabot](.github/dependabot.yml) opens weekly update pull requests for Maven, pnpm, uv, GitHub Actions, and the Compose images. Its alerts appear in the **Security** tab, next to the secret scanning alerts. They do not cover the two-document lockfile of pnpm 12 and can miss transitive Maven dependencies, which is why OSV-Scanner runs too. [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explains the choice.
+[Dependabot](.github/dependabot.yml) opens weekly update pull requests for Maven, pnpm, uv, GitHub Actions, the Compose images, and the analytics Dockerfile. Its alerts appear in the **Security** tab, next to the secret scanning alerts. They do not cover the two-document lockfile of pnpm 12 and can miss transitive Maven dependencies, which is why OSV-Scanner runs too. [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explains the choice.
 
-`main` only accepts pull requests, and `Java`, `TypeScript`, `Python`, `Compose core`, `Compose observability`, `Sensitive files stay out of Git`, and `Secret scan` must pass before a merge.
+`main` only accepts pull requests, and `Java`, `TypeScript`, `Python`, `Compose core`, `Compose observability`, `Compose automation`, `Compose analytics`, `Sensitive files stay out of Git`, and `Secret scan` must pass before a merge.
 
 **If a secret leaks:** revoke it first, because deleting the commit does not help once it has been pushed. Then check the provider's logs for unauthorized use, issue a new secret, and remove the old one from the code.
 
@@ -222,6 +252,30 @@ Este comando llena el [tablero de Grafana](http://localhost:3001/d/pos-overview)
 bash scripts/send-test-telemetry.sh
 ```
 
+El perfil `automation` corre n8n por su cuenta, sin `core`. La primera vez descarga unos 300 MiB:
+
+```bash
+bash scripts/wait-for-profile.sh automation
+```
+
+El perfil `analytics` corre un servicio mínimo de FastAPI, también por su cuenta. La primera vez construye dos imágenes:
+
+```bash
+bash scripts/wait-for-profile.sh analytics
+```
+
+dbt con DuckDB no arranca con ese perfil, porque corre bajo pedido y termina. Este comando carga las ventas de ejemplo, crea los modelos y corre sus pruebas:
+
+```bash
+docker compose run --rm dbt build
+```
+
+Este otro muestra el resultado de un modelo:
+
+```bash
+docker compose run --rm dbt show --select daily_sales
+```
+
 [`infra/compose`](infra/compose/README.md) indica las direcciones y cómo empezar de nuevo con datos vacíos.
 
 ### Cómo correr las pruebas
@@ -247,8 +301,14 @@ Python, desde `services/analytics`:
 uv run pytest
 ```
 
+dbt, desde la raíz del repositorio:
+
+```bash
+docker compose run --rm dbt build
+```
+
 ### Integración continua
-Cada pull request y cada push a `main` corren [tres trabajos](.github/workflows/ci.yml), uno para Java, otro para TypeScript y otro para Python. Cada trabajo compila y prueba su proyecto, y una sola prueba rota lo pone en rojo. Mientras llega su código real, `services/core`, `services/analytics` y `packages/money` tienen un relleno pequeño con una prueba. Un cuarto trabajo, `Compose core`, arranca el stack local y falla si algún servicio no está sano en dos minutos. Un quinto trabajo, `Compose observability`, hace lo mismo con su perfil, envía telemetría de prueba y falla si Grafana no puede leer la traza, las métricas y el log.
+Cada pull request y cada push a `main` corren [tres trabajos](.github/workflows/ci.yml), uno para Java, otro para TypeScript y otro para Python. Cada trabajo compila y prueba su proyecto, y una sola prueba rota lo pone en rojo. Mientras llega su código real, `services/core` y `packages/money` tienen un relleno pequeño con una prueba. Un cuarto trabajo, `Compose core`, arranca el stack local y falla si algún servicio no está sano en dos minutos. Un quinto trabajo, `Compose observability`, hace lo mismo con su perfil, envía telemetría de prueba y falla si Grafana no puede leer la traza, las métricas y el log. Un sexto trabajo, `Compose automation`, hace lo mismo con n8n. Un séptimo trabajo, `Compose analytics`, hace lo mismo con la API, y además corre los modelos de dbt y sus pruebas.
 
 ### Revisiones de seguridad
 El escaneo de secretos y la protección al subir de GitHub detienen en el `git push` los secretos con formato conocido. El [workflow de seguridad](.github/workflows/security.yml) agrega dos trabajos en cada pull request, en cada push a `main` y una vez por semana:
@@ -258,9 +318,9 @@ El escaneo de secretos y la protección al subir de GitHub detienen en el `git p
 | `Secret scan` | [Gitleaks](https://github.com/gitleaks/gitleaks) | Cada commit del cambio, con las reglas predeterminadas y las [reglas de números de tarjeta](.gitleaks.toml) | Falla, y `main` rechaza la fusión |
 | `Dependency scan` | [OSV-Scanner](https://google.github.io/osv-scanner/) | `pom.xml`, `pnpm-lock.yaml` y `uv.lock` | Avisa en un pull request. Falla en `main` y en la corrida semanal, para que GitHub notifique al dueño |
 
-[Dependabot](.github/dependabot.yml) abre cada semana pull requests de actualización para Maven, pnpm, uv, GitHub Actions y las imágenes de Compose. Sus alertas aparecen en la pestaña **Security**, junto a las del escaneo de secretos. No cubren el lockfile de dos documentos de pnpm 12 y pueden omitir dependencias transitivas de Maven, por eso también corre OSV-Scanner. El [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explica la decisión.
+[Dependabot](.github/dependabot.yml) abre cada semana pull requests de actualización para Maven, pnpm, uv, GitHub Actions, las imágenes de Compose y el Dockerfile de analítica. Sus alertas aparecen en la pestaña **Security**, junto a las del escaneo de secretos. No cubren el lockfile de dos documentos de pnpm 12 y pueden omitir dependencias transitivas de Maven, por eso también corre OSV-Scanner. El [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explica la decisión.
 
-`main` solo acepta pull requests, y `Java`, `TypeScript`, `Python`, `Compose core`, `Compose observability`, `Sensitive files stay out of Git` y `Secret scan` deben pasar antes de fusionar.
+`main` solo acepta pull requests, y `Java`, `TypeScript`, `Python`, `Compose core`, `Compose observability`, `Compose automation`, `Compose analytics`, `Sensitive files stay out of Git` y `Secret scan` deben pasar antes de fusionar.
 
 **Si se filtra un secreto:** primero revócalo, porque borrar el commit no sirve una vez que se subió. Después revisa en los registros del proveedor si alguien lo usó, genera uno nuevo y quita el anterior del código.
 

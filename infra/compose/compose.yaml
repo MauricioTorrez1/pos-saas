@@ -1,6 +1,8 @@
 # Local development stack. With COMPOSE_FILE set in .env, run it from the repository root:
 #   docker compose --profile core up
 #   docker compose --profile observability up
+#   docker compose --profile automation up
+#   docker compose --profile analytics up
 name: pos-saas
 
 # Ports listen on 127.0.0.1 only, so the stack is not reachable from the local network.
@@ -223,6 +225,58 @@ services:
       timeout: 3s
       retries: 24
 
+  # Keeps its data in SQLite on its own volume, so this profile does not need PostgreSQL.
+  n8n:
+    image: n8nio/n8n:2.46.4@sha256:4384b9ff20a78bc1708c35ce7864f84f724611de7801fb36d715998db7c000f1
+    profiles: [automation]
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Run bash scripts/create-dev-env.sh to add it to .env}
+      GENERIC_TIMEZONE: America/Mexico_City
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      N8N_UNVERIFIED_PACKAGES_ENABLED: "false"
+    ports:
+      - "127.0.0.1:5678:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+    healthcheck:
+      # The readiness endpoint also checks the connection to its database.
+      test: wget -q -O /dev/null http://127.0.0.1:5678/healthz/readiness
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
+  analytics-api:
+    build:
+      context: ../../services/analytics
+      target: api
+    profiles: [analytics]
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      # The image has no curl or wget. urlopen raises an error unless the answer is successful.
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # A command, not a server. Scale 0 keeps it out of up, and this starts it: docker compose run --rm dbt build
+  # The project is mounted, so editing a model does not need a new image.
+  dbt:
+    build:
+      context: ../../services/analytics
+      target: dbt
+    profiles: [analytics]
+    scale: 0
+    volumes:
+      - ../../services/analytics/dbt:/app/dbt:ro
+      - analytics-data:/data
+
 volumes:
   postgres-data:
   redis-data:
@@ -231,3 +285,5 @@ volumes:
   prometheus-data:
   loki-data:
   tempo-data:
+  n8n-data:
+  analytics-data:
