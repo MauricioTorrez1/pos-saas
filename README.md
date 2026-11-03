@@ -41,7 +41,7 @@ A hardware store sells by the piece, the meter, and the kilo. One customer can a
 | Operations | GitHub Actions, Terraform, OpenTelemetry, Prometheus, Loki, Tempo, Grafana, Sentry |
 
 ### Getting started
-You need Git, Node.js 24 or later, JDK 21, and [uv](https://docs.astral.sh/uv/). The applications are added in upcoming tasks.
+You need Git, Node.js 24 or later, JDK 21, [uv](https://docs.astral.sh/uv/), and [Docker](https://docs.docker.com/get-started/get-docker/) with Compose. The applications are added in upcoming tasks. On Windows, run the `bash` commands in Git Bash.
 
 ```bash
 npm install -g pnpm@12.16.1
@@ -52,12 +52,27 @@ pnpm install
 ```
 
 ```bash
-cp .env.example .env
+bash scripts/create-dev-env.sh
 ```
 
 ```bash
 pnpm check:repo
 ```
+
+### Local stack
+The `core` profile runs PostgreSQL 16, Keycloak, Redis, and Redpanda. This command starts it in the background and fails unless every service is healthy within two minutes. The first run also downloads the images, about 560 MiB, and that time does not count:
+
+```bash
+bash scripts/wait-for-core.sh
+```
+
+Stop it and keep the data:
+
+```bash
+docker compose --profile core down
+```
+
+[`infra/compose`](infra/compose/README.md) lists the addresses and how to start over with empty data.
 
 ### Running the tests
 TypeScript, from the repository root:
@@ -83,7 +98,7 @@ uv run pytest
 ```
 
 ### Continuous integration
-Every pull request and every push to `main` runs [three jobs](.github/workflows/ci.yml), one each for Java, TypeScript, and Python. Each job compiles and tests its project, and a single failing test turns it red. Until their real code arrives, `services/core`, `services/analytics`, and `packages/money` each hold a small placeholder with one test.
+Every pull request and every push to `main` runs [three jobs](.github/workflows/ci.yml), one each for Java, TypeScript, and Python. Each job compiles and tests its project, and a single failing test turns it red. Until their real code arrives, `services/core`, `services/analytics`, and `packages/money` each hold a small placeholder with one test. A fourth job, `Compose core`, starts the local stack and fails unless every service is healthy within two minutes.
 
 ### Security checks
 GitHub secret scanning and push protection stop known secret formats at `git push`. The [security workflow](.github/workflows/security.yml) adds two jobs on every pull request, on every push to `main`, and once a week:
@@ -93,9 +108,9 @@ GitHub secret scanning and push protection stop known secret formats at `git pus
 | `Secret scan` | [Gitleaks](https://github.com/gitleaks/gitleaks) | Every commit of the change, with the default rules plus [card number rules](.gitleaks.toml) | Fails, and `main` rejects the merge |
 | `Dependency scan` | [OSV-Scanner](https://google.github.io/osv-scanner/) | `pom.xml`, `pnpm-lock.yaml`, and `uv.lock` | Warns on a pull request. Fails on `main` and on the weekly run, so GitHub notifies the owner |
 
-[Dependabot](.github/dependabot.yml) opens weekly update pull requests for Maven, pnpm, uv, and GitHub Actions. Its alerts appear in the **Security** tab, next to the secret scanning alerts. They do not cover the two-document lockfile of pnpm 12 and can miss transitive Maven dependencies, which is why OSV-Scanner runs too. [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explains the choice.
+[Dependabot](.github/dependabot.yml) opens weekly update pull requests for Maven, pnpm, uv, GitHub Actions, and the Compose images. Its alerts appear in the **Security** tab, next to the secret scanning alerts. They do not cover the two-document lockfile of pnpm 12 and can miss transitive Maven dependencies, which is why OSV-Scanner runs too. [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explains the choice.
 
-`main` only accepts pull requests, and `Java`, `TypeScript`, `Python`, `Sensitive files stay out of Git`, and `Secret scan` must pass before a merge.
+`main` only accepts pull requests, and `Java`, `TypeScript`, `Python`, `Compose core`, `Sensitive files stay out of Git`, and `Secret scan` must pass before a merge.
 
 **If a secret leaks:** revoke it first, because deleting the commit does not help once it has been pushed. Then check the provider's logs for unauthorized use, issue a new secret, and remove the old one from the code.
 
@@ -108,7 +123,7 @@ GitHub secret scanning and push protection stop known secret formats at `git pus
 | `services/` | Java core and Python analytics |
 | `packages/` | Shared contracts, money logic, and UI |
 | `infra/` | Compose, Terraform, Keycloak, and Grafana |
-| `scripts/` | Repository checks |
+| `scripts/` | Repository checks and local stack setup |
 | `docs/` | Specification, architecture decisions, and plan (in Spanish) |
 
 ### Documentation
@@ -152,7 +167,7 @@ Una tlapalería vende por pieza, por metro y por kilo. Un mismo cliente puede pe
 | Operación | GitHub Actions, Terraform, OpenTelemetry, Prometheus, Loki, Tempo, Grafana, Sentry |
 
 ### Cómo empezar
-Necesitas Git, Node.js 24 o posterior, JDK 21 y [uv](https://docs.astral.sh/uv/). Las aplicaciones se agregan en las siguientes tareas.
+Necesitas Git, Node.js 24 o posterior, JDK 21, [uv](https://docs.astral.sh/uv/) y [Docker](https://docs.docker.com/get-started/get-docker/) con Compose. Las aplicaciones se agregan en las siguientes tareas. En Windows, corre los comandos `bash` en Git Bash.
 
 ```bash
 npm install -g pnpm@12.16.1
@@ -163,12 +178,27 @@ pnpm install
 ```
 
 ```bash
-cp .env.example .env
+bash scripts/create-dev-env.sh
 ```
 
 ```bash
 pnpm check:repo
 ```
+
+### Stack local
+El perfil `core` corre PostgreSQL 16, Keycloak, Redis y Redpanda. Este comando lo arranca en segundo plano y falla si algún servicio no está sano en dos minutos. La primera vez también descarga las imágenes, unos 560 MiB, y ese tiempo no cuenta:
+
+```bash
+bash scripts/wait-for-core.sh
+```
+
+Para detenerlo sin perder los datos:
+
+```bash
+docker compose --profile core down
+```
+
+[`infra/compose`](infra/compose/README.md) indica las direcciones y cómo empezar de nuevo con datos vacíos.
 
 ### Cómo correr las pruebas
 TypeScript, desde la raíz del repositorio:
@@ -194,7 +224,7 @@ uv run pytest
 ```
 
 ### Integración continua
-Cada pull request y cada push a `main` corren [tres trabajos](.github/workflows/ci.yml), uno para Java, otro para TypeScript y otro para Python. Cada trabajo compila y prueba su proyecto, y una sola prueba rota lo pone en rojo. Mientras llega su código real, `services/core`, `services/analytics` y `packages/money` tienen un relleno pequeño con una prueba.
+Cada pull request y cada push a `main` corren [tres trabajos](.github/workflows/ci.yml), uno para Java, otro para TypeScript y otro para Python. Cada trabajo compila y prueba su proyecto, y una sola prueba rota lo pone en rojo. Mientras llega su código real, `services/core`, `services/analytics` y `packages/money` tienen un relleno pequeño con una prueba. Un cuarto trabajo, `Compose core`, arranca el stack local y falla si algún servicio no está sano en dos minutos.
 
 ### Revisiones de seguridad
 El escaneo de secretos y la protección al subir de GitHub detienen en el `git push` los secretos con formato conocido. El [workflow de seguridad](.github/workflows/security.yml) agrega dos trabajos en cada pull request, en cada push a `main` y una vez por semana:
@@ -204,9 +234,9 @@ El escaneo de secretos y la protección al subir de GitHub detienen en el `git p
 | `Secret scan` | [Gitleaks](https://github.com/gitleaks/gitleaks) | Cada commit del cambio, con las reglas predeterminadas y las [reglas de números de tarjeta](.gitleaks.toml) | Falla, y `main` rechaza la fusión |
 | `Dependency scan` | [OSV-Scanner](https://google.github.io/osv-scanner/) | `pom.xml`, `pnpm-lock.yaml` y `uv.lock` | Avisa en un pull request. Falla en `main` y en la corrida semanal, para que GitHub notifique al dueño |
 
-[Dependabot](.github/dependabot.yml) abre cada semana pull requests de actualización para Maven, pnpm, uv y GitHub Actions. Sus alertas aparecen en la pestaña **Security**, junto a las del escaneo de secretos. No cubren el lockfile de dos documentos de pnpm 12 y pueden omitir dependencias transitivas de Maven, por eso también corre OSV-Scanner. El [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explica la decisión.
+[Dependabot](.github/dependabot.yml) abre cada semana pull requests de actualización para Maven, pnpm, uv, GitHub Actions y las imágenes de Compose. Sus alertas aparecen en la pestaña **Security**, junto a las del escaneo de secretos. No cubren el lockfile de dos documentos de pnpm 12 y pueden omitir dependencias transitivas de Maven, por eso también corre OSV-Scanner. El [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explica la decisión.
 
-`main` solo acepta pull requests, y `Java`, `TypeScript`, `Python`, `Sensitive files stay out of Git` y `Secret scan` deben pasar antes de fusionar.
+`main` solo acepta pull requests, y `Java`, `TypeScript`, `Python`, `Compose core`, `Sensitive files stay out of Git` y `Secret scan` deben pasar antes de fusionar.
 
 **Si se filtra un secreto:** primero revócalo, porque borrar el commit no sirve una vez que se subió. Después revisa en los registros del proveedor si alguien lo usó, genera uno nuevo y quita el anterior del código.
 
@@ -219,7 +249,7 @@ El escaneo de secretos y la protección al subir de GitHub detienen en el `git p
 | `services/` | Núcleo en Java y analítica en Python |
 | `packages/` | Contratos, lógica de dinero e interfaz compartidos |
 | `infra/` | Compose, Terraform, Keycloak y Grafana |
-| `scripts/` | Revisiones del repositorio |
+| `scripts/` | Revisiones del repositorio y preparación del stack local |
 | `docs/` | Especificación, decisiones de arquitectura y plan |
 
 ### Documentación

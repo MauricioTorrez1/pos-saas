@@ -36,5 +36,5 @@ Dependabot abre actualizaciones semanales. OSV-Scanner 2.7.0 avisa en cada PR si
 - Solo se revisan los commits alcanzables desde el cambio, para que una rama abandonada no ponga en rojo a los demás PR. Las otras ramas las cubre el escaneo de GitHub.
 - Las reglas de tarjeta no calculan el dígito de Luhn, así que puede haber falsas alarmas. Se aceptan con `.gitleaksignore`.
 - OSV-Scanner no resuelve las transitivas de las dependencias de prueba en Maven, así que Java tiene poca cobertura hasta F0-07.
-- Dependabot declara soporte para uv v0.11 y usamos la 0.13.6: hay que revisar su primera corrida.
+- Dependabot declara soporte para uv v0.11 y usamos la 0.13.6. Su primera corrida terminó en verde.
 - Si el repositorio se vuelve privado, el filtro de GitHub tiene costo. Gitleaks y OSV-Scanner siguen funcionando igual.

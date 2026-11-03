@@ -39,3 +39,16 @@ updates:
       minor-and-patch:
         patterns: ["*"]
         update-types: [minor, patch]
+
+  - package-ecosystem: docker-compose
+    directory: /infra/compose
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    # The stack is decided on PostgreSQL 16. A new major version needs its own ADR.
+    ignore:
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
