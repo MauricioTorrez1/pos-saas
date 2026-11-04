@@ -22,3 +22,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0016](0016-keycloak-en-postgresql.md) | Keycloak con base propia y stack local probado en cada PR | Aceptada |
 | [0017](0017-n8n-y-dbt-locales.md) | n8n con SQLite y dbt v2 OSS bajo pedido | Aceptada |
 | [0018](0018-escaneo-de-java-con-sbom.md) | Escaneo de Java con la lista real de Maven | Aceptada |
+| [0019](0019-caja-primero.md) | Empezar por la caja y conectar el servidor después | Aceptada |

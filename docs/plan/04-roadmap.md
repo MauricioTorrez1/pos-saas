@@ -24,6 +24,14 @@ Calculado con 25 horas por semana hasta diciembre y 12 desde enero. La titulaci�
 | Piloto paralelo | Febrero 2027 | Febrero o marzo de 2027 |
 | Entrega 2 | Marzo 2027 | Marzo o abril de 2027 |
 
+## Orden de trabajo
+Desde F0-07, el orden lo marca el [ADR 0019](../adr/0019-caja-primero.md):
+
+1. **Tramo de caja, unas 47 horas:** F0-23, E1-01, E1-02, E1-03, E1-05, E1-06, E1-07, E1-10, E1-11, E1-13 y E1-14. Termina con una caja que vende en efectivo sin internet.
+2. **Lo demás:** las tareas pendientes de Fase 0 y Entrega 1, según las dependencias de cada ficha.
+
+Las tareas de Fase 0 y Entrega 1 se intercalan, pero el total de horas no cambia, así que el fin estimado de la Entrega 1 tampoco.
+
 ## Cómo leer una ficha
 Cada tarea tiene ID, objetivo, conceptos con enlaces oficiales, reparto de trabajo, pruebas, criterios, dependencias, estimación, 3 preguntas de autoevaluación y 2 de entrevista.
 
