@@ -3,7 +3,7 @@
 Actualizado: 2026-11-03. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** F0-07, en revisión.
+- **Tarea en curso:** ninguna.
 - **Siguiente:** F0-08.
 - **Rellenos temporales:** `ci-smoke` lo reemplaza E1-05.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar. Los pendientes de la tienda están en una nota local, fuera de Git.
@@ -17,7 +17,7 @@ Actualizado: 2026-11-03. Estados: Pendiente, En curso, En revisión, Terminada, 
 | F0-04 | Compose: perfil `core` | 4 | Terminada |
 | F0-05 | Compose: perfil `observability` | 5 | Terminada |
 | F0-06 | Compose: perfiles `automation` y `analytics` | 4 | Terminada |
-| F0-07 | Esqueleto de Spring Boot 4.1 | 4 | En revisión |
+| F0-07 | Esqueleto de Spring Boot 4.1 | 4 | Terminada |
 | F0-08 | Flyway y modelo base | 4 | Pendiente |
 | F0-09 | RLS y prueba de aislamiento | 5 | Pendiente |
 | F0-10 | Outbox hacia Redpanda | 5 | Pendiente |
@@ -205,3 +205,4 @@ Actualizado: 2026-11-03. Estados: Pendiente, En curso, En revisión, Terminada, 
 | 2026-11-03 | F0-06 en revisión. Mauricio confirmó con captura que `protect-main` ya exige `Compose observability`. Perfiles `automation` (n8n 2.46.4 con SQLite) y `analytics` (FastAPI y dbt v2 OSS con DuckDB, bajo pedido), con ADR 0017. `ci_smoke` quedó reemplazado. En una pila de prueba, `automation` quedó sano en 27 segundos y `analytics` en 6, cada uno sin los demás. `dbt build` pasó 14 de 14, y falló, como debía, con una venta duplicada, un método de pago desconocido y un modelo que mezclaba negocios. Mauricio ejecutó el modelo de ejemplo en su PC y funcionó. CI todavía no corre | Abrir el PR y agregar `Compose automation` y `Compose analytics` a `protect-main` tras su primera corrida |
 | 2026-11-03 | F0-06 terminada. PR 9 fusionado en `c14b568`. En `main`, CI en verde con `Compose automation` en 60 segundos y `Compose analytics` en 23, y Repository checks y Security también en verde. El mensaje del commit quedó con el título que GitHub tomó de la rama, y no se corrige porque reescribir `main` no vale la pena por un título. Mauricio confirmó con captura y de palabra que `protect-main` ya exige los dos checks nuevos; la API no lo puede confirmar. Dependabot leyó el Dockerfile y abrió el PR 10, que sube uv a 0.13.7, con sus diez checks en verde. En las preguntas de la ficha, Mauricio pidió que se le explicaran las cinco, y Claude lo hizo; quedan por reforzar en F5-01 y F5-02 | Fusionar el PR 10 y empezar F0-07 en una sesión nueva |
 | 2026-11-03 | F0-07 en revisión. Núcleo con Spring Boot 4.1.2 y Spring Modulith 2.1.2, nueve módulos vacíos y `CiSmoke` reemplazado. En local, tres pruebas en verde, y el JAR arrancó en 3.6 segundos con `/actuator/health` en `UP` y `/actuator/env` cerrado. Una violación deliberada de `sales` hacia `inventory.internal` puso el build en rojo. Mauricio confirmó las fechas de soporte en la tabla de Spring y quedaron en el ADR 0008, y decidió que Dependabot también proponga 4.2. El PR 10 ya está fusionado y no hay ningún PR de Maven abierto. CI todavía no corre | Abrir el PR y repetir la violación en CI con un PR que se cierra sin fusionar |
+| 2026-11-03 | F0-07 terminada. PR 11 fusionado en `6f1eef9`. En `main`, los diez checks en verde, con `Java` en 37 segundos. En el PR 12, `Java` falló con `Module 'sales' depends on non-exposed type ...StockLedger within module 'inventory'`, los otros nueve quedaron en verde, y se cerró sin fusionar. No hay ningún PR de Maven abierto; la rama de Dependabot que queda es la del PR 5. Una captura de Mauricio del log de `Dependency scan` mostró que Java no se estaba escaneando: se confirmó que el escáner descartaba las 5 dependencias del `pom.xml` por no tener versión. Mauricio pidió que Claude respondiera las cinco preguntas de la ficha; quedan por reforzar en F0-10 | Arreglar el escaneo de Java en un PR aparte |
