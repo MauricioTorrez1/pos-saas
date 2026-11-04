@@ -1,6 +1,6 @@
 # ADR 0015: Gitleaks, OSV-Scanner y Dependabot
 
-Estado: Aceptada · Fecha: 2026-11-02.
+Estado: Aceptada · Fecha: 2026-11-02 · El [ADR 0018](0018-escaneo-de-java-con-sbom.md) cambia cómo se escanea Java.
 
 ## Contexto
 RNF-08 pide que no haya secretos ni datos de tarjeta en el repositorio, y escaneo de secretos y dependencias en CI. La tarea F0-03 menciona secret scanning y Dependabot de GitHub, pero ningún documento elegía el escáner de CI. Tres hechos, revisados en noviembre de 2026, condicionan la decisión:
@@ -35,6 +35,6 @@ Dependabot abre actualizaciones semanales. OSV-Scanner 2.7.0 avisa en cada PR si
 - Gitleaks no trae reglas de Mercado Pago ni de Facturapi. Se agregan en E2-02 y E1-30.
 - Solo se revisan los commits alcanzables desde el cambio, para que una rama abandonada no ponga en rojo a los demás PR. Las otras ramas las cubre el escaneo de GitHub.
 - Las reglas de tarjeta no calculan el dígito de Luhn, así que puede haber falsas alarmas. Se aceptan con `.gitleaksignore`.
-- OSV-Scanner no resuelve las transitivas de las dependencias de prueba en Maven, así que Java tiene poca cobertura hasta F0-07.
+- OSV-Scanner no resuelve las transitivas de las dependencias de prueba en Maven, así que Java tiene poca cobertura hasta F0-07. Esto resultó incorrecto: Java no tenía cobertura, y F0-07 no lo resolvía. Ver el [ADR 0018](0018-escaneo-de-java-con-sbom.md).
 - Dependabot declara soporte para uv v0.11 y usamos la 0.13.6. Su primera corrida terminó en verde.
 - Si el repositorio se vuelve privado, el filtro de GitHub tiene costo. Gitleaks y OSV-Scanner siguen funcionando igual.

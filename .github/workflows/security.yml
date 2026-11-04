@@ -62,5 +62,12 @@ jobs:
           echo "${OSV_SCANNER_SHA256}  ${binary}" | sha256sum --check --strict
           chmod +x "$binary"
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      # Maven resolves the list of Java dependencies that the scan reads.
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: services/core/pom.xml
       - name: Scan dependency files
         run: bash scripts/scan-dependencies.sh
