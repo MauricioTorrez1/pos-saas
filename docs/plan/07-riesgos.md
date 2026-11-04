@@ -12,7 +12,7 @@ Probabilidad e impacto: A (alto), M (medio), B (bajo).
 | Pérdida de ventas no sincronizadas por falla del disco | B | A | Copia cada hora en otro dispositivo y sincronización frecuente |
 | Filtración entre negocios | B | A | RLS forzado, roles separados y prueba por tabla |
 | Impresora o cajón no funcionan como se espera en Windows 10 | M | M | Interfaces con falsos y prueba física apenas llegue el hardware |
-| Spring Modulith incompatible con Spring Boot 4.1 | B | M | Se confirma en F0-07 antes de construir encima |
+| Spring Modulith incompatible con Spring Boot 4.1 | Resuelto | M | Confirmado en F0-07: Modulith 2.1.2 está compilado contra Boot 4.1.2 y las pruebas pasan |
 | El objeto `global` de Facturapi no funciona sin e-receipts | M | M | Se prueba en modo de prueba en E1-32; se actualiza el ADR 0012 si falla |
 | PC de un negocio sin actualizaciones de seguridad | M | M | Revisar el soporte de su Windows antes de instalar, y migrar si hace falta |
 | La actualización de la caja rompe la tienda | B | A | Actualización con reversión, migraciones probadas y plan de regreso |
