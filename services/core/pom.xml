@@ -71,6 +71,11 @@
           <failIfNoTests>true</failIfNoTests>
         </configuration>
       </plugin>
+      <!-- Spring Boot sets it up. It lists every dependency with its exact version (ADR 0018). -->
+      <plugin>
+        <groupId>org.cyclonedx</groupId>
+        <artifactId>cyclonedx-maven-plugin</artifactId>
+      </plugin>
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>

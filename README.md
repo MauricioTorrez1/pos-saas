@@ -148,9 +148,9 @@ GitHub secret scanning and push protection stop known secret formats at `git pus
 | Job | Tool | What it reads | When it finds something |
 | --- | --- | --- | --- |
 | `Secret scan` | [Gitleaks](https://github.com/gitleaks/gitleaks) | Every commit of the change, with the default rules plus [card number rules](.gitleaks.toml) | Fails, and `main` rejects the merge |
-| `Dependency scan` | [OSV-Scanner](https://google.github.io/osv-scanner/) | `pom.xml`, `pnpm-lock.yaml`, and `uv.lock` | Warns on a pull request. Fails on `main` and on the weekly run, so GitHub notifies the owner |
+| `Dependency scan` | [OSV-Scanner](https://google.github.io/osv-scanner/) | The list of Java dependencies that Maven generates, `pnpm-lock.yaml`, and `uv.lock` | Warns on a pull request. Fails on `main` and on the weekly run, so GitHub notifies the owner. It always fails if it skips a package |
 
-[Dependabot](.github/dependabot.yml) opens weekly update pull requests for Maven, pnpm, uv, GitHub Actions, the Compose images, and the analytics Dockerfile. Its alerts appear in the **Security** tab, next to the secret scanning alerts. They do not cover the two-document lockfile of pnpm 12 and can miss transitive Maven dependencies, which is why OSV-Scanner runs too. [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explains the choice.
+[Dependabot](.github/dependabot.yml) opens weekly update pull requests for Maven, pnpm, uv, GitHub Actions, the Compose images, and the analytics Dockerfile. Its alerts appear in the **Security** tab, next to the secret scanning alerts. They do not cover the two-document lockfile of pnpm 12 and can miss transitive Maven dependencies, which is why OSV-Scanner runs too. [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explains the choice, and [ADR 0018](docs/adr/0018-escaneo-de-java-con-sbom.md) explains the Java list.
 
 `main` only accepts pull requests, and `Java`, `TypeScript`, `Python`, `Compose core`, `Compose observability`, `Compose automation`, `Compose analytics`, `Sensitive files stay out of Git`, and `Secret scan` must pass before a merge.
 
@@ -316,9 +316,9 @@ El escaneo de secretos y la protección al subir de GitHub detienen en el `git p
 | Trabajo | Herramienta | Qué lee | Cuando encuentra algo |
 | --- | --- | --- | --- |
 | `Secret scan` | [Gitleaks](https://github.com/gitleaks/gitleaks) | Cada commit del cambio, con las reglas predeterminadas y las [reglas de números de tarjeta](.gitleaks.toml) | Falla, y `main` rechaza la fusión |
-| `Dependency scan` | [OSV-Scanner](https://google.github.io/osv-scanner/) | `pom.xml`, `pnpm-lock.yaml` y `uv.lock` | Avisa en un pull request. Falla en `main` y en la corrida semanal, para que GitHub notifique al dueño |
+| `Dependency scan` | [OSV-Scanner](https://google.github.io/osv-scanner/) | La lista de dependencias de Java que genera Maven, `pnpm-lock.yaml` y `uv.lock` | Avisa en un pull request. Falla en `main` y en la corrida semanal, para que GitHub notifique al dueño. Siempre falla si descarta un paquete |
 
-[Dependabot](.github/dependabot.yml) abre cada semana pull requests de actualización para Maven, pnpm, uv, GitHub Actions, las imágenes de Compose y el Dockerfile de analítica. Sus alertas aparecen en la pestaña **Security**, junto a las del escaneo de secretos. No cubren el lockfile de dos documentos de pnpm 12 y pueden omitir dependencias transitivas de Maven, por eso también corre OSV-Scanner. El [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explica la decisión.
+[Dependabot](.github/dependabot.yml) abre cada semana pull requests de actualización para Maven, pnpm, uv, GitHub Actions, las imágenes de Compose y el Dockerfile de analítica. Sus alertas aparecen en la pestaña **Security**, junto a las del escaneo de secretos. No cubren el lockfile de dos documentos de pnpm 12 y pueden omitir dependencias transitivas de Maven, por eso también corre OSV-Scanner. El [ADR 0015](docs/adr/0015-escaneo-de-seguridad.md) explica la decisión, y el [ADR 0018](docs/adr/0018-escaneo-de-java-con-sbom.md) explica la lista de Java.
 
 `main` solo acepta pull requests, y `Java`, `TypeScript`, `Python`, `Compose core`, `Compose observability`, `Compose automation`, `Compose analytics`, `Sensitive files stay out of Git` y `Secret scan` deben pasar antes de fusionar.
 
