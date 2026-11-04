@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { test as base, expect, type ElectronApplication, type Page } from '@playwright/test';
 
-import { createTemporaryUserData, launchRegister, removeTemporaryUserData } from './register-harness.ts';
+import { createTemporaryUserData, launchRegister, recordStartupOptions, removeTemporaryUserData } from './register-harness.ts';
 
 const APP_ROOT = join(import.meta.dirname, '..');
 const OUTSIDE_URL = 'https://example.com/';
@@ -17,7 +17,7 @@ const test = base.extend<{ electronApp: ElectronApplication; appWindow: Page }>(
   // Playwright requires an object pattern as the first argument, even when it is empty.
   electronApp: async ({}, use) => {
     const userDataDir = createTemporaryUserData();
-    const electronApp = await launchRegister(userDataDir);
+    const electronApp = await launchRegister(userDataDir, recordStartupOptions(userDataDir));
     await use(electronApp);
     await electronApp.close();
     await removeTemporaryUserData(userDataDir);

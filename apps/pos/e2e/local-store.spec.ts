@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 import { test as base, expect, type ElectronApplication } from '@playwright/test';
 
@@ -13,13 +12,14 @@ import {
   readMainPid,
   readRecoveredState,
   readWalSize,
+  recordStartupOptions,
   removeTemporaryUserData,
   runRegisterUntilExit,
+  startupRecordPath,
   startWritingTestSales,
   testSalePaths,
 } from './register-harness.ts';
 
-const RECORD_STARTUP = join(import.meta.dirname, 'fixtures', 'record-startup.cjs');
 const MIN_SALES_BEFORE_CRASH = 50;
 
 const test = base.extend<{
@@ -36,7 +36,7 @@ const test = base.extend<{
   launch: async ({ userDataDir }, use) => {
     const running = new Set<number>();
     await use(async () => {
-      const register = await launchRegister(userDataDir);
+      const register = await launchRegister(userDataDir, recordStartupOptions(userDataDir));
       const mainPid = await readMainPid(register);
       running.add(mainPid);
       register.once('close', () => running.delete(mainPid));
@@ -122,7 +122,6 @@ test('discards a sale that a forced close caught halfway', async ({ userDataDir,
 
 test('tells the cashier and stays closed when the database is from a newer app', async ({ userDataDir, launch }) => {
   const { databasePath } = testSalePaths(userDataDir);
-  const recordPath = join(userDataDir, 'startup-record.json');
   const register = await launch();
   await register.firstWindow();
   await register.evaluate(
@@ -136,13 +135,10 @@ test('tells the cashier and stays closed when the database is from a newer app',
   );
   await register.close();
 
-  const exitCode = runRegisterUntilExit(userDataDir, {
-    electronArgs: ['-r', RECORD_STARTUP],
-    env: { POS_TEST_RECORD_PATH: recordPath },
-  });
+  const exitCode = runRegisterUntilExit(userDataDir, recordStartupOptions(userDataDir));
 
   expect(exitCode).toBe(1);
-  expect(JSON.parse(readFileSync(recordPath, 'utf8'))).toMatchObject({
+  expect(JSON.parse(readFileSync(startupRecordPath(userDataDir), 'utf8'))).toMatchObject({
     errorBox: { title: 'La caja no pudo abrir su base de datos' },
     windowsOpened: 0,
   });

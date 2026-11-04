@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import { MIGRATIONS, type Migration } from './migrations';
+import { retryWhileSharedMemoryBusy } from './shared-memory-retry';
 
 /** How long a write waits for another connection, such as a backup, before it fails. */
 const BUSY_TIMEOUT_MS = 5_000;
@@ -73,15 +74,17 @@ export class LocalStore {
   static open({ path, appVersion, migrations = MIGRATIONS }: LocalStoreOptions): LocalStore {
     assertConsecutiveVersions(migrations);
     mkdirSync(dirname(path), { recursive: true });
-    const connection = new DatabaseSync(path, { enableForeignKeyConstraints: true, timeout: BUSY_TIMEOUT_MS });
-    try {
-      configureForDurability(connection);
-      applyPendingMigrations(connection, migrations, appVersion);
-      return new LocalStore(connection);
-    } catch (error) {
-      connection.close();
-      throw error;
-    }
+    return retryWhileSharedMemoryBusy(() => {
+      const connection = new DatabaseSync(path, { enableForeignKeyConstraints: true, timeout: BUSY_TIMEOUT_MS });
+      try {
+        configureForDurability(connection);
+        applyPendingMigrations(connection, migrations, appVersion);
+        return new LocalStore(connection);
+      } catch (error) {
+        connection.close();
+        throw error;
+      }
+    });
   }
 
   /**

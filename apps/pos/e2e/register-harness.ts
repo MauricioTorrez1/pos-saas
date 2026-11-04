@@ -81,6 +81,30 @@ export async function launchRegister(userDataDir: string, options: LaunchOptions
 }
 
 /**
+ * Options for a test run. A native error box would block the test until it times out, so the app
+ * records it in a file and goes on to close, and the test fails at once.
+ *
+ * @param userDataDir the folder of the run
+ * @returns the options to open the register with
+ */
+export function recordStartupOptions(userDataDir: string): LaunchOptions {
+  return {
+    electronArgs: ['-r', join(import.meta.dirname, 'fixtures', 'record-startup.cjs')],
+    env: { POS_TEST_RECORD_PATH: startupRecordPath(userDataDir) },
+  };
+}
+
+/**
+ * Names the file where a test run records how the register started.
+ *
+ * @param userDataDir the folder of the run
+ * @returns the path of that file
+ */
+export function startupRecordPath(userDataDir: string): string {
+  return join(userDataDir, 'startup-record.json');
+}
+
+/**
  * Names the files of a test run.
  *
  * @param userDataDir the folder of the run

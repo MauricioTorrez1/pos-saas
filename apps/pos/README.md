@@ -26,6 +26,7 @@ The register keeps its data in `pos.db`, in the user data folder of the app (`%A
 - **Startup:** the main process opens the database and applies pending migrations before any window opens.
 - **Durability:** WAL is required, and every commit reaches the disk before it returns (`synchronous = FULL`).
 - **Migrations:** each one runs in its own transaction with the new schema version, so a failure undoes it completely. To change the schema, add an entry at the end of `MIGRATIONS`. Never edit one that has shipped.
+- **After a forced close:** on Windows the shared-memory file (`-shm`) stays busy for a few seconds, so opening retries for up to 15 seconds on that exact error.
 - **When it cannot open:** if a migration fails or the file comes from a newer version of the app, the register shows an error box, opens no window, and exits with code 1.
 
 The tests never touch the real database, because each run gets a temporary user data folder.

@@ -20,6 +20,7 @@ E1-02 necesita una base local que sobreviva a un cierre forzado sin perder venta
 - Cada migración corre en su propia transacción, junto con su fila en `schema_history` y la nueva versión. Si falla, se deshace completa, la base queda en la versión anterior y la caja no abre la ventana.
 - Una migración publicada no se cambia: una corrección es una migración nueva.
 - La caja se niega a abrir una base de una versión más nueva de la app, porque podría dañar un esquema que no conoce.
+- Si al abrir SQLite responde `SQLITE_IOERR_TRUNCATE` (1546), la caja reintenta hasta por 15 segundos. Tras un cierre forzado, Windows mantiene ocupado el archivo `-shm` entre 0.2 y 4.9 segundos en lo medido, y sin reintento la caja falló 8 de 30 veces al reabrir enseguida. Con reintento falló 0 de 30. Ese archivo es un índice que SQLite reconstruye desde el WAL, así que esperar no arriesga las ventas. Ningún otro error se reintenta.
 - E1-02 no agrega tablas de negocio. Las primeras llegan con la tarea que las usa, y cumplen las reglas del ADR 0019.
 
 ## Consecuencias
@@ -28,4 +29,5 @@ E1-02 necesita una base local que sobreviva a un cierre forzado sin perder venta
 - Vitest usa el SQLite de Node (3.53.0 en esta PC) y Electron el suyo (3.53.4). Las pruebas con Playwright cubren el que corre de verdad.
 - Si la API cambia al subir de Electron, las pruebas lo muestran en CI antes de llegar a una caja.
 - La ruta de la base depende del nombre de la app en `package.json`. E1-36 no debe cambiar ese nombre sin mover el archivo.
+- CI corre en Linux, donde esa espera de Windows no ocurre. Solo las pruebas locales y la PC de la tienda la cubren.
 - Las pruebas matan el proceso de verdad, pero un proceso muerto no es un corte de luz: el sistema operativo aún puede terminar de escribir. El corte de luz solo se simula truncando el WAL. Probarlo de verdad queda para la PC de la tienda.
