@@ -69,7 +69,7 @@
       "unit_price_e4": 125000,
       "quantity_milli": 3275,
       "unit": "meter",
-      "expected_amount_cents": 4095
+      "expected_amount_cents": 4094
     }
   ],
   "rejections": [
