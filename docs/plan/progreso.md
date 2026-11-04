@@ -1,10 +1,10 @@
 # Progreso
 
-Actualizado: 2026-11-03. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
+Actualizado: 2026-11-04. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** E1-02, en la rama `feat/e1-02-local-store`, sin PR todavía.
-- **Siguiente:** averiguar por qué falla a veces la prueba de cierre forzado, que Mauricio corra el simulacro, abrir el PR de E1-02, y luego la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-03, E1-05, E1-06, E1-07, E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
+- **Tarea en curso:** E1-02, en revisión, en la rama `feat/e1-02-local-store`.
+- **Siguiente:** que Mauricio corra el simulacro y se fusione el PR de E1-02, y luego la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-03, E1-05, E1-06, E1-07, E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
 - **Rellenos temporales:** `ci-smoke` lo reemplaza E1-05.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
 
@@ -41,7 +41,7 @@ Actualizado: 2026-11-03. Estados: Pendiente, En curso, En revisión, Terminada, 
 | Tarea | Título | Horas | Estado |
 | --- | --- | --- | --- |
 | E1-01 | Esqueleto de la caja en Electron | 4 | Terminada |
-| E1-02 | SQLite local y migraciones | 4 | En curso |
+| E1-02 | SQLite local y migraciones | 4 | En revisión |
 | E1-03 | Interfaces de hardware y falsos | 3 | Pendiente |
 | E1-04 | Login con PIN en la caja | 4 | Pendiente |
 | E1-05 | Dinero y cantidades | 5 | Pendiente |
@@ -214,3 +214,4 @@ Actualizado: 2026-11-03. Estados: Pendiente, En curso, En revisión, Terminada, 
 | 2026-11-03 | E1-01 sigue en revisión, con el PR 15 abierto. En CI, los diez checks en verde, con `TypeScript` en 20 segundos y `Dependency scan` sin avisos. Con la pantalla insegura a propósito, `TypeScript` quedó en rojo y los otros nueve en verde, así que la prueba de arranque sí corre en Linux. Se quitó el reporte `github` de Playwright porque no generó anotaciones. Mauricio abrió la caja en su PC y lo confirmó con captura. La prueba en Windows 10 sigue pendiente, con sus pasos en la nota local. Mauricio pidió que todas las pantallas de la caja se vean cuidadas, sean intuitivas y las personalice el dueño: quedó como RNF-13 y criterio de E1-07, y falta definir qué podrá cambiar el dueño | Fusionar el PR 15 |
 | 2026-11-03 | E1-01 terminada. PR 15 fusionado en `3e097ca`. Con la seguridad restaurada, los diez checks quedaron en verde en el PR. En `main`, los diez en verde, con `TypeScript` en 27 segundos y `Dependency scan` sin avisos. La prueba en Windows 10 sigue pendiente. Las preguntas de la ficha se le entregaron a Mauricio y siguen sin responder | Empezar E1-02 en una sesión nueva |
 | 2026-11-03 | E1-02 en curso, sin PR. Mauricio eligió `node:sqlite` en lugar de `better-sqlite3` (ADR 0021). `LocalStore` abre la base en la carpeta de datos de la app antes de cualquier ventana, con WAL obligatorio y `synchronous = FULL`, y cada migración corre en su propia transacción. No hay tablas de negocio todavía. Se detectó que el primer cierre forzado de las pruebas no probaba nada: en Windows, Playwright entrega un lanzador, y al matarlo la caja seguía viva. Ahora matan el proceso real y fallan si sobrevive. En el ensayo de Claude del simulacro, con cierre real, de 367 ventas confirmadas no se perdió ninguna. En local, las 39 pruebas de Vitest pasan. Con Playwright, una corrida pasó 11 de 11 y la siguiente 10 de 11: en `keeps every confirmed sale`, la caja reabierta se cerró antes de mostrar su ventana, y falta averiguar la causa. Mauricio todavía no corre el simulacro. CI todavía no corre | Averiguar esa falla, que Mauricio corra el simulacro, abrir el PR y repetir la rotura en CI |
+| 2026-11-04 | E1-02 en revisión. La falla era un error real de la caja en Windows: tras un cierre forzado, el archivo `-shm` queda ocupado entre 0.2 y 4.9 segundos, y al reabrir enseguida la caja daba `disk I/O error` en 8 de 30 intentos. Ahora reintenta hasta 15 segundos solo con ese error, y falló 0 de 30. En local, 45 pruebas en Vitest y 11 con Playwright. Al borrar el WAL a propósito fallaron dos pruebas de Vitest, y al confirmar ventas que la base no tiene fallaron la prueba de Playwright y el simulacro, con `Confirmed sales lost: 1000`. La base real queda en `%APPDATA%\@pos-saas\pos`. Mauricio todavía no corre el simulacro. CI todavía no corre | Abrir el PR, repetir la rotura en CI y fusionar |
