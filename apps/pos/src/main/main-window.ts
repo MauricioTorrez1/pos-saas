@@ -20,8 +20,8 @@ export async function openMainWindow(rendererEntry: string, preloadPath: string)
     backgroundColor: '#f5f5f4',
     webPreferences: {
       preload: preloadPath,
-      contextIsolation: true,
-      nodeIntegration: false,
+      contextIsolation: false,
+      nodeIntegration: true,
       sandbox: true,
     },
   });
