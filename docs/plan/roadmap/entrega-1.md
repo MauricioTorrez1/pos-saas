@@ -71,7 +71,7 @@ Duración estimada: 160 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Conceptos:** [React], [FTS5]
 - **Claude / tú:** Claude escribe la pantalla y la búsqueda local. Tú pruebas con tu lector.
 - **Pruebas:** Playwright y medición con 5,000 productos.
-- **Criterios:** cumple RF-011 y RNF-02, y se opera con teclado.
+- **Criterios:** cumple RF-011, RNF-02 y RNF-13, y se opera con teclado.
 - **Depende de:** E1-02, E1-05 · **Estimación:** 5 h
 - **Autoevaluación:** (1) ¿Cómo distingues escaneo de tecleo? (2) ¿Qué es un índice FTS? (3) ¿Por qué medir en la PC de la tienda?
 - **Entrevista:** (1) ¿Cómo mides rendimiento en un cliente? (2) ¿Qué causa renders innecesarios en React?

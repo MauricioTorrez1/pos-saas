@@ -127,3 +127,4 @@ Formato de cada criterio: **Dado** el contexto, **cuando** ocurre algo, **entonc
 | RNF-10 | Exactitud | Cero diferencias entre caja y servidor en los casos compartidos | CI |
 | RNF-11 | Compatibilidad | La caja corre en Windows 10 y 11 con 4 GB de RAM como mínimo | Prueba manual por versión |
 | RNF-12 | Cumplimiento | CFDI 4.0 válido y aviso de privacidad publicado antes de capturar datos personales | Revisión con el contador |
+| RNF-13 | Experiencia de uso | Todas las pantallas de la caja comparten un diseño cuidado, una persona nueva hace su primera venta sin capacitación, y el dueño personaliza la apariencia sin tocar código | Prueba con alguien de la tienda y revisión de Mauricio |
