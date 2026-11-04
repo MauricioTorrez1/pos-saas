@@ -62,6 +62,16 @@
   </dependencies>
 
   <build>
+    <testResources>
+      <testResource>
+        <directory>src/test/resources</directory>
+      </testResource>
+      <!-- The same cases run in Vitest, so a difference between the two languages breaks CI (ADR 0009). -->
+      <testResource>
+        <directory>../../packages/contracts/cases</directory>
+        <targetPath>contracts/cases</targetPath>
+      </testResource>
+    </testResources>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
