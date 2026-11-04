@@ -41,7 +41,7 @@ A hardware store sells by the piece, the meter, and the kilo. One customer can a
 | Operations | GitHub Actions, Terraform, OpenTelemetry, Prometheus, Loki, Tempo, Grafana, Sentry |
 
 ### Getting started
-You need Git, Node.js 24 or later, JDK 21, [uv](https://docs.astral.sh/uv/), and [Docker](https://docs.docker.com/get-started/get-docker/) with Compose. The applications are added in upcoming tasks. On Windows, run the `bash` commands in Git Bash.
+You need Git, Node.js 24 or later, JDK 21, [uv](https://docs.astral.sh/uv/), and [Docker](https://docs.docker.com/get-started/get-docker/) with Compose. The rest of the applications are added in upcoming tasks. On Windows, run the `bash` commands in Git Bash.
 
 ```bash
 npm install -g pnpm@12.16.1
@@ -57,6 +57,13 @@ bash scripts/create-dev-env.sh
 
 ```bash
 pnpm check:repo
+```
+
+### Register
+The [desktop register](apps/pos/README.md) only opens a window for now, and sales arrive in upcoming tasks. This command builds and opens it. The first run also downloads Electron, about 150 MiB:
+
+```bash
+pnpm --filter @pos-saas/pos start
 ```
 
 ### Local stack
@@ -140,7 +147,7 @@ docker compose run --rm dbt build
 ```
 
 ### Continuous integration
-Every pull request and every push to `main` runs [three jobs](.github/workflows/ci.yml), one each for Java, TypeScript, and Python. Each job compiles and tests its project, and a single failing test turns it red. The `Java` job also fails if a module of the core reaches into the internals of another. The `Java` and `TypeScript` jobs both run the same [calculation cases](packages/contracts/README.md), so the register and the core cannot calculate differently without turning CI red. Until the rest of its code arrives, `packages/money` also holds a small placeholder with one test. A fourth job, `Compose core`, starts the local stack and fails unless every service is healthy within two minutes. A fifth job, `Compose observability`, does the same with its profile, sends test telemetry, and fails unless Grafana can read the trace, the metrics, and the log. A sixth job, `Compose automation`, does the same with n8n. A seventh job, `Compose analytics`, does the same with the API, and also runs the dbt models and their tests.
+Every pull request and every push to `main` runs [three jobs](.github/workflows/ci.yml), one each for Java, TypeScript, and Python. Each job compiles and tests its project, and a single failing test turns it red. The `Java` job also fails if a module of the core reaches into the internals of another. The `Java` and `TypeScript` jobs both run the same [calculation cases](packages/contracts/README.md), so the register and the core cannot calculate differently without turning CI red. The `TypeScript` job also opens the [register](apps/pos/README.md) on a virtual display, and fails if its screen can reach Node. Until the rest of its code arrives, `packages/money` also holds a small placeholder with one test. A fourth job, `Compose core`, starts the local stack and fails unless every service is healthy within two minutes. A fifth job, `Compose observability`, does the same with its profile, sends test telemetry, and fails unless Grafana can read the trace, the metrics, and the log. A sixth job, `Compose automation`, does the same with n8n. A seventh job, `Compose analytics`, does the same with the API, and also runs the dbt models and their tests.
 
 ### Security checks
 GitHub secret scanning and push protection stop known secret formats at `git push`. The [security workflow](.github/workflows/security.yml) adds two jobs on every pull request, on every push to `main`, and once a week:
@@ -209,7 +216,7 @@ Una tlapalería vende por pieza, por metro y por kilo. Un mismo cliente puede pe
 | Operación | GitHub Actions, Terraform, OpenTelemetry, Prometheus, Loki, Tempo, Grafana, Sentry |
 
 ### Cómo empezar
-Necesitas Git, Node.js 24 o posterior, JDK 21, [uv](https://docs.astral.sh/uv/) y [Docker](https://docs.docker.com/get-started/get-docker/) con Compose. Las aplicaciones se agregan en las siguientes tareas. En Windows, corre los comandos `bash` en Git Bash.
+Necesitas Git, Node.js 24 o posterior, JDK 21, [uv](https://docs.astral.sh/uv/) y [Docker](https://docs.docker.com/get-started/get-docker/) con Compose. Las demás aplicaciones se agregan en las siguientes tareas. En Windows, corre los comandos `bash` en Git Bash.
 
 ```bash
 npm install -g pnpm@12.16.1
@@ -225,6 +232,13 @@ bash scripts/create-dev-env.sh
 
 ```bash
 pnpm check:repo
+```
+
+### Caja
+La [caja de escritorio](apps/pos/README.md) por ahora solo abre una ventana, y la venta llega en las siguientes tareas. Este comando la construye y la abre. La primera vez también descarga Electron, unos 150 MiB:
+
+```bash
+pnpm --filter @pos-saas/pos start
 ```
 
 ### Stack local
@@ -308,7 +322,7 @@ docker compose run --rm dbt build
 ```
 
 ### Integración continua
-Cada pull request y cada push a `main` corren [tres trabajos](.github/workflows/ci.yml), uno para Java, otro para TypeScript y otro para Python. Cada trabajo compila y prueba su proyecto, y una sola prueba rota lo pone en rojo. El trabajo `Java` también falla si un módulo del núcleo entra en la parte interna de otro. Los trabajos `Java` y `TypeScript` corren los mismos [casos de cálculo](packages/contracts/README.md), así que la caja y el núcleo no pueden calcular distinto sin poner CI en rojo. Mientras llega el resto de su código, `packages/money` también tiene un relleno pequeño con una prueba. Un cuarto trabajo, `Compose core`, arranca el stack local y falla si algún servicio no está sano en dos minutos. Un quinto trabajo, `Compose observability`, hace lo mismo con su perfil, envía telemetría de prueba y falla si Grafana no puede leer la traza, las métricas y el log. Un sexto trabajo, `Compose automation`, hace lo mismo con n8n. Un séptimo trabajo, `Compose analytics`, hace lo mismo con la API, y además corre los modelos de dbt y sus pruebas.
+Cada pull request y cada push a `main` corren [tres trabajos](.github/workflows/ci.yml), uno para Java, otro para TypeScript y otro para Python. Cada trabajo compila y prueba su proyecto, y una sola prueba rota lo pone en rojo. El trabajo `Java` también falla si un módulo del núcleo entra en la parte interna de otro. Los trabajos `Java` y `TypeScript` corren los mismos [casos de cálculo](packages/contracts/README.md), así que la caja y el núcleo no pueden calcular distinto sin poner CI en rojo. El trabajo `TypeScript` también abre la [caja](apps/pos/README.md) en una pantalla virtual, y falla si su pantalla puede llegar a Node. Mientras llega el resto de su código, `packages/money` también tiene un relleno pequeño con una prueba. Un cuarto trabajo, `Compose core`, arranca el stack local y falla si algún servicio no está sano en dos minutos. Un quinto trabajo, `Compose observability`, hace lo mismo con su perfil, envía telemetría de prueba y falla si Grafana no puede leer la traza, las métricas y el log. Un sexto trabajo, `Compose automation`, hace lo mismo con n8n. Un séptimo trabajo, `Compose analytics`, hace lo mismo con la API, y además corre los modelos de dbt y sus pruebas.
 
 ### Revisiones de seguridad
 El escaneo de secretos y la protección al subir de GitHub detienen en el `git push` los secretos con formato conocido. El [workflow de seguridad](.github/workflows/security.yml) agrega dos trabajos en cada pull request, en cada push a `main` y una vez por semana:

@@ -3,8 +3,8 @@
 Actualizado: 2026-11-03. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** ninguna.
-- **Siguiente:** E1-01, y luego la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-02, E1-03, E1-05, E1-06, E1-07, E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
+- **Tarea en curso:** E1-01.
+- **Siguiente:** la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-02, E1-03, E1-05, E1-06, E1-07, E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
 - **Rellenos temporales:** `ci-smoke` lo reemplaza E1-05.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar. Los pendientes de la tienda están en una nota local, fuera de Git.
 
@@ -40,7 +40,7 @@ Actualizado: 2026-11-03. Estados: Pendiente, En curso, En revisión, Terminada, 
 ## Entrega 1
 | Tarea | Título | Horas | Estado |
 | --- | --- | --- | --- |
-| E1-01 | Esqueleto de la caja en Electron | 4 | Pendiente |
+| E1-01 | Esqueleto de la caja en Electron | 4 | En revisión |
 | E1-02 | SQLite local y migraciones | 4 | Pendiente |
 | E1-03 | Interfaces de hardware y falsos | 3 | Pendiente |
 | E1-04 | Login con PIN en la caja | 4 | Pendiente |
@@ -210,3 +210,4 @@ Actualizado: 2026-11-03. Estados: Pendiente, En curso, En revisión, Terminada, 
 | 2026-11-03 | Arreglo del escaneo de Java terminado. PR 13 fusionado en `01214b8`. En `main`, los diez checks en verde, con `Dependency scan` en 25 segundos (antes 6), porque ahora corre Maven. Mauricio decidió empezar por la caja y retomar después el resto de las etapas (ADR 0019). El total de horas no cambia | Empezar F0-23 en una sesión nueva |
 | 2026-11-03 | F0-23 en revisión: `packages/contracts` con dos esquemas y 14 casos, y el importe de línea en TypeScript y en Java, fuera de los módulos (ADR 0020). Mauricio agregó el caso de cable: 3.275 m a $12.50 da 4094. En local, 31 pruebas en Vitest y 17 en Maven, 14 de ellas con los casos compartidos. Un resultado esperado equivocado y una cantidad con decimales fallaron en los dos lenguajes. CI todavía no corre | Abrir el PR y fusionarlo |
 | 2026-11-03 | F0-23 terminada. PR 14 fusionado en `dfae10f`. En CI, con el caso de cable en 4095, `Java` y `TypeScript` quedaron en rojo y los otros ocho checks en verde. Al revertirlo, los diez quedaron en verde, con `Java` en 28 segundos y `TypeScript` en 23, y `Dependency scan` sin avisos. En `main`, los diez en verde, con `Java` en 30 segundos y `TypeScript` en 13. Las preguntas de la ficha se le entregaron a Mauricio y siguen sin responder | Empezar E1-01 en una sesión nueva |
+| 2026-11-03 | E1-01 en revisión: `apps/pos` con Electron 45, React 19 y electron-vite, y la pantalla sin Node, aislada y con `sandbox`. En local, 19 pruebas en Vitest y 7 de arranque con Playwright. Con la caja insegura a propósito fallaron 6 de las 7, y sin el bloqueo de ventanas nuevas falló esa prueba. El código de pantalla que usa `process` o `node:fs` no compila. Se usa Electron 45.2.1 porque 45.2.2 tenía horas de publicada y no pasaba la antigüedad mínima de `pnpm`. Mauricio todavía no ejecuta la caja en su PC ni en Windows 10. CI todavía no corre | Abrir el PR y repetir la rotura en CI |

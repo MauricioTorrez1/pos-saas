@@ -7,7 +7,9 @@ pos-saas/
 │   ├── pos/                  # Caja: Electron, React, TypeScript y SQLite
 │   │   ├── src/main/         # Proceso principal: hardware y base local
 │   │   ├── src/preload/      # Puente seguro entre procesos
-│   │   └── src/renderer/     # Pantalla de React, sin acceso directo al hardware
+│   │   ├── src/renderer/     # Pantalla de React, sin acceso directo al hardware
+│   │   ├── src/shared/       # Tipos y canales que comparten los dos lados del puente
+│   │   └── e2e/              # Prueba de arranque con Playwright
 │   └── web/                  # Next.js: panel desde F0 y tienda pública en F3
 ├── services/
 │   ├── core/                 # Núcleo: Java 21, Spring Boot 4.1, Spring Modulith

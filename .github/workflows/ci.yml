@@ -52,8 +52,12 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Type-check
         run: pnpm typecheck
+      # Ubuntu 24.04 restricts the user namespaces that the sandbox of Electron relies on.
+      - name: Allow the Electron sandbox
+        run: sudo sysctl --write kernel.apparmor_restrict_unprivileged_userns=0
+      # The startup test of the register opens a real window, so it needs a virtual display.
       - name: Run tests
-        run: pnpm test
+        run: xvfb-run --auto-servernum pnpm test
 
   python:
     name: Python
