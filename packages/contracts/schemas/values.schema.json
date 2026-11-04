@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shared value types",
+  "description": "Integer scales from ADR 0011. The limit is the largest integer that JavaScript represents exactly, so a value means the same in TypeScript and in Java.",
+  "$defs": {
+    "safe_integer": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "amount_cents": {
+      "$ref": "#/$defs/safe_integer",
+      "description": "Money in cents: $40.94 is 4094."
+    },
+    "unit_price_e4": {
+      "$ref": "#/$defs/safe_integer",
+      "description": "Unit price in ten-thousandths of a peso: $12.50 is 125000."
+    },
+    "quantity_milli": {
+      "$ref": "#/$defs/safe_integer",
+      "description": "Quantity in thousandths of its unit: 3.275 m is 3275."
+    },
+    "unit": {
+      "description": "Base unit of a quantity. A roll or a box converts to one of these.",
+      "enum": ["piece", "meter", "kilogram", "liter"]
+    }
+  }
+}

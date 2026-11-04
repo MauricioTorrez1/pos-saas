@@ -1,0 +1,105 @@
+{
+  "$schema": "../schemas/line-amount-cases.schema.json",
+  "amounts": [
+    {
+      "name": "Whole price: 1 piece at $2.00",
+      "unit_price_e4": 20000,
+      "quantity_milli": 1000,
+      "unit": "piece",
+      "expected_amount_cents": 200
+    },
+    {
+      "name": "Price below a cent: 7 screws from a box of 1,000 at $153",
+      "unit_price_e4": 1530,
+      "quantity_milli": 7000,
+      "unit": "piece",
+      "expected_amount_cents": 107
+    },
+    {
+      "name": "Exactly half a cent rounds up: 0.125 kg of nails at $45.00",
+      "unit_price_e4": 450000,
+      "quantity_milli": 125,
+      "unit": "kilogram",
+      "expected_amount_cents": 563
+    },
+    {
+      "name": "Half a cent in the price: 1 piece at $1.005",
+      "unit_price_e4": 10050,
+      "quantity_milli": 1000,
+      "unit": "piece",
+      "expected_amount_cents": 101
+    },
+    {
+      "name": "Just below half a cent rounds down",
+      "unit_price_e4": 49999,
+      "quantity_milli": 1,
+      "unit": "kilogram",
+      "expected_amount_cents": 0
+    },
+    {
+      "name": "Exact amount with decimals: 2.5 L of thinner at $38.90",
+      "unit_price_e4": 389000,
+      "quantity_milli": 2500,
+      "unit": "liter",
+      "expected_amount_cents": 9725
+    },
+    {
+      "name": "Zero quantity costs nothing",
+      "unit_price_e4": 125000,
+      "quantity_milli": 0,
+      "unit": "kilogram",
+      "expected_amount_cents": 0
+    },
+    {
+      "name": "Stays exact where a double would round wrong",
+      "unit_price_e4": 1849999,
+      "quantity_milli": 5000000001,
+      "unit": "liter",
+      "expected_amount_cents": 92499950018
+    },
+    {
+      "name": "Largest product with room to round",
+      "unit_price_e4": 92233720368,
+      "quantity_milli": 100000000,
+      "unit": "piece",
+      "expected_amount_cents": 92233720368000
+    },
+    {
+      "name": "Cable by the meter: 3.275 m at $12.50",
+      "unit_price_e4": 125000,
+      "quantity_milli": 3275,
+      "unit": "meter",
+      "expected_amount_cents": 4094
+    }
+  ],
+  "rejections": [
+    {
+      "name": "Negative quantity",
+      "unit_price_e4": 125000,
+      "quantity_milli": -1000,
+      "unit": "piece",
+      "expected_error": "negative_input"
+    },
+    {
+      "name": "Negative price",
+      "unit_price_e4": -1,
+      "quantity_milli": 1000,
+      "unit": "piece",
+      "expected_error": "negative_input"
+    },
+    {
+      "name": "Product above the limit of a 64-bit integer",
+      "unit_price_e4": 92233720369,
+      "quantity_milli": 100000000,
+      "unit": "piece",
+      "expected_error": "overflow"
+    },
+    {
+      "name": "Product at the limit, with no room to round",
+      "unit_price_e4": 153092023,
+      "quantity_milli": 60247241209,
+      "unit": "piece",
+      "expected_error": "overflow"
+    }
+  ]
+}

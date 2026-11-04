@@ -1,12 +1,14 @@
 # Core service
 
-Modular monolith built with Java 21, Spring Boot 4.1, and Spring Modulith. For now it holds an application that starts and reports its health, and nine empty modules whose boundaries are checked on every build.
+Modular monolith built with Java 21, Spring Boot 4.1, and Spring Modulith. For now it holds an application that starts and reports its health, nine empty modules whose boundaries are checked on every build, and the line amount calculation.
 
 | Path | Contents |
 | --- | --- |
 | `src/main/java/.../core/CoreApplication.java` | Entry point of the service |
 | `src/main/java/.../core/<module>/` | One package per module |
+| `src/main/java/.../money/` | Line amount calculation, outside the modules ([ADR 0020](../../docs/adr/0020-casos-compartidos.md)) |
 | `src/test/java/.../core/` | Startup test and module structure test |
+| `src/test/java/.../money/` | Runs the shared cases of [`packages/contracts`](../../packages/contracts/README.md) |
 
 ## Modules
 | Module | Responsibility |

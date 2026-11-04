@@ -1,0 +1,21 @@
+{
+  "name": "@pos-saas/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "JSON schemas and calculation cases shared by the TypeScript register and the Java core.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    "./cases/*": "./cases/*",
+    "./schemas/*": "./schemas/*"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
