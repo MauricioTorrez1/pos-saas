@@ -33,7 +33,7 @@ El ADR 0010 pide guardar la venta como `pending_payment` antes de cobrar y resol
 - Una venta `completed` debe tener pagos que sumen su total (invariante 5), y un disparador lo revisa. El pago y el nuevo estado se escriben en la misma transacción, así que **una fila de `payment` solo existe en ventas completadas**.
 - **Existencias y corte (ADR 0010):** la vista `counted_sale` es la única definición de «venta que cuenta» y solo incluye `completed`. E1-23 y E1-25 deben leer de ella y de `payment`. E1-15 la reemplaza cuando existan las devoluciones.
 - Cada línea guarda el nombre, el precio y la tasa con que se vendió, y `product_id` no tiene llave foránea, porque una venta debe sobrevivir a un producto que salga del catálogo.
-- El diálogo usa `closedby="none"`, porque un `preventDefault` en el evento `cancel` no detiene a Chromium si se oprime Esc dos veces. El teclado vuelve al contenido después de cada respuesta, para que el Enter de una lectura no oprima el botón que se acaba de usar.
+- El diálogo usa `closedby="none"`, que le pide al navegador no cerrarlo con Esc, y una prueba oprime Esc dos veces en la caja real. El teclado vuelve al contenido después de cada respuesta, para que el Enter de una lectura no oprima el botón que se acaba de usar.
 
 ## Consecuencias
 - Un error en el código ya no puede dejar una venta completada sin pago o con dos estados: lo detiene la base. Cada uno de los 12 disparadores tiene una prueba que falla si se quita.

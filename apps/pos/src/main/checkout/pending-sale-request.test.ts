@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { MAX_SALE_LINES, parsePendingSaleRequest, parseSaleId } from './pending-sale-request';
 
-const KEY = '3f2c8a1e-5b7d-4c9a-8e21-6d4f0a9b1c23';
+const KEY = crypto.randomUUID();
 const PRODUCT_ID = '019a5f2e-7c40-7b1a-9d2e-3f4a5b6c7d8e';
 const LINE = { productId: PRODUCT_ID, quantityMilli: 3275 };
 const VALID = { idempotencyKey: KEY, lines: [LINE], expectedTotalCents: 4094 };
@@ -60,7 +60,11 @@ describe('parseSaleId', () => {
     expect(parseSaleId(PRODUCT_ID)).toBe(PRODUCT_ID);
   });
 
-  it.each([[undefined], [5], ['abc'], [KEY]])('refuses %s', (value) => {
+  it.each([[undefined], [5], ['abc']])('refuses %s', (value) => {
     expect(() => parseSaleId(value)).toThrow(TypeError);
+  });
+
+  it('refuses a UUID that is not version 7', () => {
+    expect(() => parseSaleId(KEY)).toThrow(TypeError);
   });
 });
