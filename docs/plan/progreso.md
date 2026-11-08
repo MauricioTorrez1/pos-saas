@@ -3,10 +3,28 @@
 Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** ninguna. E1-05 terminó con el PR 18.
-- **Siguiente:** E1-06, y luego la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-07, E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
+- **Tarea en curso:** E1-06, en revisión.
+- **Siguiente:** la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-07, E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
+
+## Pendientes de Mauricio antes del piloto (E1-37)
+No detienen el tramo de caja, pero deben estar resueltos antes de vender en paralelo con Eleventa.
+
+- **Comparar el IVA de E1-06 con el contador o con Facturapi en modo de prueba.** El [ADR 0023](../adr/0023-iva-incluido-por-linea.md) saca la base redondeada de cada línea y deja el IVA como la diferencia. Para cada caso, revisar que la base, el IVA y el total sean los que acepta la factura. Si Facturapi da un centavo distinto en algún caso, anotarlo: E1-31 ajusta cómo se le envían los conceptos. Preguntarle también al contador qué productos de la tienda van al 0% y cuáles son exentos.
+
+| # | Caso | Tasa | Base | IVA | Total |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Cable, 3.275 m a $12.50 | 16% | $35.29 | $5.65 | $40.94 |
+| 2 | Martillo, 1 pieza a $116.00 | 16% | $100.00 | $16.00 | $116.00 |
+| 3 | Tornillos, 3 piezas a $1.00 | 16% | $2.59 | $0.41 | $3.00 |
+| 4 | Piola #4, 2.5 m a $18.90 | 16% | $40.73 | $6.52 | $47.25 |
+| 5 | Clavo, 0.125 kg a $45.00 | 16% | $4.85 | $0.78 | $5.63 |
+| 6 | Una pieza a $0.01 | 16% | $0.01 | $0.00 | $0.01 |
+| 7 | Una pieza a $108.00 | 8% (frontera) | $100.00 | $8.00 | $108.00 |
+| 8 | 2.5 kg a $40.00 | 0% | $100.00 | $0.00 | $100.00 |
+| 9 | 2 piezas a $35.00 | Exento | $70.00 | Sin IVA | $70.00 |
+| 10 | Una venta con dos líneas del caso 3 | 16% | $5.18 | $0.82 | $6.00 |
 
 ## Fase 0
 | Tarea | Título | Horas | Estado |
@@ -45,7 +63,7 @@ Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, 
 | E1-03 | Interfaces de hardware y falsos | 3 | Terminada |
 | E1-04 | Login con PIN en la caja | 4 | Pendiente |
 | E1-05 | Dinero y cantidades | 5 | Terminada |
-| E1-06 | IVA incluido y totales | 4 | Pendiente |
+| E1-06 | IVA incluido y totales | 4 | En revisión |
 | E1-07 | Pantalla de venta | 5 | Pendiente |
 | E1-08 | Venta por peso y por metro | 4 | Pendiente |
 | E1-09 | Artículo varios y listas de precio | 3 | Pendiente |
@@ -223,3 +241,4 @@ Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, 
 | 2026-11-07 | E1-05 en revisión. Mauricio decidió que `packages/money` exporte su código fuente, que las piezas sean enteras y que el texto tecleado se lea en los dos lenguajes sin `float` (ADR 0022). Hay `Quantity` con unidad, suma de líneas, lectura de texto y formato `$1,234.56` en TypeScript, y `Money`, `UnitPrice` y `Quantity` en Java, con el mismo código de error en los dos lenguajes. Los casos compartidos pasan de 14 a 54, en tres archivos. La caja ya usa el paquete, y el build lo empaca dentro del proceso principal. `ci-smoke` quedó reemplazado. En local, 70 pruebas en money, 18 en contracts, 72 en Vitest de la caja y 61 en Maven (antes 17). Mauricio agregó sus casos de piola (2.5 m a $18.90 da 4725) y tornillo (3 a $1.00 da 300). En su primera versión, los dos lenguajes rechazaron el archivo: los casos estaban en la lista de errores, la piola esperaba 3074 y un precio llevaba un cero a la izquierda, que JSON no permite. Playwright no se corrió en local porque la app empaquetada no cambia. CI todavía no corre | Abrir el PR y repetir la rotura en CI |
 | 2026-11-07 | E1-05 sigue en revisión, con el PR 18 abierto. En CI, los diez checks en verde, con `Java` en 39 segundos, `TypeScript` en 27 y `Dependency scan` sin avisos. Con la piola esperando 4726, `Java` y `TypeScript` quedaron en rojo y los otros ocho en verde. TypeScript marcó `expected 4725 to be 4726`; la API pública no da el log de Java. Sin la rotura, los diez volvieron a verde, con `Java` en 34 segundos y `TypeScript` en 31 | Fusionar el PR 18 |
 | 2026-11-07 | E1-05 terminada. PR 18 fusionado con squash en `87d9d9d`. En `main`, los diez checks en verde, con `Java` en 33 segundos, `TypeScript` en 26 y `Dependency scan` sin avisos. La caja ya puede calcular líneas, sumarlas y leer lo que se teclea; E1-06 agrega el IVA y produce el `totalCents` que recibe `SaleCheckout`. Las preguntas de la ficha se le entregaron a Mauricio | Empezar E1-06 en una sesión nueva |
+| 2026-11-07 | E1-06 en revisión, en modo automático. ADR 0023: la base de cada línea se redondea hacia arriba desde medio centavo y el IVA es la diferencia, así que la base más el IVA siempre da lo cobrado. La tasa es un factor (`rate` o `exempt`) con `rate_bp`, y el exento se distingue del 0% como en el CFDI. La venta suma sus líneas y agrupa el IVA por tasa. El cálculo nunca se desborda, porque solo multiplica el residuo de la división. En TypeScript, `taxRateOf`, `lineTotals`, `splitIncludedTax` y `saleTotals`; en Java, `TaxRate`, `LineTotals`, `TaxGroup` y `SaleTotals`, con el nuevo código `invalid_tax_rate` en los dos. Los casos compartidos pasan de 54 a 81, en cinco archivos. Una prueba revisa que el IVA de cada total de $0 a $1,000, al 16% y al 8%, quede dentro de la tolerancia del Anexo 20. En local, 115 pruebas en money (antes 70), 30 en contracts (antes 18) y 91 en Maven (antes 61). La comparación de 10 casos con el contador o Facturapi quedó en «Pendientes de Mauricio antes del piloto». CI todavía no corre | Abrir el PR, repetir la rotura en CI y fusionar |

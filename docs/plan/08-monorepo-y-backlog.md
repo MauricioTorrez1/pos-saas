@@ -27,7 +27,7 @@ pos-saas/
 │   └── analytics/            # Python: FastAPI, Polars, dbt y DuckDB; sin reglas de negocio
 ├── packages/
 │   ├── contracts/            # Esquemas JSON, OpenAPI y casos de cálculo compartidos
-│   ├── money/                # Dinero y cantidades en TypeScript
+│   ├── money/                # Dinero, cantidades e IVA en TypeScript
 │   └── pos-ui/               # Componentes reutilizables por la caja web de F4
 ├── infra/
 │   ├── compose/              # Perfiles core, observability, automation y analytics

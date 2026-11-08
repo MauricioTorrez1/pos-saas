@@ -35,4 +35,4 @@ Los precios públicos incluyen IVA (ADR 0011). La factura CFDI 4.0 necesita, por
 - Redondear por línea puede dar un centavo distinto que calcular el IVA sobre el total. Tres tornillos a $1.00 dan $0.41 de IVA; dos líneas así dan $0.82, y sacarlo de los $6.00 daría $0.83. Manda la suma de líneas, como en el CFDI.
 - Antes del piloto (E1-37), Mauricio compara 10 casos con el contador o con Facturapi en modo de prueba. Si Facturapi, al recibir precios con IVA incluido, calcula un centavo distinto en alguna línea, E1-31 le envía la base sin IVA de cada concepto para que respete la de la caja.
 - En Java, `LineTotals` revisa al crearse que su base y su IVA salen de su total. Una línea que no cuadra es un error de programación (`IllegalArgumentException`), no un código compartido. E1-19 decide qué hacer cuando el servidor recibe una así de la caja.
-- Los casos compartidos pasan de 54 a 82, en cinco archivos.
+- Los casos compartidos pasan de 54 a 81, en cinco archivos.
