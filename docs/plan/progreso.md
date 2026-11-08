@@ -3,7 +3,7 @@
 Actualizado: 2026-11-08. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** E1-10, en revisión.
+- **Tarea en curso:** ninguna.
 - **Siguiente:** la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
@@ -82,7 +82,7 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | E1-07 | Pantalla de venta | 5 | Terminada |
 | E1-08 | Venta por peso y por metro | 4 | Pendiente |
 | E1-09 | Artículo varios y listas de precio | 3 | Pendiente |
-| E1-10 | Máquina de estados de la venta | 5 | En revisión |
+| E1-10 | Máquina de estados de la venta | 5 | Terminada |
 | E1-11 | Efectivo, transferencia y pago mixto | 5 | Pendiente |
 | E1-12 | Tarjeta tecleada con folio | 2 | Pendiente |
 | E1-13 | Ticket ESC/POS | 5 | Pendiente |
@@ -263,3 +263,5 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | 2026-11-08 | E1-07 sigue en revisión, con el PR 20 abierto. En CI, los diez checks en verde en `cb6f099`, con `TypeScript` en 52 segundos. Con 150 ms de espera agregados a `findByCode`, `TypeScript` quedó en rojo en 78 segundos y los otros nueve en verde: agregar un producto tardó 155.4 ms de p95 contra el límite de 100, y de las 22 pruebas de Playwright solo falló esa. Sin la rotura, los diez volvieron a verde en `bffaad5`, con `TypeScript` en 51 segundos | Fusionar el PR 20 |
 | 2026-11-08 | E1-07 terminada. PR 20 fusionado con squash en `72b347c` con `gh pr merge`, con el título revisado. En `main`, los diez checks en verde, con `Java` en 26 segundos y `TypeScript` en 51. La caja ya puede buscar y agregar productos con lector o teclado, y el dueño puede ajustar su apariencia; E1-10 guarda la venta partiendo de `SaleState` y `uuidV7`. La prueba con el lector y en la PC de la tienda sigue pendiente, antes del piloto. Las preguntas de la ficha se le entregaron a Mauricio | Empezar E1-10 en una sesión nueva |
 | 2026-11-08 | E1-10 en revisión, en modo automático. ADR 0025: la venta va de `pending_payment` a `completed` o `cancelled`, con la regla en TypeScript y también en 12 disparadores de la base, cada uno con una prueba que falla si se quita. `sale`, `sale_line` y `payment` usan las escalas del ADR 0011, UUIDv7, llave de idempotencia y `tenant_id`. La pantalla manda productos, cantidades y el total que ve, y el proceso principal pone los precios; si el total no coincide, no guarda nada. `card_pending` es de la Entrega 2 y no se construyó. Al arrancar, la caja pregunta por cada venta pendiente, con F2 o F4, y no deja vender hasta responder. En local, 298 pruebas en Vitest de la caja (antes 192) y 28 con Playwright (antes 22), incluida una que mata el proceso con una venta pendiente y la confirma al reabrir. Apagar la PC de verdad quedó en «Pendientes de Mauricio antes del piloto». CI todavía no corre | Abrir el PR, repetir la rotura en CI y fusionar |
+| 2026-11-08 | E1-10 sigue en revisión, con el PR 21 abierto. En `fceda9f`, `Secret scan` quedó en rojo y los otros nueve en verde: Gitleaks leyó como credencial un UUID inventado en una prueba. El valor salió del código y `.gitleaksignore` acepta ese único commit, la ruta que marca `.gitleaks.toml`. Diez en verde en `c622a63`, con `TypeScript` en 59 segundos. Al dejar pasar una venta de `completed` a `cancelled`, `TypeScript` quedó en rojo en 24 segundos y los otros nueve en verde, con 3 pruebas fallidas; en una de ellas, el disparador de SQLite rechazó el cambio aunque la regla en TypeScript estaba rota. Sin la rotura, los diez volvieron a verde en `65c4b1d`, con `TypeScript` en 65 segundos | Fusionar el PR 21 |
+| 2026-11-08 | E1-10 terminada. PR 21 fusionado con squash en `535b92c` con `gh pr merge`, con el título revisado. En `main`, los diez checks en verde, con `Java` en 32 segundos y `TypeScript` en 51. La caja ya guarda cada venta antes de cobrar y pregunta al arrancar por las que quedaron pendientes. Apagar la PC de verdad sigue pendiente, antes del piloto. La entrada de `.gitleaksignore` apunta a un commit que no quedó en `main`, así que ya no hace falta allí. Las preguntas de la ficha se le entregaron a Mauricio | Empezar E1-11 en una sesión nueva |
