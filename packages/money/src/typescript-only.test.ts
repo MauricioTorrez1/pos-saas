@@ -2,7 +2,9 @@ import { describe, expect, test } from "vitest";
 
 import { formatCents, sumCents } from "./cents.js";
 import { lineAmountCents } from "./line-amount.js";
+import { splitIncludedTax } from "./line-totals.js";
 import { quantityOf, type Quantity } from "./quantity.js";
+import { taxRateOf, type TaxRate } from "./tax-rate.js";
 import type { Unit } from "./unit.js";
 
 // A JavaScript number can hold decimals and a Java long cannot, so these checks exist only here.
@@ -30,6 +32,24 @@ describe("values that only TypeScript can receive", () => {
     const halfScrew: Quantity = { milli: 500, unit: "piece" };
 
     expect(() => lineAmountCents(1530, halfScrew)).toThrow(expect.objectContaining({ code: "fractional_piece" }));
+  });
+
+  test("rejects a tax rate with decimals", () => {
+    expect(() => taxRateOf("rate", 16.5)).toThrow(expect.objectContaining({ code: "not_an_integer" }));
+  });
+
+  test("rejects an amount with decimals before splitting its VAT", () => {
+    expect(() => splitIncludedTax(40.94, taxRateOf("rate", 1600))).toThrow(
+      expect.objectContaining({ code: "not_an_integer" }),
+    );
+  });
+
+  test("checks a tax rate that did not come from taxRateOf, such as a bad row from the database", () => {
+    const exemptWithRate: TaxRate = { factor: "exempt", rateBp: 1600 };
+
+    expect(() => splitIncludedTax(7000, exemptWithRate)).toThrow(
+      expect.objectContaining({ code: "invalid_tax_rate" }),
+    );
   });
 });
 

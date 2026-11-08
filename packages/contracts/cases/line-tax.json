@@ -1,0 +1,193 @@
+{
+  "$schema": "../schemas/line-tax-cases.schema.json",
+  "lines": [
+    {
+      "name": "Cable at 16%: 3.275 m at $12.50 is $40.94, with a base of $35.29 and $5.65 of VAT",
+      "unit_price_e4": 125000,
+      "quantity_milli": 3275,
+      "unit": "meter",
+      "tax_factor": "rate",
+      "tax_rate_bp": 1600,
+      "expected_subtotal_cents": 3529,
+      "expected_tax_cents": 565,
+      "expected_total_cents": 4094
+    },
+    {
+      "name": "A hammer at $116.00 and 16% splits exactly into $100.00 and $16.00",
+      "unit_price_e4": 1160000,
+      "quantity_milli": 1000,
+      "unit": "piece",
+      "tax_factor": "rate",
+      "tax_rate_bp": 1600,
+      "expected_subtotal_cents": 10000,
+      "expected_tax_cents": 1600,
+      "expected_total_cents": 11600
+    },
+    {
+      "name": "Three screws at $1.00 and 16%: the base rounds up from 258.62 cents",
+      "unit_price_e4": 10000,
+      "quantity_milli": 3000,
+      "unit": "piece",
+      "tax_factor": "rate",
+      "tax_rate_bp": 1600,
+      "expected_subtotal_cents": 259,
+      "expected_tax_cents": 41,
+      "expected_total_cents": 300
+    },
+    {
+      "name": "Piola #4 at 16%: 2.5 m at $18.90 is $47.25, with a base of $40.73",
+      "unit_price_e4": 189000,
+      "quantity_milli": 2500,
+      "unit": "meter",
+      "tax_factor": "rate",
+      "tax_rate_bp": 1600,
+      "expected_subtotal_cents": 4073,
+      "expected_tax_cents": 652,
+      "expected_total_cents": 4725
+    },
+    {
+      "name": "Nails at 16%: the line rounds to $5.63 first, and the VAT comes out of that",
+      "unit_price_e4": 450000,
+      "quantity_milli": 125,
+      "unit": "kilogram",
+      "tax_factor": "rate",
+      "tax_rate_bp": 1600,
+      "expected_subtotal_cents": 485,
+      "expected_tax_cents": 78,
+      "expected_total_cents": 563
+    },
+    {
+      "name": "One cent at 16%: the base keeps the cent and the VAT is zero",
+      "unit_price_e4": 100,
+      "quantity_milli": 1000,
+      "unit": "piece",
+      "tax_factor": "rate",
+      "tax_rate_bp": 1600,
+      "expected_subtotal_cents": 1,
+      "expected_tax_cents": 0,
+      "expected_total_cents": 1
+    },
+    {
+      "name": "Border region at 8%: $108.00 splits into $100.00 and $8.00",
+      "unit_price_e4": 1080000,
+      "quantity_milli": 1000,
+      "unit": "piece",
+      "tax_factor": "rate",
+      "tax_rate_bp": 800,
+      "expected_subtotal_cents": 10000,
+      "expected_tax_cents": 800,
+      "expected_total_cents": 10800
+    },
+    {
+      "name": "A product at 0%: 2.5 kg at $40.00, the whole $100.00 is the base and the VAT is $0.00",
+      "unit_price_e4": 400000,
+      "quantity_milli": 2500,
+      "unit": "kilogram",
+      "tax_factor": "rate",
+      "tax_rate_bp": 0,
+      "expected_subtotal_cents": 10000,
+      "expected_tax_cents": 0,
+      "expected_total_cents": 10000
+    },
+    {
+      "name": "An exempt product: 2 at $35.00, the whole $70.00 is the base and there is no VAT",
+      "unit_price_e4": 350000,
+      "quantity_milli": 2000,
+      "unit": "piece",
+      "tax_factor": "exempt",
+      "tax_rate_bp": 0,
+      "expected_subtotal_cents": 7000,
+      "expected_tax_cents": 0,
+      "expected_total_cents": 7000
+    },
+    {
+      "name": "Nothing sold has no base and no VAT",
+      "unit_price_e4": 125000,
+      "quantity_milli": 0,
+      "unit": "meter",
+      "tax_factor": "rate",
+      "tax_rate_bp": 1600,
+      "expected_subtotal_cents": 0,
+      "expected_tax_cents": 0,
+      "expected_total_cents": 0
+    },
+    {
+      "name": "The highest rate, 100%: a base of exactly 1.5 cents rounds half up to 2",
+      "unit_price_e4": 300,
+      "quantity_milli": 1000,
+      "unit": "piece",
+      "tax_factor": "rate",
+      "tax_rate_bp": 10000,
+      "expected_subtotal_cents": 2,
+      "expected_tax_cents": 1,
+      "expected_total_cents": 3
+    },
+    {
+      "name": "A huge line at 16% splits without overflow",
+      "unit_price_e4": 9007199254740991,
+      "quantity_milli": 1000,
+      "unit": "piece",
+      "tax_factor": "rate",
+      "tax_rate_bp": 1600,
+      "expected_subtotal_cents": 77648269437422,
+      "expected_tax_cents": 12423723109988,
+      "expected_total_cents": 90071992547410
+    }
+  ],
+  "rejections": [
+    {
+      "name": "16% written as 16000 basis points",
+      "unit_price_e4": 1160000,
+      "quantity_milli": 1000,
+      "unit": "piece",
+      "tax_factor": "rate",
+      "tax_rate_bp": 16000,
+      "expected_error": "invalid_tax_rate"
+    },
+    {
+      "name": "One basis point above 100%",
+      "unit_price_e4": 1160000,
+      "quantity_milli": 1000,
+      "unit": "piece",
+      "tax_factor": "rate",
+      "tax_rate_bp": 10001,
+      "expected_error": "invalid_tax_rate"
+    },
+    {
+      "name": "An exempt product with a rate",
+      "unit_price_e4": 350000,
+      "quantity_milli": 1000,
+      "unit": "piece",
+      "tax_factor": "exempt",
+      "tax_rate_bp": 1600,
+      "expected_error": "invalid_tax_rate"
+    },
+    {
+      "name": "A quota (Cuota) factor, which VAT does not use",
+      "unit_price_e4": 1160000,
+      "quantity_milli": 1000,
+      "unit": "piece",
+      "tax_factor": "quota",
+      "tax_rate_bp": 1600,
+      "expected_error": "invalid_tax_rate"
+    },
+    {
+      "name": "A negative rate",
+      "unit_price_e4": 1160000,
+      "quantity_milli": 1000,
+      "unit": "piece",
+      "tax_factor": "rate",
+      "tax_rate_bp": -1600,
+      "expected_error": "negative_input"
+    },
+    {
+      "name": "Half a screw still fails before the VAT",
+      "unit_price_e4": 10000,
+      "quantity_milli": 500,
+      "unit": "piece",
+      "tax_factor": "rate",
+      "tax_rate_bp": 1600,
+      "expected_error": "fractional_piece"
+    }
+  ]
+}

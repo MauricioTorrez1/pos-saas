@@ -9,7 +9,8 @@ export type MoneyErrorCode =
   | "fractional_piece"
   | "overflow"
   | "invalid_format"
-  | "too_many_decimals";
+  | "too_many_decimals"
+  | "invalid_tax_rate";
 
 /** Tells why a money or quantity value could not be used. */
 export class MoneyError extends RangeError {

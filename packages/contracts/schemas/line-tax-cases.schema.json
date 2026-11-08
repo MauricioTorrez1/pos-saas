@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Line tax cases",
+  "description": "Cases for a sale line with VAT included (ADR 0023): the amount of ADR 0011, its base round_half_up(total * 10000 / (10000 + tax_rate_bp)), and the VAT as the rest.",
+  "type": "object",
+  "required": ["lines", "rejections"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "lines": {
+      "description": "Inputs that must produce a base, a VAT, and a total.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/line_case" }
+    },
+    "rejections": {
+      "description": "Inputs that must fail instead of producing a line.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/rejection_case" }
+    }
+  },
+  "$defs": {
+    "line_case": {
+      "type": "object",
+      "required": [
+        "name",
+        "unit_price_e4",
+        "quantity_milli",
+        "unit",
+        "tax_factor",
+        "tax_rate_bp",
+        "expected_subtotal_cents",
+        "expected_tax_cents",
+        "expected_total_cents"
+      ],
+      "additionalProperties": false,
+      "allOf": [{ "$ref": "values.schema.json#/$defs/exempt_has_no_rate" }],
+      "properties": {
+        "name": { "$ref": "#/$defs/case_name" },
+        "unit_price_e4": { "$ref": "values.schema.json#/$defs/unit_price_e4", "minimum": 0 },
+        "quantity_milli": { "$ref": "values.schema.json#/$defs/quantity_milli", "minimum": 0 },
+        "unit": { "$ref": "values.schema.json#/$defs/unit" },
+        "tax_factor": { "$ref": "values.schema.json#/$defs/tax_factor" },
+        "tax_rate_bp": { "$ref": "values.schema.json#/$defs/valid_tax_rate_bp" },
+        "expected_subtotal_cents": { "$ref": "values.schema.json#/$defs/amount_cents", "minimum": 0 },
+        "expected_tax_cents": { "$ref": "values.schema.json#/$defs/amount_cents", "minimum": 0 },
+        "expected_total_cents": { "$ref": "values.schema.json#/$defs/amount_cents", "minimum": 0 }
+      }
+    },
+    "rejection_case": {
+      "type": "object",
+      "required": ["name", "unit_price_e4", "quantity_milli", "unit", "tax_factor", "tax_rate_bp", "expected_error"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/case_name" },
+        "unit_price_e4": { "$ref": "values.schema.json#/$defs/unit_price_e4" },
+        "quantity_milli": { "$ref": "values.schema.json#/$defs/quantity_milli" },
+        "unit": { "$ref": "values.schema.json#/$defs/unit" },
+        "tax_factor": {
+          "description": "Any text, so a case can check that an unknown factor fails.",
+          "type": "string",
+          "minLength": 1
+        },
+        "tax_rate_bp": { "$ref": "values.schema.json#/$defs/tax_rate_bp" },
+        "expected_error": { "enum": ["negative_input", "fractional_piece", "overflow", "invalid_tax_rate"] }
+      }
+    },
+    "case_name": {
+      "description": "Shown when the case fails, so it says what the case protects.",
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
