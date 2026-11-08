@@ -11,7 +11,8 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json --composite false && tsc -p tsconfig.web.json --composite false && tsc -p tsconfig.test.json --composite false",
-    "test": "vitest run && electron-vite build && install-electron && playwright test"
+    "test": "vitest run && electron-vite build && install-electron && playwright test",
+    "crash-drill": "electron-vite build && install-electron && node e2e/crash-drill.ts"
   },
   "dependencies": {
     "react": "^19.3.1",
