@@ -12,7 +12,8 @@ public enum MoneyErrorCode {
     FRACTIONAL_PIECE,
     OVERFLOW,
     INVALID_FORMAT,
-    TOO_MANY_DECIMALS;
+    TOO_MANY_DECIMALS,
+    INVALID_TAX_RATE;
 
     /**
      * Returns the code as the shared cases and TypeScript write it.
