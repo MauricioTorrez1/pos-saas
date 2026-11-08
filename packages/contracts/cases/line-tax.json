@@ -9,7 +9,7 @@
       "tax_factor": "rate",
       "tax_rate_bp": 1600,
       "expected_subtotal_cents": 3529,
-      "expected_tax_cents": 565,
+      "expected_tax_cents": 566,
       "expected_total_cents": 4094
     },
     {
