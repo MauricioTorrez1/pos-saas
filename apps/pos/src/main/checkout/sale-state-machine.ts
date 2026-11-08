@@ -6,7 +6,7 @@ export type SaleStatus = (typeof SALE_STATUSES)[number];
 
 const NEXT_STATUSES: Readonly<Record<SaleStatus, readonly SaleStatus[]>> = {
   pending_payment: ['completed', 'cancelled'],
-  completed: [],
+  completed: ['cancelled'],
   cancelled: [],
 };
 
