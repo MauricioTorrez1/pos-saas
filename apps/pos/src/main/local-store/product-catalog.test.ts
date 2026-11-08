@@ -47,6 +47,28 @@ function namesFound(text: string): string[] {
   return catalog.search(text, RESULT_LIMIT).map(({ name }) => name);
 }
 
+describe('findById', () => {
+  it('returns the product with its price, unit, and tax rate', () => {
+    const id = addProduct('Martillo');
+
+    expect(catalog.findById(id)).toEqual({
+      id,
+      name: 'Martillo',
+      unit: 'piece',
+      unitPriceE4: 1160000,
+      taxRate: { factor: 'rate', rateBp: 1600 },
+    });
+  });
+
+  it('returns null for an id nobody has', () => {
+    expect(catalog.findById(uuidV7())).toBeNull();
+  });
+
+  it('does not find a product of another business', () => {
+    expect(catalog.findById(addProduct('Martillo', undefined, OTHER_TENANT))).toBeNull();
+  });
+});
+
 describe('findByCode', () => {
   it('returns the product with its price, unit, and tax rate', () => {
     const id = addProduct('Martillo', '7501');

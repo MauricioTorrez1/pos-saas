@@ -4,6 +4,8 @@ import { DEFAULT_APPEARANCE, type Appearance } from '../shared/appearance';
 import type { PosApi } from '../shared/pos-api';
 import { applyAppearance } from './appearance/apply-appearance';
 import { AppearanceDialog } from './appearance/AppearanceDialog';
+import { PendingSaleDialog } from './recovery/PendingSaleDialog';
+import { usePendingSales } from './recovery/use-pending-sales';
 import { SaleScreen } from './sale/SaleScreen';
 
 type AppInfoState = { status: 'loading' } | { status: 'ready'; version: string } | { status: 'failed' };
@@ -32,6 +34,8 @@ export function App({ posApi }: AppProps): ReactElement {
   const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
+  const pendingSales = usePendingSales(posApi);
+  const hasPendingSales = pendingSales.sales.length > 0;
 
   useEffect(() => {
     posApi.getAppInfo().then(
@@ -67,7 +71,7 @@ export function App({ posApi }: AppProps): ReactElement {
           Apariencia <kbd>F9</kbd>
         </button>
       </header>
-      <SaleScreen posApi={posApi} isKeyboardElsewhere={isEditingAppearance} onOpenAppearance={openAppearance} />
+      <SaleScreen posApi={posApi} isKeyboardElsewhere={isEditingAppearance || hasPendingSales} onOpenAppearance={openAppearance} />
       <footer className="register-footer">
         <ul className="shortcuts" aria-label="Atajos de teclado">
           {SHORTCUTS.map(({ keys, action }) => (
@@ -82,10 +86,16 @@ export function App({ posApi }: AppProps): ReactElement {
             No se pudo leer la versión de la caja.
           </p>
         )}
+        {pendingSales.couldNotRead && (
+          <p className="version" role="alert">
+            No se pudieron revisar las ventas pendientes. Reinicia la caja.
+          </p>
+        )}
       </footer>
-      {isEditingAppearance && (
+      {isEditingAppearance && !hasPendingSales && (
         <AppearanceDialog saved={appearance} onPreview={applyAppearance} onSave={saveAppearance} onClose={closeAppearance} />
       )}
+      {hasPendingSales && <PendingSaleDialog sales={pendingSales.sales} onAnswer={pendingSales.answer} />}
     </div>
   );
 }

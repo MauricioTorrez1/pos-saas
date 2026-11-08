@@ -4,15 +4,15 @@ import {
   SaleAlreadyCompletedError,
   type RecordedPayment,
   type SaleRecorder,
-  type SaleToCheckout,
+  type SaleToSave,
 } from './sale-recorder';
 
 /** What the fake knows about one sale. */
 export type RecordedSale =
-  | { readonly status: 'pending_payment'; readonly sale: SaleToCheckout }
-  | { readonly status: 'completed'; readonly sale: SaleToCheckout; readonly payment: RecordedPayment };
+  | { readonly status: 'pending_payment'; readonly sale: SaleToSave }
+  | { readonly status: 'completed'; readonly sale: SaleToSave; readonly payment: RecordedPayment };
 
-/** Keeps sales in memory, for tests, until E1-10 saves them in `LocalStore`. */
+/** Keeps sales in memory, so checkout can be tested with a save that fails on demand. */
 export class InMemorySaleRecorder implements SaleRecorder {
   readonly #sales = new Map<string, RecordedSale>();
   readonly #log: CallLog;
@@ -24,7 +24,7 @@ export class InMemorySaleRecorder implements SaleRecorder {
   }
 
   /** {@inheritDoc SaleRecorder.savePendingPayment} */
-  savePendingPayment(sale: SaleToCheckout): void {
+  savePendingPayment(sale: SaleToSave): void {
     this.#log.record('sales.savePendingPayment');
     this.#nextFailure.throwIfArmed();
     if (this.#sales.get(sale.saleId)?.status === 'completed') {

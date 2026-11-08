@@ -28,3 +28,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0022](0022-libreria-de-dinero.md) | Librería de dinero como código fuente, piezas enteras y lectura estricta de texto | Aceptada |
 | [0023](0023-iva-incluido-por-linea.md) | IVA incluido, con la base redondeada por línea y el IVA por diferencia | Aceptada |
 | [0024](0024-pantalla-de-venta.md) | Pantalla de venta con búsqueda FTS5 y apariencia acotada | Aceptada |
+| [0025](0025-maquina-de-estados-de-la-venta.md) | Máquina de estados de la venta, con reglas también en la base | Aceptada |

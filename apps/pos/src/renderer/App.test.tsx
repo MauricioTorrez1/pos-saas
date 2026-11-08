@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_APPEARANCE, type Appearance } from '../shared/appearance';
-import type { CatalogProduct, PosApi } from '../shared/pos-api';
+import type { CatalogProduct, PendingSale, PosApi } from '../shared/pos-api';
 import { App } from './App';
 
 const HAMMER: CatalogProduct = {
@@ -41,6 +41,10 @@ function fakePosApi(overrides: Partial<PosApi> = {}): PosApi {
     searchProducts: (text) => Promise.resolve(text.startsWith('xyz') ? [] : [HAMMER, CABLE]),
     getAppearance: () => Promise.resolve(DEFAULT_APPEARANCE),
     saveAppearance: () => Promise.resolve(),
+    savePendingSale: () => Promise.resolve({ status: 'catalog_changed' }),
+    listPendingSales: () => Promise.resolve([]),
+    confirmPendingSale: () => Promise.resolve(),
+    cancelPendingSale: () => Promise.resolve(),
     ...overrides,
   };
 }
@@ -325,6 +329,193 @@ describe('selling', () => {
     typeText('m');
 
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+});
+
+describe('pending sales', () => {
+  const OLDER: PendingSale = {
+    id: 'older-sale',
+    occurredAt: '2026-11-08T20:05:00.000Z',
+    totalCents: 15694,
+    lines: [
+      { productName: 'Cable THW', quantity: { milli: 3275, unit: 'meter' }, unitPriceE4: 125_000, totalCents: 4094 },
+      { productName: 'Martillo', quantity: { milli: 1000, unit: 'piece' }, unitPriceE4: 1_160_000, totalCents: 11600 },
+    ],
+  };
+  const NEWER: PendingSale = {
+    id: 'newer-sale',
+    occurredAt: '2026-11-08T21:00:00.000Z',
+    totalCents: 11600,
+    lines: [{ productName: 'Martillo', quantity: { milli: 1000, unit: 'piece' }, unitPriceE4: 1_160_000, totalCents: 11600 }],
+  };
+
+  function withPending(...sales: PendingSale[]): Pick<PosApi, 'listPendingSales'> {
+    return { listPendingSales: () => Promise.resolve(sales) };
+  }
+
+  function findDialog(): Promise<HTMLElement> {
+    return screen.findByRole('dialog', { name: '¿Se cobró esta venta?', hidden: true });
+  }
+
+  function dialogGone(): Promise<void> {
+    return waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull());
+  }
+
+  function pressKey(key: string): void {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key });
+  }
+
+  it('does not interrupt the cashier when nothing was left pending', async () => {
+    const listPendingSales = vi.fn(() => Promise.resolve([]));
+    render(<App posApi={fakePosApi({ listPendingSales })} />);
+
+    await waitFor(() => expect(listPendingSales).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(screen.queryByRole('dialog', { hidden: true })).toBeNull();
+    expect(document.activeElement).toBe(lookupBox());
+  });
+
+  it('shows a sale left pending as soon as the register starts, with what is needed to recognize it', async () => {
+    render(<App posApi={fakePosApi(withPending(OLDER))} />);
+
+    const dialog = await findDialog();
+
+    const text = dialog.textContent ?? '';
+    expect(text).toContain('Cable THW');
+    expect(text).toContain('3.275 m');
+    expect(text).toContain('$40.94');
+    expect(text).toContain('Martillo');
+    expect(text).toContain('1 pza');
+    expect(within(dialog).getByRole('status', { name: 'Total de la venta pendiente', hidden: true }).textContent).toBe('$156.94');
+    expect(text).toContain('2026');
+    expect(text).toContain('No cuenta en existencias ni en el corte');
+  });
+
+  it('confirms the sale with F2 and gives the keyboard back to the lookup box', async () => {
+    const confirmPendingSale = vi.fn(() => Promise.resolve());
+    render(<App posApi={fakePosApi({ ...withPending(OLDER), confirmPendingSale })} />);
+    await findDialog();
+
+    pressKey('F2');
+
+    await dialogGone();
+    expect(confirmPendingSale).toHaveBeenCalledExactlyOnceWith('older-sale');
+    await waitFor(() => expect(document.activeElement).toBe(lookupBox()));
+  });
+
+  it('cancels the sale with F4', async () => {
+    const cancelPendingSale = vi.fn(() => Promise.resolve());
+    const confirmPendingSale = vi.fn(() => Promise.resolve());
+    render(<App posApi={fakePosApi({ ...withPending(OLDER), cancelPendingSale, confirmPendingSale })} />);
+    await findDialog();
+
+    pressKey('F4');
+
+    await dialogGone();
+    expect(cancelPendingSale).toHaveBeenCalledExactlyOnceWith('older-sale');
+    expect(confirmPendingSale).not.toHaveBeenCalled();
+  });
+
+  it('answers with the buttons too', async () => {
+    const confirmPendingSale = vi.fn(() => Promise.resolve());
+    render(<App posApi={fakePosApi({ ...withPending(OLDER), confirmPendingSale })} />);
+    const dialog = await findDialog();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Sí, se cobró en efectivo/, hidden: true }));
+
+    await dialogGone();
+    expect(confirmPendingSale).toHaveBeenCalledExactlyOnceWith('older-sale');
+  });
+
+  it('goes through several sales one at a time, oldest first', async () => {
+    const confirmPendingSale = vi.fn(() => Promise.resolve());
+    const cancelPendingSale = vi.fn(() => Promise.resolve());
+    render(<App posApi={fakePosApi({ ...withPending(OLDER, NEWER), confirmPendingSale, cancelPendingSale })} />);
+    const dialog = await findDialog();
+    expect(dialog.textContent).toContain('Cable THW');
+    expect(dialog.textContent).toContain('Quedan 2 ventas por revisar');
+
+    pressKey('F2');
+
+    await waitFor(() => expect(dialog.textContent).not.toContain('Cable THW'));
+    expect(dialog.textContent).not.toContain('por revisar');
+    pressKey('F4');
+    await dialogGone();
+    expect(confirmPendingSale).toHaveBeenCalledExactlyOnceWith('older-sale');
+    expect(cancelPendingSale).toHaveBeenCalledExactlyOnceWith('newer-sale');
+  });
+
+  it('does not take the Enter of a scanner for an answer', async () => {
+    const confirmPendingSale = vi.fn(() => Promise.resolve());
+    const cancelPendingSale = vi.fn(() => Promise.resolve());
+    render(<App posApi={fakePosApi({ ...withPending(OLDER), confirmPendingSale, cancelPendingSale })} />);
+    const dialog = await findDialog();
+
+    await waitFor(() => expect(document.activeElement).toHaveProperty('tagName', 'SECTION'));
+    pressKey('2');
+    pressKey('Enter');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(confirmPendingSale).not.toHaveBeenCalled();
+    expect(cancelPendingSale).not.toHaveBeenCalled();
+    expect(dialog.isConnected).toBe(true);
+  });
+
+  it('takes the keyboard off the button that was clicked, before the next sale appears', async () => {
+    render(<App posApi={fakePosApi(withPending(OLDER, NEWER))} />);
+    const dialog = await findDialog();
+    const button = within(dialog).getByRole('button', { name: /Sí, se cobró en efectivo/, hidden: true });
+    button.focus();
+
+    fireEvent.click(button);
+
+    await waitFor(() => expect(dialog.textContent).not.toContain('Cable THW'));
+    expect(document.activeElement).toHaveProperty('tagName', 'SECTION');
+  });
+
+  it('ignores a second key while the first answer is being saved', async () => {
+    let finishSaving: () => void = () => undefined;
+    const confirmPendingSale = vi.fn(() => new Promise<void>((resolve) => (finishSaving = resolve)));
+    render(<App posApi={fakePosApi({ ...withPending(OLDER, NEWER), confirmPendingSale })} />);
+    await findDialog();
+
+    pressKey('F2');
+    pressKey('F2');
+    finishSaving();
+
+    await waitFor(() => expect(screen.getByRole('dialog', { hidden: true }).textContent).not.toContain('Cable THW'));
+    expect(confirmPendingSale).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the sale on the screen and explains when the answer cannot be saved', async () => {
+    const confirmPendingSale = vi
+      .fn<PosApi['confirmPendingSale']>()
+      .mockRejectedValueOnce(new Error('disk full'))
+      .mockResolvedValueOnce();
+    render(<App posApi={fakePosApi({ ...withPending(OLDER), confirmPendingSale })} />);
+    const dialog = await findDialog();
+
+    pressKey('F2');
+
+    expect((await within(dialog).findByRole('alert', { hidden: true })).textContent).toContain('No se guardó tu respuesta');
+    expect(dialog.textContent).toContain('Cable THW');
+    pressKey('F2');
+    await dialogGone();
+    expect(confirmPendingSale).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks the browser not to close the question with Esc', async () => {
+    render(<App posApi={fakePosApi(withPending(OLDER))} />);
+
+    expect((await findDialog()).getAttribute('closedby')).toBe('none');
+  });
+
+  it('warns the cashier when the pending sales cannot be read, and goes on selling', async () => {
+    render(<App posApi={fakePosApi({ listPendingSales: () => Promise.reject(new Error('closed')) })} />);
+
+    expect((await screen.findByRole('alert')).textContent).toContain('No se pudieron revisar las ventas pendientes');
+    expect(document.activeElement).toBe(lookupBox());
   });
 });
 
