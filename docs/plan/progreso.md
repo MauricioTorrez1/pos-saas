@@ -1,10 +1,10 @@
 # Progreso
 
-Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
+Actualizado: 2026-11-08. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** E1-07, en revisión, en la rama `feat/e1-07-sale-screen`. E1-06 terminó con el PR 19.
-- **Siguiente:** terminar E1-07, y luego la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
+- **Tarea en curso:** ninguna. E1-07 terminó con el PR 20.
+- **Siguiente:** E1-10, y luego la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
 
@@ -71,7 +71,7 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | E1-04 | Login con PIN en la caja | 4 | Pendiente |
 | E1-05 | Dinero y cantidades | 5 | Terminada |
 | E1-06 | IVA incluido y totales | 4 | Terminada |
-| E1-07 | Pantalla de venta | 5 | En revisión |
+| E1-07 | Pantalla de venta | 5 | Terminada |
 | E1-08 | Venta por peso y por metro | 4 | Pendiente |
 | E1-09 | Artículo varios y listas de precio | 3 | Pendiente |
 | E1-10 | Máquina de estados de la venta | 5 | Pendiente |
@@ -252,3 +252,5 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | 2026-11-07 | E1-06 sigue en revisión, con el PR 19 abierto con GitHub CLI, que ya tiene sesión. En CI, los diez checks en verde, con `Java` en 36 segundos, `TypeScript` en 32 y `Dependency scan` sin avisos. Con el IVA del cable esperando 566 centavos, `Java` y `TypeScript` quedaron en rojo y los otros ocho en verde. Ahora `gh` sí da los logs: Java marcó `expected: 566L but was: 565L`, y TypeScript falló en el mismo caso y en la revisión de que la base más el IVA da el total (`expected 4095 to be 4094`). Sin la rotura, los diez volvieron a verde, con `Java` en 29 segundos y `TypeScript` en 21 | Fusionar el PR 19 |
 | 2026-11-07 | E1-06 terminada. PR 19 fusionado con squash en `6d86ea0` con `gh pr merge`, con el título revisado. En `main`, los diez checks en verde, con `Java` en 28 segundos, `TypeScript` en 31 y `Dependency scan` sin avisos. La caja ya puede sacar la base y el IVA de cada línea y sumar la venta con su IVA por tasa; E1-10 arma la venta con sus líneas y le pasa a `SaleCheckout` el total de `saleTotals`. La comparación de 10 casos con el contador o Facturapi sigue pendiente, antes del piloto. Las preguntas de la ficha se le entregaron a Mauricio | Empezar E1-07 en una sesión nueva |
 | 2026-11-08 | E1-07 en revisión, en modo automático. ADR 0024: búsqueda con FTS5, lector distinguido por velocidad (al menos 4 caracteres con hasta 50 ms entre ellos) y apariencia acotada a nombre, seis colores, tres tamaños y dos temas. Hay productos de prueba con `tenant_id`, UUIDv7 y las escalas del ADR 0011, y la pantalla se opera solo con teclado. El total es una etiqueta de precio colgante y los colores se eligen como en un muestrario de pintura. Con 5,000 productos y 200 lecturas, agregar un producto tardó 24.5 ms de p95 y buscar por nombre 4.0 ms. No hizo falta un `worker`. En local, 192 pruebas en Vitest de la caja (antes 72), 124 en money (antes 115) y 22 con Playwright (antes 11). La prueba con el lector y en la PC de la tienda quedó en «Pendientes de Mauricio antes del piloto». CI todavía no corre | Abrir el PR, repetir la rotura en CI y fusionar |
+| 2026-11-08 | E1-07 sigue en revisión, con el PR 20 abierto. En CI, los diez checks en verde en `cb6f099`, con `TypeScript` en 52 segundos. Con 150 ms de espera agregados a `findByCode`, `TypeScript` quedó en rojo en 78 segundos y los otros nueve en verde: agregar un producto tardó 155.4 ms de p95 contra el límite de 100, y de las 22 pruebas de Playwright solo falló esa. Sin la rotura, los diez volvieron a verde en `bffaad5`, con `TypeScript` en 51 segundos | Fusionar el PR 20 |
+| 2026-11-08 | E1-07 terminada. PR 20 fusionado con squash en `72b347c` con `gh pr merge`, con el título revisado. En `main`, los diez checks en verde, con `Java` en 26 segundos y `TypeScript` en 51. La caja ya puede buscar y agregar productos con lector o teclado, y el dueño puede ajustar su apariencia; E1-10 guarda la venta partiendo de `SaleState` y `uuidV7`. La prueba con el lector y en la PC de la tienda sigue pendiente, antes del piloto. Las preguntas de la ficha se le entregaron a Mauricio | Empezar E1-10 en una sesión nueva |
