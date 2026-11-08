@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactElement } from 'react';
 
 import type { PosApi } from '../shared/pos-api';
-import { RecordingPrinter } from '../main/hardware/fakes/recording-printer';
 
 type AppInfoState = { status: 'loading' } | { status: 'ready'; version: string } | { status: 'failed' };
 
