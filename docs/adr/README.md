@@ -26,3 +26,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0020](0020-casos-compartidos.md) | Casos en JSON y cálculo de Java fuera de los módulos | Aceptada |
 | [0021](0021-sqlite-de-la-caja.md) | SQLite de la caja con `node:sqlite` | Aceptada |
 | [0022](0022-libreria-de-dinero.md) | Librería de dinero como código fuente, piezas enteras y lectura estricta de texto | Aceptada |
+| [0023](0023-iva-incluido-por-linea.md) | IVA incluido, con la base redondeada por línea y el IVA por diferencia | Aceptada |
