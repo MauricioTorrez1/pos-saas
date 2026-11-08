@@ -286,6 +286,49 @@ export async function leaveSaleUnfinished(register: ElectronApplication, paths: 
 }
 
 /**
+ * Adds products straight to the database of the running register, the way a catalog sync will.
+ *
+ * @param register the running app
+ * @param databasePath the database of this run
+ * @param tenantId the business that owns the products
+ * @param count how many to add
+ * @returns the barcode of each product
+ */
+export async function insertTestProducts(
+  register: ElectronApplication,
+  databasePath: string,
+  tenantId: string,
+  count: number,
+): Promise<string[]> {
+  return register.evaluate(
+    (_electron, { path, tenant, total }) => {
+      const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
+      const { randomUUID } = process.getBuiltinModule('node:crypto');
+      const database = new DatabaseSync(path, { timeout: 5_000 });
+      const insertProduct = database.prepare(`
+        INSERT INTO product (id, tenant_id, name, base_unit, unit_price_e4, tax_factor, tax_rate_bp)
+        VALUES (?, ?, ?, 'piece', ?, 'rate', 1600)
+      `);
+      const insertBarcode = database.prepare('INSERT INTO product_barcode (tenant_id, code, product_id) VALUES (?, ?, ?)');
+      const families = ['Tornillo acero', 'Tuerca galvanizada', 'Clavija reforzada', 'Tubo cobre', 'Tapón plástico'];
+      const codes: string[] = [];
+      database.exec('BEGIN IMMEDIATE');
+      for (let number = 1; number <= total; number += 1) {
+        const id = randomUUID();
+        const code = String(3_000_000_000_000 + number);
+        insertProduct.run(id, tenant, `${families[number % families.length]} medida ${number}`, 10_000 + number);
+        insertBarcode.run(tenant, code, id);
+        codes.push(code);
+      }
+      database.exec('COMMIT');
+      database.close();
+      return codes;
+    },
+    { path: databasePath, tenant: tenantId, total: count },
+  );
+}
+
+/**
  * Reads the database from inside a reopened register, with the SQLite that the app really uses.
  *
  * @param register the reopened app

@@ -1,6 +1,6 @@
 # Register app
 
-Desktop register built with Electron, React, and TypeScript, using [electron-vite](https://electron-vite.org/) on top of Vite. For now it opens a window, shows its version, keeps its local database up to date, and can run a checkout with fake devices. The sale screen and the real devices arrive in the next tasks of the [roadmap](../../docs/plan/04-roadmap.md).
+Desktop register built with Electron, React, and TypeScript, using [electron-vite](https://electron-vite.org/) on top of Vite. It keeps its local database up to date and rings up a sale from the keyboard: a scan or a search by name adds a product and updates the totals with VAT. Collecting the payment and the real devices arrive in the next tasks of the [roadmap](../../docs/plan/04-roadmap.md).
 
 Electron 45 runs on Windows 10 and later, which covers the machines of [ADR 0002](../../docs/adr/0002-caja-electron.md).
 
@@ -12,8 +12,10 @@ Electron 45 runs on Windows 10 and later, which covers the machines of [ADR 0002
 | `src/main/checkout/` | Checkout, which drives the devices in the order of ADR 0010 | Main process, with Node |
 | `src/preload/` | The `window.pos` bridge | Sandboxed preload script |
 | `src/renderer/` | React screen | Sandboxed renderer, without Node |
+| `src/renderer/sale/` | Sale screen: lookup box, lines, totals, and scanner detection | Sandboxed renderer, without Node |
+| `src/renderer/appearance/` | Dialog where the owner changes how the register looks | Sandboxed renderer, without Node |
 | `src/shared/` | Types and channel names used on both sides of the bridge | Compiled into each side |
-| `e2e/` | Startup and database tests with Playwright, and the crash drill | Test runner, driving the built app |
+| `e2e/` | Startup, database, and sale tests with Playwright, and the crash drill | Test runner, driving the built app |
 
 ## How the screen stays away from Node
 - **Window:** `contextIsolation` and `sandbox` are on, and `nodeIntegration` is off. The startup test reads these settings from the running window and checks that `require` and `process` do not exist on the screen.
@@ -22,6 +24,27 @@ Electron 45 runs on Windows 10 and later, which covers the machines of [ADR 0002
 - **Injected code:** the Content Security Policy in `index.html` only allows scripts and styles from the app itself.
 - **Compile time:** `tsconfig.web.json` has no Node types, so screen code that uses `process` or `node:fs` does not compile.
 - **Imports:** `src/main/screen-boundary.test.ts` fails if any file in `src/renderer` or `src/shared` imports Electron or a file from `src/main` or `src/preload`, such as a device or its fake.
+
+## Sale screen
+The lookup box always holds the keyboard, so a scan lands there even after a click somewhere else. The decisions behind the screen are in [ADR 0024](../../docs/adr/0024-pantalla-de-venta.md).
+
+| Key | What it does |
+| --- | --- |
+| Enter | Adds the product with that exact code or, for typed text, the highlighted match |
+| ↑ ↓ | Moves through the matches or, with no matches, through the lines of the sale |
+| + − | Adds or takes away one unit of the selected line, when the box is empty |
+| Supr | Removes the selected line, when the box is empty |
+| Esc | Clears the box and the matches |
+| F9 | Opens the appearance dialog |
+
+A barcode scanner acts as a keyboard, so the register tells it apart by speed: at least 4 characters with no more than 50 ms between them. Only what happens to an unknown code changes: from the scanner it shows a warning, and from a person it searches by name.
+
+Search runs on an FTS5 index in the local database. It matches the beginning of each word and ignores accents and capitals. With 5,000 products on the development PC, adding a scanned product took 24.5 ms at the 95th percentile, against a limit of 100 ms.
+
+Until the real catalog arrives with F0-16, the register fills an empty catalog with sample products marked `is_sample`. Their barcodes are valid EAN-13 codes that start with 2, a range reserved for use inside a store. `2000000000107` is the first one, a hammer at $116.00.
+
+## Appearance
+F9 opens the dialog where the owner sets the business name, one of six colors, one of three text sizes, and the light or dark theme. Changes show at once and stay only when saved, and Esc undoes them. The stylesheet takes everything from a few tokens, driven by three attributes on the page, and a test checks that the text of every color and theme keeps a contrast of at least 4.5:1.
 
 ## Hardware
 The screen never gives orders to a device. It will ask the main process for a business operation, such as "check out this sale", and the main process decides which devices to use and in what order. That way the drawer cannot open for a sale that was not saved, whatever the screen does.
@@ -73,6 +96,16 @@ pnpm --filter @pos-saas/pos typecheck
 
 ```bash
 pnpm --filter @pos-saas/pos test
+```
+
+Measure how fast the register adds products with a catalog of 5,000. It opens the register and prints the times:
+
+```bash
+pnpm --filter @pos-saas/pos build
+```
+
+```bash
+pnpm --filter @pos-saas/pos exec playwright test sale-screen -g "under 100 ms"
 ```
 
 Run the crash drill. The register opens and saves test sales to a temporary database, and the terminal prints the command to kill it. After the forced close, the drill reopens the register and reports whether any confirmed sale was lost:
