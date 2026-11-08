@@ -151,7 +151,7 @@ export async function startWritingTestSales(register: ElectronApplication, paths
           insertLine.run(saleNumber, line);
         }
         database.exec('COMMIT');
-        writeSync(confirmations, `${saleNumber + 1000}\n`);
+        writeSync(confirmations, `${saleNumber}\n`);
       }, 1);
     },
     { ...paths, linesPerSale: LINES_PER_TEST_SALE },
