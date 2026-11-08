@@ -57,6 +57,11 @@ export class ProductCatalog {
    * @returns the product, or null if no product of this business has that code
    */
   findByCode(code: string): CatalogProduct | null {
+    // Deliberate break: proves the speed test fails on a slow lookup. The next commit removes it.
+    const slowUntil = Date.now() + 150;
+    while (Date.now() < slowUntil) {
+      // Busy wait on purpose.
+    }
     const row = this.#findByCode.get(this.#tenantId, code.trim()) as unknown as ProductRow | undefined;
     return row === undefined ? null : toCatalogProduct(row);
   }
