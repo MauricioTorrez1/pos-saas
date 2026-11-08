@@ -3,8 +3,8 @@
 Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** ninguna. E1-06 terminó con el PR 19.
-- **Siguiente:** E1-07, y luego la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
+- **Tarea en curso:** E1-07, en la rama `feat/e1-07-sale-screen`, todavía sin código. E1-06 terminó con el PR 19.
+- **Siguiente:** terminar E1-07, y luego la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
 
@@ -64,7 +64,7 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | E1-04 | Login con PIN en la caja | 4 | Pendiente |
 | E1-05 | Dinero y cantidades | 5 | Terminada |
 | E1-06 | IVA incluido y totales | 4 | Terminada |
-| E1-07 | Pantalla de venta | 5 | Pendiente |
+| E1-07 | Pantalla de venta | 5 | En curso |
 | E1-08 | Venta por peso y por metro | 4 | Pendiente |
 | E1-09 | Artículo varios y listas de precio | 3 | Pendiente |
 | E1-10 | Máquina de estados de la venta | 5 | Pendiente |
