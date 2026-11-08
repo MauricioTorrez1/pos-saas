@@ -17,7 +17,7 @@ export async function openMainWindow(rendererEntry: string, preloadPath: string)
     width: 1280,
     height: 800,
     autoHideMenuBar: true,
-    backgroundColor: '#f5f5f4',
+    backgroundColor: '#dde1e4',
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,

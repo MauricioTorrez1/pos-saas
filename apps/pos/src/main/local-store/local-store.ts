@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, type StatementSync } from 'node:sqlite';
 
 import { MIGRATIONS, type Migration } from './migrations';
 import { retryWhileSharedMemoryBusy } from './shared-memory-retry';
@@ -97,6 +97,17 @@ export class LocalStore {
    */
   transaction<T>(work: (connection: DatabaseSync) => T): T {
     return runInTransaction(this.#connection, () => work(this.#connection));
+  }
+
+  /**
+   * Compiles a statement once, so a lookup that runs on every scan does not parse its SQL each time. Reads do not
+   * need `transaction`, which would take the write lock.
+   *
+   * @param sql the statement, with `?` for its values
+   * @returns the compiled statement. It stops working once the store closes.
+   */
+  prepare(sql: string): StatementSync {
+    return this.#connection.prepare(sql);
   }
 
   /** Closes the database. SQLite moves the WAL into the main file and removes it. */

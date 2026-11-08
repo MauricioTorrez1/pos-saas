@@ -6,6 +6,7 @@ import { splitIncludedTax } from "./line-totals.js";
 import { quantityOf, type Quantity } from "./quantity.js";
 import { taxRateOf, type TaxRate } from "./tax-rate.js";
 import type { Unit } from "./unit.js";
+import { formatUnitPriceE4 } from "./unit-price.js";
 
 // A JavaScript number can hold decimals and a Java long cannot, so these checks exist only here.
 describe("values that only TypeScript can receive", () => {
@@ -60,6 +61,27 @@ describe("rounding", () => {
 
     // Each line is 562.5 cents and rounds to 563. Rounding only the total would give 1125.
     expect(sumCents(lines)).toBe(1126);
+  });
+});
+
+describe("formatUnitPriceE4", () => {
+  test.each([
+    [0, "$0.00"],
+    [125000, "$12.50"],
+    [13900000, "$1,390.00"],
+    [1530, "$0.153"],
+    [1535, "$0.1535"],
+    [5, "$0.0005"],
+    [50, "$0.005"],
+  ])("shows %i as %s", (unitPriceE4, expected) => {
+    expect(formatUnitPriceE4(unitPriceE4)).toBe(expected);
+  });
+
+  test.each([
+    [-1, "negative_input"],
+    [1.5, "not_an_integer"],
+  ])("rejects %d with %s", (unitPriceE4, code) => {
+    expect(() => formatUnitPriceE4(unitPriceE4)).toThrow(expect.objectContaining({ code }));
   });
 });
 

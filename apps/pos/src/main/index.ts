@@ -4,7 +4,11 @@ import { pathToFileURL } from 'node:url';
 import { app, dialog } from 'electron';
 
 import { registerIpcHandlers } from './ipc-handlers';
+import { AppearanceStore } from './local-store/appearance-store';
 import { LocalStore } from './local-store/local-store';
+import { LOCAL_TENANT_ID } from './local-store/local-tenant';
+import { ProductCatalog } from './local-store/product-catalog';
+import { seedSampleCatalogIfEmpty } from './local-store/sample-catalog';
 import { openMainWindow } from './main-window';
 
 const PRELOAD_PATH = join(import.meta.dirname, '../preload/index.cjs');
@@ -20,14 +24,18 @@ function resolveRendererEntry(): string {
 /**
  * Runs before any window opens, so the screen never works on a schema that is out of date. Without a
  * window the cashier would see nothing, so a failure here is the one startup error that gets a message.
+ *
+ * @returns the open store, which closes by itself when the app quits
  */
-function openLocalStore(): void {
+function openLocalStore(): LocalStore {
   try {
     const store = LocalStore.open({
       path: join(app.getPath('userData'), DATABASE_FILE_NAME),
       appVersion: app.getVersion(),
     });
     app.once('will-quit', () => store.close());
+    seedSampleCatalogIfEmpty(store, LOCAL_TENANT_ID);
+    return store;
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     dialog.showErrorBox(
@@ -40,9 +48,12 @@ function openLocalStore(): void {
 
 async function start(): Promise<void> {
   await app.whenReady();
-  openLocalStore();
+  const store = openLocalStore();
   const rendererEntry = resolveRendererEntry();
-  registerIpcHandlers(rendererEntry);
+  registerIpcHandlers(rendererEntry, {
+    catalog: new ProductCatalog(store, LOCAL_TENANT_ID),
+    appearance: new AppearanceStore(store, LOCAL_TENANT_ID),
+  });
   await openMainWindow(rendererEntry, PRELOAD_PATH);
 }
 

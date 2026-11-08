@@ -14,5 +14,5 @@
     "noEmit": true
   },
   "include": ["src/renderer", "src/shared"],
-  "exclude": ["src/renderer/**/*.test.tsx"]
+  "exclude": ["src/renderer/**/*.test.ts", "src/renderer/**/*.test.tsx", "src/shared/**/*.test.ts"]
 }
