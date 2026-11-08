@@ -63,6 +63,7 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
     // The cashier may already be typing the next product, and that text must stay.
     if (inputRef.current?.value.trim() === submittedText) {
       inputRef.current.value = '';
+      detector.reset();
     }
     search.clear();
   };

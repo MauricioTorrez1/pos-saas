@@ -225,6 +225,22 @@ describe('selling', () => {
     await waitFor(() => expect(linesShown()[0]).toContain('Cable THW'));
   });
 
+  it('recognizes the next scan after a match is chosen with the mouse', async () => {
+    const searchProducts = vi.fn<PosApi['searchProducts']>(() => Promise.resolve([HAMMER, CABLE]));
+    render(<App posApi={fakePosApi({ searchProducts })} />);
+    // A correction marks the text as typed by a person, which must not carry over to the next scan.
+    press('Backspace');
+    typeText('cable');
+    fireEvent.mouseDown((await screen.findAllByRole('option'))[1]!);
+    await waitFor(() => expect(linesShown()).toHaveLength(1));
+    searchProducts.mockClear();
+
+    scan('9999999');
+
+    expect((await screen.findByRole('alert')).textContent).toContain('«9999999»');
+    expect(searchProducts).not.toHaveBeenCalled();
+  });
+
   it('says so when a name matches nothing', async () => {
     render(<App posApi={fakePosApi()} />);
 

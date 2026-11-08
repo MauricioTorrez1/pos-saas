@@ -45,9 +45,8 @@ export class AppearanceStore {
    * Saves the appearance, replacing the previous one.
    *
    * @param appearance the new appearance
-   * @param now when it changed
    */
-  save(appearance: Appearance, now: Date = new Date()): void {
+  save(appearance: Appearance): void {
     this.#store.transaction((connection) => {
       connection
         .prepare(`
@@ -60,7 +59,14 @@ export class AppearanceStore {
             theme = excluded.theme,
             updated_at = excluded.updated_at
         `)
-        .run(this.#tenantId, appearance.businessName, appearance.accent, appearance.textSize, appearance.theme, now.toISOString());
+        .run(
+          this.#tenantId,
+          appearance.businessName,
+          appearance.accent,
+          appearance.textSize,
+          appearance.theme,
+          new Date().toISOString(),
+        );
     });
   }
 }
