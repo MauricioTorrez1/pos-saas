@@ -2,7 +2,12 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 
 export default defineConfig({
-  main: {},
+  main: {
+    build: {
+      // The money package exports TypeScript source, which plain Node cannot run, so the build bundles it.
+      externalizeDeps: { exclude: ['@pos-saas/money'] },
+    },
+  },
   preload: {
     build: {
       rolldownOptions: {

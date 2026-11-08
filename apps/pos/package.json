@@ -15,6 +15,7 @@
     "crash-drill": "electron-vite build && install-electron && node e2e/crash-drill.ts"
   },
   "dependencies": {
+    "@pos-saas/money": "workspace:*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
