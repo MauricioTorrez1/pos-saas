@@ -3,8 +3,8 @@
 Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** E1-05, en revisión.
-- **Siguiente:** la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-06, E1-07, E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
+- **Tarea en curso:** ninguna. E1-05 terminó con el PR 18.
+- **Siguiente:** E1-06, y luego la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-07, E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
 
@@ -44,7 +44,7 @@ Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, 
 | E1-02 | SQLite local y migraciones | 4 | Terminada |
 | E1-03 | Interfaces de hardware y falsos | 3 | Terminada |
 | E1-04 | Login con PIN en la caja | 4 | Pendiente |
-| E1-05 | Dinero y cantidades | 5 | En revisión |
+| E1-05 | Dinero y cantidades | 5 | Terminada |
 | E1-06 | IVA incluido y totales | 4 | Pendiente |
 | E1-07 | Pantalla de venta | 5 | Pendiente |
 | E1-08 | Venta por peso y por metro | 4 | Pendiente |
@@ -222,3 +222,4 @@ Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, 
 | 2026-11-07 | E1-03 terminada. PR 17 fusionado con squash en `bdc0541`. Sin la rotura, los diez checks volvieron a verde en el PR. En `main`, los diez en verde, con `TypeScript` en 28 segundos y `Dependency scan` sin avisos. Los falsos solo los usan las pruebas, hasta que E1-08, E1-12, E1-13 y E1-14 traigan las implementaciones reales y E1-11 conecte el cobro al puente. Las preguntas de la ficha se le entregaron a Mauricio | Empezar E1-05 en una sesión nueva |
 | 2026-11-07 | E1-05 en revisión. Mauricio decidió que `packages/money` exporte su código fuente, que las piezas sean enteras y que el texto tecleado se lea en los dos lenguajes sin `float` (ADR 0022). Hay `Quantity` con unidad, suma de líneas, lectura de texto y formato `$1,234.56` en TypeScript, y `Money`, `UnitPrice` y `Quantity` en Java, con el mismo código de error en los dos lenguajes. Los casos compartidos pasan de 14 a 54, en tres archivos. La caja ya usa el paquete, y el build lo empaca dentro del proceso principal. `ci-smoke` quedó reemplazado. En local, 70 pruebas en money, 18 en contracts, 72 en Vitest de la caja y 61 en Maven (antes 17). Mauricio agregó sus casos de piola (2.5 m a $18.90 da 4725) y tornillo (3 a $1.00 da 300). En su primera versión, los dos lenguajes rechazaron el archivo: los casos estaban en la lista de errores, la piola esperaba 3074 y un precio llevaba un cero a la izquierda, que JSON no permite. Playwright no se corrió en local porque la app empaquetada no cambia. CI todavía no corre | Abrir el PR y repetir la rotura en CI |
 | 2026-11-07 | E1-05 sigue en revisión, con el PR 18 abierto. En CI, los diez checks en verde, con `Java` en 39 segundos, `TypeScript` en 27 y `Dependency scan` sin avisos. Con la piola esperando 4726, `Java` y `TypeScript` quedaron en rojo y los otros ocho en verde. TypeScript marcó `expected 4725 to be 4726`; la API pública no da el log de Java. Sin la rotura, los diez volvieron a verde, con `Java` en 34 segundos y `TypeScript` en 31 | Fusionar el PR 18 |
+| 2026-11-07 | E1-05 terminada. PR 18 fusionado con squash en `87d9d9d`. En `main`, los diez checks en verde, con `Java` en 33 segundos, `TypeScript` en 26 y `Dependency scan` sin avisos. La caja ya puede calcular líneas, sumarlas y leer lo que se teclea; E1-06 agrega el IVA y produce el `totalCents` que recibe `SaleCheckout`. Las preguntas de la ficha se le entregaron a Mauricio | Empezar E1-06 en una sesión nueva |
