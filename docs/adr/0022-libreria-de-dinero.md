@@ -32,4 +32,4 @@ E1-05 convierte el cálculo mínimo de F0-23 en la librería de dinero y cantida
 - Un cambio en `packages/money` se ve al instante en la caja, sin compilar. No se puede publicar en npm tal cual, y no hace falta, porque es privado.
 - Vender media pieza requiere dar de alta el producto en otra unidad o como varios (E1-09).
 - Un precio de Eleventa con `$` o con comas se limpia antes de leerlo (F0-18).
-- Los casos compartidos pasan de 14 a 52: importe por línea, lectura de texto y suma.
+- Los casos compartidos pasan de 14 a 54: importe por línea, lectura de texto y suma.
