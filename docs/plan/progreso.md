@@ -3,8 +3,8 @@
 Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** E1-06, en revisión.
-- **Siguiente:** la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-07, E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
+- **Tarea en curso:** ninguna. E1-06 terminó con el PR 19.
+- **Siguiente:** E1-07, y luego la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
 
@@ -63,7 +63,7 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | E1-03 | Interfaces de hardware y falsos | 3 | Terminada |
 | E1-04 | Login con PIN en la caja | 4 | Pendiente |
 | E1-05 | Dinero y cantidades | 5 | Terminada |
-| E1-06 | IVA incluido y totales | 4 | En revisión |
+| E1-06 | IVA incluido y totales | 4 | Terminada |
 | E1-07 | Pantalla de venta | 5 | Pendiente |
 | E1-08 | Venta por peso y por metro | 4 | Pendiente |
 | E1-09 | Artículo varios y listas de precio | 3 | Pendiente |
@@ -243,3 +243,4 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | 2026-11-07 | E1-05 terminada. PR 18 fusionado con squash en `87d9d9d`. En `main`, los diez checks en verde, con `Java` en 33 segundos, `TypeScript` en 26 y `Dependency scan` sin avisos. La caja ya puede calcular líneas, sumarlas y leer lo que se teclea; E1-06 agrega el IVA y produce el `totalCents` que recibe `SaleCheckout`. Las preguntas de la ficha se le entregaron a Mauricio | Empezar E1-06 en una sesión nueva |
 | 2026-11-07 | E1-06 en revisión, en modo automático. ADR 0023: la base de cada línea se redondea hacia arriba desde medio centavo y el IVA es la diferencia, así que la base más el IVA siempre da lo cobrado. La tasa es un factor (`rate` o `exempt`) con `rate_bp`, y el exento se distingue del 0% como en el CFDI. La venta suma sus líneas y agrupa el IVA por tasa. El cálculo nunca se desborda, porque solo multiplica el residuo de la división. En TypeScript, `taxRateOf`, `lineTotals`, `splitIncludedTax` y `saleTotals`; en Java, `TaxRate`, `LineTotals`, `TaxGroup` y `SaleTotals`, con el nuevo código `invalid_tax_rate` en los dos. Los casos compartidos pasan de 54 a 81, en cinco archivos. Una prueba revisa que el IVA de cada total de $0 a $1,000, al 16% y al 8%, quede dentro de la tolerancia del Anexo 20. En local, 115 pruebas en money (antes 70), 30 en contracts (antes 18) y 91 en Maven (antes 61). La comparación de 10 casos con el contador o Facturapi quedó en «Pendientes de Mauricio antes del piloto». CI todavía no corre | Abrir el PR, repetir la rotura en CI y fusionar |
 | 2026-11-07 | E1-06 sigue en revisión, con el PR 19 abierto con GitHub CLI, que ya tiene sesión. En CI, los diez checks en verde, con `Java` en 36 segundos, `TypeScript` en 32 y `Dependency scan` sin avisos. Con el IVA del cable esperando 566 centavos, `Java` y `TypeScript` quedaron en rojo y los otros ocho en verde. Ahora `gh` sí da los logs: Java marcó `expected: 566L but was: 565L`, y TypeScript falló en el mismo caso y en la revisión de que la base más el IVA da el total (`expected 4095 to be 4094`). Sin la rotura, los diez volvieron a verde, con `Java` en 29 segundos y `TypeScript` en 21 | Fusionar el PR 19 |
+| 2026-11-07 | E1-06 terminada. PR 19 fusionado con squash en `6d86ea0` con `gh pr merge`, con el título revisado. En `main`, los diez checks en verde, con `Java` en 28 segundos, `TypeScript` en 31 y `Dependency scan` sin avisos. La caja ya puede sacar la base y el IVA de cada línea y sumar la venta con su IVA por tasa; E1-10 arma la venta con sus líneas y le pasa a `SaleCheckout` el total de `saleTotals`. La comparación de 10 casos con el contador o Facturapi sigue pendiente, antes del piloto. Las preguntas de la ficha se le entregaron a Mauricio | Empezar E1-07 en una sesión nueva |
