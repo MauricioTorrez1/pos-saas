@@ -5,20 +5,28 @@ JSON schemas and calculation cases shared by the TypeScript register and the Jav
 | Path | Contents |
 | --- | --- |
 | `schemas/values.schema.json` | Integer scales from [ADR 0011](../../docs/adr/0011-precision-monetaria.md), and the base units |
-| `schemas/line-amount-cases.schema.json` | The shape of a file of line amount cases |
-| `cases/line-amount.json` | The cases: `amounts` must produce a result, and `rejections` must fail |
+| `schemas/*-cases.schema.json` | The shape of each file of cases |
+| `cases/line-amount.json` | Line amounts: `amounts` must produce a result, and `rejections` must fail |
+| `cases/text-input.json` | Numbers typed as text: `values` must be read, and `rejections` must fail |
+| `cases/amount-sum.json` | Totals of a sale: `sums` must add up, and `rejections` must fail |
 | `src/cases.test.ts` | Checks that the cases follow their schema, and that the schema rejects bad ones |
 
+Each rejection names the error it expects. Both languages use the same codes: `negative_input`, `fractional_piece`, `overflow`, `invalid_format`, and `too_many_decimals` ([ADR 0022](../../docs/adr/0022-libreria-de-dinero.md)).
+
 ## Who runs the cases
-| Language | Test | Calculation |
+| Cases | TypeScript ([`packages/money`](../money/README.md)) | Java ([`pos.money`](../../services/core/src/main/java/io/github/mauriciotorrez1/pos/money/)) |
 | --- | --- | --- |
-| TypeScript | [`line-amount.contract.test.ts`](../money/src/line-amount.contract.test.ts) | [`line-amount.ts`](../money/src/line-amount.ts) |
-| Java | [`LineAmountContractTest`](../../services/core/src/test/java/io/github/mauriciotorrez1/pos/money/LineAmountContractTest.java) | [`LineAmount`](../../services/core/src/main/java/io/github/mauriciotorrez1/pos/money/LineAmount.java) |
+| Line amount | [`line-amount.contract.test.ts`](../money/src/line-amount.contract.test.ts) | [`LineAmountContractTest`](../../services/core/src/test/java/io/github/mauriciotorrez1/pos/money/LineAmountContractTest.java) |
+| Text input | [`text-input.contract.test.ts`](../money/src/text-input.contract.test.ts) | [`TextInputContractTest`](../../services/core/src/test/java/io/github/mauriciotorrez1/pos/money/TextInputContractTest.java) |
+| Amount sum | [`amount-sum.contract.test.ts`](../money/src/amount-sum.contract.test.ts) | [`AmountSumContractTest`](../../services/core/src/test/java/io/github/mauriciotorrez1/pos/money/AmountSumContractTest.java) |
 
 Only TypeScript validates against the schema, because the `TypeScript` job runs on every pull request. Java reads the same file with a strict parser, so a case with decimals or a misspelled field also fails there.
 
 ## Add a case
-Add an entry to `amounts` in `cases/line-amount.json`. The file names its schema, so editors such as VS Code autocomplete and check it as you type.
+The files name their schema, so editors such as VS Code autocomplete and check them as you type.
+
+### A line amount
+Add an entry to `amounts` in `cases/line-amount.json`.
 
 ```json
 {
@@ -37,7 +45,19 @@ Add an entry to `amounts` in `cases/line-amount.json`. The file names its schema
 | `unit` | `piece`, `meter`, `kilogram`, or `liter` | `piece` |
 | `expected_amount_cents` | Work it out by hand: `unit_price_e4 × quantity_milli / 100000`, rounding half up | `200` |
 
-Then run the cases in both languages. TypeScript, from the repository root:
+A quantity in pieces must be whole: `quantity_milli` is a multiple of 1000.
+
+### A typed number
+Add an entry to `values` in `cases/text-input.json`.
+
+```json
+{ "name": "Say what this case protects", "text": "3.275", "reads_as": "meter", "expected_value": 3275 }
+```
+
+`reads_as` is `amount_cents` (2 decimals), `unit_price_e4` (4 decimals), or a unit, which reads a quantity with 3 decimals.
+
+### Run them
+TypeScript, from the repository root:
 
 ```bash
 pnpm test
@@ -46,7 +66,7 @@ pnpm test
 Java, from `services/core` (in PowerShell or CMD, use `mvnw.cmd`):
 
 ```bash
-./mvnw test -Dtest=LineAmountContractTest
+./mvnw test -Dtest='*ContractTest'
 ```
 
 ## Versioning

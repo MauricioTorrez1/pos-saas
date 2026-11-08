@@ -25,3 +25,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0019](0019-caja-primero.md) | Empezar por la caja y conectar el servidor después | Aceptada |
 | [0020](0020-casos-compartidos.md) | Casos en JSON y cálculo de Java fuera de los módulos | Aceptada |
 | [0021](0021-sqlite-de-la-caja.md) | SQLite de la caja con `node:sqlite` | Aceptada |
+| [0022](0022-libreria-de-dinero.md) | Librería de dinero como código fuente, piezas enteras y lectura estricta de texto | Aceptada |

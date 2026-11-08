@@ -3,9 +3,9 @@
 Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** ninguna. E1-03 terminó con el PR 17.
-- **Siguiente:** E1-05, y luego la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-06, E1-07, E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
-- **Rellenos temporales:** `ci-smoke` lo reemplaza E1-05.
+- **Tarea en curso:** E1-05, en revisión.
+- **Siguiente:** la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-06, E1-07, E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
+- **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
 
 ## Fase 0
@@ -44,7 +44,7 @@ Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, 
 | E1-02 | SQLite local y migraciones | 4 | Terminada |
 | E1-03 | Interfaces de hardware y falsos | 3 | Terminada |
 | E1-04 | Login con PIN en la caja | 4 | Pendiente |
-| E1-05 | Dinero y cantidades | 5 | Pendiente |
+| E1-05 | Dinero y cantidades | 5 | En revisión |
 | E1-06 | IVA incluido y totales | 4 | Pendiente |
 | E1-07 | Pantalla de venta | 5 | Pendiente |
 | E1-08 | Venta por peso y por metro | 4 | Pendiente |
@@ -220,3 +220,4 @@ Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, 
 | 2026-11-07 | E1-03 en revisión. Mauricio decidió que las interfaces vivan en `src/main/hardware` y que la pantalla solo pida operaciones de venta, nunca órdenes a un aparato. `PrinterProvider`, `CashDrawer`, `ScaleProvider` y `CardTerminal` tienen un falso cada uno: la impresora guarda los bytes, el cajón cuenta aperturas, la báscula devuelve pesos en milésimas y la terminal cobra una sola vez por llave de idempotencia. `SaleCheckout` corre la venta completa con los cuatro falsos, en el orden del ADR 0010. `window.pos` no cambia hasta E1-11. En local, 70 pruebas en Vitest (antes 45). Con la pantalla importando el falso de la impresora, falló la prueba de frontera; con el cajón abierto antes de cobrar, fallaron 6 pruebas de cobro, incluida la de tarjeta rechazada. Playwright no se corrió en local porque la app empaquetada no cambia. CI todavía no corre | Abrir el PR, repetir la rotura en CI y fusionar |
 | 2026-11-07 | E1-03 sigue en revisión, con el PR 17 abierto. En CI, los diez checks en verde, con `TypeScript` en 34 segundos y `Dependency scan` sin avisos. Con la pantalla importando el falso de la impresora, `TypeScript` quedó en rojo en el paso de pruebas, con el type-check en verde, y los otros nueve en verde. Así que la prueba de frontera también corre en CI: el type-check solo no la habría detectado. Se quitó la rotura | Fusionar el PR 17 |
 | 2026-11-07 | E1-03 terminada. PR 17 fusionado con squash en `bdc0541`. Sin la rotura, los diez checks volvieron a verde en el PR. En `main`, los diez en verde, con `TypeScript` en 28 segundos y `Dependency scan` sin avisos. Los falsos solo los usan las pruebas, hasta que E1-08, E1-12, E1-13 y E1-14 traigan las implementaciones reales y E1-11 conecte el cobro al puente. Las preguntas de la ficha se le entregaron a Mauricio | Empezar E1-05 en una sesión nueva |
+| 2026-11-07 | E1-05 en revisión. Mauricio decidió que `packages/money` exporte su código fuente, que las piezas sean enteras y que el texto tecleado se lea en los dos lenguajes sin `float` (ADR 0022). Hay `Quantity` con unidad, suma de líneas, lectura de texto y formato `$1,234.56` en TypeScript, y `Money`, `UnitPrice` y `Quantity` en Java, con el mismo código de error en los dos lenguajes. Los casos compartidos pasan de 14 a 52, en tres archivos. La caja ya usa el paquete, y el build lo empaca dentro del proceso principal. `ci-smoke` quedó reemplazado. En local, 68 pruebas en money, 18 en contracts, 72 en Vitest de la caja y 59 en Maven (antes 17). Playwright no se corrió en local porque la app empaquetada no cambia. CI todavía no corre | Que Mauricio agregue sus casos de cable y tornillo, abrir el PR y repetir la rotura en CI |
