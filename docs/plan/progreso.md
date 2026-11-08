@@ -3,8 +3,8 @@
 Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** ninguna. E1-02 terminó con el PR 16.
-- **Siguiente:** E1-03, y luego la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-05, E1-06, E1-07, E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
+- **Tarea en curso:** E1-03, en revisión.
+- **Siguiente:** la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-05, E1-06, E1-07, E1-10, E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
 - **Rellenos temporales:** `ci-smoke` lo reemplaza E1-05.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
 
@@ -42,7 +42,7 @@ Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, 
 | --- | --- | --- | --- |
 | E1-01 | Esqueleto de la caja en Electron | 4 | Terminada |
 | E1-02 | SQLite local y migraciones | 4 | Terminada |
-| E1-03 | Interfaces de hardware y falsos | 3 | Pendiente |
+| E1-03 | Interfaces de hardware y falsos | 3 | En revisión |
 | E1-04 | Login con PIN en la caja | 4 | Pendiente |
 | E1-05 | Dinero y cantidades | 5 | Pendiente |
 | E1-06 | IVA incluido y totales | 4 | Pendiente |
@@ -217,3 +217,4 @@ Actualizado: 2026-11-07. Estados: Pendiente, En curso, En revisión, Terminada, 
 | 2026-11-04 | E1-02 en revisión. La falla era un error real de la caja en Windows: tras un cierre forzado, el archivo `-shm` queda ocupado entre 0.2 y 4.9 segundos, y al reabrir enseguida la caja daba `disk I/O error` en 8 de 30 intentos. Ahora reintenta hasta 15 segundos solo con ese error, y falló 0 de 30. En local, 45 pruebas en Vitest y 11 con Playwright. Al borrar el WAL a propósito fallaron dos pruebas de Vitest, y al confirmar ventas que la base no tiene fallaron la prueba de Playwright y el simulacro, con `Confirmed sales lost: 1000`. La base real queda en `%APPDATA%\@pos-saas\pos`. Mauricio todavía no corre el simulacro. CI todavía no corre | Abrir el PR, repetir la rotura en CI y fusionar |
 | 2026-11-07 | E1-02 sigue en revisión, con el PR 16 abierto. Mauricio corrió el simulacro en su PC, mató la caja mientras guardaba ventas y salió PASSED, sin ventas perdidas. En CI, los diez checks en verde, con `TypeScript` en 49 segundos y `Dependency scan` sin avisos. Con una rotura a propósito, que apunta como confirmadas ventas que la base no tiene, `TypeScript` quedó en rojo en el paso de pruebas, con el type-check en verde, y los otros nueve en verde. Así que la prueba del cierre forzado también corre y detecta la pérdida en Linux. Se quitó la rotura | Fusionar el PR 16 |
 | 2026-11-07 | E1-02 terminada. PR 16 fusionado con squash en `0406b7b`. Sin la rotura, los diez checks volvieron a verde en el PR. En `main`, los diez en verde, con `TypeScript` en 22 segundos y `Dependency scan` sin avisos. CI corre en Linux y no cubre la espera del `-shm` de Windows. Las preguntas de la ficha se le entregaron a Mauricio | Empezar E1-03 en una sesión nueva |
+| 2026-11-07 | E1-03 en revisión. Mauricio decidió que las interfaces vivan en `src/main/hardware` y que la pantalla solo pida operaciones de venta, nunca órdenes a un aparato. `PrinterProvider`, `CashDrawer`, `ScaleProvider` y `CardTerminal` tienen un falso cada uno: la impresora guarda los bytes, el cajón cuenta aperturas, la báscula devuelve pesos en milésimas y la terminal cobra una sola vez por llave de idempotencia. `SaleCheckout` corre la venta completa con los cuatro falsos, en el orden del ADR 0010. `window.pos` no cambia hasta E1-11. En local, 70 pruebas en Vitest (antes 45). Con la pantalla importando el falso de la impresora, falló la prueba de frontera; con el cajón abierto antes de cobrar, fallaron 6 pruebas de cobro, incluida la de tarjeta rechazada. Playwright no se corrió en local porque la app empaquetada no cambia. CI todavía no corre | Abrir el PR, repetir la rotura en CI y fusionar |
