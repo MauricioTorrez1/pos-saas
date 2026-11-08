@@ -42,7 +42,7 @@
         "unit_price_e4": { "$ref": "values.schema.json#/$defs/unit_price_e4" },
         "quantity_milli": { "$ref": "values.schema.json#/$defs/quantity_milli" },
         "unit": { "$ref": "values.schema.json#/$defs/unit" },
-        "expected_error": { "enum": ["negative_input", "overflow"] }
+        "expected_error": { "enum": ["negative_input", "fractional_piece", "overflow"] }
       }
     },
     "case_name": {

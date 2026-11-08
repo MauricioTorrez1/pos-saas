@@ -1,0 +1,38 @@
+{
+  "$schema": "../schemas/text-input-cases.schema.json",
+  "values": [
+    { "name": "Price as the catalog writes it: $12.50", "text": "12.50", "reads_as": "unit_price_e4", "expected_value": 125000 },
+    { "name": "Price below a cent: a screw from a box of 1,000 at $153", "text": "0.153", "reads_as": "unit_price_e4", "expected_value": 1530 },
+    { "name": "Price with four decimals", "text": "1.0050", "reads_as": "unit_price_e4", "expected_value": 10050 },
+    { "name": "Cash with no decimals: $500", "text": "500", "reads_as": "amount_cents", "expected_value": 50000 },
+    { "name": "Cash with cents: $40.94", "text": "40.94", "reads_as": "amount_cents", "expected_value": 4094 },
+    { "name": "Where 0.29 * 100 gives 28.999... as a float", "text": "0.29", "reads_as": "amount_cents", "expected_value": 29 },
+    { "name": "Cable typed by the cashier: 3.275 m", "text": "3.275", "reads_as": "meter", "expected_value": 3275 },
+    { "name": "Where 1.005 * 1000 gives 1004.999... as a float", "text": "1.005", "reads_as": "kilogram", "expected_value": 1005 },
+    { "name": "A leading point: .5 kg", "text": ".5", "reads_as": "kilogram", "expected_value": 500 },
+    { "name": "A trailing point: 2. L", "text": "2.", "reads_as": "liter", "expected_value": 2000 },
+    { "name": "Whole pieces: 7 screws", "text": "7", "reads_as": "piece", "expected_value": 7000 },
+    { "name": "Leading zeros are ignored", "text": "007.50", "reads_as": "amount_cents", "expected_value": 750 },
+    { "name": "Zero", "text": "0", "reads_as": "meter", "expected_value": 0 },
+    { "name": "The largest value both languages hold exactly", "text": "9007199254740.991", "reads_as": "meter", "expected_value": 9007199254740991 }
+  ],
+  "rejections": [
+    { "name": "A comma between thousands", "text": "1,000", "reads_as": "amount_cents", "expected_error": "invalid_format" },
+    { "name": "A comma as the decimal point", "text": "3,275", "reads_as": "meter", "expected_error": "invalid_format" },
+    { "name": "A minus sign", "text": "-1", "reads_as": "amount_cents", "expected_error": "invalid_format" },
+    { "name": "A space before the number", "text": " 3.275", "reads_as": "meter", "expected_error": "invalid_format" },
+    { "name": "A line break after the number", "text": "3.275\n", "reads_as": "meter", "expected_error": "invalid_format" },
+    { "name": "A peso sign", "text": "$40.94", "reads_as": "amount_cents", "expected_error": "invalid_format" },
+    { "name": "An exponent", "text": "1e3", "reads_as": "piece", "expected_error": "invalid_format" },
+    { "name": "Full-width digits", "text": "３", "reads_as": "piece", "expected_error": "invalid_format" },
+    { "name": "Empty text", "text": "", "reads_as": "meter", "expected_error": "invalid_format" },
+    { "name": "Only a point", "text": ".", "reads_as": "kilogram", "expected_error": "invalid_format" },
+    { "name": "Two points", "text": "1.2.3", "reads_as": "liter", "expected_error": "invalid_format" },
+    { "name": "A fourth decimal in a quantity", "text": "3.2755", "reads_as": "meter", "expected_error": "too_many_decimals" },
+    { "name": "A third decimal in cash", "text": "40.945", "reads_as": "amount_cents", "expected_error": "too_many_decimals" },
+    { "name": "A fifth decimal in a price", "text": "12.50001", "reads_as": "unit_price_e4", "expected_error": "too_many_decimals" },
+    { "name": "Half a screw: pieces are whole", "text": "0.5", "reads_as": "piece", "expected_error": "fractional_piece" },
+    { "name": "One past the largest value", "text": "9007199254740.992", "reads_as": "meter", "expected_error": "overflow" },
+    { "name": "Far past the largest value", "text": "99999999999999999999", "reads_as": "amount_cents", "expected_error": "overflow" }
+  ]
+}

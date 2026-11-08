@@ -70,6 +70,20 @@
       "quantity_milli": 3275,
       "unit": "meter",
       "expected_amount_cents": 4094
+    },
+    {
+      "name": "Piola #4 by the meter: 2.5 m at $18.90",
+      "unit_price_e4": 189000,
+      "quantity_milli": 2500,
+      "unit": "meter",
+      "expected_amount_cents": 4725
+    },
+    {
+      "name": "Tornillo #8 x 1 in by the piece: 3 at $1.00",
+      "unit_price_e4": 10000,
+      "quantity_milli": 3000,
+      "unit": "piece",
+      "expected_amount_cents": 300
     }
   ],
   "rejections": [
@@ -98,8 +112,15 @@
       "name": "Product at the limit, with no room to round",
       "unit_price_e4": 153092023,
       "quantity_milli": 60247241209,
-      "unit": "piece",
+      "unit": "kilogram",
       "expected_error": "overflow"
+    },
+    {
+      "name": "Half a screw: pieces are whole",
+      "unit_price_e4": 1530,
+      "quantity_milli": 500,
+      "unit": "piece",
+      "expected_error": "fractional_piece"
     }
   ]
 }

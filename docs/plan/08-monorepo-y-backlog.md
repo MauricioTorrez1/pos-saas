@@ -23,7 +23,7 @@ pos-saas/
 │   │       ├── invoicing/    # CFDI con Facturapi
 │   │       ├── sync/         # Lotes, cursores y discrepancias
 │   │       ├── reporting/    # Reportes y bitácora
-│   │       └── ../money/     # Importes de línea, fuera de los módulos (ADR 0020)
+│   │       └── ../money/     # Dinero y cantidades, fuera de los módulos (ADR 0020)
 │   └── analytics/            # Python: FastAPI, Polars, dbt y DuckDB; sin reglas de negocio
 ├── packages/
 │   ├── contracts/            # Esquemas JSON, OpenAPI y casos de cálculo compartidos
