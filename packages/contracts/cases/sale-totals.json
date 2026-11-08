@@ -1,0 +1,100 @@
+{
+  "$schema": "../schemas/sale-totals-cases.schema.json",
+  "sales": [
+    {
+      "name": "A sale with no lines has no totals and no tax groups",
+      "lines": [],
+      "expected_subtotal_cents": 0,
+      "expected_tax_cents": 0,
+      "expected_total_cents": 0,
+      "expected_tax_groups": []
+    },
+    {
+      "name": "Cable and a hammer at 16% share one group",
+      "lines": [
+        { "total_cents": 4094, "tax_factor": "rate", "tax_rate_bp": 1600 },
+        { "total_cents": 11600, "tax_factor": "rate", "tax_rate_bp": 1600 }
+      ],
+      "expected_subtotal_cents": 13529,
+      "expected_tax_cents": 2165,
+      "expected_total_cents": 15694,
+      "expected_tax_groups": [{ "tax_factor": "rate", "tax_rate_bp": 1600, "base_cents": 13529, "tax_cents": 2165 }]
+    },
+    {
+      "name": "16%, 0%, and exempt keep separate groups, highest rate first and exempt last",
+      "lines": [
+        { "total_cents": 7000, "tax_factor": "exempt", "tax_rate_bp": 0 },
+        { "total_cents": 10000, "tax_factor": "rate", "tax_rate_bp": 0 },
+        { "total_cents": 4094, "tax_factor": "rate", "tax_rate_bp": 1600 }
+      ],
+      "expected_subtotal_cents": 20529,
+      "expected_tax_cents": 565,
+      "expected_total_cents": 21094,
+      "expected_tax_groups": [
+        { "tax_factor": "rate", "tax_rate_bp": 1600, "base_cents": 3529, "tax_cents": 565 },
+        { "tax_factor": "rate", "tax_rate_bp": 0, "base_cents": 10000, "tax_cents": 0 },
+        { "tax_factor": "exempt", "tax_rate_bp": 0, "base_cents": 7000, "tax_cents": 0 }
+      ]
+    },
+    {
+      "name": "Two lines of three screws: the VAT adds up per line to $0.82, not $0.83 from the $6.00 total",
+      "lines": [
+        { "total_cents": 300, "tax_factor": "rate", "tax_rate_bp": 1600 },
+        { "total_cents": 300, "tax_factor": "rate", "tax_rate_bp": 1600 }
+      ],
+      "expected_subtotal_cents": 518,
+      "expected_tax_cents": 82,
+      "expected_total_cents": 600,
+      "expected_tax_groups": [{ "tax_factor": "rate", "tax_rate_bp": 1600, "base_cents": 518, "tax_cents": 82 }]
+    },
+    {
+      "name": "8% and 16% in one sale: 16% goes first",
+      "lines": [
+        { "total_cents": 10800, "tax_factor": "rate", "tax_rate_bp": 800 },
+        { "total_cents": 11600, "tax_factor": "rate", "tax_rate_bp": 1600 }
+      ],
+      "expected_subtotal_cents": 20000,
+      "expected_tax_cents": 2400,
+      "expected_total_cents": 22400,
+      "expected_tax_groups": [
+        { "tax_factor": "rate", "tax_rate_bp": 1600, "base_cents": 10000, "tax_cents": 1600 },
+        { "tax_factor": "rate", "tax_rate_bp": 800, "base_cents": 10000, "tax_cents": 800 }
+      ]
+    },
+    {
+      "name": "A line at the largest value both languages hold exactly splits without overflow",
+      "lines": [{ "total_cents": 9007199254740991, "tax_factor": "rate", "tax_rate_bp": 1600 }],
+      "expected_subtotal_cents": 7764826943742234,
+      "expected_tax_cents": 1242372310998757,
+      "expected_total_cents": 9007199254740991,
+      "expected_tax_groups": [
+        {
+          "tax_factor": "rate",
+          "tax_rate_bp": 1600,
+          "base_cents": 7764826943742234,
+          "tax_cents": 1242372310998757
+        }
+      ]
+    }
+  ],
+  "rejections": [
+    {
+      "name": "A total one cent past the largest value",
+      "lines": [
+        { "total_cents": 9007199254740991, "tax_factor": "rate", "tax_rate_bp": 1600 },
+        { "total_cents": 1, "tax_factor": "rate", "tax_rate_bp": 1600 }
+      ],
+      "expected_error": "overflow"
+    },
+    {
+      "name": "A negative line total",
+      "lines": [{ "total_cents": -1, "tax_factor": "rate", "tax_rate_bp": 1600 }],
+      "expected_error": "negative_input"
+    },
+    {
+      "name": "An exempt line with a rate",
+      "lines": [{ "total_cents": 7000, "tax_factor": "exempt", "tax_rate_bp": 1600 }],
+      "expected_error": "invalid_tax_rate"
+    }
+  ]
+}

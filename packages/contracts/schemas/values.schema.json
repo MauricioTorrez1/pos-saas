@@ -23,6 +23,24 @@
     "unit": {
       "description": "Base unit of a quantity. A roll or a box converts to one of these.",
       "enum": ["piece", "meter", "kilogram", "liter"]
+    },
+    "tax_factor": {
+      "description": "How VAT applies, as CFDI 4.0 names it: rate (Tasa), even 0%, or exempt (Exento). ADR 0023.",
+      "enum": ["rate", "exempt"]
+    },
+    "tax_rate_bp": {
+      "$ref": "#/$defs/safe_integer",
+      "description": "VAT rate in basis points: 16% is 1600. An exempt product always has 0."
+    },
+    "valid_tax_rate_bp": {
+      "$ref": "#/$defs/tax_rate_bp",
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "exempt_has_no_rate": {
+      "description": "Applied to an object with tax_factor and tax_rate_bp: an exempt product has a rate of 0.",
+      "if": { "required": ["tax_factor"], "properties": { "tax_factor": { "const": "exempt" } } },
+      "then": { "properties": { "tax_rate_bp": { "const": 0 } } }
     }
   }
 }

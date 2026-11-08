@@ -9,9 +9,11 @@ JSON schemas and calculation cases shared by the TypeScript register and the Jav
 | `cases/line-amount.json` | Line amounts: `amounts` must produce a result, and `rejections` must fail |
 | `cases/text-input.json` | Numbers typed as text: `values` must be read, and `rejections` must fail |
 | `cases/amount-sum.json` | Totals of a sale: `sums` must add up, and `rejections` must fail |
+| `cases/line-tax.json` | Lines with VAT included at 16%, 8%, 0%, and exempt: `lines` must split into base and VAT, and `rejections` must fail |
+| `cases/sale-totals.json` | Sales with their VAT grouped by rate: `sales` must add up, and `rejections` must fail |
 | `src/cases.test.ts` | Checks that the cases follow their schema, and that the schema rejects bad ones |
 
-Each rejection names the error it expects. Both languages use the same codes: `negative_input`, `fractional_piece`, `overflow`, `invalid_format`, and `too_many_decimals` ([ADR 0022](../../docs/adr/0022-libreria-de-dinero.md)).
+Each rejection names the error it expects. Both languages use the same codes: `negative_input`, `fractional_piece`, `overflow`, `invalid_format`, `too_many_decimals`, and `invalid_tax_rate` ([ADR 0022](../../docs/adr/0022-libreria-de-dinero.md), [ADR 0023](../../docs/adr/0023-iva-incluido-por-linea.md)).
 
 ## Who runs the cases
 | Cases | TypeScript ([`packages/money`](../money/README.md)) | Java ([`pos.money`](../../services/core/src/main/java/io/github/mauriciotorrez1/pos/money/)) |
@@ -19,6 +21,8 @@ Each rejection names the error it expects. Both languages use the same codes: `n
 | Line amount | [`line-amount.contract.test.ts`](../money/src/line-amount.contract.test.ts) | [`LineAmountContractTest`](../../services/core/src/test/java/io/github/mauriciotorrez1/pos/money/LineAmountContractTest.java) |
 | Text input | [`text-input.contract.test.ts`](../money/src/text-input.contract.test.ts) | [`TextInputContractTest`](../../services/core/src/test/java/io/github/mauriciotorrez1/pos/money/TextInputContractTest.java) |
 | Amount sum | [`amount-sum.contract.test.ts`](../money/src/amount-sum.contract.test.ts) | [`AmountSumContractTest`](../../services/core/src/test/java/io/github/mauriciotorrez1/pos/money/AmountSumContractTest.java) |
+| Line tax | [`line-tax.contract.test.ts`](../money/src/line-tax.contract.test.ts) | [`LineTaxContractTest`](../../services/core/src/test/java/io/github/mauriciotorrez1/pos/money/LineTaxContractTest.java) |
+| Sale totals | [`sale-totals.contract.test.ts`](../money/src/sale-totals.contract.test.ts) | [`SaleTotalsContractTest`](../../services/core/src/test/java/io/github/mauriciotorrez1/pos/money/SaleTotalsContractTest.java) |
 
 Only TypeScript validates against the schema, because the `TypeScript` job runs on every pull request. Java reads the same file with a strict parser, so a case with decimals or a misspelled field also fails there.
 
@@ -55,6 +59,31 @@ Add an entry to `values` in `cases/text-input.json`.
 ```
 
 `reads_as` is `amount_cents` (2 decimals), `unit_price_e4` (4 decimals), or a unit, which reads a quantity with 3 decimals.
+
+### A line with VAT
+Add an entry to `lines` in `cases/line-tax.json`. It has the fields of a line amount, plus the rate and the three results.
+
+```json
+{
+  "name": "Say what this case protects",
+  "unit_price_e4": 1160000,
+  "quantity_milli": 1000,
+  "unit": "piece",
+  "tax_factor": "rate",
+  "tax_rate_bp": 1600,
+  "expected_subtotal_cents": 10000,
+  "expected_tax_cents": 1600,
+  "expected_total_cents": 11600
+}
+```
+
+| Field | How to write it | Example |
+| --- | --- | --- |
+| `tax_factor` | `rate` for 16%, 8%, or 0%, and `exempt` for an exempt product | `rate` |
+| `tax_rate_bp` | The rate times 100. Exempt is always `0` | 16% is `1600` |
+| `expected_total_cents` | The line amount, as in `line-amount.json` | `11600` |
+| `expected_subtotal_cents` | `total × 10000 / (10000 + tax_rate_bp)`, rounding half up. Exempt: the total | `10000` |
+| `expected_tax_cents` | The total minus the subtotal | `1600` |
 
 ### Run them
 TypeScript, from the repository root:

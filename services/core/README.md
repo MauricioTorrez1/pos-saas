@@ -6,7 +6,7 @@ Modular monolith built with Java 21, Spring Boot 4.1, and Spring Modulith. For n
 | --- | --- |
 | `src/main/java/.../core/CoreApplication.java` | Entry point of the service |
 | `src/main/java/.../core/<module>/` | One package per module |
-| `src/main/java/.../money/` | `Money`, `UnitPrice`, `Quantity`, and `LineAmount`, outside the modules ([ADR 0020](../../docs/adr/0020-casos-compartidos.md), [ADR 0022](../../docs/adr/0022-libreria-de-dinero.md)) |
+| `src/main/java/.../money/` | `Money`, `UnitPrice`, `Quantity`, `LineAmount`, and the VAT of `LineTotals` and `SaleTotals`, outside the modules ([ADR 0020](../../docs/adr/0020-casos-compartidos.md), [ADR 0022](../../docs/adr/0022-libreria-de-dinero.md), [ADR 0023](../../docs/adr/0023-iva-incluido-por-linea.md)) |
 | `src/test/java/.../core/` | Startup test and module structure test |
 | `src/test/java/.../money/` | Runs the shared cases of [`packages/contracts`](../../packages/contracts/README.md) |
 
@@ -16,9 +16,13 @@ The register does the same calculations in TypeScript ([`packages/money`](../../
 ```java
 Money cable = LineAmount.of(UnitPrice.parse("12.50"), Quantity.parse("3.275", Unit.METER)); // 4094 cents
 Money total = Money.sum(List.of(cable, new Money(107)));                                    // 4201 cents
+
+LineTotals line = LineTotals.of(UnitPrice.parse("12.50"), Quantity.parse("3.275", Unit.METER), TaxRate.of(1600));
+// line.subtotal() is 3529 cents, line.tax() is 565, and line.total() is 4094
+SaleTotals sale = SaleTotals.of(List.of(line));                     // with one TaxGroup per rate
 ```
 
-The records check their values when they are created. A failure is a `MoneyException` whose `code()` matches the code of TypeScript, such as `FRACTIONAL_PIECE` for half a screw.
+The records check their values when they are created. A failure is a `MoneyException` whose `code()` matches the code of TypeScript, such as `FRACTIONAL_PIECE` for half a screw, or `INVALID_TAX_RATE` for an exempt product with a rate. A `LineTotals` whose base and VAT do not come from its total fails with `IllegalArgumentException`, because only a bug builds one.
 
 ## Modules
 | Module | Responsibility |
