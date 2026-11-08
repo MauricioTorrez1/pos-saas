@@ -3,12 +3,14 @@ import { pathToFileURL } from 'node:url';
 
 import { app, dialog } from 'electron';
 
+import { PendingSales } from './checkout/pending-sales';
 import { registerIpcHandlers } from './ipc-handlers';
 import { AppearanceStore } from './local-store/appearance-store';
 import { LocalStore } from './local-store/local-store';
 import { LOCAL_TENANT_ID } from './local-store/local-tenant';
 import { ProductCatalog } from './local-store/product-catalog';
 import { seedSampleCatalogIfEmpty } from './local-store/sample-catalog';
+import { SaleStore } from './local-store/sale-store';
 import { openMainWindow } from './main-window';
 
 const PRELOAD_PATH = join(import.meta.dirname, '../preload/index.cjs');
@@ -50,9 +52,11 @@ async function start(): Promise<void> {
   await app.whenReady();
   const store = openLocalStore();
   const rendererEntry = resolveRendererEntry();
+  const catalog = new ProductCatalog(store, LOCAL_TENANT_ID);
   registerIpcHandlers(rendererEntry, {
-    catalog: new ProductCatalog(store, LOCAL_TENANT_ID),
+    catalog,
     appearance: new AppearanceStore(store, LOCAL_TENANT_ID),
+    pendingSales: new PendingSales(catalog, new SaleStore(store, LOCAL_TENANT_ID)),
   });
   await openMainWindow(rendererEntry, PRELOAD_PATH);
 }

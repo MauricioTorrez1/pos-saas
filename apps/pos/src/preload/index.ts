@@ -8,6 +8,10 @@ const posApi: PosApi = {
   searchProducts: (text) => ipcRenderer.invoke(IPC_CHANNELS.searchProducts, text),
   getAppearance: () => ipcRenderer.invoke(IPC_CHANNELS.getAppearance),
   saveAppearance: (appearance) => ipcRenderer.invoke(IPC_CHANNELS.saveAppearance, appearance),
+  savePendingSale: (request) => ipcRenderer.invoke(IPC_CHANNELS.savePendingSale, request),
+  listPendingSales: () => ipcRenderer.invoke(IPC_CHANNELS.listPendingSales),
+  confirmPendingSale: (saleId) => ipcRenderer.invoke(IPC_CHANNELS.confirmPendingSale, saleId),
+  cancelPendingSale: (saleId) => ipcRenderer.invoke(IPC_CHANNELS.cancelPendingSale, saleId),
 };
 
 contextBridge.exposeInMainWorld('pos', posApi);

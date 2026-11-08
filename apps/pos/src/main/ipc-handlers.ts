@@ -1,7 +1,16 @@
 import { app, ipcMain } from 'electron';
 
 import { isAppearance } from '../shared/appearance';
-import { IPC_CHANNELS, MAX_LOOKUP_TEXT_LENGTH, type AppInfo, type CatalogProduct } from '../shared/pos-api';
+import {
+  IPC_CHANNELS,
+  MAX_LOOKUP_TEXT_LENGTH,
+  type AppInfo,
+  type CatalogProduct,
+  type PendingSale,
+  type SavePendingSaleResult,
+} from '../shared/pos-api';
+import { parsePendingSaleRequest, parseSaleId } from './checkout/pending-sale-request';
+import type { PendingSales } from './checkout/pending-sales';
 import type { AppearanceStore } from './local-store/appearance-store';
 import type { ProductCatalog } from './local-store/product-catalog';
 import { assertTrustedSender } from './trusted-url';
@@ -12,6 +21,7 @@ const SEARCH_RESULT_LIMIT = 20;
 export interface IpcServices {
   readonly catalog: ProductCatalog;
   readonly appearance: AppearanceStore;
+  readonly pendingSales: PendingSales;
 }
 
 /** Whatever crosses the bridge is checked again here, because the database must not depend on the screen being right. */
@@ -28,7 +38,7 @@ function requireLookupText(value: unknown): string {
  * @param rendererEntry address the register screen was loaded from
  * @param services the local data the answers come from
  */
-export function registerIpcHandlers(rendererEntry: string, { catalog, appearance }: IpcServices): void {
+export function registerIpcHandlers(rendererEntry: string, { catalog, appearance, pendingSales }: IpcServices): void {
   const answerScreen = <Result>(channel: string, respond: (argument: unknown) => Result): void => {
     ipcMain.handle(channel, (event, argument: unknown) => {
       assertTrustedSender(event.senderFrame?.url, rendererEntry);
@@ -48,4 +58,8 @@ export function registerIpcHandlers(rendererEntry: string, { catalog, appearance
     }
     appearance.save(value);
   });
+  answerScreen(IPC_CHANNELS.savePendingSale, (request): SavePendingSaleResult => pendingSales.save(parsePendingSaleRequest(request)));
+  answerScreen(IPC_CHANNELS.listPendingSales, (): PendingSale[] => pendingSales.list());
+  answerScreen(IPC_CHANNELS.confirmPendingSale, (saleId): void => pendingSales.confirm(parseSaleId(saleId)));
+  answerScreen(IPC_CHANNELS.cancelPendingSale, (saleId): void => pendingSales.cancel(parseSaleId(saleId)));
 }

@@ -25,6 +25,7 @@ interface ProductRow {
  */
 export class ProductCatalog {
   readonly #tenantId: string;
+  readonly #findById: StatementSync;
   readonly #findByCode: StatementSync;
   readonly #searchByName: StatementSync;
 
@@ -34,6 +35,7 @@ export class ProductCatalog {
    */
   constructor(store: LocalStore, tenantId: string) {
     this.#tenantId = tenantId;
+    this.#findById = store.prepare(`SELECT ${PRODUCT_COLUMNS} FROM product WHERE product.tenant_id = ? AND product.id = ?`);
     this.#findByCode = store.prepare(`
       SELECT ${PRODUCT_COLUMNS}
       FROM product_barcode
@@ -48,6 +50,17 @@ export class ProductCatalog {
       ORDER BY product_search.rank, product.name
       LIMIT ?
     `);
+  }
+
+  /**
+   * Finds a product by its id, to price a sale with the catalog instead of with what the screen says.
+   *
+   * @param id the UUIDv7 of the product
+   * @returns the product, or null if this business has no product with that id
+   */
+  findById(id: string): CatalogProduct | null {
+    const row = this.#findById.get(this.#tenantId, id) as unknown as ProductRow | undefined;
+    return row === undefined ? null : toCatalogProduct(row);
   }
 
   /**

@@ -1,6 +1,6 @@
 # Register app
 
-Desktop register built with Electron, React, and TypeScript, using [electron-vite](https://electron-vite.org/) on top of Vite. It keeps its local database up to date and rings up a sale from the keyboard: a scan or a search by name adds a product and updates the totals with VAT. Collecting the payment and the real devices arrive in the next tasks of the [roadmap](../../docs/plan/04-roadmap.md).
+Desktop register built with Electron, React, and TypeScript, using [electron-vite](https://electron-vite.org/) on top of Vite. It keeps its local database up to date and rings up a sale from the keyboard: a scan or a search by name adds a product and updates the totals with VAT. A sale left unfinished by a power cut comes back when the register starts. Collecting the payment and the real devices arrive in the next tasks of the [roadmap](../../docs/plan/04-roadmap.md).
 
 Electron 45 runs on Windows 10 and later, which covers the machines of [ADR 0002](../../docs/adr/0002-caja-electron.md).
 
@@ -9,13 +9,14 @@ Electron 45 runs on Windows 10 and later, which covers the machines of [ADR 0002
 | --- | --- | --- |
 | `src/main/` | Window, navigation limits, answers to the screen, and the local database | Main process, with Node |
 | `src/main/hardware/` | Device interfaces, and their fakes in `fakes/` | Main process, with Node |
-| `src/main/checkout/` | Checkout, which drives the devices in the order of ADR 0010 | Main process, with Node |
+| `src/main/checkout/` | Checkout, which drives the devices in the order of ADR 0010, and the states of a sale | Main process, with Node |
 | `src/preload/` | The `window.pos` bridge | Sandboxed preload script |
 | `src/renderer/` | React screen | Sandboxed renderer, without Node |
 | `src/renderer/sale/` | Sale screen: lookup box, lines, totals, and scanner detection | Sandboxed renderer, without Node |
 | `src/renderer/appearance/` | Dialog where the owner changes how the register looks | Sandboxed renderer, without Node |
+| `src/renderer/recovery/` | Dialog that asks about the sales left pending | Sandboxed renderer, without Node |
 | `src/shared/` | Types and channel names used on both sides of the bridge | Compiled into each side |
-| `e2e/` | Startup, database, and sale tests with Playwright, and the crash drill | Test runner, driving the built app |
+| `e2e/` | Startup, database, sale, and recovery tests with Playwright, and the crash drill | Test runner, driving the built app |
 
 ## How the screen stays away from Node
 - **Window:** `contextIsolation` and `sandbox` are on, and `nodeIntegration` is off. The startup test reads these settings from the running window and checks that `require` and `process` do not exist on the screen.
@@ -42,6 +43,22 @@ A barcode scanner acts as a keyboard, so the register tells it apart by speed: a
 Search runs on an FTS5 index in the local database. It matches the beginning of each word and ignores accents and capitals. With 5,000 products on the development PC, adding a scanned product took 24.5 ms at the 95th percentile, against a limit of 100 ms.
 
 Until the real catalog arrives with F0-16, the register fills an empty catalog with sample products marked `is_sample`. Their barcodes are valid EAN-13 codes that start with 2, a range reserved for use inside a store. `2000000000107` is the first one, a hammer at $116.00.
+
+## Sale states and recovery
+A sale is saved as `pending_payment` before anything is charged, so a power cut can never leave money without a record ([ADR 0010](../../docs/adr/0010-guardar-antes-de-cobrar.md)). From there it can only become `completed` or `cancelled`, and each change is one transaction. `src/main/checkout/sale-state-machine.ts` gives a clear error, and triggers in the database refuse the same changes if the code ever gets it wrong ([ADR 0025](../../docs/adr/0025-maquina-de-estados-de-la-venta.md)).
+
+The screen sends only products, quantities, and the total the customer sees. The main process prices the sale with the catalog and saves nothing if its total is different. A pending sale counts neither in stock nor in the cash-up: the `counted_sale` view only has completed sales, and a `payment` row only exists for them.
+
+When the register starts, it shows the sales left pending, oldest first, and does not let anyone sell until each one is answered.
+
+![The register asking whether a pending sale was paid](../../docs/capturas/e1-10-venta-pendiente.png)
+
+| Key | What it does |
+| --- | --- |
+| F2 | The sale was paid. It records a cash payment for the whole total |
+| F4 | The sale was not paid. It stays in the database as cancelled |
+
+The keyboard rests on the dialog rather than on a button, and Esc does nothing, so a scanner or a stray key cannot answer for the cashier.
 
 ## Appearance
 F9 opens the dialog where the owner sets the business name, one of six colors, one of three text sizes, and the light or dark theme. Changes show at once and stay only when saved, and Esc undoes them. The stylesheet takes everything from a few tokens, driven by three attributes on the page, and a test checks that the text of every color and theme keeps a contrast of at least 4.5:1.

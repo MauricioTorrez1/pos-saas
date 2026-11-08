@@ -9,6 +9,9 @@ import { SaleAlreadyCompletedError, type RecordedPayment, type SaleToCheckout } 
 const CASH_SALE: SaleToCheckout = {
   saleId: '019a5f2e-7c40-7b1a-9d2e-3f4a5b6c7d8e',
   idempotencyKey: '019a5f2e-7c41-7000-8000-000000000001',
+  lines: [],
+  subtotalCents: 4849,
+  taxCents: 776,
   totalCents: 5625,
   paymentMethod: 'cash',
 };

@@ -5,6 +5,8 @@ const QUANTITY_DECIMALS = 3;
 const BASIS_POINTS_PER_PERCENT = 100;
 const PERCENT_DECIMALS = 2;
 
+const MOMENT_FORMAT = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
+
 const UNIT_LABELS: Readonly<Record<Unit, string>> = {
   piece: 'pza',
   meter: 'm',
@@ -33,6 +35,16 @@ export function formatQuantity({ milli, unit }: Quantity): string {
   const whole = (milli - thousandths) / MILLI_PER_UNIT;
   const number = unit === 'piece' ? String(whole) : `${whole}.${String(thousandths).padStart(QUANTITY_DECIMALS, '0')}`;
   return `${number} ${UNIT_LABELS[unit]}`;
+}
+
+/**
+ * Shows when a sale happened, in the time zone of the register.
+ *
+ * @param isoMoment the moment in ISO 8601
+ * @returns text such as "8 nov 2026, 2:05 p.m."
+ */
+export function formatSaleMoment(isoMoment: string): string {
+  return MOMENT_FORMAT.format(new Date(isoMoment));
 }
 
 /**

@@ -71,7 +71,17 @@ test('runs the screen isolated and sandboxed', async ({ electronApp, appWindow }
 test('exposes only the agreed functions through the bridge', async ({ appWindow }) => {
   const bridgeFunctions = await appWindow.evaluate(() => Object.keys(window.pos));
 
-  expect(bridgeFunctions).toEqual(['getAppInfo', 'findProductByCode', 'searchProducts', 'getAppearance', 'saveAppearance']);
+  expect(bridgeFunctions).toEqual([
+    'getAppInfo',
+    'findProductByCode',
+    'searchProducts',
+    'getAppearance',
+    'saveAppearance',
+    'savePendingSale',
+    'listPendingSales',
+    'confirmPendingSale',
+    'cancelPendingSale',
+  ]);
 });
 
 test('keeps the window on its own screen when a page tries to leave', async ({ electronApp, appWindow }) => {

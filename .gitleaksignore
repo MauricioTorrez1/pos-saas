@@ -1,0 +1,5 @@
+# False alarms accepted from the secret scan. Each entry is a fingerprint from the scan log.
+
+# A made-up UUID in a test, read as an API credential. A later commit of the same change removed it,
+# but the scan reads every commit, so the old one needs this entry.
+fceda9f72df390c1c2912979821da38f7964d975:apps/pos/src/main/checkout/pending-sale-request.test.ts:generic-api-key:5

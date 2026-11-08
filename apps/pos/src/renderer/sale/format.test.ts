@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatQuantity, formatTaxLabel } from './format';
+import { formatQuantity, formatSaleMoment, formatTaxLabel } from './format';
+
+describe('formatSaleMoment', () => {
+  it('shows the date and the time of the register', () => {
+    const moment = new Date(2026, 10, 8, 14, 5).toISOString();
+
+    const text = formatSaleMoment(moment);
+
+    expect(text).toMatch(/^8 nov 2026/);
+    expect(text).toContain('2:05');
+  });
+});
 
 describe('formatQuantity', () => {
   it.each([
