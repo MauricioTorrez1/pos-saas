@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Text input cases",
+  "description": "Cases for reading a number typed as text into an integer of ADR 0011, without floating point.",
+  "type": "object",
+  "required": ["values", "rejections"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "values": {
+      "description": "Texts that must produce a value.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/value_case" }
+    },
+    "rejections": {
+      "description": "Texts that must fail instead of producing a value.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/rejection_case" }
+    }
+  },
+  "$defs": {
+    "value_case": {
+      "type": "object",
+      "required": ["name", "text", "reads_as", "expected_value"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/case_name" },
+        "text": { "type": "string" },
+        "reads_as": { "$ref": "#/$defs/reads_as" },
+        "expected_value": { "$ref": "values.schema.json#/$defs/safe_integer", "minimum": 0 }
+      }
+    },
+    "rejection_case": {
+      "type": "object",
+      "required": ["name", "text", "reads_as", "expected_error"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/case_name" },
+        "text": { "type": "string" },
+        "reads_as": { "$ref": "#/$defs/reads_as" },
+        "expected_error": {
+          "enum": ["invalid_format", "too_many_decimals", "overflow", "fractional_piece"]
+        }
+      }
+    },
+    "reads_as": {
+      "description": "amount_cents keeps 2 decimals and unit_price_e4 keeps 4. A unit reads a quantity, with 3 decimals.",
+      "anyOf": [{ "enum": ["amount_cents", "unit_price_e4"] }, { "$ref": "values.schema.json#/$defs/unit" }]
+    },
+    "case_name": {
+      "description": "Shown when the case fails, so it says what the case protects.",
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

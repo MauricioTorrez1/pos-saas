@@ -1,0 +1,21 @@
+{
+  "$schema": "../schemas/amount-sum-cases.schema.json",
+  "sums": [
+    { "name": "A sale with no lines totals zero", "amounts_cents": [], "expected_total_cents": 0 },
+    { "name": "Cable and screws: $40.94 + $1.07", "amounts_cents": [4094, 107], "expected_total_cents": 4201 },
+    {
+      "name": "Two lines of 0.125 kg of nails at $45.00, each rounded on its own: 5.63 + 5.63",
+      "amounts_cents": [563, 563],
+      "expected_total_cents": 1126
+    },
+    {
+      "name": "A total at the largest value both languages hold exactly",
+      "amounts_cents": [9007199254740990, 1],
+      "expected_total_cents": 9007199254740991
+    }
+  ],
+  "rejections": [
+    { "name": "A total one cent past the largest value", "amounts_cents": [9007199254740991, 1], "expected_error": "overflow" },
+    { "name": "A negative amount", "amounts_cents": [4094, -1], "expected_error": "negative_input" }
+  ]
+}

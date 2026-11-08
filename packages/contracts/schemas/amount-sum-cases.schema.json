@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Amount sum cases",
+  "description": "Cases for adding amounts in cents, such as the lines of a sale. Each line is already rounded (ADR 0011).",
+  "type": "object",
+  "required": ["sums", "rejections"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "sums": {
+      "description": "Amounts that must add up to a total.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/sum_case" }
+    },
+    "rejections": {
+      "description": "Amounts that must fail instead of adding up.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/rejection_case" }
+    }
+  },
+  "$defs": {
+    "sum_case": {
+      "type": "object",
+      "required": ["name", "amounts_cents", "expected_total_cents"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/case_name" },
+        "amounts_cents": {
+          "type": "array",
+          "items": { "$ref": "values.schema.json#/$defs/amount_cents", "minimum": 0 }
+        },
+        "expected_total_cents": { "$ref": "values.schema.json#/$defs/amount_cents", "minimum": 0 }
+      }
+    },
+    "rejection_case": {
+      "type": "object",
+      "required": ["name", "amounts_cents", "expected_error"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/case_name" },
+        "amounts_cents": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "values.schema.json#/$defs/amount_cents" }
+        },
+        "expected_error": { "enum": ["negative_input", "overflow"] }
+      }
+    },
+    "case_name": {
+      "description": "Shown when the case fails, so it says what the case protects.",
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

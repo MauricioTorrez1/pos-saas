@@ -1,13 +1,56 @@
 import { describe, expect, test } from "vitest";
 import { Ajv2020 } from "ajv/dist/2020.js";
 
+import amountSumCases from "../cases/amount-sum.json" with { type: "json" };
 import lineAmountCases from "../cases/line-amount.json" with { type: "json" };
+import textInputCases from "../cases/text-input.json" with { type: "json" };
+import amountSumSchema from "../schemas/amount-sum-cases.schema.json" with { type: "json" };
 import lineAmountSchema from "../schemas/line-amount-cases.schema.json" with { type: "json" };
+import textInputSchema from "../schemas/text-input-cases.schema.json" with { type: "json" };
 import valuesSchema from "../schemas/values.schema.json" with { type: "json" };
 
 const ajv = new Ajv2020({ allErrors: true });
 ajv.addSchema(valuesSchema, "values.schema.json");
 const validateLineAmountCases = ajv.compile(lineAmountSchema);
+const validateTextInputCases = ajv.compile(textInputSchema);
+const validateAmountSumCases = ajv.compile(amountSumSchema);
+
+describe.each([
+  ["text input cases", validateTextInputCases, textInputCases],
+  ["amount sum cases", validateAmountSumCases, amountSumCases],
+])("%s", (_description, validate, cases) => {
+  test("follow their schema", () => {
+    const isValid = validate(cases);
+
+    expect(validate.errors).toBeNull();
+    expect(isValid).toBe(true);
+  });
+});
+
+describe("text input schema", () => {
+  const validValue = textInputCases.values[0]!;
+
+  test.each([
+    ["a text read as an unknown kind", { reads_as: "bucket" }],
+    ["a number instead of a text", { text: 12.5 }],
+    ["an expected value with decimals", { expected_value: 1.5 }],
+  ])("rejects %s", (_description, change) => {
+    const file = { values: [{ ...validValue, ...change }], rejections: textInputCases.rejections };
+
+    expect(validateTextInputCases(file)).toBe(false);
+  });
+});
+
+describe("amount sum schema", () => {
+  test("rejects a negative amount in a sum that must succeed", () => {
+    const file = {
+      sums: [{ name: "Negative", amounts_cents: [-1], expected_total_cents: 0 }],
+      rejections: amountSumCases.rejections,
+    };
+
+    expect(validateAmountSumCases(file)).toBe(false);
+  });
+});
 
 const VALID_AMOUNT_CASE = lineAmountCases.amounts[0];
 
