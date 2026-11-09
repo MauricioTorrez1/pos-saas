@@ -62,6 +62,14 @@ function total(page: Page): Locator {
   return page.getByRole('status', { name: 'Total', exact: true });
 }
 
+/** The keys of the finished sale start working a moment after it shows, so Enter is retried until the dialog closes. */
+async function closeDone(page: Page): Promise<void> {
+  await expect(async () => {
+    await page.keyboard.press('Enter');
+    await expect(payment(page)).toHaveCount(0, { timeout: 1000 });
+  }).toPass();
+}
+
 /** A scanner is a keyboard that types a whole code at once and ends it with Enter. */
 async function scan(page: Page, code: string): Promise<void> {
   await page.keyboard.type(code);
@@ -107,8 +115,7 @@ test('charges a sale in cash and shows the change, using only the keyboard (RF-0
 
   await expect(page.getByRole('status', { name: 'Cambio a entregar' })).toHaveText('Entrega $34.00 de cambio');
   await expect(payment(page)).toContainText('Folio T1-000001');
-  await page.keyboard.press('Enter');
-  await expect(payment(page)).toHaveCount(0);
+  await closeDone(page);
   await expect(total(page)).toHaveText('$0.00');
   await expect(lookupBox(page)).toBeFocused();
   expect(await readSavedRows(register, testSalePaths(userDataDir).databasePath)).toEqual({
@@ -258,8 +265,7 @@ test('numbers the sales and prints the last ticket again with F8 (RF-018)', asyn
         await expect(payment(page)).toContainText('Ticket T1-000002 reimpreso.', { timeout: 1000 });
       }).toPass();
     }
-    await page.keyboard.press('Enter');
-    await expect(payment(page)).toHaveCount(0);
+    await closeDone(page);
     await expect(lookupBox(page)).toBeFocused();
   }
   await page.keyboard.press('F8');
