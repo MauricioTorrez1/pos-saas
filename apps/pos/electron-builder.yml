@@ -1,0 +1,27 @@
+# How the register is packed for Windows (E1-36, ADR 0031). Everything the register needs is already bundled by
+# electron-vite into out/, so no node_modules travel inside the installer.
+appId: mx.pos-saas.register
+productName: Caja
+copyright: AGPL-3.0-only
+directories:
+  output: dist
+files:
+  - out/**/*
+  - package.json
+asar: true
+npmRebuild: false
+win:
+  target:
+    - target: nsis
+      arch: x64
+  # Without a code-signing certificate Windows shows the SmartScreen warning on first install. See docs/instalacion.md.
+  signAndEditExecutable: false
+nsis:
+  # A per-user install needs no administrator, and an update is the same installer run again: it keeps the data.
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  # The sales live in the user data folder, and an uninstall must never delete them.
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
