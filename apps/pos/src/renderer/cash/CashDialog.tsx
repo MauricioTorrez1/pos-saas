@@ -1,5 +1,5 @@
 import { formatCents } from '@pos-saas/money';
-import { useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 
 import type { UserSummary } from '../../shared/auth';
 import { countCash, DENOMINATIONS_CENTS } from '../../shared/cash';
@@ -7,11 +7,11 @@ import type { CashCut, CashMovementKind, CashStatus, CutComparisonView } from '.
 import type { PosApi } from '../../shared/pos-api';
 import { readTypedCents } from '../checkout/amount-input';
 import { formatSignedCents } from '../sale/format';
+import { Field, Message, useAction } from '../ui/form-parts';
 import { ModalDialog } from '../ui/ModalDialog';
 import { useWindowKeys } from '../ui/use-window-keys';
 
 const MOMENT = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
-const FAILED = 'No se pudo completar. Intenta de nuevo y, si sigue fallando, reinicia la caja.';
 const INVALID_AMOUNT = 'Escribe solo números, por ejemplo 500 o 500.50.';
 
 type View =
@@ -59,79 +59,6 @@ export function CashDialog({ posApi, user, status, onStatusChange, onClose }: Ca
       {view.kind === 'limit' && <LimitView posApi={posApi} onStatusChange={onStatusChange} onBack={back} current={status.withdrawalLimitCents} />}
     </ModalDialog>
   );
-}
-
-interface FieldProps {
-  readonly label: string;
-  readonly value: string;
-  readonly onChange: (value: string) => void;
-  readonly type?: 'text' | 'password';
-  readonly autoFocus?: boolean;
-  readonly hint?: string;
-  readonly maxLength?: number;
-}
-
-/** A labeled box. Enter moves to the next box of the form, and never submits it. */
-function Field({ label, value, onChange, type = 'text', autoFocus = false, hint, maxLength }: FieldProps): ReactElement {
-  const ref = useRef<HTMLInputElement>(null);
-  return (
-    <label className="payment-field">
-      <span>{label}</span>
-      <input
-        ref={ref}
-        aria-label={label}
-        type={type}
-        inputMode={type === 'password' ? 'numeric' : 'decimal'}
-        autoComplete="off"
-        spellCheck={false}
-        autoFocus={autoFocus}
-        maxLength={maxLength}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={moveOnEnter}
-      />
-      {hint !== undefined && <small>{hint}</small>}
-    </label>
-  );
-}
-
-function moveOnEnter(event: KeyboardEvent<HTMLInputElement>): void {
-  if (event.key !== 'Enter') {
-    return;
-  }
-  event.preventDefault();
-  const inputs = [...(event.currentTarget.closest('dialog')?.querySelectorAll<HTMLInputElement>('input') ?? [])];
-  inputs[inputs.indexOf(event.currentTarget) + 1]?.focus();
-}
-
-function Message({ text }: { readonly text: string | null }): ReactElement | null {
-  return text === null ? null : (
-    <p className="notice" role="alert">
-      {text}
-    </p>
-  );
-}
-
-/** Runs one request at a time and turns a failure into a message. */
-function useAction(): { isBusy: boolean; message: string | null; setMessage: (text: string | null) => void; run: (work: () => Promise<void>) => void } {
-  const [isBusy, setIsBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const running = useRef(false);
-  const run = (work: () => Promise<void>): void => {
-    if (running.current) {
-      return;
-    }
-    running.current = true;
-    setIsBusy(true);
-    setMessage(null);
-    work()
-      .catch(() => setMessage(FAILED))
-      .finally(() => {
-        running.current = false;
-        setIsBusy(false);
-      });
-  };
-  return { isBusy, message, setMessage, run };
 }
 
 interface SummaryViewProps {

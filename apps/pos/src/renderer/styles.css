@@ -1000,3 +1000,19 @@ kbd {
   font-weight: 700;
   color: var(--alert);
 }
+.return-quantity {
+  width: 6rem;
+  height: 2.25rem;
+  padding: 0 0.5rem;
+  font-size: 1.125rem;
+  text-align: right;
+  background: var(--ground);
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+}
+
+.return-override {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}

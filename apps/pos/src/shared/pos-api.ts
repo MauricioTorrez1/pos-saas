@@ -2,6 +2,7 @@ import type { Quantity, TaxRate, Unit } from '@pos-saas/money';
 
 import type { Appearance } from './appearance';
 import type { LoginResult, UserRole, UserSummary } from './auth';
+import type { FindReturnableResult, ReturnRequest, ReturnResult } from './returns-api';
 import type {
   CashMovementRequest,
   CashMovementResult,
@@ -20,6 +21,8 @@ export const IPC_CHANNELS = {
   login: 'auth:login',
   logout: 'auth:logout',
   createUser: 'auth:create-user',
+  findReturnableSale: 'returns:find-sale',
+  createReturn: 'returns:create',
   getCashStatus: 'cash:get-status',
   openCashSession: 'cash:open',
   recordCashMovement: 'cash:record-movement',
@@ -161,6 +164,23 @@ export interface PosApi {
    * @returns the app version, as the main process knows it
    */
   getAppInfo(): Promise<AppInfo>;
+
+  /**
+   * Finds the completed sale a customer wants to return from the folio on their ticket (RF-019).
+   *
+   * @param folio what was typed, such as T1-000123 or just 123`
+   * @returns the sale with what can still come back from each line, or why it was not found
+   */
+  findReturnableSale(folio: string): Promise<FindReturnableResult>;
+
+  /**
+   * Records a return as a record next to the sale, which never changes. The owner authorizes it, it is refused by default
+   * after 30 days or for cut-to-measure products, and it can never bring back more than was sold.
+   *
+   * @param request the sale, what comes back from each line, the reason, and the authorization
+   * @returns what to give back by each means, or why the return was refused
+   */
+  createReturn(request: ReturnRequest): Promise<ReturnResult>;
 
   /**
    * Reads how the cash of the register stands: whether it is open, what is expected in the drawer, and whether to withdraw.

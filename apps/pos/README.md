@@ -93,6 +93,21 @@ pnpm --filter @pos-saas/pos start
 
 with the variable `POS_PRINTER_SHARE` set to the shared printer, such as `\\localhost\TM-T20`. Without it the register sells normally and prints nothing, because a missing printer must never stop a sale.
 
+## Sign in
+Nothing works until a person enters with a PIN of four to eight digits, with or without internet. The first start asks for the owner. PINs are kept only as scrypt hashes, five wrong ones in a row lock that person for five minutes (the lock survives a restart), and the main process refuses sales and the catalog while nobody is signed in ([ADR 0029](../../docs/adr/0029-acceso-con-pin-y-sesion-de-caja.md)). F6 signs out.
+
+## Cash
+F3 opens everything about the cash of the register. A closed register cannot sell: it opens with a float. Entries and exits of cash need a reason, and a cashier needs the PIN of an owner to take cash out. The register warns, without stopping any sale, when the drawer passes the limit the owner set (,000 at first). The cut counts bills and coins by denomination plus the card and transfer vouchers, shows the difference of each form of payment, asks for a reason when it does not balance, and closes the session. Only the owner sees what the drawer should hold.
+
+| Key | What it does (inside the cash dialog) |
+| --- | --- |
+| F5 / F6 | Cash entry / cash exit |
+| F7 | The cut, which closes the register |
+| F8 | Changes the withdrawal warning (owner) |
+| F2 | Confirms the form that is open |
+
+## Returns
+F4 takes back what a customer returns. Type the folio of the ticket, say how much of each line comes back and why, and the screen shows what is given back by each means before confirming. The sale never changes: the return is a record next to it ([ADR 0030](../../docs/adr/0030-devoluciones-como-registro-compensatorio.md)). The owner authorizes every return, so a cashier asks for their PIN. A sale of more than 30 days, or a product sold by length or weight, is refused unless the owner overrides it. A return can never bring back more than was sold.
 ## Appearance
 F9 opens the dialog where the owner sets the business name, one of six colors, one of three text sizes, and the light or dark theme. Changes show at once and stay only when saved, and Esc undoes them. The stylesheet takes everything from a few tokens, driven by three attributes on the page, and a test checks that the text of every color and theme keeps a contrast of at least 4.5:1.
 

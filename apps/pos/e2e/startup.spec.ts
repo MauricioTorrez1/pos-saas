@@ -78,6 +78,8 @@ test('exposes only the agreed functions through the bridge', async ({ appWindow 
     'login',
     'logout',
     'createUser',
+    'findReturnableSale',
+    'createReturn',
     'getCashStatus',
     'openCashSession',
     'recordCashMovement',

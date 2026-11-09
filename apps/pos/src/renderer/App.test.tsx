@@ -4,6 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_APPEARANCE, type Appearance } from '../shared/appearance';
 import type { UserSummary } from '../shared/auth';
 import type { CashStatus } from '../shared/cash-api';
+import type { ReturnableSale } from '../shared/returns-api';
 import type { CatalogProduct, CheckoutSaleResult, PendingSale, PosApi } from '../shared/pos-api';
 import { App } from './App';
 
@@ -64,6 +65,8 @@ function fakePosApi(overrides: Partial<PosApi> = {}): PosApi {
     login: () => Promise.resolve({ status: 'ok', user: OWNER }),
     logout: () => Promise.resolve(),
     createUser: () => Promise.resolve(OWNER),
+    findReturnableSale: () => Promise.resolve({ status: 'not_found' }),
+    createReturn: () => Promise.resolve({ status: 'not_found' }),
     getCashStatus: () => Promise.resolve(OPEN_CASH),
     openCashSession: () => Promise.resolve({ status: 'opened', cash: OPEN_CASH }),
     recordCashMovement: () => Promise.resolve({ status: 'recorded', cash: OPEN_CASH }),
@@ -1395,6 +1398,125 @@ describe('the cash of the register (E1-21, E1-22, E1-23)', () => {
     pressKey('F2');
 
     await waitFor(() => expect(setWithdrawalLimit).toHaveBeenCalledExactlyOnceWith({ limitCents: 800_000 }));
+  });
+});
+
+describe('returns (E1-15)', () => {
+  const CASHIER: UserSummary = { id: '019a5f2e-7c41-7b1a-9d2e-3f4a5b6c7d8f', name: 'Ana', role: 'cashier' };
+  const SALE: ReturnableSale = {
+    saleId: '019a5f2e-7c42-7b1a-9d2e-3f4a5b6c7d80',
+    folio: 'T1-000123',
+    completedAt: '2026-11-08T20:05:00.000Z',
+    totalCents: 23200,
+    daysOld: 10,
+    lines: [
+      { saleLineId: '019a5f2e-7c43-7b1a-9d2e-3f4a5b6c7d81', productName: 'Martillo', unit: 'piece', soldMilli: 2000, returnedMilli: 0, returnableMilli: 2000, unitPriceE4: 1_160_000, lineTotalCents: 23200, refundedCents: 0 },
+    ],
+    parts: [
+      { method: 'cash', reference: null, remainingCents: 19200 },
+      { method: 'transfer', reference: 'SPEI-778812', remainingCents: 4000 },
+    ],
+    violations: [],
+  };
+
+  function typeInto(name: string, value: string): void {
+    fireEvent.change(screen.getByRole('textbox', { name, hidden: true }), { target: { value } });
+  }
+
+  function pressKey(key: string): void {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key });
+  }
+
+  async function openFound(overrides: Partial<PosApi> = {}, sale: ReturnableSale = SALE): Promise<void> {
+    await renderApp(fakePosApi({ findReturnableSale: () => Promise.resolve({ status: 'found', sale }), ...overrides }));
+    press('F4');
+    await screen.findByRole('heading', { name: 'Devolución', hidden: true });
+    typeInto('Folio del ticket', 'T1-000123');
+    pressKey('Enter');
+    await screen.findByRole('heading', { name: 'Devolución del ticket T1-000123', hidden: true });
+  }
+
+  it('looks the sale up by the folio, and says so when there is none', async () => {
+    const findReturnableSale = vi.fn<PosApi['findReturnableSale']>(() => Promise.resolve({ status: 'not_found' }));
+    await renderApp(fakePosApi({ findReturnableSale }));
+    press('F4');
+    await screen.findByRole('heading', { name: 'Devolución', hidden: true });
+
+    typeInto('Folio del ticket', 't1-000999');
+    pressKey('Enter');
+
+    expect((await screen.findByRole('alert', { hidden: true })).textContent).toContain('No hay ninguna venta cobrada');
+    expect(findReturnableSale).toHaveBeenCalledExactlyOnceWith('t1-000999');
+  });
+
+  it('shows what is given back by each means before the owner confirms, and then gives the cash to hand over', async () => {
+    const createReturn = vi.fn<PosApi['createReturn']>(() =>
+      Promise.resolve({ status: 'returned', returnId: 'r1', totalCents: 23200, refunds: [{ method: 'cash', reference: null, amountCents: 19200 }, { method: 'transfer', reference: 'SPEI-778812', amountCents: 4000 }] }),
+    );
+    await openFound({ createReturn });
+
+    pressKey('F5');
+    expect(screen.getByRole('status', { name: 'Lo que se regresa', hidden: true }).textContent).toContain('Se regresan $232.00: Efectivo $192.00 y Transferencia $40.00');
+    typeInto('Motivo de la devolución', ' No era el modelo ');
+    pressKey('F2');
+
+    expect((await screen.findByRole('status', { name: 'Lo que se entrega', hidden: true })).textContent).toBe('Entrega $192.00 en efectivo');
+    expect(createReturn).toHaveBeenCalledExactlyOnceWith({ saleId: SALE.saleId, lines: [{ saleLineId: SALE.lines[0]!.saleLineId, quantityMilli: 2000 }], reason: 'No era el modelo' });
+  });
+
+  it('returns only part of a line, and never lets more than was sold be typed', async () => {
+    const createReturn = vi.fn<PosApi['createReturn']>(() => Promise.resolve({ status: 'exceeds_sold' }));
+    await openFound({ createReturn });
+
+    fireEvent.change(screen.getByLabelText('Devuelve de Martillo'), { target: { value: '3' } });
+    typeInto('Motivo de la devolución', 'x');
+    pressKey('F2');
+    expect((await screen.findByRole('alert', { hidden: true })).textContent).toContain('Revisa las cantidades');
+    expect(createReturn).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Devuelve de Martillo'), { target: { value: '1' } });
+
+    expect(screen.getByRole('status', { name: 'Lo que se regresa', hidden: true }).textContent).toContain('$116.00');
+  });
+
+  it('asks for a reason, and does not send the return without one', async () => {
+    const createReturn = vi.fn<PosApi['createReturn']>();
+    await openFound({ createReturn });
+
+    pressKey('F5');
+    pressKey('F2');
+
+    expect((await screen.findByRole('alert', { hidden: true })).textContent).toContain('Escribe el motivo');
+    expect(createReturn).not.toHaveBeenCalled();
+  });
+
+  it('asks a cashier for the PIN of the owner, and sends it with the return', async () => {
+    const createReturn = vi.fn<PosApi['createReturn']>(() => Promise.resolve({ status: 'wrong_pin', attemptsLeft: 4 }));
+    await openFound({ createReturn, getAuthState: () => Promise.resolve({ needsSetup: false, users: [CASHIER], current: CASHIER }) });
+
+    pressKey('F5');
+    typeInto('Motivo de la devolución', 'x');
+    fireEvent.change(screen.getByLabelText('PIN del dueño'), { target: { value: '4321' } });
+    pressKey('F2');
+
+    await waitFor(() => expect(createReturn).toHaveBeenCalledWith(expect.objectContaining({ ownerPin: '4321' })));
+    expect((await screen.findByRole('alert', { hidden: true })).textContent).toContain('PIN del dueño incorrecto');
+  });
+
+  it('warns that a rule is broken, and only sends the exception when the owner is said to allow it (RF-019)', async () => {
+    const createReturn = vi.fn<PosApi['createReturn']>(() => Promise.resolve({ status: 'needs_override', violations: ['older_than_window'] }));
+    await openFound({ createReturn }, { ...SALE, daysOld: 45, violations: ['older_than_window'] });
+
+    expect(screen.getByRole('alert', { hidden: true }).textContent).toContain('tiene más de 30 días');
+    pressKey('F5');
+    typeInto('Motivo de la devolución', 'x');
+    pressKey('F2');
+    await waitFor(() => expect(createReturn).toHaveBeenCalledTimes(1));
+    expect(createReturn.mock.calls[0]![0]).not.toHaveProperty('override');
+    fireEvent.click(screen.getByRole('checkbox', { hidden: true }));
+    pressKey('F2');
+
+    await waitFor(() => expect(createReturn).toHaveBeenCalledTimes(2));
+    expect(createReturn.mock.calls[1]![0]).toMatchObject({ override: true });
   });
 });
 

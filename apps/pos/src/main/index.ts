@@ -8,6 +8,8 @@ import { CashService } from './cash/cash-service';
 import { CashSessionStore } from './cash/cash-session-store';
 import { UserStore } from './auth/user-store';
 import { PendingSales } from './checkout/pending-sales';
+import { ReturnService } from './returns/return-service';
+import { ReturnStore } from './returns/return-store';
 import { SaleCheckout } from './checkout/sale-checkout';
 import { SalePayments } from './checkout/sale-payments';
 import { renderTicket } from './checkout/ticket/ticket';
@@ -91,6 +93,7 @@ async function start(): Promise<void> {
   registerIpcHandlers(rendererEntry, {
     auth,
     cash,
+    returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, cash),
     catalog,
     appearance,
     pendingSales: new PendingSales(catalog, sales, () => {

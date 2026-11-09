@@ -8,6 +8,7 @@ import { AppearanceDialog } from './appearance/AppearanceDialog';
 import type { CashStatus } from '../shared/cash-api';
 import { LoginScreen } from './auth/LoginScreen';
 import { CashDialog } from './cash/CashDialog';
+import { ReturnDialog } from './returns/ReturnDialog';
 import { PendingSaleDialog } from './recovery/PendingSaleDialog';
 import { usePendingSales } from './recovery/use-pending-sales';
 import { SaleScreen } from './sale/SaleScreen';
@@ -24,6 +25,7 @@ const SHORTCUTS: readonly { readonly keys: string; readonly action: string }[] =
   { keys: 'Esc', action: 'Limpiar' },
   { keys: 'F12', action: 'Cobrar' },
   { keys: 'F3', action: 'Caja' },
+  { keys: 'F4', action: 'Devolución' },
   { keys: 'F8', action: 'Reimprimir' },
   { keys: 'F6', action: 'Salir' },
 ];
@@ -94,6 +96,7 @@ function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
   const [cash, setCash] = useState<CashStatus | null>(null);
   const [isEditingCash, setIsEditingCash] = useState(false);
+  const [isReturning, setIsReturning] = useState(false);
   const pendingSales = usePendingSales(posApi);
   const hasPendingSales = pendingSales.sales.length > 0;
   const isOwner = user.role === 'owner';
@@ -122,6 +125,8 @@ function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut
 
   const openCash = useCallback(() => setIsEditingCash(true), []);
   const closeCash = useCallback(() => setIsEditingCash(false), []);
+  const openReturns = useCallback(() => setIsReturning(true), []);
+  const closeReturns = useCallback(() => setIsReturning(false), []);
 
   // Only the owner changes how the register looks, and the main process refuses anyone else.
   const openAppearance = useCallback(() => setIsEditingAppearance(isOwner), [isOwner]);
@@ -149,6 +154,9 @@ function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut
             Apariencia <kbd>F9</kbd>
           </button>
         )}
+        <button type="button" className="header-button" tabIndex={-1} onClick={openReturns}>
+          Devolución <kbd>F4</kbd>
+        </button>
         <button type="button" className="header-button" tabIndex={-1} onClick={openCash}>
           Caja <kbd>F3</kbd>
         </button>
@@ -163,10 +171,11 @@ function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut
       )}
       <SaleScreen
         posApi={posApi}
-        isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash}
+        isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash || isReturning}
         onOpenAppearance={openAppearance}
         onSignOut={onSignOut}
         onOpenCash={openCash}
+        onOpenReturns={openReturns}
         onCashChanged={refreshCash}
       />
       <footer className="register-footer">
@@ -189,6 +198,7 @@ function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut
           </p>
         )}
       </footer>
+      {isReturning && !hasPendingSales && <ReturnDialog posApi={posApi} user={user} onReturned={refreshCash} onClose={closeReturns} />}
       {isEditingCash && !hasPendingSales && cash !== null && (
         <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} onClose={closeCash} />
       )}

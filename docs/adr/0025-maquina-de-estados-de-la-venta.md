@@ -35,6 +35,8 @@ El ADR 0010 pide guardar la venta como `pending_payment` antes de cobrar y resol
 - Cada línea guarda el nombre, el precio y la tasa con que se vendió, y `product_id` no tiene llave foránea, porque una venta debe sobrevivir a un producto que salga del catálogo.
 - El diálogo usa `closedby="none"`, que le pide al navegador no cerrarlo con Esc, y una prueba oprime Esc dos veces en la caja real. El teclado vuelve al contenido después de cada respuesta, para que el Enter de una lectura no oprima el botón que se acaba de usar.
 
+> **Actualización (ADR 0030):** E1-15 no agrega partially_returned ni eturned: la devolución es un registro aparte y la venta sigue completed.
+>
 > **Actualización (ADR 0026):** la recuperación ya no deja el pago fijo en efectivo. «Sí, se cobró» pregunta con qué se pagó.
 
 ## Consecuencias
