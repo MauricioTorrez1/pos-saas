@@ -3,6 +3,7 @@ import type { Quantity, TaxRate, Unit } from '@pos-saas/money';
 import type { Appearance } from './appearance';
 import type { BackupOutcome, BackupStatus, ImportOutcome, RestoreOutcome } from './admin-api';
 import type { LoginResult, UserRole, UserSummary } from './auth';
+import type { AdjustStockRequest, AdjustStockResult, Kardex, LedgerCheck } from './inventory-api';
 import type { FindReturnableResult, ReturnRequest, ReturnResult } from './returns-api';
 import type {
   CashMovementRequest,
@@ -27,6 +28,9 @@ export const IPC_CHANNELS = {
   configureBackup: 'admin:configure-backup',
   backupNow: 'admin:backup-now',
   restoreBackup: 'admin:restore-backup',
+  getKardex: 'inventory:get-kardex',
+  adjustStock: 'inventory:adjust',
+  checkLedger: 'inventory:check-ledger',
   findReturnableSale: 'returns:find-sale',
   createReturn: 'returns:create',
   getCashStatus: 'cash:get-status',
@@ -207,6 +211,29 @@ export interface PosApi {
    * @returns staged when the backup is healthy, or why not
    */
   restoreBackup(request: { readonly passphrase: string }): Promise<RestoreOutcome>;
+
+  /**
+   * Reads the history of a product with the balance after each movement (RF-031). Only the owner.
+   *
+   * @param productId the UUIDv7 of the product
+   * @returns the kardex, or null if the product does not exist
+   */
+  getKardex(productId: string): Promise<Kardex | null>;
+
+  /**
+   * Corrects a count or writes off a loss, with the reason (RF-030). Only the owner.
+   *
+   * @param request the product, the type, the signed quantity and the reason
+   * @returns the new kardex, or why nothing was recorded
+   */
+  adjustStock(request: AdjustStockRequest): Promise<AdjustStockResult>;
+
+  /**
+   * Compares the stock ledger with the sales and the returns. Only the owner.
+   *
+   * @returns how many movements were checked and everything that does not agree
+   */
+  checkLedger(): Promise<LedgerCheck>;
 
   /**
    * Finds the completed sale a customer wants to return from the folio on their ticket (RF-019).

@@ -7,6 +7,8 @@ import { app, dialog, safeStorage } from 'electron';
 import { AdminActions, type PassphraseVault } from './admin/admin-actions';
 import { applyPendingRestore } from './backup/backup-service';
 import { CatalogImporter } from './import/catalog-importer';
+import { AuditLog } from './audit/audit-log';
+import { InventoryService } from './inventory/inventory-service';
 import { StockStore } from './inventory/stock-store';
 
 import { AuthService } from './auth/auth-service';
@@ -144,6 +146,7 @@ async function start(): Promise<void> {
     cash,
     returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, cash),
     admin,
+    inventory: new InventoryService(store, LOCAL_TENANT_ID, auth, new StockStore(store, LOCAL_TENANT_ID), new AuditLog(store, LOCAL_TENANT_ID), catalog),
     catalog,
     appearance,
     pendingSales: new PendingSales(catalog, sales, () => {

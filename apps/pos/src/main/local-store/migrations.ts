@@ -467,4 +467,30 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'a stock movement is never deleted'); END;
     `,
   },
+  {
+    version: 11,
+    name: 'create_audit_log',
+    // Who did something sensitive, when, and what: a stock adjustment, a loss, a price typed by hand (RF-030, RF-040). It
+    // is only added to, never edited or deleted, so it can be trusted.
+    sql: `
+      CREATE TABLE audit_log (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        action TEXT NOT NULL CHECK (length(action) > 0),
+        entity TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        detail TEXT NOT NULL,
+        occurred_at TEXT NOT NULL
+      ) STRICT;
+
+      CREATE INDEX audit_log_by_entity ON audit_log (tenant_id, entity, entity_id);
+
+      CREATE TRIGGER audit_log_never_changes BEFORE UPDATE ON audit_log
+      BEGIN SELECT RAISE(ABORT, 'the audit log never changes'); END;
+
+      CREATE TRIGGER audit_log_is_never_deleted BEFORE DELETE ON audit_log
+      BEGIN SELECT RAISE(ABORT, 'the audit log is never deleted'); END;
+    `,
+  },
 ];

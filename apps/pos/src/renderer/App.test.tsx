@@ -65,6 +65,9 @@ function fakePosApi(overrides: Partial<PosApi> = {}): PosApi {
     login: () => Promise.resolve({ status: 'ok', user: OWNER }),
     logout: () => Promise.resolve(),
     createUser: () => Promise.resolve(OWNER),
+    getKardex: () => Promise.resolve(null),
+    adjustStock: () => Promise.resolve({ status: 'not_found' }),
+    checkLedger: () => Promise.resolve({ checkedMovements: 0, problems: [] }),
     importCatalog: () => Promise.resolve({ status: 'cancelled' }),
     getBackupStatus: () => Promise.resolve({ folder: null, lastBackupAt: null, lastError: null }),
     configureBackup: () => Promise.resolve({ status: 'not_configured' }),
@@ -1551,6 +1554,62 @@ describe('administration (E1-29, E1-35)', () => {
     const dialog = await openAdmin();
 
     expect((await within(dialog).findByRole('alert', { hidden: true })).textContent).toContain('No hay respaldos configurados');
+  });
+
+  it('says whether the inventory agrees with the sales, and how many movements do not', async () => {
+    const checkLedger = vi
+      .fn<PosApi['checkLedger']>()
+      .mockResolvedValueOnce({ checkedMovements: 12, problems: [] })
+      .mockResolvedValueOnce({ checkedMovements: 12, problems: [{ kind: 'wrong_quantity', sourceId: 'line-1' }] });
+    const dialog = await openAdmin({ checkLedger });
+
+    pressKey('F3');
+    expect((await within(dialog).findByRole('status', { hidden: true })).textContent).toContain('Todo cuadra: 12 movimientos');
+
+    pressKey('F3');
+    expect(await within(dialog).findByText(/1 movimiento\(s\) no cuadran/)).toBeDefined();
+  });
+
+  it('registers a loss with its reason and shows the new stock in the history of the product', async () => {
+    const hammer = { id: '01900000-0000-7000-8000-000000000001', name: 'Martillo', unit: 'piece' as const, unitPriceE4: 1_000_000, taxRate: { factor: 'rate' as const, rateBp: 1600 } };
+    const kardex = (stockMilli: number) => ({ productId: hammer.id, productName: 'Martillo', unit: 'piece' as const, stockMilli, rows: [], totalMovements: 0 });
+    const adjustStock = vi.fn<PosApi['adjustStock']>(() => Promise.resolve({ status: 'recorded', kardex: kardex(4000) }));
+    const dialog = await openAdmin({ findProductByCode: () => Promise.resolve(hammer), getKardex: () => Promise.resolve(kardex(5000)), adjustStock });
+
+    pressKey('F2');
+    fireEvent.change(await within(dialog).findByRole('textbox', { name: 'Producto', hidden: true }), { target: { value: '750100' } });
+    fireEvent.submit(within(dialog).getByRole('textbox', { name: 'Producto', hidden: true }));
+    await within(dialog).findByRole('heading', { name: 'Martillo', hidden: true });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Cantidad', hidden: true }), { target: { value: '1' } });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Motivo', hidden: true }), { target: { value: 'Se cayó del estante' } });
+    pressKey('F2');
+
+    await waitFor(() => expect(adjustStock).toHaveBeenCalledWith({ productId: hammer.id, type: 'waste', quantityMilli: -1000, reason: 'Se cayó del estante' }));
+    expect((await within(dialog).findByRole('status', { hidden: true })).textContent).toContain('Quedó guardado');
+    expect(dialog.textContent).toContain('Existencia: 4 pza');
+  });
+
+  it('refuses a quantity that is not a number and a reason that is empty, before asking the main process', async () => {
+    const hammer = { id: '01900000-0000-7000-8000-000000000001', name: 'Martillo', unit: 'piece' as const, unitPriceE4: 1_000_000, taxRate: { factor: 'rate' as const, rateBp: 1600 } };
+    const adjustStock = vi.fn<PosApi['adjustStock']>();
+    const dialog = await openAdmin({
+      findProductByCode: () => Promise.resolve(hammer),
+      getKardex: () => Promise.resolve({ productId: hammer.id, productName: 'Martillo', unit: 'piece', stockMilli: 5000, rows: [], totalMovements: 0 }),
+      adjustStock,
+    });
+    pressKey('F2');
+    fireEvent.change(await within(dialog).findByRole('textbox', { name: 'Producto', hidden: true }), { target: { value: '750100' } });
+    fireEvent.submit(within(dialog).getByRole('textbox', { name: 'Producto', hidden: true }));
+    await within(dialog).findByRole('heading', { name: 'Martillo', hidden: true });
+
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Cantidad', hidden: true }), { target: { value: '1.5' } });
+    pressKey('F2');
+    expect((await within(dialog).findByRole('alert', { hidden: true })).textContent).toContain('La cantidad no es válida');
+
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Cantidad', hidden: true }), { target: { value: '1' } });
+    pressKey('F2');
+    await waitFor(() => expect(within(dialog).getByRole('alert', { hidden: true }).textContent).toContain('Escribe el motivo'));
+    expect(adjustStock).not.toHaveBeenCalled();
   });
 
   it('shows the report of a catalog load so the owner can compare it with Eleventa, and the rows that were left out', async () => {
