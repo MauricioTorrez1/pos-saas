@@ -1,11 +1,17 @@
 import type { Quantity, TaxRate, Unit } from '@pos-saas/money';
 
 import type { Appearance } from './appearance';
+import type { LoginResult, UserRole, UserSummary } from './auth';
 import type { PaymentPlan } from './payment-plan';
 
 /** Channels between the preload bridge and the main process. */
 export const IPC_CHANNELS = {
   getAppInfo: 'app:get-info',
+  getAuthState: 'auth:get-state',
+  setupOwner: 'auth:setup-owner',
+  login: 'auth:login',
+  logout: 'auth:logout',
+  createUser: 'auth:create-user',
   findProductByCode: 'catalog:find-by-code',
   searchProducts: 'catalog:search',
   getAppearance: 'appearance:get',
@@ -124,6 +130,14 @@ export type ReprintResult =
   /** The printer did not take the job. The sale is not affected. */
   | { readonly status: 'printer_failed'; readonly folio: string; readonly message: string };
 
+/** Who can sign in at this register and who is signed in. */
+export interface AuthState {
+  /** True when nobody was registered yet, so the first person must become the owner. */
+  readonly needsSetup: boolean;
+  readonly users: readonly UserSummary[];
+  readonly current: UserSummary | null;
+}
+
 /** Everything the screen can ask of the main process. */
 export interface PosApi {
   /**
@@ -132,6 +146,44 @@ export interface PosApi {
    * @returns the app version, as the main process knows it
    */
   getAppInfo(): Promise<AppInfo>;
+
+  /**
+   * Reads who can sign in and who is signed in. Nothing else works until somebody is.
+   *
+   * @returns whether the register needs its owner, the people who can sign in, and the person signed in
+   */
+  getAuthState(): Promise<AuthState>;
+
+  /**
+   * Creates the owner of a register that has nobody. It does not sign them in.
+   *
+   * @param request their name and a PIN of four to eight digits
+   * @returns the owner
+   */
+  setupOwner(request: { readonly name: string; readonly pin: string }): Promise<UserSummary>;
+
+  /**
+   * Signs a person in with their PIN. It works without internet.
+   *
+   * @param request the person and their PIN
+   * @returns ok, or why not: a wrong PIN with the tries left, or a lock after five wrong ones
+   */
+  login(request: { readonly userId: string; readonly pin: string }): Promise<LoginResult>;
+
+  /**
+   * Signs out whoever is signed in.
+   *
+   * @returns once nobody is signed in
+   */
+  logout(): Promise<void>;
+
+  /**
+   * Adds a person. Only the owner who is signed in can.
+   *
+   * @param request their name, their role, and a PIN of four to eight digits
+   * @returns the new person
+   */
+  createUser(request: { readonly name: string; readonly role: UserRole; readonly pin: string }): Promise<UserSummary>;
 
   /**
    * Finds the product that has exactly this barcode.

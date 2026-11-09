@@ -32,6 +32,8 @@ interface SaleScreenProps {
   /** While true, another part of the screen has the keyboard, and the lookup box waits. */
   readonly isKeyboardElsewhere: boolean;
   readonly onOpenAppearance: () => void;
+  /** Called when the cashier asks to sign out. */
+  readonly onSignOut: () => void;
 }
 
 /**
@@ -41,9 +43,10 @@ interface SaleScreenProps {
  * @param props.posApi bridge to the main process
  * @param props.isKeyboardElsewhere whether a dialog is using the keyboard
  * @param props.onOpenAppearance called when the cashier asks for the appearance dialog
+ * @param props.onSignOut called when the cashier asks to sign out
  * @returns the screen
  */
-export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: SaleScreenProps): ReactElement {
+export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSignOut }: SaleScreenProps): ReactElement {
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
@@ -237,6 +240,10 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
       case 'F8':
         event.preventDefault();
         void reprintLast();
+        return;
+      case 'F6':
+        event.preventDefault();
+        onSignOut();
         return;
       default:
         if (isPrintableKey(event)) {

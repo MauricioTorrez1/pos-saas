@@ -3,6 +3,8 @@ import { pathToFileURL } from 'node:url';
 
 import { app, dialog } from 'electron';
 
+import { AuthService } from './auth/auth-service';
+import { UserStore } from './auth/user-store';
 import { PendingSales } from './checkout/pending-sales';
 import { SaleCheckout } from './checkout/sale-checkout';
 import { SalePayments } from './checkout/sale-payments';
@@ -74,6 +76,7 @@ async function start(): Promise<void> {
   const catalog = new ProductCatalog(store, LOCAL_TENANT_ID);
   const sales = new SaleStore(store, LOCAL_TENANT_ID);
   const appearance = new AppearanceStore(store, LOCAL_TENANT_ID);
+  const auth = new AuthService(new UserStore(store, LOCAL_TENANT_ID));
   const printer = choosePrinter();
   // The drawer hangs from the printer, so both are real once the printer is configured and fakes until then (ADR 0028).
   const checkout = new SaleCheckout({
@@ -83,6 +86,7 @@ async function start(): Promise<void> {
       renderTicket(toTicketData(appearance.read().businessName || UNNAMED_BUSINESS, sale, { ...receipt, isReprint: false })),
   });
   registerIpcHandlers(rendererEntry, {
+    auth,
     catalog,
     appearance,
     pendingSales: new PendingSales(catalog, sales),

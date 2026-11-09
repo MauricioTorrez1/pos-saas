@@ -82,7 +82,7 @@ test('keeps every confirmed sale, whole, after a forced close during writes', as
 
   const reopened = await launch();
   const reopenedWindow = await reopened.firstWindow();
-  await expect(reopenedWindow.getByRole('heading', { name: 'Caja' })).toBeVisible();
+  await expect(reopenedWindow.getByRole('heading', { name: /Bienvenido|¿Quién cobra\?/ })).toBeVisible();
   const state = await readRecoveredState(reopened, paths);
   await reopened.close();
 

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 
 import { DEFAULT_APPEARANCE, type Appearance } from '../shared/appearance';
-import type { PosApi } from '../shared/pos-api';
+import type { UserSummary } from '../shared/auth';
+import type { AuthState, PosApi } from '../shared/pos-api';
 import { applyAppearance } from './appearance/apply-appearance';
 import { AppearanceDialog } from './appearance/AppearanceDialog';
+import { LoginScreen } from './auth/LoginScreen';
 import { PendingSaleDialog } from './recovery/PendingSaleDialog';
 import { usePendingSales } from './recovery/use-pending-sales';
 import { SaleScreen } from './sale/SaleScreen';
@@ -20,6 +22,7 @@ const SHORTCUTS: readonly { readonly keys: string; readonly action: string }[] =
   { keys: 'Esc', action: 'Limpiar' },
   { keys: 'F12', action: 'Cobrar' },
   { keys: 'F8', action: 'Reimprimir' },
+  { keys: 'F6', action: 'Salir' },
 ];
 
 interface AppProps {
@@ -27,24 +30,16 @@ interface AppProps {
 }
 
 /**
- * Register screen. It receives the bridge as a prop, so it never touches what lies behind it.
+ * The register. It receives the bridge as a prop, so it never touches what lies behind it. It shows the sign-in until a
+ * person enters, and the register screen after that.
  *
  * @param props.posApi bridge to the main process
  * @returns the screen
  */
 export function App({ posApi }: AppProps): ReactElement {
-  const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
-  const [isEditingAppearance, setIsEditingAppearance] = useState(false);
-  const pendingSales = usePendingSales(posApi);
-  const hasPendingSales = pendingSales.sales.length > 0;
-
-  useEffect(() => {
-    posApi.getAppInfo().then(
-      ({ version }) => setAppInfo({ status: 'ready', version }),
-      () => setAppInfo({ status: 'failed' }),
-    );
-  }, [posApi]);
+  const [authState, setAuthState] = useState<AuthState | null>(null);
+  const [authFailed, setAuthFailed] = useState(false);
 
   useEffect(() => {
     posApi.getAppearance().then(setAppearance, (error: unknown) => {
@@ -55,12 +50,63 @@ export function App({ posApi }: AppProps): ReactElement {
 
   useEffect(() => applyAppearance(appearance), [appearance]);
 
-  const openAppearance = useCallback(() => setIsEditingAppearance(true), []);
+  const loadAuthState = useCallback(() => {
+    posApi.getAuthState().then(setAuthState, () => setAuthFailed(true));
+  }, [posApi]);
+
+  useEffect(loadAuthState, [loadAuthState]);
+
+  const signOut = useCallback(() => {
+    posApi.logout().then(loadAuthState, loadAuthState);
+  }, [posApi, loadAuthState]);
+
+  if (authFailed) {
+    return (
+      <p className="notice" role="alert">
+        No se pudo abrir la caja. Reiníciala y, si sigue igual, avísale a soporte.
+      </p>
+    );
+  }
+  if (authState === null) {
+    return <div className="register" aria-busy="true" />;
+  }
+  if (authState.current === null) {
+    return <LoginScreen posApi={posApi} authState={authState} onSignedIn={loadAuthState} />;
+  }
+  return (
+    <RegisterScreen posApi={posApi} user={authState.current} appearance={appearance} onAppearanceSaved={setAppearance} onSignOut={signOut} />
+  );
+}
+
+interface RegisterScreenProps {
+  readonly posApi: PosApi;
+  readonly user: UserSummary;
+  readonly appearance: Appearance;
+  readonly onAppearanceSaved: (appearance: Appearance) => void;
+  readonly onSignOut: () => void;
+}
+
+function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
+  const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
+  const [isEditingAppearance, setIsEditingAppearance] = useState(false);
+  const pendingSales = usePendingSales(posApi);
+  const hasPendingSales = pendingSales.sales.length > 0;
+  const isOwner = user.role === 'owner';
+
+  useEffect(() => {
+    posApi.getAppInfo().then(
+      ({ version }) => setAppInfo({ status: 'ready', version }),
+      () => setAppInfo({ status: 'failed' }),
+    );
+  }, [posApi]);
+
+  // Only the owner changes how the register looks, and the main process refuses anyone else.
+  const openAppearance = useCallback(() => setIsEditingAppearance(isOwner), [isOwner]);
   const closeAppearance = useCallback(() => setIsEditingAppearance(false), []);
 
   const saveAppearance = async (updated: Appearance): Promise<void> => {
     await posApi.saveAppearance(updated);
-    setAppearance(updated);
+    onAppearanceSaved(updated);
     setIsEditingAppearance(false);
   };
 
@@ -68,12 +114,25 @@ export function App({ posApi }: AppProps): ReactElement {
     <div className="register">
       <header className="register-header">
         <h1>{appearance.businessName || UNNAMED_REGISTER}</h1>
-        {/* Out of the tab order: F9 is the keyboard route, and Tab must not pull a scan out of the lookup box. */}
-        <button type="button" className="header-button" tabIndex={-1} onClick={openAppearance}>
-          Apariencia <kbd>F9</kbd>
+        <p className="register-user" aria-label="Persona en la caja">
+          {user.name}
+        </p>
+        {/* Out of the tab order: the keys are the keyboard route, and Tab must not pull a scan out of the lookup box. */}
+        {isOwner && (
+          <button type="button" className="header-button" tabIndex={-1} onClick={openAppearance}>
+            Apariencia <kbd>F9</kbd>
+          </button>
+        )}
+        <button type="button" className="header-button" tabIndex={-1} onClick={onSignOut}>
+          Salir <kbd>F6</kbd>
         </button>
       </header>
-      <SaleScreen posApi={posApi} isKeyboardElsewhere={isEditingAppearance || hasPendingSales} onOpenAppearance={openAppearance} />
+      <SaleScreen
+        posApi={posApi}
+        isKeyboardElsewhere={isEditingAppearance || hasPendingSales}
+        onOpenAppearance={openAppearance}
+        onSignOut={onSignOut}
+      />
       <footer className="register-footer">
         <ul className="shortcuts" aria-label="Atajos de teclado">
           {SHORTCUTS.map(({ keys, action }) => (

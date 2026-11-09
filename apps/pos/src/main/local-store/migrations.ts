@@ -244,4 +244,34 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'a transfer or a card payment needs its reference'); END;
     `,
   },
+  {
+    version: 8,
+    name: 'create_app_user',
+    // The people who sign in with a PIN, with or without internet (ADR 0006, ADR 0029). The PIN is only kept as a hash. A
+    // person is deactivated, never deleted, because their sales and cuts keep their name.
+    sql: `
+      CREATE TABLE app_user (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+        role TEXT NOT NULL,
+        pin_hash TEXT NOT NULL CHECK (length(pin_hash) > 0),
+        failed_attempts INTEGER NOT NULL DEFAULT 0 CHECK (failed_attempts >= 0),
+        locked_until TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        created_at TEXT NOT NULL,
+        UNIQUE (tenant_id, name)
+      ) STRICT;
+
+      CREATE TRIGGER app_user_has_known_role BEFORE INSERT ON app_user
+      WHEN NEW.role NOT IN ('owner', 'cashier')
+      BEGIN SELECT RAISE(ABORT, 'unknown role'); END;
+
+      CREATE TRIGGER app_user_keeps_its_identity BEFORE UPDATE OF id, tenant_id, name, role ON app_user
+      BEGIN SELECT RAISE(ABORT, 'the identity and role of a user never change'); END;
+
+      CREATE TRIGGER app_user_is_never_deleted BEFORE DELETE ON app_user
+      BEGIN SELECT RAISE(ABORT, 'a user is never deleted: deactivate them instead'); END;
+    `,
+  },
 ];

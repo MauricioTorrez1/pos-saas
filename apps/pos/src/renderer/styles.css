@@ -151,6 +151,12 @@ kbd {
   background: var(--sign);
 }
 
+.register-user {
+  flex: 1;
+  color: var(--on-sign);
+  opacity: 0.8;
+}
+
 .register-header h1 {
   overflow: hidden;
   font-size: 1.75rem;
@@ -859,4 +865,75 @@ kbd {
     grid-template-rows: minmax(0, 1fr) auto;
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+
+/* Sign-in: a single card on the galvanized background, so the first thing a new cashier sees is who is asking. */
+
+.login {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+.login-card {
+  width: min(30rem, 100%);
+  padding: 1.5rem;
+  background: var(--surface);
+  border-top: 0.5rem solid var(--accent);
+  border-radius: 2px;
+}
+
+.login-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.login-card h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  font-stretch: condensed;
+  line-height: 1.05;
+}
+
+.login-users {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.login-user {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  font-size: 1.25rem;
+  cursor: pointer;
+  border: 2px solid var(--rule);
+  border-radius: 2px;
+}
+
+.login-user[data-selected='true'] {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--ink);
+}
+
+.login-user-role,
+.login-hint {
+  font-size: 1rem;
+  color: var(--ink-soft);
+}
+
+.login-user[data-selected='true'] .login-user-role {
+  color: inherit;
+}
+
+.login .text-field input {
+  height: 3.25rem;
+  font-size: 1.5rem;
+  letter-spacing: 0.3em;
 }

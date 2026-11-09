@@ -9,6 +9,7 @@ import {
   readMainPid,
   recordStartupOptions,
   removeTemporaryUserData,
+  signInWindow,
   testSalePaths,
 } from './register-harness.ts';
 
@@ -61,7 +62,7 @@ const test = base.extend<{
     await use(await launch());
   },
   page: async ({ register }, use) => {
-    const page = await register.firstWindow();
+    const page = await signInWindow(register);
     await expect(lookupBox(page)).toBeFocused();
     await use(page);
   },
@@ -269,7 +270,7 @@ test('keeps the appearance the owner chose after restarting', async ({ launch, r
   await expect(lookupBox(page)).toBeFocused();
   await register.close();
 
-  const reopened = await (await launch()).firstWindow();
+  const reopened = await signInWindow(await launch());
   await expect(reopened.getByRole('heading', { name: 'Tlapalería Torres' })).toBeVisible();
   await expect(reopened.locator('html')).toHaveAttribute('data-accent', 'blue');
   await expect(reopened.locator('html')).toHaveAttribute('data-theme', 'dark');

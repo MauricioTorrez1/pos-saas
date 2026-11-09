@@ -7,6 +7,7 @@ import {
   readMainPid,
   recordStartupOptions,
   removeTemporaryUserData,
+  signInWindow,
   testSalePaths,
 } from './register-harness.ts';
 
@@ -79,7 +80,7 @@ async function scan(page: Page, code: string): Promise<void> {
 /** Opens the register, rings up a hammer with the scanner, and opens the payment screen with F12. */
 async function startCheckout(launch: () => Promise<ElectronApplication>): Promise<{ register: ElectronApplication; page: Page }> {
   const register = await launch();
-  const page = await register.firstWindow();
+  const page = await signInWindow(register);
   await expect(lookupBox(page)).toBeFocused();
   await scan(page, HAMMER_CODE);
   await expect(total(page)).toHaveText('$116.00');
@@ -220,7 +221,7 @@ test('asks for the payment method of a sale left pending when the register is ki
   await forceClose(await readMainPid(first.register));
 
   const reopened = await launch();
-  const page = await reopened.firstWindow();
+  const page = await signInWindow(reopened);
   const question = page.getByRole('dialog', { name: '¿Se cobró esta venta?' });
   await expect(question).toBeVisible();
   await page.keyboard.press('F2');
@@ -245,7 +246,7 @@ test('asks for the payment method of a sale left pending when the register is ki
 
 test('numbers the sales and prints the last ticket again with F8 (RF-018)', async ({ launch }) => {
   const register = await launch();
-  const page = await register.firstWindow();
+  const page = await signInWindow(register);
   await expect(lookupBox(page)).toBeFocused();
   await page.keyboard.press('F8');
   await expect(page.getByText('Todavía no hay ventas cobradas para reimprimir.')).toBeVisible();
@@ -274,7 +275,7 @@ test('numbers the sales and prints the last ticket again with F8 (RF-018)', asyn
 });
 
 test('refuses payment requests that do not follow the rules of the bridge', async ({ launch }) => {
-  const page = await (await launch()).firstWindow();
+  const page = await signInWindow(await launch());
   await expect(lookupBox(page)).toBeFocused();
 
   const refusals = await page.evaluate(async () => {
