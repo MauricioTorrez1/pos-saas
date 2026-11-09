@@ -78,7 +78,7 @@ describe('parseEleventaCatalog', () => {
     const result = parseEleventaCatalog(`${HEADER}\n,Sin código,1,2,3,Pieza\nA,,1,2,3,Pieza\nB,Bien,1,2,3,Pieza\nC,Precio mal,x,abc,3,Pieza\nD,Existencia mal,1,2,mucho,Pieza`);
 
     expect(result).toMatchObject({ status: 'read', rows: [{ code: 'B' }] });
-    expect((result as { invalid: { line: number; reason: string }[] }).invalid.map(({ line }) => line)).toEqual([2, 3, 5, 6]);
+    expect((result as unknown as { invalid: { line: number; reason: string }[] }).invalid.map(({ line }) => line)).toEqual([2, 3, 5, 6]);
   });
 
   it('refuses a repeated code inside the same file, because it would post the stock twice', () => {
@@ -98,7 +98,7 @@ describe('parseEleventaCatalog', () => {
   it('refuses a name or a code that is too long, or that carries control characters', () => {
     const result = parseEleventaCatalog(`${HEADER}\n${'9'.repeat(51)},A,1,2,3,Pieza\nB,${'x'.repeat(121)},1,2,3,Pieza\nC\u0007,D,1,2,3,Pieza`);
 
-    expect((result as { rows: unknown[] }).rows).toEqual([]);
-    expect((result as { invalid: unknown[] }).invalid).toHaveLength(3);
+    expect((result as unknown as { rows: unknown[] }).rows).toEqual([]);
+    expect((result as unknown as { invalid: unknown[] }).invalid).toHaveLength(3);
   });
 });

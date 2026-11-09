@@ -2,6 +2,7 @@ import { app, ipcMain } from 'electron';
 
 import { isAppearance } from '../shared/appearance';
 import type { LoginResult, UserSummary } from '../shared/auth';
+import type { BackupOutcome, BackupStatus, ImportOutcome, RestoreOutcome } from '../shared/admin-api';
 import type { FindReturnableResult, ReturnResult } from '../shared/returns-api';
 import type { CashMovementResult, CashStatus, CloseCashResult, OpenCashResult } from '../shared/cash-api';
 import {
@@ -16,6 +17,8 @@ import {
   type SavePendingSaleResult,
 } from '../shared/pos-api';
 import { parseCreateUserRequest, parseLoginRequest, parseSetupRequest } from './auth/auth-request';
+import { parsePassphraseRequest } from './admin/admin-request';
+import type { AdminActions } from './admin/admin-actions';
 import type { AuthService } from './auth/auth-service';
 import { parseCloseRequest, parseLimitRequest, parseMovementRequest, parseOpenRequest } from './cash/cash-request';
 import type { CashService } from './cash/cash-service';
@@ -35,6 +38,7 @@ export interface IpcServices {
   readonly auth: AuthService;
   readonly cash: CashService;
   readonly returns: ReturnService;
+  readonly admin: AdminActions;
   readonly catalog: ProductCatalog;
   readonly appearance: AppearanceStore;
   readonly pendingSales: PendingSales;
@@ -68,7 +72,7 @@ function requireLookupText(value: unknown): string {
  */
 export function registerIpcHandlers(
   rendererEntry: string,
-  { auth, cash, returns, catalog, appearance, pendingSales, salePayments }: IpcServices,
+  { auth, cash, returns, admin, catalog, appearance, pendingSales, salePayments }: IpcServices,
 ): void {
   const answerScreen = <Result>(channel: string, respond: (argument: unknown) => Result): void => {
     ipcMain.handle(channel, (event, argument: unknown) => {
@@ -124,6 +128,12 @@ export function registerIpcHandlers(
   answerSignedIn(IPC_CHANNELS.recordCashMovement, (request): CashMovementResult => cash.recordMovement(parseMovementRequest(request)));
   answerSignedIn(IPC_CHANNELS.closeCashSession, (request): CloseCashResult => cash.close(parseCloseRequest(request)));
   answerOwner(IPC_CHANNELS.setWithdrawalLimit, (request): CashStatus => cash.setWithdrawalLimit(parseLimitRequest(request)));
+
+  answerOwner(IPC_CHANNELS.importCatalog, (): Promise<ImportOutcome> => admin.importCatalog());
+  answerOwner(IPC_CHANNELS.getBackupStatus, (): BackupStatus => admin.backupStatus());
+  answerOwner(IPC_CHANNELS.configureBackup, (request): Promise<BackupOutcome> => admin.configureBackup(parsePassphraseRequest(request)));
+  answerOwner(IPC_CHANNELS.backupNow, (): BackupOutcome => admin.backupNow());
+  answerOwner(IPC_CHANNELS.restoreBackup, (request): Promise<RestoreOutcome> => admin.restoreBackup(parsePassphraseRequest(request)));
 
   answerSignedIn(IPC_CHANNELS.findProductByCode, (code): CatalogProduct | null => catalog.findByCode(requireLookupText(code)));
   answerSignedIn(IPC_CHANNELS.searchProducts, (text): CatalogProduct[] => catalog.search(requireLookupText(text), SEARCH_RESULT_LIMIT));

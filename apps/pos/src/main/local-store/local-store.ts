@@ -110,6 +110,17 @@ export class LocalStore {
     return this.#connection.prepare(sql);
   }
 
+  /**
+   * Writes a consistent copy of the whole database to a new file, with everything committed up to this moment. It is not
+   * the same as copying the file by hand: the recent writes may still be in the WAL, and a copy made in the middle of a
+   * write would be torn. `VACUUM INTO` reads a single consistent snapshot.
+   *
+   * @param path where to write the copy, which must not exist
+   */
+  backupTo(path: string): void {
+    this.#connection.prepare('VACUUM INTO ?').run(path);
+  }
+
   /** Closes the database. SQLite moves the WAL into the main file and removes it. */
   close(): void {
     this.#connection.close();

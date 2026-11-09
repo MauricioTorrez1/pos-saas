@@ -1,7 +1,13 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { app, dialog } from 'electron';
+import { app, dialog, safeStorage } from 'electron';
+
+import { AdminActions, type PassphraseVault } from './admin/admin-actions';
+import { applyPendingRestore } from './backup/backup-service';
+import { CatalogImporter } from './import/catalog-importer';
+import { StockStore } from './inventory/stock-store';
 
 import { AuthService } from './auth/auth-service';
 import { CashService } from './cash/cash-service';
@@ -47,6 +53,8 @@ function resolveRendererEntry(): string {
  */
 function openLocalStore(): LocalStore {
   try {
+    // A restore that was waiting for the restart is applied before the database opens, and the old one is kept beside it.
+    applyPendingRestore(app.getPath('userData'), DATABASE_FILE_NAME);
     const store = LocalStore.open({
       path: join(app.getPath('userData'), DATABASE_FILE_NAME),
       appVersion: app.getVersion(),
@@ -73,6 +81,33 @@ function choosePrinter(): PrinterProvider {
   return share ? new WindowsSharedPrinter(share) : new RecordingPrinter();
 }
 
+const BACKUP_KEY_FILE_NAME = 'backup.key';
+const BACKUP_INTERVAL_MS = 60 * 60 * 1000;
+
+/** The passphrase of the backups, kept encrypted by Windows for this user, so it is never in the database or in plain text. */
+function backupVault(): PassphraseVault {
+  const file = join(app.getPath('userData'), BACKUP_KEY_FILE_NAME);
+  return {
+    read: () => {
+      if (!existsSync(file) || !safeStorage.isEncryptionAvailable()) {
+        return null;
+      }
+      return safeStorage.decryptString(readFileSync(file));
+    },
+    save: (passphrase) => {
+      if (!safeStorage.isEncryptionAvailable()) {
+        throw new Error('Windows cannot protect the passphrase on this computer');
+      }
+      writeFileSync(file, safeStorage.encryptString(passphrase));
+    },
+  };
+}
+
+async function pickPath(properties: ('openFile' | 'openDirectory')[], title: string): Promise<string | null> {
+  const { canceled, filePaths } = await dialog.showOpenDialog({ title, properties });
+  return canceled ? null : (filePaths[0] ?? null);
+}
+
 async function start(): Promise<void> {
   await app.whenReady();
   const store = openLocalStore();
@@ -81,7 +116,21 @@ async function start(): Promise<void> {
   const sales = new SaleStore(store, LOCAL_TENANT_ID);
   const appearance = new AppearanceStore(store, LOCAL_TENANT_ID);
   const auth = new AuthService(new UserStore(store, LOCAL_TENANT_ID));
-  const cash = new CashService(new CashSessionStore(store, LOCAL_TENANT_ID), auth);
+  const cashStore = new CashSessionStore(store, LOCAL_TENANT_ID);
+  const cash = new CashService(cashStore, auth);
+  const admin = new AdminActions({
+    store,
+    importer: new CatalogImporter(store, LOCAL_TENANT_ID, new StockStore(store, LOCAL_TENANT_ID)),
+    settings: cashStore,
+    vault: backupVault(),
+    userDataDirectory: app.getPath('userData'),
+    pickFile: (title) => pickPath(['openFile'], title),
+    pickFolder: (title) => pickPath(['openDirectory'], title),
+  });
+  // One copy an hour, and one soon after starting. A failure is kept in the status instead of stopping the register.
+  const backupTimer = setInterval(() => admin.backupNow(), BACKUP_INTERVAL_MS);
+  backupTimer.unref();
+  app.once('will-quit', () => clearInterval(backupTimer));
   const printer = choosePrinter();
   // The drawer hangs from the printer, so both are real once the printer is configured and fakes until then (ADR 0028).
   const checkout = new SaleCheckout({
@@ -94,6 +143,7 @@ async function start(): Promise<void> {
     auth,
     cash,
     returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, cash),
+    admin,
     catalog,
     appearance,
     pendingSales: new PendingSales(catalog, sales, () => {

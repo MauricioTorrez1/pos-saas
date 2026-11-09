@@ -118,7 +118,7 @@ describe('loading the catalog of Eleventa (RF-034)', () => {
   it('keeps the sample products when the file had nothing to load', () => {
     seedSampleCatalogIfEmpty(store, TENANT);
 
-    const report = importer.load({ status: 'read', rows: [], invalid: [] });
+    const report = importer.load({ rows: [], invalid: [] });
 
     expect(report.samplesRemoved).toBe(0);
     expect(catalog.findByCode('2000000000107')).not.toBeNull();
