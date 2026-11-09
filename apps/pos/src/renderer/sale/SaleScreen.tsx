@@ -17,6 +17,7 @@ const CATALOG_FAILURE = 'No se pudo consultar el catálogo. Intenta de nuevo y, 
 const EMPTY_SALE_MESSAGE = 'Agrega al menos un producto para cobrar.';
 const CATALOG_CHANGED =
   'El catálogo cambió mientras armabas la venta, y un precio o un producto ya no es el que ves. No se cobró nada. Quita los productos y vuelve a agregarlos para ver los precios nuevos.';
+const CASH_CLOSED = 'La caja está cerrada. Ábrela con su fondo para poder cobrar.';
 const SAVE_FAILURE = 'No se pudo guardar la venta. No se cobró nada. Intenta de nuevo y, si sigue fallando, reinicia la caja.';
 
 function notFoundMessage(text: string): string {
@@ -34,6 +35,10 @@ interface SaleScreenProps {
   readonly onOpenAppearance: () => void;
   /** Called when the cashier asks to sign out. */
   readonly onSignOut: () => void;
+  /** Called when the cashier asks for the cash of the register, or needs to open it. */
+  readonly onOpenCash: () => void;
+  /** Called after a sale was collected, so the cash of the register is read again. */
+  readonly onCashChanged: () => void;
 }
 
 /**
@@ -44,9 +49,11 @@ interface SaleScreenProps {
  * @param props.isKeyboardElsewhere whether a dialog is using the keyboard
  * @param props.onOpenAppearance called when the cashier asks for the appearance dialog
  * @param props.onSignOut called when the cashier asks to sign out
+ * @param props.onOpenCash called when the cashier asks for the cash of the register
+ * @param props.onCashChanged called after a sale was collected
  * @returns the screen
  */
-export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSignOut }: SaleScreenProps): ReactElement {
+export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSignOut, onOpenCash, onCashChanged }: SaleScreenProps): ReactElement {
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
@@ -90,6 +97,9 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSi
       });
       if (result.status === 'saved') {
         setSavedSale(result.sale);
+      } else if (result.status === 'no_cash_session') {
+        setNotice(CASH_CLOSED);
+        onOpenCash();
       } else {
         setNotice(CATALOG_CHANGED);
       }
@@ -113,6 +123,7 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSi
     if (wasCollected) {
       dispatch({ type: 'clear' });
       setNotice(null);
+      onCashChanged();
     }
   };
 
@@ -244,6 +255,10 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSi
       case 'F6':
         event.preventDefault();
         onSignOut();
+        return;
+      case 'F3':
+        event.preventDefault();
+        onOpenCash();
         return;
       default:
         if (isPrintableKey(event)) {

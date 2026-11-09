@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
+import { ErrorBoundary } from './ui/ErrorBoundary';
 
 const container = document.getElementById('root');
 if (container === null) {
@@ -10,6 +11,8 @@ if (container === null) {
 
 createRoot(container).render(
   <StrictMode>
-    <App posApi={window.pos} />
+    <ErrorBoundary>
+      <App posApi={window.pos} />
+    </ErrorBoundary>
   </StrictMode>,
 );

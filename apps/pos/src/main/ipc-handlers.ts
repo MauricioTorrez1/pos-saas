@@ -2,6 +2,7 @@ import { app, ipcMain } from 'electron';
 
 import { isAppearance } from '../shared/appearance';
 import type { LoginResult, UserSummary } from '../shared/auth';
+import type { CashMovementResult, CashStatus, CloseCashResult, OpenCashResult } from '../shared/cash-api';
 import {
   IPC_CHANNELS,
   MAX_LOOKUP_TEXT_LENGTH,
@@ -15,6 +16,8 @@ import {
 } from '../shared/pos-api';
 import { parseCreateUserRequest, parseLoginRequest, parseSetupRequest } from './auth/auth-request';
 import type { AuthService } from './auth/auth-service';
+import { parseCloseRequest, parseLimitRequest, parseMovementRequest, parseOpenRequest } from './cash/cash-request';
+import type { CashService } from './cash/cash-service';
 import { parsePaymentRequest, parsePendingSaleRequest, parseSaleId } from './checkout/pending-sale-request';
 import type { PendingSales } from './checkout/pending-sales';
 import type { SalePayments } from './checkout/sale-payments';
@@ -27,6 +30,7 @@ const SEARCH_RESULT_LIMIT = 20;
 /** What the handlers answer with. */
 export interface IpcServices {
   readonly auth: AuthService;
+  readonly cash: CashService;
   readonly catalog: ProductCatalog;
   readonly appearance: AppearanceStore;
   readonly pendingSales: PendingSales;
@@ -60,7 +64,7 @@ function requireLookupText(value: unknown): string {
  */
 export function registerIpcHandlers(
   rendererEntry: string,
-  { auth, catalog, appearance, pendingSales, salePayments }: IpcServices,
+  { auth, cash, catalog, appearance, pendingSales, salePayments }: IpcServices,
 ): void {
   const answerScreen = <Result>(channel: string, respond: (argument: unknown) => Result): void => {
     ipcMain.handle(channel, (event, argument: unknown) => {
@@ -108,6 +112,12 @@ export function registerIpcHandlers(
     }
     appearance.save(value);
   });
+
+  answerSignedIn(IPC_CHANNELS.getCashStatus, (): CashStatus => cash.status());
+  answerSignedIn(IPC_CHANNELS.openCashSession, (request): OpenCashResult => cash.open(parseOpenRequest(request)));
+  answerSignedIn(IPC_CHANNELS.recordCashMovement, (request): CashMovementResult => cash.recordMovement(parseMovementRequest(request)));
+  answerSignedIn(IPC_CHANNELS.closeCashSession, (request): CloseCashResult => cash.close(parseCloseRequest(request)));
+  answerOwner(IPC_CHANNELS.setWithdrawalLimit, (request): CashStatus => cash.setWithdrawalLimit(parseLimitRequest(request)));
 
   answerSignedIn(IPC_CHANNELS.findProductByCode, (code): CatalogProduct | null => catalog.findByCode(requireLookupText(code)));
   answerSignedIn(IPC_CHANNELS.searchProducts, (text): CatalogProduct[] => catalog.search(requireLookupText(text), SEARCH_RESULT_LIMIT));

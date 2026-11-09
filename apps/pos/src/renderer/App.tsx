@@ -5,7 +5,9 @@ import type { UserSummary } from '../shared/auth';
 import type { AuthState, PosApi } from '../shared/pos-api';
 import { applyAppearance } from './appearance/apply-appearance';
 import { AppearanceDialog } from './appearance/AppearanceDialog';
+import type { CashStatus } from '../shared/cash-api';
 import { LoginScreen } from './auth/LoginScreen';
+import { CashDialog } from './cash/CashDialog';
 import { PendingSaleDialog } from './recovery/PendingSaleDialog';
 import { usePendingSales } from './recovery/use-pending-sales';
 import { SaleScreen } from './sale/SaleScreen';
@@ -21,6 +23,7 @@ const SHORTCUTS: readonly { readonly keys: string; readonly action: string }[] =
   { keys: 'Supr', action: 'Quitar' },
   { keys: 'Esc', action: 'Limpiar' },
   { keys: 'F12', action: 'Cobrar' },
+  { keys: 'F3', action: 'Caja' },
   { keys: 'F8', action: 'Reimprimir' },
   { keys: 'F6', action: 'Salir' },
 ];
@@ -89,6 +92,8 @@ interface RegisterScreenProps {
 function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
   const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
+  const [cash, setCash] = useState<CashStatus | null>(null);
+  const [isEditingCash, setIsEditingCash] = useState(false);
   const pendingSales = usePendingSales(posApi);
   const hasPendingSales = pendingSales.sales.length > 0;
   const isOwner = user.role === 'owner';
@@ -99,6 +104,24 @@ function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut
       () => setAppInfo({ status: 'failed' }),
     );
   }, [posApi]);
+
+  const refreshCash = useCallback(() => {
+    posApi.getCashStatus().then(setCash, () => setCash(null));
+  }, [posApi]);
+
+  // A closed register cannot sell, so the first thing a cashier sees is how to open it.
+  useEffect(() => {
+    posApi.getCashStatus().then(
+      (status) => {
+        setCash(status);
+        setIsEditingCash(status.session === null);
+      },
+      () => setCash(null),
+    );
+  }, [posApi]);
+
+  const openCash = useCallback(() => setIsEditingCash(true), []);
+  const closeCash = useCallback(() => setIsEditingCash(false), []);
 
   // Only the owner changes how the register looks, and the main process refuses anyone else.
   const openAppearance = useCallback(() => setIsEditingAppearance(isOwner), [isOwner]);
@@ -117,21 +140,34 @@ function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut
         <p className="register-user" aria-label="Persona en la caja">
           {user.name}
         </p>
+        <p className="register-cash" data-open={cash?.session !== null && cash !== null} aria-label="Estado de la caja">
+          {cash === null ? '' : cash.session === null ? 'Caja cerrada' : 'Caja abierta'}
+        </p>
         {/* Out of the tab order: the keys are the keyboard route, and Tab must not pull a scan out of the lookup box. */}
         {isOwner && (
           <button type="button" className="header-button" tabIndex={-1} onClick={openAppearance}>
             Apariencia <kbd>F9</kbd>
           </button>
         )}
+        <button type="button" className="header-button" tabIndex={-1} onClick={openCash}>
+          Caja <kbd>F3</kbd>
+        </button>
         <button type="button" className="header-button" tabIndex={-1} onClick={onSignOut}>
           Salir <kbd>F6</kbd>
         </button>
       </header>
+      {cash?.shouldWithdraw === true && (
+        <p className="notice register-banner" role="status">
+          Hay mucho efectivo en el cajón. Haz un retiro parcial cuando puedas (F3). Puedes seguir vendiendo.
+        </p>
+      )}
       <SaleScreen
         posApi={posApi}
-        isKeyboardElsewhere={isEditingAppearance || hasPendingSales}
+        isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash}
         onOpenAppearance={openAppearance}
         onSignOut={onSignOut}
+        onOpenCash={openCash}
+        onCashChanged={refreshCash}
       />
       <footer className="register-footer">
         <ul className="shortcuts" aria-label="Atajos de teclado">
@@ -153,6 +189,9 @@ function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut
           </p>
         )}
       </footer>
+      {isEditingCash && !hasPendingSales && cash !== null && (
+        <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} onClose={closeCash} />
+      )}
       {isEditingAppearance && !hasPendingSales && (
         <AppearanceDialog saved={appearance} onPreview={applyAppearance} onSave={saveAppearance} onClose={closeAppearance} />
       )}

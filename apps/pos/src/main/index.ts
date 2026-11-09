@@ -4,6 +4,8 @@ import { pathToFileURL } from 'node:url';
 import { app, dialog } from 'electron';
 
 import { AuthService } from './auth/auth-service';
+import { CashService } from './cash/cash-service';
+import { CashSessionStore } from './cash/cash-session-store';
 import { UserStore } from './auth/user-store';
 import { PendingSales } from './checkout/pending-sales';
 import { SaleCheckout } from './checkout/sale-checkout';
@@ -77,6 +79,7 @@ async function start(): Promise<void> {
   const sales = new SaleStore(store, LOCAL_TENANT_ID);
   const appearance = new AppearanceStore(store, LOCAL_TENANT_ID);
   const auth = new AuthService(new UserStore(store, LOCAL_TENANT_ID));
+  const cash = new CashService(new CashSessionStore(store, LOCAL_TENANT_ID), auth);
   const printer = choosePrinter();
   // The drawer hangs from the printer, so both are real once the printer is configured and fakes until then (ADR 0028).
   const checkout = new SaleCheckout({
@@ -87,9 +90,14 @@ async function start(): Promise<void> {
   });
   registerIpcHandlers(rendererEntry, {
     auth,
+    cash,
     catalog,
     appearance,
-    pendingSales: new PendingSales(catalog, sales),
+    pendingSales: new PendingSales(catalog, sales, () => {
+      const cashierId = auth.currentUser()?.id;
+      const cashSessionId = cash.openSessionId();
+      return cashierId === undefined || cashSessionId === null ? null : { cashierId, cashSessionId };
+    }),
     salePayments: new SalePayments(sales, checkout, {
       printer,
       businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,

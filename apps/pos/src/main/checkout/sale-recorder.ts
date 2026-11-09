@@ -47,6 +47,10 @@ export interface SaleToSave {
   readonly taxCents: number;
   /** Positive amount to collect, in cents. */
   readonly totalCents: number;
+  /** The cash session the sale was made in, so the cut can count it. */
+  readonly cashSessionId?: string;
+  /** Who made the sale. */
+  readonly cashierId?: string;
 }
 
 /** How the customer pays one attempt: at the counter with cash and transfers, or on the card terminal. */

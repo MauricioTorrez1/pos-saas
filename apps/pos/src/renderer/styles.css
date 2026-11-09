@@ -937,3 +937,66 @@ kbd {
   font-size: 1.5rem;
   letter-spacing: 0.3em;
 }
+/* Cash dialog */
+
+.register-cash {
+  padding: 0.1rem 0.6rem;
+  font-size: 0.95rem;
+  color: var(--on-sign);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+}
+
+.register-cash[data-open='true'] {
+  color: var(--accent);
+}
+
+.register-banner {
+  margin: 0.5rem 1rem 0;
+}
+
+.cash {
+  width: min(46rem, calc(100vw - 2rem));
+  overflow-y: auto;
+}
+
+.cash-actions {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 0;
+  font-size: 1.125rem;
+  list-style: none;
+}
+
+.cash-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+}
+
+.cash-counts .payment-field input {
+  height: 2.5rem;
+  font-size: 1.125rem;
+}
+
+.cash-differences {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cash-differences th,
+.cash-differences td {
+  padding: 0.4rem 0.6rem;
+  text-align: right;
+  border-bottom: 1px solid var(--rule);
+}
+
+.cash-differences th:first-child {
+  text-align: left;
+}
+
+.cash-differences td[data-off='true'] {
+  font-weight: 700;
+  color: var(--alert);
+}

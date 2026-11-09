@@ -274,4 +274,165 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'a user is never deleted: deactivate them instead'); END;
     `,
   },
+  {
+    version: 9,
+    name: 'create_cash_sessions_and_returns',
+    // A cash session is the stretch between opening the register with a float and the cut (ADR 0029). Only one can be open
+    // per business. Sales point at the session they were made in and at who made them, and the returns have their own
+    // tables because a completed sale never changes: a refund is a record next to it (ADR 0030).
+    sql: `
+      CREATE TABLE cash_session (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        opened_by TEXT NOT NULL,
+        opened_at TEXT NOT NULL,
+        opening_float_cents INTEGER NOT NULL CHECK (opening_float_cents >= 0),
+        closed_by TEXT,
+        closed_at TEXT
+      ) STRICT;
+
+      CREATE UNIQUE INDEX cash_session_one_open ON cash_session (tenant_id) WHERE closed_at IS NULL;
+
+      CREATE TRIGGER cash_session_keeps_its_opening BEFORE UPDATE OF id, tenant_id, opened_by, opened_at, opening_float_cents ON cash_session
+      BEGIN SELECT RAISE(ABORT, 'how a cash session opened never changes'); END;
+
+      CREATE TRIGGER cash_session_freezes_once_closed BEFORE UPDATE ON cash_session
+      WHEN OLD.closed_at IS NOT NULL
+      BEGIN SELECT RAISE(ABORT, 'a closed cash session never changes'); END;
+
+      CREATE TRIGGER cash_session_is_never_deleted BEFORE DELETE ON cash_session
+      BEGIN SELECT RAISE(ABORT, 'a cash session is never deleted'); END;
+
+      CREATE TABLE cash_movement (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        session_id TEXT NOT NULL REFERENCES cash_session (id),
+        kind TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+        reason TEXT NOT NULL CHECK (length(trim(reason)) > 0),
+        recorded_by TEXT NOT NULL,
+        authorized_by TEXT,
+        recorded_at TEXT NOT NULL
+      ) STRICT;
+
+      CREATE INDEX cash_movement_by_session ON cash_movement (session_id);
+
+      CREATE TRIGGER cash_movement_has_known_kind BEFORE INSERT ON cash_movement
+      WHEN NEW.kind NOT IN ('in', 'out')
+      BEGIN SELECT RAISE(ABORT, 'a cash movement is an entry or an exit'); END;
+
+      CREATE TRIGGER cash_movement_only_while_open BEFORE INSERT ON cash_movement
+      WHEN (SELECT closed_at FROM cash_session WHERE id = NEW.session_id) IS NOT NULL
+      BEGIN SELECT RAISE(ABORT, 'cash movements can only be added to an open cash session'); END;
+
+      CREATE TRIGGER cash_movement_never_changes BEFORE UPDATE ON cash_movement
+      BEGIN SELECT RAISE(ABORT, 'a cash movement never changes'); END;
+
+      CREATE TRIGGER cash_movement_is_never_deleted BEFORE DELETE ON cash_movement
+      BEGIN SELECT RAISE(ABORT, 'a cash movement is never deleted'); END;
+
+      CREATE TABLE register_setting (
+        tenant_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        value TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, name)
+      ) STRICT, WITHOUT ROWID;
+
+      CREATE TABLE cash_cut (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        session_id TEXT NOT NULL UNIQUE REFERENCES cash_session (id),
+        cut_by TEXT NOT NULL,
+        cut_at TEXT NOT NULL,
+        expected_cash_cents INTEGER NOT NULL,
+        counted_cash_cents INTEGER NOT NULL CHECK (counted_cash_cents >= 0),
+        expected_card_cents INTEGER NOT NULL,
+        counted_card_cents INTEGER NOT NULL CHECK (counted_card_cents >= 0),
+        expected_transfer_cents INTEGER NOT NULL,
+        counted_transfer_cents INTEGER NOT NULL CHECK (counted_transfer_cents >= 0),
+        denominations TEXT NOT NULL,
+        reason TEXT
+      ) STRICT;
+
+      CREATE TRIGGER cash_cut_never_changes BEFORE UPDATE ON cash_cut
+      BEGIN SELECT RAISE(ABORT, 'a cash cut never changes'); END;
+
+      CREATE TRIGGER cash_cut_is_never_deleted BEFORE DELETE ON cash_cut
+      BEGIN SELECT RAISE(ABORT, 'a cash cut is never deleted'); END;
+
+      CREATE TRIGGER cash_cut_explains_a_difference BEFORE INSERT ON cash_cut
+      WHEN (NEW.expected_cash_cents <> NEW.counted_cash_cents
+        OR NEW.expected_card_cents <> NEW.counted_card_cents
+        OR NEW.expected_transfer_cents <> NEW.counted_transfer_cents)
+        AND length(trim(coalesce(NEW.reason, ''))) = 0
+      BEGIN SELECT RAISE(ABORT, 'a cut that does not balance needs its reason'); END;
+
+      ALTER TABLE sale ADD COLUMN cash_session_id TEXT REFERENCES cash_session (id);
+      ALTER TABLE sale ADD COLUMN cashier_id TEXT;
+
+      CREATE TRIGGER sale_only_in_open_session BEFORE INSERT ON sale
+      WHEN NEW.cash_session_id IS NOT NULL
+        AND (SELECT closed_at FROM cash_session WHERE id = NEW.cash_session_id) IS NOT NULL
+      BEGIN SELECT RAISE(ABORT, 'a sale can only start in an open cash session'); END;
+
+      CREATE TABLE sale_return (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        sale_id TEXT NOT NULL REFERENCES sale (id),
+        cash_session_id TEXT NOT NULL REFERENCES cash_session (id),
+        requested_by TEXT NOT NULL,
+        authorized_by TEXT NOT NULL,
+        reason TEXT NOT NULL CHECK (length(trim(reason)) > 0),
+        total_cents INTEGER NOT NULL CHECK (total_cents > 0),
+        occurred_at TEXT NOT NULL
+      ) STRICT;
+
+      CREATE INDEX sale_return_by_sale ON sale_return (sale_id);
+      CREATE INDEX sale_return_by_session ON sale_return (cash_session_id);
+
+      CREATE TABLE sale_return_line (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        return_id TEXT NOT NULL REFERENCES sale_return (id),
+        sale_line_id TEXT NOT NULL REFERENCES sale_line (id),
+        quantity_milli INTEGER NOT NULL CHECK (quantity_milli > 0),
+        refund_cents INTEGER NOT NULL CHECK (refund_cents > 0)
+      ) STRICT;
+
+      CREATE INDEX sale_return_line_by_line ON sale_return_line (sale_line_id);
+
+      CREATE TABLE refund_payment (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        return_id TEXT NOT NULL REFERENCES sale_return (id),
+        method TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+        reference TEXT
+      ) STRICT;
+
+      CREATE INDEX refund_payment_by_return ON refund_payment (return_id);
+
+      CREATE TRIGGER refund_payment_has_known_method BEFORE INSERT ON refund_payment
+      WHEN NEW.method NOT IN ('cash', 'transfer', 'card', 'card_manual')
+      BEGIN SELECT RAISE(ABORT, 'unknown payment method'); END;
+
+      CREATE TRIGGER sale_return_never_changes BEFORE UPDATE ON sale_return
+      BEGIN SELECT RAISE(ABORT, 'a return never changes'); END;
+
+      CREATE TRIGGER sale_return_is_never_deleted BEFORE DELETE ON sale_return
+      BEGIN SELECT RAISE(ABORT, 'a return is never deleted'); END;
+
+      CREATE TRIGGER sale_return_line_never_changes BEFORE UPDATE ON sale_return_line
+      BEGIN SELECT RAISE(ABORT, 'a return line never changes'); END;
+
+      CREATE TRIGGER sale_return_line_is_never_deleted BEFORE DELETE ON sale_return_line
+      BEGIN SELECT RAISE(ABORT, 'a return line is never deleted'); END;
+
+      CREATE TRIGGER refund_payment_never_changes BEFORE UPDATE ON refund_payment
+      BEGIN SELECT RAISE(ABORT, 'a refund payment never changes'); END;
+
+      CREATE TRIGGER refund_payment_is_never_deleted BEFORE DELETE ON refund_payment
+      BEGIN SELECT RAISE(ABORT, 'a refund payment is never deleted'); END;
+    `,
+  },
 ];

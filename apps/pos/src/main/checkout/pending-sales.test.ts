@@ -6,6 +6,7 @@ import { MoneyError } from '@pos-saas/money';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PendingSaleRequest } from '../../shared/pos-api';
+import { CashSessionStore } from '../cash/cash-session-store';
 import { LocalStore } from '../local-store/local-store';
 import { ProductCatalog } from '../local-store/product-catalog';
 import { SaleStore } from '../local-store/sale-store';
@@ -22,7 +23,8 @@ let pendingSales: PendingSales;
 beforeEach(() => {
   directory = mkdtempSync(join(tmpdir(), 'pending-sales-'));
   store = LocalStore.open({ path: join(directory, 'pos.db'), appVersion: '1.0.0' });
-  pendingSales = new PendingSales(new ProductCatalog(store, TENANT), new SaleStore(store, TENANT));
+  const cashSessionId = new CashSessionStore(store, TENANT).open(uuidV7(), 0);
+  pendingSales = new PendingSales(new ProductCatalog(store, TENANT), new SaleStore(store, TENANT), () => ({ cashierId: uuidV7(), cashSessionId }));
 });
 
 afterEach(() => {

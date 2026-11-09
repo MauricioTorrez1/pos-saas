@@ -3,6 +3,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_APPEARANCE, type Appearance } from '../shared/appearance';
 import type { UserSummary } from '../shared/auth';
+import type { CashStatus } from '../shared/cash-api';
 import type { CatalogProduct, CheckoutSaleResult, PendingSale, PosApi } from '../shared/pos-api';
 import { App } from './App';
 
@@ -23,6 +24,24 @@ const CABLE: CatalogProduct = {
 
 const HAMMER_CODE = '2000000000107';
 const OWNER: UserSummary = { id: '019a5f2e-7c40-7b1a-9d2e-3f4a5b6c7d8e', name: 'Mauricio', role: 'owner' };
+const OPEN_CASH: CashStatus = {
+  session: { id: 'session', openedBy: 'Mauricio', openedAt: '2026-11-08T14:00:00.000Z', openingFloatCents: 50000 },
+  totals: {
+    openingFloatCents: 50000,
+    cashSalesCents: 10000,
+    cardSalesCents: 0,
+    transferSalesCents: 0,
+    cashInCents: 0,
+    cashOutCents: 0,
+    cashRefundsCents: 0,
+    cardRefundsCents: 0,
+    transferRefundsCents: 0,
+  },
+  expected: { cashCents: 60000, cardCents: 0, transferCents: 0 },
+  withdrawalLimitCents: 500_000,
+  shouldWithdraw: false,
+};
+const CLOSED_CASH: CashStatus = { session: null, totals: null, expected: null, withdrawalLimitCents: 500_000, shouldWithdraw: false };
 const COMPLETED: CheckoutSaleResult = { status: 'completed', folio: 'T1-000001', changeCents: 0, problems: [] };
 
 beforeAll(() => {
@@ -45,6 +64,11 @@ function fakePosApi(overrides: Partial<PosApi> = {}): PosApi {
     login: () => Promise.resolve({ status: 'ok', user: OWNER }),
     logout: () => Promise.resolve(),
     createUser: () => Promise.resolve(OWNER),
+    getCashStatus: () => Promise.resolve(OPEN_CASH),
+    openCashSession: () => Promise.resolve({ status: 'opened', cash: OPEN_CASH }),
+    recordCashMovement: () => Promise.resolve({ status: 'recorded', cash: OPEN_CASH }),
+    closeCashSession: () => Promise.resolve({ status: 'no_session' }),
+    setWithdrawalLimit: () => Promise.resolve(OPEN_CASH),
     findProductByCode: (code) => Promise.resolve(code === HAMMER_CODE ? HAMMER : null),
     searchProducts: (text) => Promise.resolve(text.startsWith('xyz') ? [] : [HAMMER, CABLE]),
     getAppearance: () => Promise.resolve(DEFAULT_APPEARANCE),
@@ -1211,6 +1235,166 @@ describe('signing in (E1-04)', () => {
 
     expect(screen.queryByRole('dialog', { hidden: true })).toBeNull();
     expect(screen.queryByRole('button', { name: /Apariencia/ })).toBeNull();
+  });
+});
+
+describe('the cash of the register (E1-21, E1-22, E1-23)', () => {
+  const CASHIER: UserSummary = { id: '019a5f2e-7c41-7b1a-9d2e-3f4a5b6c7d8f', name: 'Ana', role: 'cashier' };
+
+  function typeInto(name: string, value: string): void {
+    fireEvent.change(screen.getByRole('textbox', { name, hidden: true }), { target: { value } });
+  }
+
+  function pressKey(key: string): void {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key });
+  }
+
+  async function openCashDialog(title: string): Promise<HTMLElement> {
+    press('F3');
+    return screen.findByRole('dialog', { name: title, hidden: true });
+  }
+
+  it('shows how to open the register when it is closed, and opens it with the float (RF-024)', async () => {
+    const openCashSession = vi.fn<PosApi['openCashSession']>(() => Promise.resolve({ status: 'opened', cash: OPEN_CASH }));
+    render(<App posApi={fakePosApi({ getCashStatus: () => Promise.resolve(CLOSED_CASH), openCashSession })} />);
+    await screen.findByRole('dialog', { name: 'Abrir la caja', hidden: true });
+
+    typeInto('Fondo de caja', '500');
+    pressKey('F2');
+
+    await waitFor(() => expect(openCashSession).toHaveBeenCalledExactlyOnceWith({ floatCents: 50000 }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull());
+    expect(screen.getByLabelText('Estado de la caja').textContent).toBe('Caja abierta');
+  });
+
+  it('refuses a float that is not an amount', async () => {
+    const openCashSession = vi.fn<PosApi['openCashSession']>();
+    render(<App posApi={fakePosApi({ getCashStatus: () => Promise.resolve(CLOSED_CASH), openCashSession })} />);
+    await screen.findByRole('dialog', { name: 'Abrir la caja', hidden: true });
+
+    typeInto('Fondo de caja', 'mucho');
+    pressKey('F2');
+
+    expect((await screen.findByRole('alert', { hidden: true })).textContent).toContain('Escribe solo números');
+    expect(openCashSession).not.toHaveBeenCalled();
+  });
+
+  it('opens the cash dialog when a sale is started with the register closed', async () => {
+    await renderApp(fakePosApi({ savePendingSale: () => Promise.resolve({ status: 'no_cash_session' }) }));
+    await addByCode();
+
+    press('F12');
+
+    expect((await screen.findByRole('alert')).textContent).toContain('La caja está cerrada');
+  });
+
+  it('warns about withdrawing cash without stopping the sale (RF-026)', async () => {
+    await renderApp(fakePosApi({ getCashStatus: () => Promise.resolve({ ...OPEN_CASH, shouldWithdraw: true }) }));
+
+    expect((await screen.findByText(/Hay mucho efectivo en el cajón/)).textContent).toContain('Puedes seguir vendiendo');
+    await addByCode();
+    expect(totalShown()).toBe('$116.00');
+  });
+
+  it('shows the owner what the drawer should hold, and does not show it to a cashier', async () => {
+    await renderApp(fakePosApi());
+    const dialog = await openCashDialog('Caja abierta');
+    expect(dialog.textContent).toContain('$600.00');
+    cleanup();
+
+    const cashier = { getAuthState: () => Promise.resolve({ needsSetup: false, users: [CASHIER], current: CASHIER }) };
+    await renderApp(fakePosApi(cashier));
+    const cashierDialog = await openCashDialog('Caja abierta');
+
+    expect(cashierDialog.textContent).not.toContain('$600.00');
+  });
+
+  it('records an exit with its reason, and refuses one without it (RF-025)', async () => {
+    const recordCashMovement = vi.fn<PosApi['recordCashMovement']>(() => Promise.resolve({ status: 'recorded', cash: OPEN_CASH }));
+    await renderApp(fakePosApi({ recordCashMovement }));
+    await openCashDialog('Caja abierta');
+
+    pressKey('F6');
+    await screen.findByRole('heading', { name: 'Salida de efectivo', hidden: true });
+    typeInto('Monto', '350');
+    pressKey('F2');
+    expect((await screen.findByRole('alert', { hidden: true })).textContent).toContain('Escribe el motivo');
+    expect(recordCashMovement).not.toHaveBeenCalled();
+    typeInto('Motivo', ' Pago a proveedor ');
+    pressKey('F2');
+
+    await waitFor(() => expect(recordCashMovement).toHaveBeenCalledExactlyOnceWith({ kind: 'out', amountCents: 35000, reason: 'Pago a proveedor' }));
+  });
+
+  it('asks a cashier for the PIN of an owner to take cash out, and not to put it in', async () => {
+    const recordCashMovement = vi.fn<PosApi['recordCashMovement']>(() => Promise.resolve({ status: 'recorded', cash: OPEN_CASH }));
+    const cashier = { getAuthState: () => Promise.resolve({ needsSetup: false, users: [CASHIER], current: CASHIER }) };
+    await renderApp(fakePosApi({ ...cashier, recordCashMovement }));
+    await openCashDialog('Caja abierta');
+
+    pressKey('F6');
+    await screen.findByRole('heading', { name: 'Salida de efectivo', hidden: true });
+    expect(screen.getByLabelText('PIN del dueño')).toBeDefined();
+    typeInto('Monto', '100');
+    typeInto('Motivo', 'Gas');
+    fireEvent.change(screen.getByLabelText('PIN del dueño'), { target: { value: '4321' } });
+    pressKey('F2');
+
+    await waitFor(() => expect(recordCashMovement).toHaveBeenCalledWith({ kind: 'out', amountCents: 10000, reason: 'Gas', ownerPin: '4321' }));
+    cleanup();
+    await renderApp(fakePosApi(cashier));
+    await openCashDialog('Caja abierta');
+    pressKey('F5');
+    await screen.findByRole('heading', { name: 'Entrada de efectivo', hidden: true });
+    expect(screen.queryByLabelText('PIN del dueño')).toBeNull();
+  });
+
+  it('asks for a reason when the cut does not balance, and shows the difference of each form of payment (RF-027)', async () => {
+    const line = (expectedCents: number, countedCents: number) => ({ expectedCents, countedCents, differenceCents: countedCents - expectedCents });
+    const comparison = { cash: line(60000, 54000), card: line(0, 0), transfer: line(0, 0), isBalanced: false };
+    const closeCashSession = vi
+      .fn<PosApi['closeCashSession']>()
+      .mockResolvedValueOnce({ status: 'reason_required', comparison })
+      .mockResolvedValueOnce({ status: 'closed', cut: { ...comparison, id: 'cut', cutAt: '2026-11-08T22:00:00.000Z', cutBy: 'Mauricio', reason: 'Se me cayó una moneda' } });
+    await renderApp(fakePosApi({ closeCashSession, getCashStatus: vi.fn().mockResolvedValueOnce(OPEN_CASH).mockResolvedValue(CLOSED_CASH) }));
+    const dialog = await openCashDialog('Caja abierta');
+
+    pressKey('F7');
+    await screen.findByRole('heading', { name: 'Corte de caja', hidden: true });
+    typeInto('Billetes de $500', '1');
+    typeInto('Billetes de $20', '2');
+    pressKey('F2');
+
+    expect((await within(dialog).findByRole('table', { name: 'Diferencias del corte', hidden: true })).textContent).toContain('Faltan $60.00');
+    expect(closeCashSession).toHaveBeenCalledWith({ counts: { 50000: 1, 2000: 2 }, cardCountedCents: 0, transferCountedCents: 0, reason: '' });
+    typeInto('Motivo de la diferencia', 'Se me cayó una moneda');
+    pressKey('F2');
+
+    expect((await screen.findByRole('status', { name: 'Resultado del corte', hidden: true })).textContent).toBe('El corte quedó con diferencia');
+  });
+
+  it('tells the cashier to answer the pending sales before the cut', async () => {
+    await renderApp(fakePosApi({ closeCashSession: () => Promise.resolve({ status: 'pending_sales', count: 2 }) }));
+    await openCashDialog('Caja abierta');
+
+    pressKey('F7');
+    await screen.findByRole('heading', { name: 'Corte de caja', hidden: true });
+    pressKey('F2');
+
+    expect((await screen.findByRole('alert', { hidden: true })).textContent).toContain('2 venta(s) sin resolver');
+  });
+
+  it('lets only the owner change the withdrawal limit', async () => {
+    const setWithdrawalLimit = vi.fn<PosApi['setWithdrawalLimit']>(() => Promise.resolve(OPEN_CASH));
+    await renderApp(fakePosApi({ setWithdrawalLimit }));
+    await openCashDialog('Caja abierta');
+
+    pressKey('F8');
+    await screen.findByRole('heading', { name: 'Aviso de retiro', hidden: true });
+    typeInto('Nuevo límite', '8000');
+    pressKey('F2');
+
+    await waitFor(() => expect(setWithdrawalLimit).toHaveBeenCalledExactlyOnceWith({ limitCents: 800_000 }));
   });
 });
 

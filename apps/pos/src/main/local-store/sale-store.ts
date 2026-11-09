@@ -128,8 +128,9 @@ export class SaleStore implements SaleRecorder {
       FROM sale_line WHERE tenant_id = ? AND sale_id = ? ORDER BY line_number
     `);
     this.#insertSale = store.prepare(`
-      INSERT INTO sale (id, tenant_id, idempotency_key, status, subtotal_cents, tax_cents, total_cents, occurred_at)
-      VALUES (?, ?, ?, 'pending_payment', ?, ?, ?, ?)
+      INSERT INTO sale (id, tenant_id, idempotency_key, status, subtotal_cents, tax_cents, total_cents, occurred_at,
+        cash_session_id, cashier_id)
+      VALUES (?, ?, ?, 'pending_payment', ?, ?, ?, ?, ?, ?)
     `);
     this.#insertLine = store.prepare(`
       INSERT INTO sale_line (id, tenant_id, sale_id, line_number, product_id, product_name, unit, quantity_milli,
@@ -271,7 +272,17 @@ export class SaleStore implements SaleRecorder {
 
   #insert(sale: SaleToSave): void {
     const { saleId, idempotencyKey, subtotalCents, taxCents, totalCents } = sale;
-    this.#insertSale.run(saleId, this.#tenantId, idempotencyKey, subtotalCents, taxCents, totalCents, new Date().toISOString());
+    this.#insertSale.run(
+      saleId,
+      this.#tenantId,
+      idempotencyKey,
+      subtotalCents,
+      taxCents,
+      totalCents,
+      new Date().toISOString(),
+      sale.cashSessionId ?? null,
+      sale.cashierId ?? null,
+    );
     sale.lines.forEach((line, index) => this.#insertSaleLine(saleId, line, index + 1));
   }
 

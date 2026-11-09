@@ -384,5 +384,18 @@ export async function signInWindow(register: ElectronApplication): Promise<Page>
     await page.keyboard.press('Enter');
   }
   await expect(page.getByRole('combobox', { name: 'Buscar producto' })).toBeVisible();
+  await openCashIfClosed(page);
   return page;
+}
+
+/** The first start has a closed register, which cannot sell, so the test opens it with no float, as a cashier would. */
+async function openCashIfClosed(page: Page): Promise<void> {
+  const state = page.getByLabel('Estado de la caja');
+  await expect(state).toHaveText(/Caja (abierta|cerrada)/);
+  if ((await state.textContent()) === 'Caja cerrada') {
+    await page.getByRole('textbox', { name: 'Fondo de caja' }).fill('0');
+    await page.keyboard.press('F2');
+    await expect(state).toHaveText('Caja abierta');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  }
 }

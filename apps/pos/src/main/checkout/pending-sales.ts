@@ -6,6 +6,12 @@ import type { SaleStore } from '../local-store/sale-store';
 import { uuidV7 } from '../uuid-v7';
 import type { SaleLineToSave, SaleToSave } from './sale-recorder';
 
+/** Who sells, and in which cash session, so the cut can count the sale. */
+export interface SaleContext {
+  readonly cashierId: string;
+  readonly cashSessionId: string;
+}
+
 /**
  * What the screen can do with a sale that has not been paid: save it before charging, and confirm or cancel it when the
  * register comes back from a power cut (ADR 0010, RF-017).
@@ -13,21 +19,24 @@ import type { SaleLineToSave, SaleToSave } from './sale-recorder';
 export class PendingSales {
   readonly #catalog: Pick<ProductCatalog, 'findById'>;
   readonly #sales: SaleStore;
+  readonly #context: () => SaleContext | null;
 
   /**
    * @param catalog where the prices come from
    * @param sales where the sales are saved
+   * @param context who is selling and in which cash session, or null while the register is closed
    */
-  constructor(catalog: Pick<ProductCatalog, 'findById'>, sales: SaleStore) {
+  constructor(catalog: Pick<ProductCatalog, 'findById'>, sales: SaleStore, context: () => SaleContext | null) {
     this.#catalog = catalog;
     this.#sales = sales;
+    this.#context = context;
   }
 
   /**
    * Saves a sale as pending, priced with the catalog. Asking again with the same key returns the same sale.
    *
    * @param request the products, the quantities, and the total the customer sees
-   * @returns the saved sale, or `catalog_changed` if a product is gone or the total is not the one on the screen
+   * @returns the saved sale, `no_cash_session` if the register is closed, or `catalog_changed` if a product is gone or the total is not the one on the screen
    * @throws MoneyError if a quantity is not valid for its product, or an amount passes the largest supported value
    * @throws Error from SQLite if the key belongs to a sale that was already resolved
    */
@@ -36,11 +45,15 @@ export class PendingSales {
     if (alreadySaved !== null) {
       return { status: 'saved', sale: alreadySaved };
     }
+    const context = this.#context();
+    if (context === null) {
+      return { status: 'no_cash_session' };
+    }
     const sale = this.#price(request);
     if (sale === null) {
       return { status: 'catalog_changed' };
     }
-    this.#sales.savePendingPayment(sale);
+    this.#sales.savePendingPayment({ ...sale, ...context });
     return { status: 'saved', sale: this.#sales.findPendingByIdempotencyKey(request.idempotencyKey)! };
   }
 

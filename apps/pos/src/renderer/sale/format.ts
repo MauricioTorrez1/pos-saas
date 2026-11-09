@@ -1,9 +1,19 @@
-import type { Quantity, TaxRate, Unit } from '@pos-saas/money';
+import { formatCents, type Quantity, type TaxRate, type Unit } from '@pos-saas/money';
 
 const MILLI_PER_UNIT = 1000;
 const QUANTITY_DECIMALS = 3;
 const BASIS_POINTS_PER_PERCENT = 100;
 const PERCENT_DECIMALS = 2;
+
+/**
+ * Shows an amount that may be negative, such as the cash a drawer should hold after more was taken out than came in.
+ *
+ * @param amountCents the amount in cents, which may be below zero
+ * @returns text such as "$35.00" or "−$35.00"
+ */
+export function formatSignedCents(amountCents: number): string {
+  return amountCents < 0 ? `−${formatCents(-amountCents)}` : formatCents(amountCents);
+}
 
 const MOMENT_FORMAT = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
 
