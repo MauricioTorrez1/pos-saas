@@ -1,7 +1,10 @@
 import type { LineTotals, Quantity } from '@pos-saas/money';
 
-/** How a customer can pay. A card payment keeps its authorization code, never card data. */
-export const PAYMENT_METHODS = ['cash', 'transfer', 'card'] as const;
+/**
+ * How a customer can pay. A card payment keeps its authorization code or the folio of the terminal, never card data.
+ * `card_manual` is a card charged on the standalone terminal, with the folio typed by the cashier (RF-016).
+ */
+export const PAYMENT_METHODS = ['cash', 'transfer', 'card', 'card_manual'] as const;
 
 /** One of the ways to pay. */
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
@@ -62,6 +65,20 @@ export interface SaleToCheckout extends SaleToSave {
   readonly payment: CheckoutPayment;
 }
 
+/** What completing a sale gives back. */
+export interface CompletedSale {
+  /** The number of the sale in this register, starting at 1 and without gaps. Only completed sales have one. */
+  readonly folio: number;
+  /** When it was completed, in ISO 8601. */
+  readonly completedAt: string;
+}
+
+/** A completed sale read back from the database, with everything a ticket needs. */
+export interface CompletedSaleRecord extends CompletedSale {
+  readonly sale: SaleToSave;
+  readonly payments: readonly SalePayment[];
+}
+
 /** A sale that was already completed. Checking it out again could charge the customer twice. */
 export class SaleAlreadyCompletedError extends Error {
   /** @param saleId the sale that is already completed */
@@ -90,6 +107,7 @@ export interface SaleRecorder {
    *
    * @param saleId the sale that was paid
    * @param payments the parts it was paid with, which must add up to its total
+   * @returns the folio the sale got and when it was completed, for the ticket
    */
-  markCompleted(saleId: string, payments: readonly SalePayment[]): void;
+  markCompleted(saleId: string, payments: readonly SalePayment[]): CompletedSale;
 }

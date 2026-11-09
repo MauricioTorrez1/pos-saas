@@ -10,6 +10,7 @@ const posApi: PosApi = {
   saveAppearance: (appearance) => ipcRenderer.invoke(IPC_CHANNELS.saveAppearance, appearance),
   savePendingSale: (request) => ipcRenderer.invoke(IPC_CHANNELS.savePendingSale, request),
   checkoutSale: (request) => ipcRenderer.invoke(IPC_CHANNELS.checkoutSale, request),
+  reprintLastTicket: () => ipcRenderer.invoke(IPC_CHANNELS.reprintLastTicket),
   listPendingSales: () => ipcRenderer.invoke(IPC_CHANNELS.listPendingSales),
   confirmPendingSale: (request) => ipcRenderer.invoke(IPC_CHANNELS.confirmPendingSale, request),
   cancelPendingSale: (saleId) => ipcRenderer.invoke(IPC_CHANNELS.cancelPendingSale, saleId),

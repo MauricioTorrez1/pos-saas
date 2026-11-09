@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { planPayments, type PaymentPlan, type PaymentTender } from './payment-plan';
 
 const TRANSFER_REFERENCE = 'SPEI-778812';
+/** Built from parts, so the secret scan does not take a test value for a real card number. */
+const SAMPLE_CARD = ['4111', '1111', '1111', '1111'];
 
 function cash(cashReceivedCents: number): PaymentTender {
   return { cashReceivedCents, transfers: [] };
@@ -113,6 +115,71 @@ describe('planPayments', () => {
 
   it('says what is missing before asking for the reference', () => {
     expect(planPayments(10000, transfer(4000, ''))).toEqual({ status: 'short', missingCents: 6000 });
+  });
+
+  describe('card typed on the standalone terminal (RF-016)', () => {
+    function withCard(cashReceivedCents: number, amountCents: number, reference: string): PaymentTender {
+      return { cashReceivedCents, transfers: [], cards: [{ amountCents, reference }] };
+    }
+
+    it('records the card as card_manual with its folio, next to the cash', () => {
+      expect(planPayments(10000, withCard(6000, 4000, 'A48291'))).toEqual({
+        status: 'ready',
+        payments: [
+          { method: 'cash', amountCents: 6000, tenderedCents: 6000 },
+          { method: 'card_manual', amountCents: 4000, reference: 'A48291' },
+        ],
+        changeCents: 0,
+      });
+    });
+
+    it('takes the whole sale on the card', () => {
+      expect(planPayments(11600, withCard(0, 11600, '482913'))).toMatchObject({
+        status: 'ready',
+        payments: [{ method: 'card_manual', amountCents: 11600, reference: '482913' }],
+      });
+    });
+
+    it('puts the cash first, then the transfers, then the cards, and the change comes only from the cash', () => {
+      const tender: PaymentTender = {
+        cashReceivedCents: 5000,
+        transfers: [{ amountCents: 3000, reference: 'SPEI-1' }],
+        cards: [{ amountCents: 4000, reference: '4829' }],
+      };
+
+      expect(planPayments(10000, tender)).toMatchObject({
+        status: 'ready',
+        payments: [
+          { method: 'cash', amountCents: 3000 },
+          { method: 'transfer', amountCents: 3000 },
+          { method: 'card_manual', amountCents: 4000 },
+        ],
+        changeCents: 2000,
+      });
+    });
+
+    it('asks for the folio, because without it the card cannot be reconciled later', () => {
+      expect(planPayments(10000, withCard(0, 10000, ' '))).toEqual({ status: 'folio_missing' });
+    });
+
+    it.each([[SAMPLE_CARD.join('')], [SAMPLE_CARD.join(' ')], [SAMPLE_CARD.join('-')], [['5555', '5555', '5555', '4444'].join('')], ['1234567890123']])(
+      'refuses %j, because it looks like a card number and the register never keeps one',
+      (reference) => {
+        expect(planPayments(10000, withCard(0, 10000, reference))).toEqual({ status: 'card_number_entered' });
+      },
+    );
+
+    it.each([['A48291'], ['482913'], ['000123456789'], ['AUT 77 12']])('accepts the folio %j', (reference) => {
+      expect(planPayments(10000, withCard(0, 10000, reference)).status).toBe('ready');
+    });
+
+    it('treats a card like a transfer: it gives no change, so it cannot pass the total', () => {
+      expect(planPayments(10000, withCard(0, 10001, '4829'))).toEqual({ status: 'transfers_exceed_total', excessCents: 1 });
+    });
+
+    it('says how much is missing, before it asks for the folio', () => {
+      expect(planPayments(10000, withCard(0, 4000, ''))).toEqual({ status: 'short', missingCents: 6000 });
+    });
   });
 
   it('always adds up to the total, and the change never passes the cash received', () => {

@@ -5,6 +5,8 @@ import { taxRateOf, type TaxFactor, type Unit } from '@pos-saas/money';
 import type { PendingSale, PendingSaleLine } from '../../shared/pos-api';
 import {
   SaleAlreadyCompletedError,
+  type CompletedSale,
+  type CompletedSaleRecord,
   type SaleLineToSave,
   type SalePayment,
   type SaleRecorder,
@@ -40,6 +42,17 @@ interface SaleRow {
   readonly subtotal_cents: number;
   readonly tax_cents: number;
   readonly total_cents: number;
+}
+
+interface CompletedRow extends SaleRow {
+  readonly folio: number;
+  readonly resolved_at: string;
+}
+
+interface PaymentRow {
+  readonly method: SalePayment['method'];
+  readonly amount_cents: number;
+  readonly reference: string | null;
 }
 
 interface SavedLineRow {
@@ -81,6 +94,10 @@ export class SaleStore implements SaleRecorder {
   readonly #insertLine: StatementSync;
   readonly #insertPayment: StatementSync;
   readonly #resolve: StatementSync;
+  readonly #complete: StatementSync;
+  readonly #nextFolio: StatementSync;
+  readonly #findLastCompleted: StatementSync;
+  readonly #paymentsOf: StatementSync;
 
   /**
    * @param store the open local database
@@ -124,7 +141,17 @@ export class SaleStore implements SaleRecorder {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     this.#resolve = store.prepare('UPDATE sale SET status = ?, resolved_at = ? WHERE tenant_id = ? AND id = ?');
-  }
+    this.#complete = store.prepare(`
+      UPDATE sale SET status = 'completed', resolved_at = ?, folio = ? WHERE tenant_id = ? AND id = ?
+    `);
+    this.#nextFolio = store.prepare('SELECT coalesce(max(folio), 0) + 1 AS next FROM sale WHERE tenant_id = ?');
+    this.#findLastCompleted = store.prepare(`
+      SELECT id, idempotency_key, subtotal_cents, tax_cents, total_cents, folio, resolved_at FROM sale
+      WHERE tenant_id = ? AND status = 'completed' ORDER BY folio DESC LIMIT 1
+    `);
+    this.#paymentsOf = store.prepare(`
+      SELECT method, amount_cents, reference FROM payment WHERE tenant_id = ? AND sale_id = ? ORDER BY rowid
+    `);  }
 
   /**
    * {@inheritDoc SaleRecorder.savePendingPayment}
@@ -151,15 +178,18 @@ export class SaleStore implements SaleRecorder {
    * @throws SaleNotFoundError if the sale does not exist
    * @throws InvalidSaleTransitionError if the sale is not pending
    */
-  markCompleted(saleId: string, payments: readonly SalePayment[]): void {
-    this.#store.transaction(() => {
+  markCompleted(saleId: string, payments: readonly SalePayment[]): CompletedSale {
+    return this.#store.transaction(() => {
       const { status } = this.#requireState(saleId);
       assertSaleTransition(saleId, status, 'completed');
-      const now = new Date().toISOString();
+      const completedAt = new Date().toISOString();
       for (const payment of payments) {
-        this.#insertPayment.run(uuidV7(), this.#tenantId, saleId, payment.method, payment.amountCents, payment.reference, now);
+        this.#insertPayment.run(uuidV7(), this.#tenantId, saleId, payment.method, payment.amountCents, payment.reference, completedAt);
       }
-      this.#resolve.run('completed', now, this.#tenantId, saleId);
+      // The folio is taken inside the transaction that completes the sale, so two sales never get the same one.
+      const { next: folio } = this.#nextFolio.get(this.#tenantId) as unknown as { next: number };
+      this.#complete.run(completedAt, folio, this.#tenantId, saleId);
+      return { folio, completedAt };
     });
   }
 
@@ -188,6 +218,24 @@ export class SaleStore implements SaleRecorder {
   }
 
   /**
+   * Reads the last completed sale of this business with its payments, which is what a reprint needs.
+   *
+   * @returns the sale with its folio and time, or null if no sale was completed yet
+   */
+  findLastCompletedSale(): CompletedSaleRecord | null {
+    const row = this.#findLastCompleted.get(this.#tenantId) as unknown as CompletedRow | undefined;
+    if (row === undefined) {
+      return null;
+    }
+    const payments = this.#paymentsOf.all(this.#tenantId, row.id) as unknown as PaymentRow[];
+    return {
+      folio: row.folio,
+      completedAt: row.resolved_at,
+      sale: this.#toSaleToSave(row),
+      payments: payments.map(({ method, amount_cents: amountCents, reference }) => ({ method, amountCents, reference })),
+    };
+  }
+  /**
    * Reads a pending sale back exactly as it was saved, with its lines, so it can be charged and ticketed.
    *
    * @param saleId the sale
@@ -195,10 +243,11 @@ export class SaleStore implements SaleRecorder {
    */
   findPendingSale(saleId: string): SaleToSave | null {
     const row = this.#findPendingSale.get(this.#tenantId, saleId) as unknown as SaleRow | undefined;
-    if (row === undefined) {
-      return null;
-    }
-    const lines = this.#fullLinesOf.all(this.#tenantId, saleId) as unknown as SavedLineRow[];
+    return row === undefined ? null : this.#toSaleToSave(row);
+  }
+
+  #toSaleToSave(row: SaleRow): SaleToSave {
+    const lines = this.#fullLinesOf.all(this.#tenantId, row.id) as unknown as SavedLineRow[];
     return {
       saleId: row.id,
       idempotencyKey: row.idempotency_key,
@@ -208,6 +257,7 @@ export class SaleStore implements SaleRecorder {
       totalCents: row.total_cents,
     };
   }
+
   /**
    * Finds the pending sale created with this key.
    *

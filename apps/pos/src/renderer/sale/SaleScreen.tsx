@@ -2,6 +2,9 @@ import { useCallback, useEffect, useReducer, useRef, useState, type KeyboardEven
 
 import { MAX_LOOKUP_TEXT_LENGTH, type CatalogProduct, type PendingSale, type PosApi } from '../../shared/pos-api';
 import { CheckoutDialog } from '../checkout/CheckoutDialog';
+import { describeReprint, REPRINT_FAILED } from '../checkout/reprint-message';
+import { QuantityDialog } from './QuantityDialog';
+import { needsMeasuring } from './quantity-entry';
 import { SaleLines } from './SaleLines';
 import { EMPTY_SALE, saleReducer } from './sale-state';
 import { SaleSummary } from './SaleSummary';
@@ -45,6 +48,8 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
   const [savedSale, setSavedSale] = useState<PendingSale | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [measuring, setMeasuring] = useState<CatalogProduct | null>(null);
   const isSaving = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -52,10 +57,17 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
   const search = useProductSearch(posApi, showCatalogFailure);
 
   useEffect(() => {
-    if (!isKeyboardElsewhere && savedSale === null) {
+    if (!isKeyboardElsewhere && savedSale === null && measuring === null) {
       inputRef.current?.focus();
     }
-  }, [isKeyboardElsewhere, savedSale]);
+  }, [isKeyboardElsewhere, savedSale, measuring]);
+
+  const confirmQuantity = (quantityMilli: number): void => {
+    if (measuring !== null) {
+      dispatch({ type: 'add-product', product: measuring, quantityMilli });
+    }
+    setMeasuring(null);
+  };
 
   // The sale is saved before the payment screen opens, so a power cut while charging leaves it to recover (ADR 0010).
   const startCheckout = async (): Promise<void> => {
@@ -63,7 +75,7 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
       setNotice(EMPTY_SALE_MESSAGE);
       return;
     }
-    if (isSaving.current || isKeyboardElsewhere) {
+    if (isSaving.current || isKeyboardElsewhere || measuring !== null) {
       return;
     }
     isSaving.current = true;
@@ -85,6 +97,14 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
     }
   };
 
+  const reprintLast = async (): Promise<void> => {
+    try {
+      setInfo(describeReprint(await posApi.reprintLastTicket()));
+    } catch {
+      setInfo(REPRINT_FAILED);
+    }
+  };
+
   const finishCheckout = (wasCollected: boolean): void => {
     setSavedSale(null);
     if (wasCollected) {
@@ -102,7 +122,12 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
   };
 
   const addProduct = (product: CatalogProduct, submittedText: string): void => {
-    dispatch({ type: 'add-product', product });
+    // What is measured is not added until the cashier says how much, and sees what it costs (RF-012).
+    if (needsMeasuring(product)) {
+      setMeasuring(product);
+    } else {
+      dispatch({ type: 'add-product', product });
+    }
     setNotice(null);
     // The cashier may already be typing the next product, and that text must stay.
     if (inputRef.current?.value.trim() === submittedText) {
@@ -209,6 +234,10 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
         event.preventDefault();
         void startCheckout();
         return;
+      case 'F8':
+        event.preventDefault();
+        void reprintLast();
+        return;
       default:
         if (isPrintableKey(event)) {
           detector.recordCharacter(event.timeStamp);
@@ -220,6 +249,7 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
 
   const handleInput = (): void => {
     setNotice(null);
+    setInfo(null);
     const text = inputRef.current?.value.trim() ?? '';
     if (text === '') {
       detector.reset();
@@ -281,9 +311,15 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
             {message}
           </p>
         )}
+        {info !== null && (
+          <p className="notice notice-info" role="status">
+            {info}
+          </p>
+        )}
         <SaleLines lines={sale.lines} selectedProductId={sale.selectedProductId} onSelect={handleSelectLine} />
       </section>
       <SaleSummary lineCount={sale.lines.length} totals={sale.totals} />
+      {measuring !== null && <QuantityDialog product={measuring} onConfirm={confirmQuantity} onCancel={() => setMeasuring(null)} />}
       {savedSale !== null && <CheckoutDialog posApi={posApi} sale={savedSale} onFinished={finishCheckout} />}
     </main>
   );

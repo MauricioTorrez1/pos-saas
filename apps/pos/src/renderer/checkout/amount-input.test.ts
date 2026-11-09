@@ -40,8 +40,10 @@ describe('describePlan', () => {
   });
 
   it('explains each reason the payment cannot be recorded', () => {
-    expect(describePlan({ status: 'transfers_exceed_total', excessCents: 100 }).text).toContain('no da cambio');
+    expect(describePlan({ status: 'transfers_exceed_total', excessCents: 100 }).text).toContain('No dan cambio');
     expect(describePlan({ status: 'cash_not_needed', excessCents: 500 }).text).toContain('Quita el efectivo');
     expect(describePlan({ status: 'reference_missing' }).text).toContain('referencia');
+    expect(describePlan({ status: 'folio_missing' }).text).toContain('folio');
+    expect(describePlan({ status: 'card_number_entered' }).text).toContain('número de tarjeta');
   });
 });

@@ -2,7 +2,7 @@ import { sumCents } from '@pos-saas/money';
 
 import { DeviceError, type DeviceName } from '../hardware/device-error';
 import type { RegisterHardware } from '../hardware/register-hardware';
-import type { SalePayment, SaleRecorder, SaleToCheckout } from './sale-recorder';
+import type { CompletedSale, SalePayment, SaleRecorder, SaleToCheckout } from './sale-recorder';
 
 /** A device that failed after the sale was completed. The sale stands; the cashier only needs to know. */
 export interface DeviceProblem {
@@ -16,6 +16,8 @@ export type CheckoutResult =
       readonly status: 'completed';
       /** What the sale was paid with. It adds up to the total. */
       readonly payments: readonly SalePayment[];
+      /** The folio the sale got. */
+      readonly folio: number;
       /** Cash given back to the customer. */
       readonly changeCents: number;
       readonly problems: readonly DeviceProblem[];
@@ -26,8 +28,15 @@ export type CheckoutResult =
 export interface CheckoutDependencies {
   readonly hardware: Pick<RegisterHardware, 'printer' | 'cashDrawer' | 'cardTerminal'>;
   readonly sales: SaleRecorder;
-  /** Builds the ticket bytes once the payments are known. E1-13 brings the ESC/POS generator. */
-  readonly renderTicket: (sale: SaleToCheckout, payments: readonly SalePayment[]) => Uint8Array;
+  /** Builds the ticket bytes once the sale is completed and has its folio. */
+  readonly renderTicket: (sale: SaleToCheckout, receipt: Receipt) => Uint8Array;
+}
+
+/** What a ticket needs besides the sale: how it was paid, the change, and the folio it got. */
+export interface Receipt extends CompletedSale {
+  readonly payments: readonly SalePayment[];
+  /** Cash given back. */
+  readonly changeCents: number;
 }
 
 type Collected =
@@ -68,7 +77,7 @@ export class SaleCheckout {
     if (collected.status === 'declined') {
       return collected;
     }
-    sales.markCompleted(sale.saleId, collected.payments);
+    const completed = sales.markCompleted(sale.saleId, collected.payments);
 
     // From here on the sale is completed. Throwing would tell the screen it failed, and the cashier could
     // charge the customer again, so device failures become problems to show instead.
@@ -77,9 +86,9 @@ export class SaleCheckout {
       await this.#tryDevice('cashDrawer', problems, () => this.#dependencies.hardware.cashDrawer.open());
     }
     await this.#tryDevice('printer', problems, () =>
-      this.#dependencies.hardware.printer.print(this.#dependencies.renderTicket(sale, collected.payments)),
+      this.#dependencies.hardware.printer.print(this.#dependencies.renderTicket(sale, { ...completed, payments: collected.payments, changeCents: collected.changeCents })),
     );
-    return { status: 'completed', payments: collected.payments, changeCents: collected.changeCents, problems };
+    return { status: 'completed', payments: collected.payments, folio: completed.folio, changeCents: collected.changeCents, problems };
   }
 
   async #collect(sale: SaleToCheckout): Promise<Collected> {

@@ -84,12 +84,19 @@ function requireNonNegativeInteger(value: unknown, description: string): number 
 }
 
 function parseTransfer(value: unknown): PaymentRequest['transfers'][number] {
-  const transfer = requireRecord(value, 'a transfer');
+  const transfer = requireRecord(value, 'a transfer or a card payment');
   const { reference } = transfer;
   if (typeof reference !== 'string' || reference.length > MAX_REFERENCE_LENGTH) {
     throw new TypeError(`Expected a transfer reference of at most ${MAX_REFERENCE_LENGTH} characters`);
   }
   return { amountCents: requirePositiveInteger(transfer.amountCents, 'a transfer amount in cents'), reference };
+}
+
+function parseTransfers(value: unknown): PaymentRequest['transfers'] {
+  if (!Array.isArray(value) || value.length > MAX_TRANSFERS) {
+    throw new TypeError(`Expected at most ${MAX_TRANSFERS} transfers or card payments`);
+  }
+  return value.map(parseTransfer);
 }
 
 /**
@@ -101,12 +108,12 @@ function parseTransfer(value: unknown): PaymentRequest['transfers'][number] {
  */
 export function parsePaymentRequest(value: unknown): PaymentRequest {
   const request = requireRecord(value, 'a payment request');
-  if (!Array.isArray(request.transfers) || request.transfers.length > MAX_TRANSFERS) {
-    throw new TypeError(`Expected at most ${MAX_TRANSFERS} transfers`);
-  }
+  const transfers = parseTransfers(request.transfers);
   return {
     saleId: parseSaleId(request.saleId),
     cashReceivedCents: requireNonNegativeInteger(request.cashReceivedCents, 'the cash received in cents'),
-    transfers: request.transfers.map(parseTransfer),
+    transfers,
+    // Only when the screen sent them, so a request without cards stays the same as before.
+    ...(request.cards === undefined ? {} : { cards: parseTransfers(request.cards) }),
   };
 }

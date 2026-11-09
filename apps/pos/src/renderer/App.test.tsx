@@ -21,7 +21,7 @@ const CABLE: CatalogProduct = {
 };
 
 const HAMMER_CODE = '2000000000107';
-const COMPLETED: CheckoutSaleResult = { status: 'completed', changeCents: 0, problems: [] };
+const COMPLETED: CheckoutSaleResult = { status: 'completed', folio: 'T1-000001', changeCents: 0, problems: [] };
 
 beforeAll(() => {
   // jsdom has no modal dialogs.
@@ -44,6 +44,7 @@ function fakePosApi(overrides: Partial<PosApi> = {}): PosApi {
     saveAppearance: () => Promise.resolve(),
     savePendingSale: () => Promise.resolve({ status: 'catalog_changed' }),
     checkoutSale: () => Promise.resolve(COMPLETED),
+    reprintLastTicket: () => Promise.resolve({ status: 'no_sales' }),
     listPendingSales: () => Promise.resolve([]),
     confirmPendingSale: () => Promise.resolve(COMPLETED),
     cancelPendingSale: () => Promise.resolve(),
@@ -83,6 +84,13 @@ function linesShown(): string[] {
     .getAllByRole('row')
     .slice(1)
     .map((row) => row.textContent ?? '');
+}
+
+/** Says how much of a measured product to add, in the dialog that opens when it is chosen. */
+async function confirmQuantity(text: string): Promise<void> {
+  const box = await screen.findByRole('textbox', { name: 'Cantidad', hidden: true });
+  fireEvent.change(box, { target: { value: text } });
+  fireEvent.keyDown(box, { key: 'Enter' });
 }
 
 async function addByCode(): Promise<void> {
@@ -207,6 +215,7 @@ describe('selling', () => {
     expect((await screen.findAllByRole('option'))[0]!.getAttribute('aria-selected')).toBe('true');
     press('ArrowUp');
     press('Enter');
+    await confirmQuantity('2');
 
     await waitFor(() => expect(linesShown()[0]).toContain('Cable THW'));
   });
@@ -227,6 +236,7 @@ describe('selling', () => {
     typeText('cable');
     const options = await screen.findAllByRole('option');
     fireEvent.mouseDown(options[1]!);
+    await confirmQuantity('2');
 
     await waitFor(() => expect(linesShown()[0]).toContain('Cable THW'));
   });
@@ -238,6 +248,7 @@ describe('selling', () => {
     press('Backspace');
     typeText('cable');
     fireEvent.mouseDown((await screen.findAllByRole('option'))[1]!);
+    await confirmQuantity('2');
     await waitFor(() => expect(linesShown()).toHaveLength(1));
     searchProducts.mockClear();
 
@@ -331,6 +342,106 @@ describe('selling', () => {
     typeText('m');
 
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+});
+
+describe('products sold by length, weight, or volume (RF-012, E1-08)', () => {
+  async function chooseCable(): Promise<void> {
+    typeText('cable');
+    const options = await screen.findAllByRole('option');
+    fireEvent.mouseDown(options[1]!);
+    await screen.findByRole('dialog', { name: /¿Cuánto Cable THW\?/, hidden: true });
+  }
+
+  function importShown(): string | null {
+    return screen.getByRole('status', { name: 'Importe de la línea', hidden: true }).textContent;
+  }
+
+  function pressKey(key: string): void {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key });
+  }
+
+  it('asks how much before adding, and shows what the line costs: 3.275 m at $12.50 is $40.94', async () => {
+    render(<App posApi={fakePosApi()} />);
+    await chooseCable();
+    expect(totalShown()).toBe('$0.00');
+
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Cantidad', hidden: true }), { target: { value: '3.275' } });
+    expect(importShown()).toBe('$40.94');
+    pressKey('Enter');
+
+    await waitFor(() => expect(linesShown()).toEqual(['Cable THW3.275 m$12.50$40.94']));
+    expect(totalShown()).toBe('$40.94');
+  });
+
+  it('adds nothing when the cashier cancels with Esc', async () => {
+    render(<App posApi={fakePosApi()} />);
+    await chooseCable();
+
+    pressKey('Escape');
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull());
+    expect(totalShown()).toBe('$0.00');
+    await waitFor(() => expect(document.activeElement).toBe(lookupBox()));
+  });
+
+  it('adds nothing, and explains, while the quantity is not valid', async () => {
+    render(<App posApi={fakePosApi()} />);
+    await chooseCable();
+    const box = await screen.findByRole('textbox', { name: 'Cantidad', hidden: true });
+
+    fireEvent.change(box, { target: { value: '3.2755' } });
+    pressKey('Enter');
+
+    expect(screen.getByRole('alert', { hidden: true }).textContent).toContain('3 decimales');
+    expect(totalShown()).toBe('$0.00');
+  });
+
+  it('asks for F2 when the quantity is more than a shop sells at once, so 125 is not taken for 1.25', async () => {
+    render(<App posApi={fakePosApi()} />);
+    await chooseCable();
+    const box = await screen.findByRole('textbox', { name: 'Cantidad', hidden: true });
+
+    fireEvent.change(box, { target: { value: '125' } });
+    pressKey('Enter');
+    expect(screen.getByRole('alert', { hidden: true }).textContent).toContain('es mucho');
+    expect(totalShown()).toBe('$0.00');
+    pressKey('F2');
+
+    await waitFor(() => expect(linesShown()).toEqual(['Cable THW125.000 m$12.50$1,562.50']));
+  });
+
+  it('adds the new meters to the line that already has some', async () => {
+    render(<App posApi={fakePosApi()} />);
+    await chooseCable();
+    await confirmQuantity('1.5');
+    await waitFor(() => expect(linesShown()).toHaveLength(1));
+
+    await chooseCable();
+    await confirmQuantity('2.25');
+
+    await waitFor(() => expect(linesShown()).toEqual(['Cable THW3.750 m$12.50$46.88']));
+  });
+
+  it('does not let the Enter that ends a barcode scan add a line', async () => {
+    render(<App posApi={fakePosApi()} />);
+    await chooseCable();
+    const box = await screen.findByRole('textbox', { name: 'Cantidad', hidden: true });
+
+    fireEvent.change(box, { target: { value: HAMMER_CODE } });
+    pressKey('Enter');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(totalShown()).toBe('$0.00');
+  });
+
+  it('adds pieces at once, without asking', async () => {
+    render(<App posApi={fakePosApi()} />);
+
+    await addByCode();
+
+    expect(screen.queryByRole('dialog', { hidden: true })).toBeNull();
+    expect(linesShown()).toEqual(['Martillo1 pza$116.00$116.00']);
   });
 });
 
@@ -678,7 +789,7 @@ describe('checkout', () => {
   });
 
   it('shows the change while the cashier types the cash, and collects with F2 (RF-014)', async () => {
-    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve({ status: 'completed', changeCents: 8400, problems: [] }));
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve({ status: 'completed', folio: 'T1-000001', changeCents: 8400, problems: [] }));
     render(<App posApi={posApiThatSaves({ checkoutSale })} />);
     const dialog = await openCheckout();
     await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('Efectivo recibido'));
@@ -695,7 +806,7 @@ describe('checkout', () => {
   });
 
   it('starts a new sale when the cashier has seen the change', async () => {
-    render(<App posApi={posApiThatSaves({ checkoutSale: () => Promise.resolve({ status: 'completed', changeCents: 8400, problems: [] }) })} />);
+    render(<App posApi={posApiThatSaves({ checkoutSale: () => Promise.resolve({ status: 'completed', folio: 'T1-000001', changeCents: 8400, problems: [] }) })} />);
     await openCheckout();
     typeInto('Efectivo recibido', '200');
     pressKey('F2');
@@ -729,6 +840,54 @@ describe('checkout', () => {
     });
   });
 
+  it('records the card typed on the standalone terminal with its folio (RF-016)', async () => {
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve(COMPLETED));
+    render(<App posApi={posApiThatSaves({ checkoutSale })} />);
+    await openCheckout();
+
+    typeInto('Efectivo recibido', '16');
+    pressKey('F7');
+    expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'Tarjeta', hidden: true }).value).toBe('100');
+    expect(status()).toBe('Escribe el folio que dio la terminal de tarjeta.');
+    typeInto('Folio de la terminal', ' A48291 ');
+    expect(status()).toBe('Pago exacto');
+    pressKey('F2');
+
+    await waitFor(() => expect(checkoutSale).toHaveBeenCalledTimes(1));
+    expect(checkoutSale).toHaveBeenCalledWith({
+      saleId: 'saved-sale',
+      cashReceivedCents: 1600,
+      transfers: [],
+      cards: [{ amountCents: 10000, reference: 'A48291' }],
+    });
+  });
+
+  it('refuses a folio that looks like a card number, and never sends it', async () => {
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve(COMPLETED));
+    render(<App posApi={posApiThatSaves({ checkoutSale })} />);
+    await openCheckout();
+
+    typeInto('Tarjeta', '116');
+    typeInto('Folio de la terminal', ['4111', '1111', '1111', '1111'].join(' '));
+    pressKey('F2');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(status()).toContain('número de tarjeta');
+    expect(checkoutSale).not.toHaveBeenCalled();
+  });
+
+  it('does not send a cards list when the sale was not paid with a card', async () => {
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve(COMPLETED));
+    render(<App posApi={posApiThatSaves({ checkoutSale })} />);
+    await openCheckout();
+    typeInto('Efectivo recibido', '116');
+
+    pressKey('F2');
+
+    await waitFor(() => expect(checkoutSale).toHaveBeenCalledTimes(1));
+    expect(checkoutSale.mock.calls[0]![0]).not.toHaveProperty('cards');
+  });
+
   it('fills the cash that is missing with F5, and the transfer that is missing with F6', async () => {
     render(<App posApi={posApiThatSaves()} />);
     await openCheckout();
@@ -748,7 +907,7 @@ describe('checkout', () => {
 
   it.each([
     ['cash that does not reach the total', '100', '', 'Faltan $16.00'],
-    ['a transfer for more than the total', '', '120', 'no da cambio'],
+    ['a transfer for more than the total', '', '120', 'No dan cambio'],
     ['cash when the transfer already covers the total', '10', '116', 'Quita el efectivo'],
     ['text that is not an amount', 'cien', '', 'Escribe solo números'],
   ])('does not collect with %s', async (_case, cash, transfer, message) => {
@@ -819,7 +978,7 @@ describe('checkout', () => {
   });
 
   it('reports a device that failed after the sale was collected, without calling the sale a failure', async () => {
-    const result: CheckoutSaleResult = { status: 'completed', changeCents: 0, problems: [{ device: 'printer', message: 'Sin papel' }] };
+    const result: CheckoutSaleResult = { status: 'completed', folio: 'T1-000001', changeCents: 0, problems: [{ device: 'printer', message: 'Sin papel' }] };
     render(<App posApi={posApiThatSaves({ checkoutSale: () => Promise.resolve(result) })} />);
     const dialog = await openCheckout();
     typeInto('Efectivo recibido', '116');
@@ -843,6 +1002,66 @@ describe('checkout', () => {
 
     await screen.findByRole('status', { name: 'Cambio a entregar', hidden: true });
     expect(checkoutSale).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('reprinting the last ticket', () => {
+  function pressKey(key: string): void {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key });
+  }
+
+  it('shows the folio when a sale is collected, and reprints it from there with F8', async () => {
+    const reprintLastTicket = vi.fn<PosApi['reprintLastTicket']>(() => Promise.resolve({ status: 'printed', folio: 'T1-000001' }));
+    const saved: PendingSale = { id: 'saved-sale', occurredAt: '2026-11-08T20:05:00.000Z', totalCents: 11600, lines: [] };
+    render(<App posApi={fakePosApi({ savePendingSale: () => Promise.resolve({ status: 'saved', sale: saved }), reprintLastTicket })} />);
+    await addByCode();
+    press('F12');
+    await screen.findByRole('textbox', { name: 'Efectivo recibido', hidden: true });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Efectivo recibido', hidden: true }), { target: { value: '116' } });
+    pressKey('F2');
+
+    const dialog = await screen.findByRole('dialog', { name: 'Venta cobrada', hidden: true });
+    expect(dialog.textContent).toContain('Folio T1-000001');
+    pressKey('F8');
+
+    await waitFor(() => expect(dialog.textContent).toContain('Ticket T1-000001 reimpreso.'));
+    expect(reprintLastTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it('reprints from the sale screen with F8', async () => {
+    const reprintLastTicket = vi.fn<PosApi['reprintLastTicket']>(() => Promise.resolve({ status: 'printed', folio: 'T1-000007' }));
+    render(<App posApi={fakePosApi({ reprintLastTicket })} />);
+
+    press('F8');
+
+    expect((await screen.findByText('Ticket T1-000007 reimpreso.')).textContent).toBeDefined();
+  });
+
+  it('says so when there is nothing to reprint', async () => {
+    render(<App posApi={fakePosApi()} />);
+
+    press('F8');
+
+    expect(await screen.findByText('Todavía no hay ventas cobradas para reimprimir.')).toBeDefined();
+  });
+
+  it('says why when the printer fails, and that the sale is safe', async () => {
+    const result = { status: 'printer_failed', folio: 'T1-000003', message: 'Sin papel' } as const;
+    render(<App posApi={fakePosApi({ reprintLastTicket: () => Promise.resolve(result) })} />);
+
+    press('F8');
+
+    const message = await screen.findByText(/No se pudo imprimir el ticket T1-000003/);
+    expect(message.textContent).toContain('Sin papel');
+    expect(message.textContent).toContain('La venta quedó registrada');
+  });
+
+  it('says so when the register cannot even ask', async () => {
+    render(<App posApi={fakePosApi({ reprintLastTicket: () => Promise.reject(new Error('closed')) })} />);
+
+    press('F8');
+
+    expect(await screen.findByText(/No se pudo reimprimir el ticket/)).toBeDefined();
   });
 });
 
