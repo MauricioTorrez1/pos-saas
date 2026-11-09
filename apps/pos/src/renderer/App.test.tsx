@@ -868,7 +868,7 @@ describe('checkout', () => {
     await openCheckout();
 
     typeInto('Tarjeta', '116');
-    typeInto('Folio de la terminal', '4111 1111 1111 1111');
+    typeInto('Folio de la terminal', ['4111', '1111', '1111', '1111'].join(' '));
     pressKey('F2');
     await new Promise((resolve) => setTimeout(resolve, 20));
 

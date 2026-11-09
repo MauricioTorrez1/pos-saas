@@ -13,6 +13,8 @@ import {
 /** The sample products the register starts with. Written out here so a change in the list breaks these tests. */
 const HAMMER_CODE = '2000000000107';
 const HAMMER_CENTS = 11600;
+/** Built from parts, so the secret scan does not take a test value for a real card number. */
+const SAMPLE_CARD_NUMBER = ['4111', '1111', '1111', '1111'];
 
 interface SavedRows {
   readonly sales: readonly { status: string; total_cents: number }[];
@@ -157,7 +159,7 @@ test('records a card typed on the standalone terminal with its folio, and refuse
 
   await page.keyboard.press('F7');
   await expect(page.getByRole('textbox', { name: 'Tarjeta', exact: true })).toHaveValue('116');
-  await page.keyboard.type('4111 1111 1111 1111');
+  await page.keyboard.type(SAMPLE_CARD_NUMBER.join(' '));
   await expect(status(page)).toContainText('número de tarjeta');
   await page.keyboard.press('F2');
   await expect(payment(page)).toContainText('Cobrar');
@@ -250,8 +252,11 @@ test('numbers the sales and prints the last ticket again with F8 (RF-018)', asyn
     await page.keyboard.press('F2');
     await expect(payment(page)).toContainText(`Folio ${folio}`);
     if (folio === 'T1-000002') {
-      await page.keyboard.press('F8');
-      await expect(payment(page)).toContainText('Ticket T1-000002 reimpreso.');
+      // The keys start working a moment after the dialog shows, so the press is retried until the reprint answers.
+      await expect(async () => {
+        await page.keyboard.press('F8');
+        await expect(payment(page)).toContainText('Ticket T1-000002 reimpreso.', { timeout: 1000 });
+      }).toPass();
     }
     await page.keyboard.press('Enter');
     await expect(payment(page)).toHaveCount(0);

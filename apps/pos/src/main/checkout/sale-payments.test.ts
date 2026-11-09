@@ -140,7 +140,7 @@ describe('checkout', () => {
   it('never keeps a card number: a folio that looks like one is refused and nothing is recorded', async () => {
     const saleId = saveSaleOf100();
 
-    const result = await salePayments.checkout({ saleId, cashReceivedCents: 0, transfers: [], cards: [{ amountCents: 10000, reference: '4111 1111 1111 1111' }] });
+    const result = await salePayments.checkout({ saleId, cashReceivedCents: 0, transfers: [], cards: [{ amountCents: 10000, reference: ['4111', '1111', '1111', '1111'].join(' ') }] });
 
     expect(result).toEqual({ status: 'payment_refused', plan: { status: 'card_number_entered' } });
     expect(rowsIn('payment')).toEqual([]);

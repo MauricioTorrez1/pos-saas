@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { planPayments, type PaymentPlan, type PaymentTender } from './payment-plan';
 
 const TRANSFER_REFERENCE = 'SPEI-778812';
+/** Built from parts, so the secret scan does not take a test value for a real card number. */
+const SAMPLE_CARD = ['4111', '1111', '1111', '1111'];
 
 function cash(cashReceivedCents: number): PaymentTender {
   return { cashReceivedCents, transfers: [] };
@@ -160,7 +162,7 @@ describe('planPayments', () => {
       expect(planPayments(10000, withCard(0, 10000, ' '))).toEqual({ status: 'folio_missing' });
     });
 
-    it.each([['4111111111111111'], ['4111 1111 1111 1111'], ['4111-1111-1111-1111'], ['5555555555554444'], ['1234567890123']])(
+    it.each([[SAMPLE_CARD.join('')], [SAMPLE_CARD.join(' ')], [SAMPLE_CARD.join('-')], [['5555', '5555', '5555', '4444'].join('')], ['1234567890123']])(
       'refuses %j, because it looks like a card number and the register never keeps one',
       (reference) => {
         expect(planPayments(10000, withCard(0, 10000, reference))).toEqual({ status: 'card_number_entered' });

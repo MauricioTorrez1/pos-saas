@@ -3,3 +3,12 @@
 # A made-up UUID in a test, read as an API credential. A later commit of the same change removed it,
 # but the scan reads every commit, so the old one needs this entry.
 fceda9f72df390c1c2912979821da38f7964d975:apps/pos/src/main/checkout/pending-sale-request.test.ts:generic-api-key:5
+
+# Made-up card numbers in tests of the card folio check (E1-12), read as real ones by the custom card rules. A later commit
+# of the same change builds them from parts, but the scan reads every commit, so the old one needs these entries.
+3688d8f56e9f294e8494797af64fbc2276185be5:apps/pos/e2e/checkout.spec.ts:card-number-spaces:160
+3688d8f56e9f294e8494797af64fbc2276185be5:apps/pos/src/main/checkout/sale-payments.test.ts:card-number-spaces:143
+3688d8f56e9f294e8494797af64fbc2276185be5:apps/pos/src/renderer/App.test.tsx:card-number-spaces:761
+3688d8f56e9f294e8494797af64fbc2276185be5:apps/pos/src/shared/payment-plan.test.ts:card-number:163
+3688d8f56e9f294e8494797af64fbc2276185be5:apps/pos/src/shared/payment-plan.test.ts:card-number-dashes:163
+3688d8f56e9f294e8494797af64fbc2276185be5:apps/pos/src/shared/payment-plan.test.ts:card-number-spaces:163
