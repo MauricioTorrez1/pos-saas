@@ -53,7 +53,7 @@ export function planPayments(totalCents: number, tender: PaymentTender): Payment
   if (transferredCents > totalCents) {
     return { status: 'transfers_exceed_total', excessCents: transferredCents - totalCents };
   }
-  if (receivedCents < totalCents) {
+  if (receivedCents < 0) {
     return { status: 'short', missingCents: totalCents - receivedCents };
   }
   const cashDueCents = totalCents - transferredCents;
