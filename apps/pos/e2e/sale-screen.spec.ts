@@ -156,9 +156,58 @@ test('moves through the matches with the arrows', async ({ page }) => {
   await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('Enter');
+  await expect(page.getByRole('textbox', { name: 'Cantidad' })).toBeFocused();
+  await page.keyboard.type('2');
+  await page.keyboard.press('Enter');
 
   await expect(saleRows(page)).toHaveCount(1);
   await expect(page.getByRole('option')).toHaveCount(0);
+});
+
+test('sells cable by the meter: asks how much, shows the amount first, and adds it (RF-012)', async ({ page }) => {
+  await page.keyboard.type('cable thw', { delay: HUMAN_KEY_DELAY_MS });
+  await expect(page.getByRole('option', { name: /Cable THW/ })).toBeVisible();
+  await page.keyboard.press('Enter');
+
+  const dialog = page.getByRole('dialog', { name: /¿Cuánto Cable THW/ });
+  await expect(dialog).toBeVisible();
+  await expect(saleRows(page)).toHaveCount(0);
+  await page.keyboard.type('3.275');
+  await expect(page.getByRole('status', { name: 'Importe de la línea' })).toHaveText('$40.94');
+  await page.keyboard.press('Enter');
+
+  await expect(dialog).toHaveCount(0);
+  await expect(saleRows(page)).toHaveText([/Cable THW calibre 123\.275 m\$12\.50\$40\.94/]);
+  await expect(total(page)).toHaveText('$40.94');
+  await expect(lookupBox(page)).toBeFocused();
+});
+
+test('does not add 125 m by accident, because it asks for F2 first (E1-08)', async ({ page }) => {
+  await page.keyboard.type('cable thw', { delay: HUMAN_KEY_DELAY_MS });
+  await expect(page.getByRole('option', { name: /Cable THW/ })).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('textbox', { name: 'Cantidad' })).toBeFocused();
+
+  await page.keyboard.type('125');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('alert')).toContainText('es mucho');
+  await expect(saleRows(page)).toHaveCount(0);
+  await page.keyboard.press('F2');
+
+  await expect(saleRows(page)).toHaveText([/125\.000 m/]);
+});
+
+test('cancels the quantity with Esc and adds nothing', async ({ page }) => {
+  await page.keyboard.type('cable thw', { delay: HUMAN_KEY_DELAY_MS });
+  await expect(page.getByRole('option', { name: /Cable THW/ })).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('textbox', { name: 'Cantidad' })).toBeFocused();
+
+  await page.keyboard.press('Escape');
+
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(total(page)).toHaveText('$0.00');
+  await expect(lookupBox(page)).toBeFocused();
 });
 
 test('runs a whole sale from the keyboard', async ({ page }) => {

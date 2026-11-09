@@ -27,7 +27,7 @@ export interface SaleState {
 
 /** What can happen to the sale. */
 export type SaleAction =
-  | { readonly type: 'add-product'; readonly product: CatalogProduct }
+  | { readonly type: 'add-product'; readonly product: CatalogProduct; readonly quantityMilli?: number }
   | { readonly type: 'change-quantity'; readonly units: 1 | -1 }
   | { readonly type: 'remove-selected' }
   | { readonly type: 'clear' }
@@ -54,7 +54,7 @@ export const EMPTY_SALE: SaleState = {
 export function saleReducer(sale: SaleState, action: SaleAction): SaleState {
   switch (action.type) {
     case 'add-product':
-      return addProduct(sale, action.product);
+      return addProduct(sale, action.product, action.quantityMilli ?? MILLI_PER_UNIT);
     case 'change-quantity':
       return changeSelectedQuantity(sale, action.units);
     case 'remove-selected':
@@ -68,12 +68,12 @@ export function saleReducer(sale: SaleState, action: SaleAction): SaleState {
   }
 }
 
-function addProduct(sale: SaleState, product: CatalogProduct): SaleState {
+function addProduct(sale: SaleState, product: CatalogProduct, milli: number): SaleState {
   const existing = sale.lines.find((line) => line.product.id === product.id);
   return withLines(sale, product.id, () =>
     existing === undefined
-      ? [...sale.lines, buildLine(product, MILLI_PER_UNIT)]
-      : replaceLine(sale.lines, existing, existing.quantity.milli + MILLI_PER_UNIT),
+      ? [...sale.lines, buildLine(product, milli)]
+      : replaceLine(sale.lines, existing, existing.quantity.milli + milli),
   );
 }
 

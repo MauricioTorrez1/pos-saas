@@ -72,16 +72,20 @@ F12 saves the sale as pending and opens the payment screen. If the catalog chang
 | F2 | Collects. It only works when the payments add up to the total |
 | F5 | Fills the cash that the transfer leaves to pay |
 | F6 | Fills the transfer that the cash leaves to pay, and moves to its reference |
+| F7 | Fills the card payment that the rest leaves to pay, and moves to its folio |
 | Esc | Cancels the saved sale and goes back to the products |
 
-Transfers are exact, because a bank gives no change, so the change always comes out of the cash. A cash payment is recorded for what it paid of the sale, not for what the customer handed over, so the payments of a sale always add up to its total. A transfer without its reference is refused by the screen, by the main process, and by the database. The main process works the payments out again from the saved total, so the screen cannot make a sale complete with the wrong amounts.
+Transfers and cards are exact, because a bank gives no change, so the change always comes out of the cash. A card is charged on the standalone terminal, and the cashier types the folio it prints. It is recorded as `card_manual`, and a folio with 13 digits or more is refused because it could be a card number, which the register never keeps (RF-016, [ADR 0028](../../docs/adr/0028-tarjeta-tecleada-cajon-y-cantidades-medidas.md)). A cash payment is recorded for what it paid of the sale, not for what the customer handed over, so the payments of a sale always add up to its total. A transfer without its reference is refused by the screen, by the main process, and by the database. The main process works the payments out again from the saved total, so the screen cannot make a sale complete with the wrong amounts.
 
 After collecting, the screen shows the folio and the change until the cashier presses Enter or Esc. F8 prints the last ticket again, here or on the sale screen.
+
+## Products sold by length, weight, or volume
+Choosing a product that is not sold by piece opens a quantity box with the amount of the line in view: 3.275 m of cable at $12.50 shows $40.94 before anything is added. Enter adds it, and Esc cancels. Above 50 kg, 100 m, or 50 L the box asks for F2 instead of Enter, so typing 125 for 1.25 or the Enter of a barcode scan cannot add a wrong line. New meters add to the line that already has some.
 
 ## Ticket
 Every completed sale gets a short folio such as `T1-000123`, assigned inside the transaction that completes it, so cancelled sales leave no gap. The ticket shows the business, the folio, the date, each product with its quantity and unit price, the base, the VAT of each rate, the total, each payment, and the change. A reprint says REIMPRESIÓN and leaves the change out, because it is not kept ([ADR 0027](../../docs/adr/0027-ticket-escpos-y-folio-corto.md)).
 
-To print on a real printer, share it in Windows and start the register with its name:
+The drawer hangs from the printer, so it opens only when the printer works. To print on a real printer, share it in Windows and start the register with its name:
 
 ```bash
 pnpm --filter @pos-saas/pos start
@@ -106,7 +110,7 @@ The screen never gives orders to a device. It will ask the main process for a bu
 
 `SaleCheckout` follows [ADR 0010](../../docs/adr/0010-guardar-antes-de-cobrar.md): it saves the sale as pending, charges the card if there is one, marks the sale completed, opens the drawer for cash, and prints the ticket. If the sale cannot be saved, nothing is charged. A declined card leaves the sale pending, so the cashier can try another method. Once the sale is completed, a failing drawer or printer becomes a problem to show, never an error, so the screen cannot mistake a completed sale for a failed one and charge again.
 
-The register runs `SaleCheckout` through the bridge (`checkoutSale`). The ticket printer is real when `POS_PRINTER_SHARE` is set (`WindowsSharedPrinter`), and the drawer is still a fake until E1-14. The manual scale arrives with E1-08, and the manual card terminal with E1-12.
+The register runs `SaleCheckout` through the bridge (`checkoutSale`). The ticket printer is real when `POS_PRINTER_SHARE` is set (`WindowsSharedPrinter`), and the cash drawer opens through that printer with an ESC/POS pulse after a cash sale is saved. Without the variable both are fakes. A USB scale would arrive with its device.
 
 ## Local database
 The register keeps its data in `pos.db`, in the user data folder of the app (`%APPDATA%\@pos-saas\pos` on Windows), never in the repository. `LocalStore`, in `src/main/local-store/`, is the only code that talks to SQLite, through the `node:sqlite` module that ships with Electron ([ADR 0021](../../docs/adr/0021-sqlite-de-la-caja.md)).

@@ -808,6 +808,11 @@ kbd {
   font-size: 2.5rem;
 }
 
+.quantity-price {
+  color: var(--ink-soft);
+  font-size: 1.25rem;
+}
+
 .payment-folio {
   font-size: 1.25rem;
   color: var(--ink-soft);

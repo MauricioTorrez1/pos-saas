@@ -86,6 +86,13 @@ function linesShown(): string[] {
     .map((row) => row.textContent ?? '');
 }
 
+/** Says how much of a measured product to add, in the dialog that opens when it is chosen. */
+async function confirmQuantity(text: string): Promise<void> {
+  const box = await screen.findByRole('textbox', { name: 'Cantidad', hidden: true });
+  fireEvent.change(box, { target: { value: text } });
+  fireEvent.keyDown(box, { key: 'Enter' });
+}
+
 async function addByCode(): Promise<void> {
   typeText(HAMMER_CODE);
   press('Enter');
@@ -208,6 +215,7 @@ describe('selling', () => {
     expect((await screen.findAllByRole('option'))[0]!.getAttribute('aria-selected')).toBe('true');
     press('ArrowUp');
     press('Enter');
+    await confirmQuantity('2');
 
     await waitFor(() => expect(linesShown()[0]).toContain('Cable THW'));
   });
@@ -228,6 +236,7 @@ describe('selling', () => {
     typeText('cable');
     const options = await screen.findAllByRole('option');
     fireEvent.mouseDown(options[1]!);
+    await confirmQuantity('2');
 
     await waitFor(() => expect(linesShown()[0]).toContain('Cable THW'));
   });
@@ -239,6 +248,7 @@ describe('selling', () => {
     press('Backspace');
     typeText('cable');
     fireEvent.mouseDown((await screen.findAllByRole('option'))[1]!);
+    await confirmQuantity('2');
     await waitFor(() => expect(linesShown()).toHaveLength(1));
     searchProducts.mockClear();
 
@@ -332,6 +342,106 @@ describe('selling', () => {
     typeText('m');
 
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+});
+
+describe('products sold by length, weight, or volume (RF-012, E1-08)', () => {
+  async function chooseCable(): Promise<void> {
+    typeText('cable');
+    const options = await screen.findAllByRole('option');
+    fireEvent.mouseDown(options[1]!);
+    await screen.findByRole('dialog', { name: /¿Cuánto Cable THW\?/, hidden: true });
+  }
+
+  function importShown(): string | null {
+    return screen.getByRole('status', { name: 'Importe de la línea', hidden: true }).textContent;
+  }
+
+  function pressKey(key: string): void {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key });
+  }
+
+  it('asks how much before adding, and shows what the line costs: 3.275 m at $12.50 is $40.94', async () => {
+    render(<App posApi={fakePosApi()} />);
+    await chooseCable();
+    expect(totalShown()).toBe('$0.00');
+
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Cantidad', hidden: true }), { target: { value: '3.275' } });
+    expect(importShown()).toBe('$40.94');
+    pressKey('Enter');
+
+    await waitFor(() => expect(linesShown()).toEqual(['Cable THW3.275 m$12.50$40.94']));
+    expect(totalShown()).toBe('$40.94');
+  });
+
+  it('adds nothing when the cashier cancels with Esc', async () => {
+    render(<App posApi={fakePosApi()} />);
+    await chooseCable();
+
+    pressKey('Escape');
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull());
+    expect(totalShown()).toBe('$0.00');
+    await waitFor(() => expect(document.activeElement).toBe(lookupBox()));
+  });
+
+  it('adds nothing, and explains, while the quantity is not valid', async () => {
+    render(<App posApi={fakePosApi()} />);
+    await chooseCable();
+    const box = await screen.findByRole('textbox', { name: 'Cantidad', hidden: true });
+
+    fireEvent.change(box, { target: { value: '3.2755' } });
+    pressKey('Enter');
+
+    expect(screen.getByRole('alert', { hidden: true }).textContent).toContain('3 decimales');
+    expect(totalShown()).toBe('$0.00');
+  });
+
+  it('asks for F2 when the quantity is more than a shop sells at once, so 125 is not taken for 1.25', async () => {
+    render(<App posApi={fakePosApi()} />);
+    await chooseCable();
+    const box = await screen.findByRole('textbox', { name: 'Cantidad', hidden: true });
+
+    fireEvent.change(box, { target: { value: '125' } });
+    pressKey('Enter');
+    expect(screen.getByRole('alert', { hidden: true }).textContent).toContain('es mucho');
+    expect(totalShown()).toBe('$0.00');
+    pressKey('F2');
+
+    await waitFor(() => expect(linesShown()).toEqual(['Cable THW125.000 m$12.50$1,562.50']));
+  });
+
+  it('adds the new meters to the line that already has some', async () => {
+    render(<App posApi={fakePosApi()} />);
+    await chooseCable();
+    await confirmQuantity('1.5');
+    await waitFor(() => expect(linesShown()).toHaveLength(1));
+
+    await chooseCable();
+    await confirmQuantity('2.25');
+
+    await waitFor(() => expect(linesShown()).toEqual(['Cable THW3.750 m$12.50$46.88']));
+  });
+
+  it('does not let the Enter that ends a barcode scan add a line', async () => {
+    render(<App posApi={fakePosApi()} />);
+    await chooseCable();
+    const box = await screen.findByRole('textbox', { name: 'Cantidad', hidden: true });
+
+    fireEvent.change(box, { target: { value: HAMMER_CODE } });
+    pressKey('Enter');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(totalShown()).toBe('$0.00');
+  });
+
+  it('adds pieces at once, without asking', async () => {
+    render(<App posApi={fakePosApi()} />);
+
+    await addByCode();
+
+    expect(screen.queryByRole('dialog', { hidden: true })).toBeNull();
+    expect(linesShown()).toEqual(['Martillo1 pza$116.00$116.00']);
   });
 });
 

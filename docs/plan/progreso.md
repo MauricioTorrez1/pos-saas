@@ -3,7 +3,7 @@
 Actualizado: 2026-11-08. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** E1-13, en revisión.
+- **Tarea en curso:** E1-13, E1-14, E1-12 y E1-08, en revisión en el mismo PR.
 - **Siguiente:** la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-13 y E1-14, tras E1-11, que ya está terminada. F0-08 y las demás se retoman después.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
@@ -55,6 +55,14 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
   5. Quitar el papel, cobrar otra venta y confirmar que se registra con un aviso. Poner el papel y reimprimir con F8.
   6. Anotar si la ruta \\localhost\... no funciona, para cambiar WindowsSharedPrinter antes del piloto.
 
+- **Cajón, impresora, lector y tarjeta juntos (E1-14, E1-12, E1-08).** Con la TM-T20 y el cajón conectados, y POS_PRINTER_SHARE puesta:
+  1. Cobrar una venta en efectivo. El cajón debe abrir una sola vez, después de guardar la venta, y salir el ticket.
+  2. Cobrar una venta solo por transferencia. El cajón no debe abrir.
+  3. Apagar la impresora y cobrar en efectivo. La venta debe registrarse con un aviso, y el cajón no debe abrir.
+  4. Cobrar $40 con la terminal de tarjeta aparte y $60 en efectivo, tecleando el folio de la terminal. Revisar que el folio salga en el ticket y que no se pueda teclear el número de tarjeta.
+  5. Escanear un kilo de clavo con el lector y teclear 125 en lugar de 1.25 en la cantidad. Debe pedir F2.
+  6. Si el cajón no abre con el pulso, anotar la marca del cajón: algunos usan la clavija 5 en lugar de la 2, y se cambia en EscPosBuilder.openDrawer.
+
 ## Fase 0
 | Tarea | Título | Horas | Estado |
 | --- | --- | --- | --- |
@@ -94,13 +102,13 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | E1-05 | Dinero y cantidades | 5 | Terminada |
 | E1-06 | IVA incluido y totales | 4 | Terminada |
 | E1-07 | Pantalla de venta | 5 | Terminada |
-| E1-08 | Venta por peso y por metro | 4 | Pendiente |
+| E1-08 | Venta por peso y por metro | 4 | En revisión |
 | E1-09 | Artículo varios y listas de precio | 3 | Pendiente |
 | E1-10 | Máquina de estados de la venta | 5 | Terminada |
 | E1-11 | Efectivo, transferencia y pago mixto | 5 | Terminada |
-| E1-12 | Tarjeta tecleada con folio | 2 | Pendiente |
+| E1-12 | Tarjeta tecleada con folio | 2 | En revisión |
 | E1-13 | Ticket ESC/POS | 5 | En revisión |
-| E1-14 | Cajón y prueba de hardware | 3 | Pendiente |
+| E1-14 | Cajón y prueba de hardware | 3 | En revisión |
 | E1-15 | Devoluciones | 6 | Pendiente |
 | E1-16 | Envío desde la caja | 5 | Pendiente |
 | E1-17 | Recepción en el núcleo | 6 | Pendiente |
@@ -283,3 +291,4 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | 2026-11-08 | E1-11 sigue en revisión, con el PR 22 abierto. En CI, los diez checks en verde en `5e9004a`, con `TypeScript` en 69 segundos. Con la comprobación de pago incompleto desactivada (`23270d7`), `TypeScript` quedó en rojo en 42 segundos y los otros nueve en verde. Sin la rotura, los diez volvieron a verde en `e431605`, con `TypeScript` en 63 segundos | Fusionar el PR 22 |
 | 2026-11-08 | E1-11 terminada. PR 22 fusionado con squash en `2b78050` con `gh pr merge`, con el título revisado. La caja ya cobra con efectivo, transferencia o ambos, muestra el cambio y la recuperación pregunta con qué se pagó. Cajón e impresora siguen con los falsos hasta E1-14 y E1-13. Las compras simuladas siguen pendientes, antes del piloto. Mauricio pidió simplificar: ya no se entregan preguntas de autoevaluación al cerrar cada tarea, y el CI corre en paralelo con la siguiente tarea. También pidió imágenes de producto y vista previa de coincidencias al buscar por código o nombre, que queda como tarea nueva | Empezar E1-13 en una sesión nueva |
 | 2026-11-08 | E1-13 en revisión, en modo automático. ADR 0027: EscPosBuilder arma los bytes (página 858 para acentos y eñes, y el texto nunca lleva comandos), layoutTicket pone 48 columnas, y el folio corto T1-000123 se asigna dentro de la transacción que completa la venta, sin huecos y con la base exigiéndolo (migración 6). F8 reimprime la última venta marcada REIMPRESIÓN y sin cambio. WindowsSharedPrinter imprime en una impresora compartida de Windows si existe POS_PRINTER_SHARE, y si no, la caja vende sin imprimir. En local, 446 pruebas en Vitest de la caja (antes 393) y 36 con Playwright (antes 35). Probar con la TM-T20 real quedó en «Pendientes de Mauricio antes del piloto». CI todavía no corre | Abrir el PR y fusionar |
+| 2026-11-08 | E1-13 abierto en el PR 23, con los diez checks en verde en `e5dbd9a`, con `TypeScript` en 74 segundos. Por petición de Mauricio, el PR lleva también E1-14, E1-12 y E1-08 (ADR 0028): el cajón abre con un pulso ESC/POS por la impresora, la tarjeta cobrada en la terminal aparte se guarda como `card_manual` con folio obligatorio y se rechaza un folio que parezca un número de tarjeta (migración 7), y los productos por metro, kilo o litro piden la cantidad con el importe a la vista, con F2 para lo que pasa de 50 kg, 100 m o 50 L. En local, 492 pruebas en Vitest de la caja y 40 con Playwright. Mauricio también pidió una versión web para negocios como un puesto de tacos, que queda como tarea nueva. CI del lote todavía no corre | Esperar el CI del PR y fusionar |
