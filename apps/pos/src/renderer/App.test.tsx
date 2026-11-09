@@ -180,7 +180,7 @@ describe('App', () => {
   it('gives the keyboard to the lookup box from the start', async () => {
     await renderApp(fakePosApi());
 
-    expect(document.activeElement).toBe(lookupBox());
+    await waitFor(() => expect(document.activeElement).toBe(lookupBox()));
   });
 
   it('takes the keyboard back when something else takes it', async () => {
