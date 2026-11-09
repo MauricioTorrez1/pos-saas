@@ -42,6 +42,10 @@ describe('EscPosBuilder', () => {
     expect(bytesOf((builder) => builder.cut())).toEqual([0x1d, 0x56, 0x42, 0]);
   });
 
+  it('kicks the drawer connected to the printer with a pulse on pin 2', () => {
+    expect(bytesOf((builder) => builder.openDrawer())).toEqual([0x1b, 0x70, 0, 25, 250]);
+  });
+
   it('refuses a feed that does not fit in one byte', () => {
     expect(() => new EscPosBuilder().feed(256)).toThrow(RangeError);
     expect(() => new EscPosBuilder().feed(-1)).toThrow(RangeError);

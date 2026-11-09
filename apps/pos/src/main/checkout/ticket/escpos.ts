@@ -120,6 +120,16 @@ export class EscPosBuilder {
   }
 
   /**
+   * Sends the pulse that opens the cash drawer. The drawer hangs from the printer, so the command goes in a print job:
+   * pin 2, on for 50 ms and off for 500 ms (the units are 2 ms), which is what the usual drawers expect.
+   *
+   * @returns this builder
+   */
+  openDrawer(): this {
+    return this.#command(ESC, 0x70, 0, 25, 250);
+  }
+
+  /**
    * Gives the bytes of the job.
    *
    * @returns a copy, so changing it does not change the builder

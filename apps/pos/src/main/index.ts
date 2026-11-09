@@ -10,6 +10,7 @@ import { renderTicket } from './checkout/ticket/ticket';
 import { toTicketData } from './checkout/ticket/ticket-data';
 import { createFakeHardware } from './hardware/fakes/fake-hardware';
 import { RecordingPrinter } from './hardware/fakes/recording-printer';
+import { PrinterCashDrawer } from './hardware/printer-cash-drawer';
 import type { PrinterProvider } from './hardware/printer-provider';
 import { WindowsSharedPrinter } from './hardware/windows-shared-printer';
 import { registerIpcHandlers } from './ipc-handlers';
@@ -74,9 +75,9 @@ async function start(): Promise<void> {
   const sales = new SaleStore(store, LOCAL_TENANT_ID);
   const appearance = new AppearanceStore(store, LOCAL_TENANT_ID);
   const printer = choosePrinter();
-  // The real drawer arrives with E1-14, so the fake stands in for it. The ticket printer is real once it is configured.
+  // The drawer hangs from the printer, so both are real once the printer is configured and fakes until then (ADR 0028).
   const checkout = new SaleCheckout({
-    hardware: { ...createFakeHardware(), printer },
+    hardware: { ...createFakeHardware(), printer, cashDrawer: new PrinterCashDrawer(printer) },
     sales,
     renderTicket: (sale, receipt) =>
       renderTicket(toTicketData(appearance.read().businessName || UNNAMED_BUSINESS, sale, { ...receipt, isReprint: false })),
