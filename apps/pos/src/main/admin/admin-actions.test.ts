@@ -93,6 +93,28 @@ describe('the backups', () => {
     expect(vaultValue).toBe('una contraseña larga');
   });
 
+  it('are not set up when the system cannot protect the passphrase, instead of keeping it in plain text', async () => {
+    const unprotected = new AdminActions({
+      store,
+      importer: new CatalogImporter(store, TENANT, new StockStore(store, TENANT)),
+      settings: new CashSessionStore(store, TENANT),
+      vault: {
+        read: () => null,
+        save: () => {
+          throw new Error('no encryption available');
+        },
+      },
+      userDataDirectory: directory,
+      pickFile: () => Promise.resolve(null),
+      pickFolder: () => Promise.resolve(picked.folder),
+    });
+
+    const outcome = await unprotected.configureBackup('una contraseña larga');
+
+    expect(outcome).toMatchObject({ status: 'failed', message: expect.stringContaining('proteger'), backup: { folder: null } });
+    expect(readdirSync(picked.folder!)).toEqual([]);
+  });
+
   it('refuse a short passphrase, and ask for nothing else', async () => {
     expect(await actions.configureBackup('corta')).toEqual({ status: 'weak_passphrase' });
     expect(vaultValue).toBeNull();

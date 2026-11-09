@@ -107,8 +107,13 @@ export class AdminActions {
     if (folder === null) {
       return { status: 'cancelled', backup: this.backupStatus() };
     }
+    try {
+      this.#dependencies.vault.save(passphrase);
+    } catch {
+      // Without the protection of the operating system the passphrase would sit in plain text, so nothing is set up.
+      return { status: 'failed', message: 'Windows no pudo proteger la contraseña en esta computadora, así que no se configuraron los respaldos.', backup: this.backupStatus() };
+    }
     this.#dependencies.settings.writeSetting(FOLDER_SETTING, folder);
-    this.#dependencies.vault.save(passphrase);
     return this.backupNow();
   }
 

@@ -89,7 +89,9 @@ test('loads the catalog and the stock of Eleventa, and then sells from it (RF-03
   ]);
 });
 
+// The passphrase is protected with the encryption of Windows, which a Linux runner does not have. The rest is covered by unit tests.
 test('makes an encrypted backup in the folder the owner chooses, and does not show the data (RNF-09)', async ({ userDataDir, launch }) => {
+  test.skip(process.platform !== 'win32', 'The passphrase vault needs Windows');
   const register = await launch();
   const page = await signInWindow(register);
   const usb = join(userDataDir, 'usb');
