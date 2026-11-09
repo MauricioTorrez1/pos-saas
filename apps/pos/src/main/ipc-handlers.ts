@@ -4,6 +4,7 @@ import { isAppearance } from '../shared/appearance';
 import type { LoginResult, UserSummary } from '../shared/auth';
 import type { BackupOutcome, BackupStatus, ImportOutcome, RestoreOutcome } from '../shared/admin-api';
 import type { AdjustStockResult, Kardex, LedgerCheck } from '../shared/inventory-api';
+import type { DailyReport } from '../shared/report-api';
 import type { FindReturnableResult, ReturnResult } from '../shared/returns-api';
 import type { CashMovementResult, CashStatus, CloseCashResult, OpenCashResult } from '../shared/cash-api';
 import {
@@ -25,6 +26,8 @@ import { parseCloseRequest, parseLimitRequest, parseMovementRequest, parseOpenRe
 import type { CashService } from './cash/cash-service';
 import { parseAdjustStockRequest, parseProductId } from './inventory/inventory-request';
 import type { InventoryService } from './inventory/inventory-service';
+import { requireDayText } from './reports/report-request';
+import type { ReportService } from './reports/report-service';
 import { parseFolioText, parseReturnRequest } from './returns/return-request';
 import type { ReturnService } from './returns/return-service';
 import { parsePaymentRequest, parsePendingSaleRequest, parseSaleId } from './checkout/pending-sale-request';
@@ -43,6 +46,7 @@ export interface IpcServices {
   readonly returns: ReturnService;
   readonly admin: AdminActions;
   readonly inventory: InventoryService;
+  readonly reports: ReportService;
   readonly catalog: ProductCatalog;
   readonly appearance: AppearanceStore;
   readonly pendingSales: PendingSales;
@@ -76,7 +80,7 @@ function requireLookupText(value: unknown): string {
  */
 export function registerIpcHandlers(
   rendererEntry: string,
-  { auth, cash, returns, admin, inventory, catalog, appearance, pendingSales, salePayments }: IpcServices,
+  { auth, cash, returns, admin, inventory, reports, catalog, appearance, pendingSales, salePayments }: IpcServices,
 ): void {
   const answerScreen = <Result>(channel: string, respond: (argument: unknown) => Result): void => {
     ipcMain.handle(channel, (event, argument: unknown) => {
@@ -136,6 +140,7 @@ export function registerIpcHandlers(
   answerOwner(IPC_CHANNELS.getKardex, (productId): Kardex | null => inventory.kardex(parseProductId(productId)));
   answerOwner(IPC_CHANNELS.adjustStock, (request): AdjustStockResult => inventory.adjust(parseAdjustStockRequest(request)));
   answerOwner(IPC_CHANNELS.checkLedger, (): LedgerCheck => inventory.verifyLedger());
+  answerOwner(IPC_CHANNELS.getDailyReport, (date): DailyReport => reports.daily(requireDayText(date)));
 
   answerOwner(IPC_CHANNELS.importCatalog, (): Promise<ImportOutcome> => admin.importCatalog());
   answerOwner(IPC_CHANNELS.getBackupStatus, (): BackupStatus => admin.backupStatus());

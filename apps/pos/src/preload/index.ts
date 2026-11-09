@@ -17,6 +17,7 @@ const posApi: PosApi = {
   getKardex: (productId) => ipcRenderer.invoke(IPC_CHANNELS.getKardex, productId),
   adjustStock: (request) => ipcRenderer.invoke(IPC_CHANNELS.adjustStock, request),
   checkLedger: () => ipcRenderer.invoke(IPC_CHANNELS.checkLedger),
+  getDailyReport: (date) => ipcRenderer.invoke(IPC_CHANNELS.getDailyReport, date),
   findReturnableSale: (folio) => ipcRenderer.invoke(IPC_CHANNELS.findReturnableSale, folio),
   createReturn: (request) => ipcRenderer.invoke(IPC_CHANNELS.createReturn, request),
   getCashStatus: () => ipcRenderer.invoke(IPC_CHANNELS.getCashStatus),

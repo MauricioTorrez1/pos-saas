@@ -16,6 +16,7 @@ import { CashService } from './cash/cash-service';
 import { CashSessionStore } from './cash/cash-session-store';
 import { UserStore } from './auth/user-store';
 import { PendingSales } from './checkout/pending-sales';
+import { ReportService } from './reports/report-service';
 import { ReturnService } from './returns/return-service';
 import { ReturnStore } from './returns/return-store';
 import { SaleCheckout } from './checkout/sale-checkout';
@@ -147,6 +148,7 @@ async function start(): Promise<void> {
     returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, cash),
     admin,
     inventory: new InventoryService(store, LOCAL_TENANT_ID, auth, new StockStore(store, LOCAL_TENANT_ID), new AuditLog(store, LOCAL_TENANT_ID), catalog),
+    reports: new ReportService(store, LOCAL_TENANT_ID, auth),
     catalog,
     appearance,
     pendingSales: new PendingSales(catalog, sales, () => {

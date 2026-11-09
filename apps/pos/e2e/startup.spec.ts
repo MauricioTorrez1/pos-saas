@@ -81,6 +81,7 @@ test('exposes only the agreed functions through the bridge', async ({ appWindow 
     'getKardex',
     'adjustStock',
     'checkLedger',
+    'getDailyReport',
     'importCatalog',
     'getBackupStatus',
     'configureBackup',

@@ -68,6 +68,21 @@ function fakePosApi(overrides: Partial<PosApi> = {}): PosApi {
     getKardex: () => Promise.resolve(null),
     adjustStock: () => Promise.resolve({ status: 'not_found' }),
     checkLedger: () => Promise.resolve({ checkedMovements: 0, problems: [] }),
+    getDailyReport: (date) =>
+      Promise.resolve({
+        date,
+        salesCount: 0,
+        totalCents: 0,
+        averageTicketCents: 0,
+        returnsCount: 0,
+        returnsCents: 0,
+        byHour: [],
+        byCashier: [],
+        marginCents: 0,
+        linesWithoutCost: 0,
+        outOfStock: [],
+        notSelling: [],
+      }),
     importCatalog: () => Promise.resolve({ status: 'cancelled' }),
     getBackupStatus: () => Promise.resolve({ folder: null, lastBackupAt: null, lastError: null }),
     configureBackup: () => Promise.resolve({ status: 'not_configured' }),
@@ -1568,6 +1583,34 @@ describe('administration (E1-29, E1-35)', () => {
 
     pressKey('F3');
     expect(await within(dialog).findByText(/1 movimiento\(s\) no cuadran/)).toBeDefined();
+  });
+
+  it('opens the report on today and shows the sales, the margin and what ran out', async () => {
+    const getDailyReport = vi.fn<PosApi['getDailyReport']>((date) =>
+      Promise.resolve({
+        date,
+        salesCount: 3,
+        totalCents: 120_050,
+        averageTicketCents: 40_017,
+        returnsCount: 1,
+        returnsCents: 5000,
+        byHour: [{ hour: 9, salesCount: 3, totalCents: 120_050 }],
+        byCashier: [{ name: 'Ana', salesCount: 3, totalCents: 120_050 }],
+        marginCents: 30_000,
+        linesWithoutCost: 2,
+        outOfStock: [{ productId: 'p1', name: 'Clavos', unit: 'piece', stockMilli: -2000 }],
+        notSelling: [],
+      }),
+    );
+    const dialog = await openAdmin({ getDailyReport });
+
+    pressKey('F4');
+
+    await within(dialog).findByRole('heading', { name: 'Reporte del día', hidden: true });
+    await waitFor(() => expect(dialog.textContent).toContain('$1,200.50'));
+    expect(dialog.textContent).toContain('2 partida(s) no tienen costo conocido');
+    expect(dialog.textContent).toContain('Clavos: −2 pza');
+    expect(getDailyReport).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
   });
 
   it('registers a loss with its reason and shows the new stock in the history of the product', async () => {

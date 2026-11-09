@@ -6,6 +6,7 @@ import type { PosApi } from '../../shared/pos-api';
 import { Field, Message, useAction } from '../ui/form-parts';
 import { ModalDialog } from '../ui/ModalDialog';
 import { InventoryView } from './InventoryView';
+import { ReportView } from './ReportView';
 import { useWindowKeys } from '../ui/use-window-keys';
 
 const MOMENT = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
@@ -15,7 +16,8 @@ type View =
   | { readonly kind: 'summary' }
   | { readonly kind: 'passphrase'; readonly purpose: 'configure' | 'restore' }
   | { readonly kind: 'imported'; readonly report: ImportReportView }
-  | { readonly kind: 'inventory' };
+  | { readonly kind: 'inventory' }
+  | { readonly kind: 'report' };
 
 interface AdminDialogProps {
   readonly posApi: PosApi;
@@ -89,6 +91,7 @@ export function AdminDialog({ posApi, onClose }: AdminDialogProps): ReactElement
       ? {
           F2: () => setView({ kind: 'inventory' }),
           F3: checkLedger,
+          F4: () => setView({ kind: 'report' }),
           F5: importCatalog,
           F6: () => setView({ kind: 'passphrase', purpose: 'configure' }),
           F7: backupNow,
@@ -105,6 +108,8 @@ export function AdminDialog({ posApi, onClose }: AdminDialogProps): ReactElement
     <ModalDialog titleId="admin-title" className="cash">
       {view.kind === 'inventory' ? (
         <InventoryView posApi={posApi} onBack={() => setView({ kind: 'summary' })} />
+      ) : view.kind === 'report' ? (
+        <ReportView posApi={posApi} onBack={() => setView({ kind: 'summary' })} />
       ) : view.kind === 'passphrase' ? (
         <PassphraseView
           posApi={posApi}
@@ -137,6 +142,9 @@ export function AdminDialog({ posApi, onClose }: AdminDialogProps): ReactElement
             </li>
             <li>
               <kbd>F3</kbd> Revisar que el inventario cuadre con las ventas
+            </li>
+            <li>
+              <kbd>F4</kbd> Reporte del día: ventas, ticket promedio, ganancia, agotados
             </li>
             <li>
               <kbd>F5</kbd> Cargar el catálogo y las existencias de Eleventa

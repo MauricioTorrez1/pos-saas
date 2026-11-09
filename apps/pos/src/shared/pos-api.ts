@@ -4,6 +4,7 @@ import type { Appearance } from './appearance';
 import type { BackupOutcome, BackupStatus, ImportOutcome, RestoreOutcome } from './admin-api';
 import type { LoginResult, UserRole, UserSummary } from './auth';
 import type { AdjustStockRequest, AdjustStockResult, Kardex, LedgerCheck } from './inventory-api';
+import type { DailyReport } from './report-api';
 import type { FindReturnableResult, ReturnRequest, ReturnResult } from './returns-api';
 import type {
   CashMovementRequest,
@@ -31,6 +32,7 @@ export const IPC_CHANNELS = {
   getKardex: 'inventory:get-kardex',
   adjustStock: 'inventory:adjust',
   checkLedger: 'inventory:check-ledger',
+  getDailyReport: 'reports:daily',
   findReturnableSale: 'returns:find-sale',
   createReturn: 'returns:create',
   getCashStatus: 'cash:get-status',
@@ -234,6 +236,14 @@ export interface PosApi {
    * @returns how many movements were checked and everything that does not agree
    */
   checkLedger(): Promise<LedgerCheck>;
+
+  /**
+   * Reads the report of one day: sales, average ticket, margin, returns, and what ran out or is not selling (RF-049). Only the owner.
+   *
+   * @param date the day as `YYYY-MM-DD`, in the time zone of the register
+   * @returns the report
+   */
+  getDailyReport(date: string): Promise<DailyReport>;
 
   /**
    * Finds the completed sale a customer wants to return from the folio on their ticket (RF-019).
