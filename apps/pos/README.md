@@ -108,6 +108,13 @@ F3 opens everything about the cash of the register. A closed register cannot sel
 
 ## Returns
 F4 takes back what a customer returns. Type the folio of the ticket, say how much of each line comes back and why, and the screen shows what is given back by each means before confirming. The sale never changes: the return is a record next to it ([ADR 0030](../../docs/adr/0030-devoluciones-como-registro-compensatorio.md)). The owner authorizes every return, so a cashier asks for their PIN. A sale of more than 30 days, or a product sold by length or weight, is refused unless the owner overrides it. A return can never bring back more than was sold.
+## Administration
+F1, for the owner only, holds what is done once or rarely. **F5** loads the products and the stock that Eleventa exports as a CSV: columns are found by name, a bad row is reported with its line and reason, loading the same file twice adds nothing, and the sample products are removed. The report gives the cost of the stock loaded, to compare with Eleventa. **F6** sets up the backups: a folder or USB and a passphrase. A consistent copy of the database is encrypted with AES-256-GCM and written every hour, and the newest 48 stay. **F7** makes one now, and **F8** prepares a restore that the register applies when it starts again, keeping the old database beside it ([ADR 0031](../../docs/adr/0031-inventario-importacion-respaldo-e-instalador.md)).
+
+Stock is the sum of an immutable ledger (stock_movement). A completed sale and a return post their movements in the same transaction, and stock can go below zero.
+
+## Installer
+`pnpm --filter @pos-saas/pos package` builds `dist/Caja Setup <version>.exe` with electron-builder (NSIS, per user, no administrator). Updating is running the new installer, and uninstalling never deletes the data. See [the installation guide](../../docs/instalacion.md), including the SmartScreen warning that an unsigned installer shows.
 ## Appearance
 F9 opens the dialog where the owner sets the business name, one of six colors, one of three text sizes, and the light or dark theme. Changes show at once and stay only when saved, and Esc undoes them. The stylesheet takes everything from a few tokens, driven by three attributes on the page, and a test checks that the text of every color and theme keeps a contrast of at least 4.5:1.
 

@@ -13,6 +13,7 @@ import { CashSessionStore } from '../cash/cash-session-store';
 import type { SalePayment, SaleToSave } from '../checkout/sale-recorder';
 import { LocalStore } from '../local-store/local-store';
 import { SaleStore } from '../local-store/sale-store';
+import { StockStore } from '../inventory/stock-store';
 import { uuidV7 } from '../uuid-v7';
 import { ReturnService } from './return-service';
 import { ReturnStore } from './return-store';
@@ -316,6 +317,28 @@ describe('the rules that refuse a return by default (RF-019)', () => {
     const hammer = findSale(folio).lines[1]!.saleLineId;
 
     expect(returns.create({ saleId: sale.saleId, lines: [{ saleLineId: hammer, quantityMilli: 1000 }], reason: 'x' }).status).toBe('returned');
+  });
+});
+
+describe('the stock follows the sale and the return (RF-029, RF-032)', () => {
+  it('takes the products out when the sale completes, and puts back what is returned', () => {
+    const { sale, folio } = hammerSale();
+    const productId = sale.lines[0]!.productId;
+    const stock = new StockStore(store, TENANT);
+    expect(stock.levelOf(productId)).toBe(-2000);
+
+    returns.create({ saleId: sale.saleId, lines: [{ saleLineId: findSale(folio).lines[0]!.saleLineId, quantityMilli: 1000 }], reason: 'x' });
+
+    expect(stock.levelOf(productId)).toBe(-1000);
+  });
+
+  it('leaves no movement for a sale that was cancelled', () => {
+    const pending = hammerSale().sale;
+    const other = { ...pending, saleId: uuidV7(), idempotencyKey: uuidV7(), lines: [line('Otro', 1000, 'piece', 100_000)] };
+    sales.savePendingPayment(other);
+    sales.cancel(other.saleId);
+
+    expect(new StockStore(store, TENANT).levelOf(other.lines[0]!.productId)).toBe(0);
   });
 });
 

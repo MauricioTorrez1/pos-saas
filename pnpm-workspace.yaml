@@ -1,3 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# electron-builder pulls electron-winstaller only for Squirrel installers. The register uses NSIS, so its build script is not needed.
+allowBuilds:
+  electron-winstaller: false

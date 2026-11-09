@@ -1,6 +1,7 @@
 import type { Quantity, TaxRate, Unit } from '@pos-saas/money';
 
 import type { Appearance } from './appearance';
+import type { BackupOutcome, BackupStatus, ImportOutcome, RestoreOutcome } from './admin-api';
 import type { LoginResult, UserRole, UserSummary } from './auth';
 import type { FindReturnableResult, ReturnRequest, ReturnResult } from './returns-api';
 import type {
@@ -21,6 +22,11 @@ export const IPC_CHANNELS = {
   login: 'auth:login',
   logout: 'auth:logout',
   createUser: 'auth:create-user',
+  importCatalog: 'admin:import-catalog',
+  getBackupStatus: 'admin:backup-status',
+  configureBackup: 'admin:configure-backup',
+  backupNow: 'admin:backup-now',
+  restoreBackup: 'admin:restore-backup',
   findReturnableSale: 'returns:find-sale',
   createReturn: 'returns:create',
   getCashStatus: 'cash:get-status',
@@ -164,6 +170,43 @@ export interface PosApi {
    * @returns the app version, as the main process knows it
    */
   getAppInfo(): Promise<AppInfo>;
+
+  /**
+   * Asks for the file of products of Eleventa and loads it with its stock (RF-034). Only the owner.
+   *
+   * @returns what was loaded, or why not
+   */
+  importCatalog(): Promise<ImportOutcome>;
+
+  /**
+   * Reads how the backups stand: where they go, when the last one was made, and whether the last attempt failed. Only the owner.
+   *
+   * @returns the status
+   */
+  getBackupStatus(): Promise<BackupStatus>;
+
+  /**
+   * Sets up the backups: asks for a folder, keeps the passphrase, and makes the first encrypted copy. Only the owner.
+   *
+   * @param request the passphrase, at least 8 characters
+   * @returns how it ended
+   */
+  configureBackup(request: { readonly passphrase: string }): Promise<BackupOutcome>;
+
+  /**
+   * Makes an encrypted copy now. Only the owner.
+   *
+   * @returns how it ended
+   */
+  backupNow(): Promise<BackupOutcome>;
+
+  /**
+   * Asks for a backup and prepares it to be used when the register restarts. Only the owner.
+   *
+   * @param request the passphrase the backup was made with
+   * @returns staged when the backup is healthy, or why not
+   */
+  restoreBackup(request: { readonly passphrase: string }): Promise<RestoreOutcome>;
 
   /**
    * Finds the completed sale a customer wants to return from the folio on their ticket (RF-019).

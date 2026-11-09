@@ -39,6 +39,8 @@ interface SaleScreenProps {
   readonly onOpenCash: () => void;
   /** Called when the cashier asks to take back a sale. */
   readonly onOpenReturns: () => void;
+  /** Called when the owner asks for the administration: the catalog of Eleventa and the backups. */
+  readonly onOpenAdmin: () => void;
   /** Called after a sale was collected, so the cash of the register is read again. */
   readonly onCashChanged: () => void;
 }
@@ -53,10 +55,11 @@ interface SaleScreenProps {
  * @param props.onSignOut called when the cashier asks to sign out
  * @param props.onOpenCash called when the cashier asks for the cash of the register
  * @param props.onOpenReturns called when the cashier asks to take back a sale
+ * @param props.onOpenAdmin called when the owner asks for the administration
  * @param props.onCashChanged called after a sale was collected
  * @returns the screen
  */
-export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onCashChanged }: SaleScreenProps): ReactElement {
+export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onCashChanged }: SaleScreenProps): ReactElement {
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
@@ -266,6 +269,10 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSi
       case 'F4':
         event.preventDefault();
         onOpenReturns();
+        return;
+      case 'F1':
+        event.preventDefault();
+        onOpenAdmin();
         return;
       default:
         if (isPrintableKey(event)) {

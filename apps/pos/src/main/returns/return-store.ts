@@ -4,6 +4,7 @@ import type { Unit } from '@pos-saas/money';
 
 import type { RefundShare } from '../../shared/returns';
 import type { LocalStore } from '../local-store/local-store';
+import { INSERT_STOCK_MOVEMENT_SQL, postWith } from '../inventory/stock-store';
 import { uuidV7 } from '../uuid-v7';
 
 /** A completed sale, as the database has it. */
@@ -82,6 +83,8 @@ export class ReturnStore {
   readonly #insertReturn: StatementSync;
   readonly #insertLine: StatementSync;
   readonly #insertRefund: StatementSync;
+  readonly #insertStock: StatementSync;
+  readonly #productOfLine: StatementSync;
 
   /**
    * @param store the open local database
@@ -117,6 +120,8 @@ export class ReturnStore {
     this.#insertLine = store.prepare(`
       INSERT INTO sale_return_line (id, tenant_id, return_id, sale_line_id, quantity_milli, refund_cents) VALUES (?, ?, ?, ?, ?, ?)
     `);
+    this.#insertStock = store.prepare(INSERT_STOCK_MOVEMENT_SQL);
+    this.#productOfLine = store.prepare('SELECT product_id FROM sale_line WHERE tenant_id = ? AND id = ?');
     this.#insertRefund = store.prepare(`
       INSERT INTO refund_payment (id, tenant_id, return_id, method, amount_cents, reference) VALUES (?, ?, ?, ?, ?, ?)
     `);
@@ -199,7 +204,11 @@ export class ReturnStore {
         new Date().toISOString(),
       );
       for (const line of record.lines) {
-        this.#insertLine.run(uuidV7(), this.#tenantId, id, line.saleLineId, line.quantityMilli, line.refundCents);
+        const lineId = uuidV7();
+        this.#insertLine.run(lineId, this.#tenantId, id, line.saleLineId, line.quantityMilli, line.refundCents);
+        // What comes back goes back on the shelf, in the same transaction as the return.
+        const { product_id: productId } = this.#productOfLine.get(this.#tenantId, line.saleLineId) as unknown as { product_id: string };
+        postWith(this.#insertStock, this.#tenantId, [{ productId, type: 'return', quantityMilli: line.quantityMilli, source: 'return_line', sourceId: lineId }]);
       }
       for (const refund of record.refunds) {
         this.#insertRefund.run(uuidV7(), this.#tenantId, id, refund.method, refund.amountCents, refund.reference);

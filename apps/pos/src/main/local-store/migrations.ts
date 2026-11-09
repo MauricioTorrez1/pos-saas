@@ -435,4 +435,36 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'a refund payment is never deleted'); END;
     `,
   },
+  {
+    version: 10,
+    name: 'create_stock_movements',
+    // Stock is the sum of an immutable ledger, never a column that is updated (ADR 0003, ADR 0031). The same source cannot
+    // post the same movement twice, so importing a file again or syncing a sale twice adds nothing.
+    sql: `
+      CREATE TABLE stock_movement (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        quantity_milli INTEGER NOT NULL CHECK (quantity_milli <> 0),
+        unit_cost_e6 INTEGER CHECK (unit_cost_e6 IS NULL OR unit_cost_e6 >= 0),
+        source TEXT NOT NULL,
+        source_id TEXT NOT NULL,
+        occurred_at TEXT NOT NULL
+      ) STRICT;
+
+      CREATE UNIQUE INDEX stock_movement_once_per_source ON stock_movement (tenant_id, source, source_id, product_id);
+      CREATE INDEX stock_movement_by_product ON stock_movement (tenant_id, product_id);
+
+      CREATE TRIGGER stock_movement_has_known_type BEFORE INSERT ON stock_movement
+      WHEN NEW.type NOT IN ('opening_balance', 'sale', 'return', 'adjustment', 'waste')
+      BEGIN SELECT RAISE(ABORT, 'unknown stock movement type'); END;
+
+      CREATE TRIGGER stock_movement_never_changes BEFORE UPDATE ON stock_movement
+      BEGIN SELECT RAISE(ABORT, 'a stock movement never changes'); END;
+
+      CREATE TRIGGER stock_movement_is_never_deleted BEFORE DELETE ON stock_movement
+      BEGIN SELECT RAISE(ABORT, 'a stock movement is never deleted'); END;
+    `,
+  },
 ];

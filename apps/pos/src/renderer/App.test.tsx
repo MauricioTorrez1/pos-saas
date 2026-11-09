@@ -65,6 +65,11 @@ function fakePosApi(overrides: Partial<PosApi> = {}): PosApi {
     login: () => Promise.resolve({ status: 'ok', user: OWNER }),
     logout: () => Promise.resolve(),
     createUser: () => Promise.resolve(OWNER),
+    importCatalog: () => Promise.resolve({ status: 'cancelled' }),
+    getBackupStatus: () => Promise.resolve({ folder: null, lastBackupAt: null, lastError: null }),
+    configureBackup: () => Promise.resolve({ status: 'not_configured' }),
+    backupNow: () => Promise.resolve({ status: 'not_configured' }),
+    restoreBackup: () => Promise.resolve({ status: 'cancelled' }),
     findReturnableSale: () => Promise.resolve({ status: 'not_found' }),
     createReturn: () => Promise.resolve({ status: 'not_found' }),
     getCashStatus: () => Promise.resolve(OPEN_CASH),
@@ -1517,6 +1522,118 @@ describe('returns (E1-15)', () => {
 
     await waitFor(() => expect(createReturn).toHaveBeenCalledTimes(2));
     expect(createReturn.mock.calls[1]![0]).toMatchObject({ override: true });
+  });
+});
+
+describe('administration (E1-29, E1-35)', () => {
+  function pressKey(key: string): void {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key });
+  }
+
+  async function openAdmin(overrides: Partial<PosApi> = {}): Promise<HTMLElement> {
+    await renderApp(fakePosApi(overrides));
+    press('F1');
+    return screen.findByRole('dialog', { name: 'Administración', hidden: true });
+  }
+
+  it('is only for the owner', async () => {
+    const cashier = { getAuthState: () => Promise.resolve({ needsSetup: false, users: [], current: { id: 'c', name: 'Ana', role: 'cashier' as const } }) };
+    await renderApp(fakePosApi(cashier));
+
+    press('F1');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(screen.queryByRole('dialog', { hidden: true })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Administración/ })).toBeNull();
+  });
+
+  it('warns when there are no backups, because a broken computer would lose the sales', async () => {
+    const dialog = await openAdmin();
+
+    expect((await within(dialog).findByRole('alert', { hidden: true })).textContent).toContain('No hay respaldos configurados');
+  });
+
+  it('shows the report of a catalog load so the owner can compare it with Eleventa, and the rows that were left out', async () => {
+    const importCatalog = vi.fn<PosApi['importCatalog']>(() =>
+      Promise.resolve({
+        status: 'done',
+        report: { rowsRead: 5, created: 3, alreadyThere: 1, openingBalances: 3, inventoryValueCents: 158_500, samplesRemoved: 33, invalid: [{ line: 4, reason: 'El código está vacío.' }] },
+      }),
+    );
+    const dialog = await openAdmin({ importCatalog });
+
+    pressKey('F5');
+
+    const result = await within(dialog).findByRole('heading', { name: 'Catálogo cargado', hidden: true });
+    expect(result).toBeDefined();
+    expect(dialog.textContent).toContain('$1,585.00');
+    expect(dialog.textContent).toContain('Línea 4: El código está vacío.');
+    expect(importCatalog).toHaveBeenCalledTimes(1);
+  });
+
+  it('says why a file cannot be loaded, and does nothing when the owner closes the file window', async () => {
+    const importCatalog = vi
+      .fn<PosApi['importCatalog']>()
+      .mockResolvedValueOnce({ status: 'cancelled' })
+      .mockResolvedValueOnce({ status: 'unreadable', message: 'No se encontró el código en la primera fila del archivo.' });
+    const dialog = await openAdmin({ importCatalog });
+
+    pressKey('F5');
+    await waitFor(() => expect(importCatalog).toHaveBeenCalledTimes(1));
+    expect(within(dialog).queryByRole('heading', { name: 'Catálogo cargado', hidden: true })).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    pressKey('F5');
+
+    expect((await within(dialog).findByText(/No se encontró el código/, { selector: 'p' })).textContent).toBeDefined();
+  });
+
+  it('sets up the backups with a passphrase of at least 8 characters, and shows the last copy', async () => {
+    const configureBackup = vi.fn<PosApi['configureBackup']>(() =>
+      Promise.resolve({ status: 'done', backup: { folder: 'E:\\Respaldos', lastBackupAt: '2026-11-08T20:00:00.000Z', lastError: null } }),
+    );
+    const dialog = await openAdmin({ configureBackup });
+
+    pressKey('F6');
+    await within(dialog).findByRole('heading', { name: 'Configurar los respaldos', hidden: true });
+    fireEvent.change(screen.getByLabelText('Contraseña de los respaldos'), { target: { value: 'corta' } });
+    pressKey('F2');
+    expect((await within(dialog).findByRole('alert', { hidden: true })).textContent).toContain('al menos 8 caracteres');
+    expect(configureBackup).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Contraseña de los respaldos'), { target: { value: 'una contraseña larga' } });
+    pressKey('F2');
+
+    await waitFor(() => expect(configureBackup).toHaveBeenCalledExactlyOnceWith({ passphrase: 'una contraseña larga' }));
+    expect((await within(dialog).findByText(/Respaldos en E:\\Respaldos/)).textContent).toContain('Última copia');
+    expect(within(dialog).getByRole('status', { hidden: true }).textContent).toContain('Copia hecha');
+  });
+
+  it('shows a copy that failed, so a backup that stopped working is not a secret', async () => {
+    const dialog = await openAdmin({ getBackupStatus: () => Promise.resolve({ folder: 'E:\\Respaldos', lastBackupAt: null, lastError: 'ENOENT' }) });
+
+    expect((await within(dialog).findByText(/La última copia falló/)).textContent).toContain('USB');
+  });
+
+  it('tells the owner to restart after a restore is ready', async () => {
+    const restoreBackup = vi.fn<PosApi['restoreBackup']>(() => Promise.resolve({ status: 'staged' }));
+    const dialog = await openAdmin({ restoreBackup });
+
+    pressKey('F8');
+    await within(dialog).findByRole('heading', { name: 'Restaurar un respaldo', hidden: true });
+    fireEvent.change(screen.getByLabelText('Contraseña de los respaldos'), { target: { value: 'una contraseña larga' } });
+    pressKey('F2');
+
+    expect((await within(dialog).findByRole('status', { hidden: true })).textContent).toContain('Cierra la caja y ábrela otra vez');
+  });
+
+  it('says why a restore failed, such as a wrong passphrase', async () => {
+    const dialog = await openAdmin({ restoreBackup: () => Promise.resolve({ status: 'failed', message: 'La contraseña es incorrecta o el respaldo está dañado.' }) });
+
+    pressKey('F8');
+    await within(dialog).findByRole('heading', { name: 'Restaurar un respaldo', hidden: true });
+    fireEvent.change(screen.getByLabelText('Contraseña de los respaldos'), { target: { value: 'otra contraseña' } });
+    pressKey('F2');
+
+    expect((await within(dialog).findByRole('alert', { hidden: true })).textContent).toContain('contraseña es incorrecta');
   });
 });
 
