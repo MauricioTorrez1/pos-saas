@@ -135,7 +135,8 @@ describe('the backups', () => {
     }
 
     expect(readdirSync(picked.folder!)).toHaveLength(BACKUPS_TO_KEEP);
-  });
+    // Fifty encrypted copies take a few seconds on a slow runner.
+  }, 30_000);
 
   it('say that a copy failed, and keep saying it until one works, so a stopped backup is not a secret', async () => {
     await actions.configureBackup('una contraseña larga');
