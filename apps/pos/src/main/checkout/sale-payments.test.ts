@@ -124,6 +124,29 @@ describe('checkout', () => {
     ]);
   });
 
+  it('records a card typed on the terminal with its folio, next to the cash, and prints it on the ticket (RF-016)', async () => {
+    const saleId = saveSaleOf100();
+
+    const result = await salePayments.checkout({ saleId, cashReceivedCents: 6000, transfers: [], cards: [{ amountCents: 4000, reference: 'A48291' }] });
+
+    expect(result).toMatchObject({ status: 'completed', changeCents: 0 });
+    expect(rowsIn('payment')).toMatchObject([
+      { method: 'cash', amount_cents: 6000, reference: null },
+      { method: 'card_manual', amount_cents: 4000, reference: 'A48291' },
+    ]);
+    expect(new TextDecoder('latin1').decode(hardware.printer.printedBytes())).toMatch(/Tarjeta folio A48291\s+\$40\.00/);
+  });
+
+  it('never keeps a card number: a folio that looks like one is refused and nothing is recorded', async () => {
+    const saleId = saveSaleOf100();
+
+    const result = await salePayments.checkout({ saleId, cashReceivedCents: 0, transfers: [], cards: [{ amountCents: 10000, reference: '4111 1111 1111 1111' }] });
+
+    expect(result).toEqual({ status: 'payment_refused', plan: { status: 'card_number_entered' } });
+    expect(rowsIn('payment')).toEqual([]);
+    expect(JSON.stringify(rowsIn('payment'))).not.toContain('4111');
+  });
+
   it('keeps the drawer closed for a sale paid only by transfer', async () => {
     const saleId = saveSaleOf100();
 

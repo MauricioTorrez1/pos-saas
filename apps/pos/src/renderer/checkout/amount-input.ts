@@ -44,10 +44,14 @@ export function describePlan(plan: PaymentPlan): PlanDescription {
     case 'short':
       return { tone: 'short', text: `Faltan ${formatCents(plan.missingCents)}` };
     case 'transfers_exceed_total':
-      return { tone: 'problem', text: `La transferencia pasa el total por ${formatCents(plan.excessCents)}. Una transferencia no da cambio.` };
+      return { tone: 'problem', text: `La transferencia y la tarjeta pasan el total por ${formatCents(plan.excessCents)}. No dan cambio.` };
     case 'cash_not_needed':
       return { tone: 'problem', text: 'Las transferencias ya cubren el total. Quita el efectivo.' };
     case 'reference_missing':
       return { tone: 'problem', text: 'Escribe la referencia de la transferencia.' };
+    case 'folio_missing':
+      return { tone: 'problem', text: 'Escribe el folio que dio la terminal de tarjeta.' };
+    case 'card_number_entered':
+      return { tone: 'problem', text: 'Eso parece un número de tarjeta, y la caja nunca lo guarda. Escribe solo el folio de la terminal.' };
   }
 }

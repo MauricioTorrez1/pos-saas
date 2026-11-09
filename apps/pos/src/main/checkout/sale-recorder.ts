@@ -1,7 +1,10 @@
 import type { LineTotals, Quantity } from '@pos-saas/money';
 
-/** How a customer can pay. A card payment keeps its authorization code, never card data. */
-export const PAYMENT_METHODS = ['cash', 'transfer', 'card'] as const;
+/**
+ * How a customer can pay. A card payment keeps its authorization code or the folio of the terminal, never card data.
+ * `card_manual` is a card charged on the standalone terminal, with the folio typed by the cashier (RF-016).
+ */
+export const PAYMENT_METHODS = ['cash', 'transfer', 'card', 'card_manual'] as const;
 
 /** One of the ways to pay. */
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];

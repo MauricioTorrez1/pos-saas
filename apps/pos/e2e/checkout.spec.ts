@@ -152,6 +152,26 @@ test('takes the whole sale by transfer with F6', async ({ userDataDir, launch })
   expect(payments).toEqual([{ method: 'transfer', amount_cents: HAMMER_CENTS, reference: 'SPEI-1' }]);
 });
 
+test('records a card typed on the standalone terminal with its folio, and refuses a card number (RF-016)', async ({ userDataDir, launch }) => {
+  const { register, page } = await startCheckout(launch);
+
+  await page.keyboard.press('F7');
+  await expect(page.getByRole('textbox', { name: 'Tarjeta', exact: true })).toHaveValue('116');
+  await page.keyboard.type('4111 1111 1111 1111');
+  await expect(status(page)).toContainText('número de tarjeta');
+  await page.keyboard.press('F2');
+  await expect(payment(page)).toContainText('Cobrar');
+  await page.getByRole('textbox', { name: 'Folio de la terminal' }).fill('A48291');
+  await page.keyboard.press('F2');
+
+  await expect(page.getByRole('status', { name: 'Cambio a entregar' })).toHaveText('Sin cambio');
+  expect(await readSavedRows(register, testSalePaths(userDataDir).databasePath)).toEqual({
+    sales: [{ status: 'completed', total_cents: HAMMER_CENTS }],
+    payments: [{ method: 'card_manual', amount_cents: HAMMER_CENTS, reference: 'A48291' }],
+    countedSales: 1,
+  });
+});
+
 test('does not complete a sale that is short, and a scanner Enter does not complete it either', async ({ userDataDir, launch }) => {
   const { register, page } = await startCheckout(launch);
 
@@ -235,6 +255,7 @@ test('numbers the sales and prints the last ticket again with F8 (RF-018)', asyn
     }
     await page.keyboard.press('Enter');
     await expect(payment(page)).toHaveCount(0);
+    await expect(lookupBox(page)).toBeFocused();
   }
   await page.keyboard.press('F8');
 

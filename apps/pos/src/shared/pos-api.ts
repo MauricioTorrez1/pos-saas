@@ -89,6 +89,12 @@ export interface PaymentRequest {
     /** The reference the bank gave. */
     readonly reference: string;
   }[];
+  /** Payments on the standalone card terminal, each with the folio the cashier typed (RF-016). */
+  readonly cards?: readonly {
+    readonly amountCents: number;
+    /** The folio of the terminal. Never a card number. */
+    readonly reference: string;
+  }[];
 }
 
 /** A device that failed after the sale was completed. The sale stands. */

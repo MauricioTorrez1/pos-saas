@@ -306,6 +306,33 @@ describe('completing a sale with several payments (RF-015)', () => {
     expect(statusOf(sale.saleId)).toBe('pending_payment');
   });
 
+  it('records a card typed on the standalone terminal with its folio (RF-016)', () => {
+    const sale = aSale();
+    sales.savePendingPayment(sale);
+
+    sales.markCompleted(sale.saleId, [{ method: 'card_manual', amountCents: sale.totalCents, reference: 'A48291' }]);
+
+    expect(row('SELECT method, amount_cents, reference FROM payment')).toEqual({
+      method: 'card_manual',
+      amount_cents: sale.totalCents,
+      reference: 'A48291',
+    });
+  });
+
+  it('refuses a card payment without its folio, in the database too', () => {
+    const sale = aSale();
+    sales.savePendingPayment(sale);
+
+    expect(() => sales.markCompleted(sale.saleId, [{ method: 'card_manual', amountCents: sale.totalCents, reference: null }])).toThrow(
+      'needs its reference',
+    );
+    expect(() => sales.markCompleted(sale.saleId, [{ method: 'card_manual', amountCents: sale.totalCents, reference: '  ' }])).toThrow(
+      'needs its reference',
+    );
+
+    expect(statusOf(sale.saleId)).toBe('pending_payment');
+  });
+
   it('refuses a payment method the register does not know', () => {
     const sale = aSale();
     sales.savePendingPayment(sale);

@@ -730,6 +730,54 @@ describe('checkout', () => {
     });
   });
 
+  it('records the card typed on the standalone terminal with its folio (RF-016)', async () => {
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve(COMPLETED));
+    render(<App posApi={posApiThatSaves({ checkoutSale })} />);
+    await openCheckout();
+
+    typeInto('Efectivo recibido', '16');
+    pressKey('F7');
+    expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'Tarjeta', hidden: true }).value).toBe('100');
+    expect(status()).toBe('Escribe el folio que dio la terminal de tarjeta.');
+    typeInto('Folio de la terminal', ' A48291 ');
+    expect(status()).toBe('Pago exacto');
+    pressKey('F2');
+
+    await waitFor(() => expect(checkoutSale).toHaveBeenCalledTimes(1));
+    expect(checkoutSale).toHaveBeenCalledWith({
+      saleId: 'saved-sale',
+      cashReceivedCents: 1600,
+      transfers: [],
+      cards: [{ amountCents: 10000, reference: 'A48291' }],
+    });
+  });
+
+  it('refuses a folio that looks like a card number, and never sends it', async () => {
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve(COMPLETED));
+    render(<App posApi={posApiThatSaves({ checkoutSale })} />);
+    await openCheckout();
+
+    typeInto('Tarjeta', '116');
+    typeInto('Folio de la terminal', '4111 1111 1111 1111');
+    pressKey('F2');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(status()).toContain('número de tarjeta');
+    expect(checkoutSale).not.toHaveBeenCalled();
+  });
+
+  it('does not send a cards list when the sale was not paid with a card', async () => {
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve(COMPLETED));
+    render(<App posApi={posApiThatSaves({ checkoutSale })} />);
+    await openCheckout();
+    typeInto('Efectivo recibido', '116');
+
+    pressKey('F2');
+
+    await waitFor(() => expect(checkoutSale).toHaveBeenCalledTimes(1));
+    expect(checkoutSale.mock.calls[0]![0]).not.toHaveProperty('cards');
+  });
+
   it('fills the cash that is missing with F5, and the transfer that is missing with F6', async () => {
     render(<App posApi={posApiThatSaves()} />);
     await openCheckout();
@@ -749,7 +797,7 @@ describe('checkout', () => {
 
   it.each([
     ['cash that does not reach the total', '100', '', 'Faltan $16.00'],
-    ['a transfer for more than the total', '', '120', 'no da cambio'],
+    ['a transfer for more than the total', '', '120', 'No dan cambio'],
     ['cash when the transfer already covers the total', '10', '116', 'Quita el efectivo'],
     ['text that is not an amount', 'cien', '', 'Escribe solo números'],
   ])('does not collect with %s', async (_case, cash, transfer, message) => {

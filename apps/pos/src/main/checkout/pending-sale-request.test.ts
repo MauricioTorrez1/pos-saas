@@ -77,6 +77,22 @@ describe('parsePaymentRequest', () => {
     expect(parsePaymentRequest({ ...PAYMENT, status: 'completed' })).toEqual(PAYMENT);
   });
 
+  it('keeps the card payments when the screen sent them, and leaves them out when it did not', () => {
+    const cards = [{ amountCents: 4000, reference: 'A48291' }];
+
+    expect(parsePaymentRequest({ ...PAYMENT, cards })).toEqual({ ...PAYMENT, cards });
+    expect('cards' in parsePaymentRequest(PAYMENT)).toBe(false);
+  });
+
+  it.each([
+    ['cards that are not a list', { cards: 'x' }],
+    ['a card payment for zero', { cards: [{ amountCents: 0, reference: 'A' }] }],
+    ['a card folio that is not text', { cards: [{ amountCents: 100, reference: 1 }] }],
+    ['too many card payments', { cards: Array.from({ length: MAX_TRANSFERS + 1 }, () => TRANSFER) }],
+  ])('refuses %s', (_case, extra) => {
+    expect(() => parsePaymentRequest({ ...PAYMENT, ...extra })).toThrow(TypeError);
+  });
+
   it('accepts a sale with no cash and a sale with no transfer', () => {
     expect(parsePaymentRequest({ ...PAYMENT, cashReceivedCents: 0 }).cashReceivedCents).toBe(0);
     expect(parsePaymentRequest({ ...PAYMENT, transfers: [] }).transfers).toEqual([]);

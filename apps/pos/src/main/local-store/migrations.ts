@@ -226,4 +226,22 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'the folio of a sale never changes'); END;
     `,
   },
+  {
+    version: 7,
+    name: 'accept_manual_card_payments',
+    // Replaces the triggers of migration 5, which is how ADR 0026 said a new method would arrive. A card typed on the
+    // standalone terminal needs its folio, so it can be reconciled later (ADR 0028).
+    sql: `
+      DROP TRIGGER payment_has_known_method;
+      DROP TRIGGER payment_transfer_has_reference;
+
+      CREATE TRIGGER payment_has_known_method BEFORE INSERT ON payment
+      WHEN NEW.method NOT IN ('cash', 'transfer', 'card', 'card_manual')
+      BEGIN SELECT RAISE(ABORT, 'unknown payment method'); END;
+
+      CREATE TRIGGER payment_needs_its_reference BEFORE INSERT ON payment
+      WHEN NEW.method IN ('transfer', 'card_manual') AND length(trim(coalesce(NEW.reference, ''))) = 0
+      BEGIN SELECT RAISE(ABORT, 'a transfer or a card payment needs its reference'); END;
+    `,
+  },
 ];

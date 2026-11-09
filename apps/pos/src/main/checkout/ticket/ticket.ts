@@ -146,6 +146,7 @@ function paymentLabel({ method, reference }: SalePayment): string {
     case 'transfer':
       return `Transferencia ${reference ?? ''}`.trim();
     case 'card':
+    case 'card_manual':
       return `Tarjeta folio ${reference ?? ''}`.trim();
   }
 }

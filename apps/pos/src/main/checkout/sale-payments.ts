@@ -120,6 +120,6 @@ function toSalePayment(payment: PlannedPayment): SalePayment {
   return {
     method: payment.method,
     amountCents: payment.amountCents,
-    reference: payment.method === 'transfer' ? payment.reference : null,
+    reference: payment.method === 'cash' ? null : payment.reference,
   };
 }
