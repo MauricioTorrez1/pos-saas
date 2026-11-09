@@ -19,6 +19,7 @@ const SHORTCUTS: readonly { readonly keys: string; readonly action: string }[] =
   { keys: 'Supr', action: 'Quitar' },
   { keys: 'Esc', action: 'Limpiar' },
   { keys: 'F12', action: 'Cobrar' },
+  { keys: 'F8', action: 'Reimprimir' },
 ];
 
 interface AppProps {

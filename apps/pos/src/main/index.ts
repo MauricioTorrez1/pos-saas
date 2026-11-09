@@ -6,7 +6,12 @@ import { app, dialog } from 'electron';
 import { PendingSales } from './checkout/pending-sales';
 import { SaleCheckout } from './checkout/sale-checkout';
 import { SalePayments } from './checkout/sale-payments';
+import { renderTicket } from './checkout/ticket/ticket';
+import { toTicketData } from './checkout/ticket/ticket-data';
 import { createFakeHardware } from './hardware/fakes/fake-hardware';
+import { RecordingPrinter } from './hardware/fakes/recording-printer';
+import type { PrinterProvider } from './hardware/printer-provider';
+import { WindowsSharedPrinter } from './hardware/windows-shared-printer';
 import { registerIpcHandlers } from './ipc-handlers';
 import { AppearanceStore } from './local-store/appearance-store';
 import { LocalStore } from './local-store/local-store';
@@ -19,6 +24,7 @@ import { openMainWindow } from './main-window';
 const PRELOAD_PATH = join(import.meta.dirname, '../preload/index.cjs');
 const RENDERER_HTML_PATH = join(import.meta.dirname, '../renderer/index.html');
 const DATABASE_FILE_NAME = 'pos.db';
+const UNNAMED_BUSINESS = 'Tlapalería';
 
 /** Uses the dev server while developing. A packaged app ignores the variable, so nothing can point it at another page. */
 function resolveRendererEntry(): string {
@@ -51,19 +57,38 @@ function openLocalStore(): LocalStore {
   }
 }
 
+/**
+ * Picks the ticket printer. `POS_PRINTER_SHARE` names a printer shared by Windows, such as `\\localhost\TM-T20`. Without
+ * it the register sells normally and prints nothing, because a missing printer must never stop a sale.
+ */
+function choosePrinter(): PrinterProvider {
+  const share = process.env.POS_PRINTER_SHARE;
+  return share ? new WindowsSharedPrinter(share) : new RecordingPrinter();
+}
+
 async function start(): Promise<void> {
   await app.whenReady();
   const store = openLocalStore();
   const rendererEntry = resolveRendererEntry();
   const catalog = new ProductCatalog(store, LOCAL_TENANT_ID);
   const sales = new SaleStore(store, LOCAL_TENANT_ID);
-  // The real drawer and printer arrive with E1-14 and E1-13. Until then the fakes stand in, so no ticket is printed.
-  const checkout = new SaleCheckout({ hardware: createFakeHardware(), sales, renderTicket: () => new Uint8Array() });
+  const appearance = new AppearanceStore(store, LOCAL_TENANT_ID);
+  const printer = choosePrinter();
+  // The real drawer arrives with E1-14, so the fake stands in for it. The ticket printer is real once it is configured.
+  const checkout = new SaleCheckout({
+    hardware: { ...createFakeHardware(), printer },
+    sales,
+    renderTicket: (sale, receipt) =>
+      renderTicket(toTicketData(appearance.read().businessName || UNNAMED_BUSINESS, sale, { ...receipt, isReprint: false })),
+  });
   registerIpcHandlers(rendererEntry, {
     catalog,
-    appearance: new AppearanceStore(store, LOCAL_TENANT_ID),
+    appearance,
     pendingSales: new PendingSales(catalog, sales),
-    salePayments: new SalePayments(sales, checkout),
+    salePayments: new SalePayments(sales, checkout, {
+      printer,
+      businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
+    }),
   });
   await openMainWindow(rendererEntry, PRELOAD_PATH);
 }

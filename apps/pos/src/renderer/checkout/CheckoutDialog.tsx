@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactElement } from 'react';
 
 import type { CheckoutProblem, PendingSale, PosApi } from '../../shared/pos-api';
 import { describePlan } from './amount-input';
+import { describeReprint, REPRINT_FAILED } from './reprint-message';
 import { PaymentForm, type EnteredPayment } from './PaymentForm';
 
 const SAVE_FAILED = 'No se pudo registrar el cobro. Intenta de nuevo y, si sigue fallando, reinicia la caja.';
@@ -10,7 +11,7 @@ const CANCEL_FAILED = 'No se pudo cancelar la venta. Intenta de nuevo y, si sigu
 
 type Phase =
   | { readonly kind: 'paying' }
-  | { readonly kind: 'done'; readonly changeCents: number; readonly problems: readonly CheckoutProblem[] };
+  | { readonly kind: 'done'; readonly folio: string; readonly changeCents: number; readonly problems: readonly CheckoutProblem[] };
 
 interface CheckoutDialogProps {
   readonly posApi: PosApi;
@@ -33,6 +34,7 @@ export function CheckoutDialog({ posApi, sale, onFinished }: CheckoutDialogProps
   const [phase, setPhase] = useState<Phase>({ kind: 'paying' });
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [reprintMessage, setReprintMessage] = useState<string | null>(null);
   const isWorking = useRef(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -68,11 +70,19 @@ export function CheckoutDialog({ posApi, sale, onFinished }: CheckoutDialogProps
     run(async () => {
       const result = await posApi.checkoutSale({ saleId: sale.id, ...payment });
       if (result.status === 'completed') {
-        setPhase({ kind: 'done', changeCents: result.changeCents, problems: result.problems });
+        setPhase({ kind: 'done', folio: result.folio, changeCents: result.changeCents, problems: result.problems });
       } else {
         setMessage(describePlan(result.plan).text);
       }
     }, SAVE_FAILED);
+
+  const reprint = async (): Promise<void> => {
+    try {
+      setReprintMessage(describeReprint(await posApi.reprintLastTicket()));
+    } catch {
+      setReprintMessage(REPRINT_FAILED);
+    }
+  };
 
   const cancelSale = (): Promise<void> =>
     run(async () => {
@@ -97,7 +107,14 @@ export function CheckoutDialog({ posApi, sale, onFinished }: CheckoutDialogProps
           backLabel="Volver y cancelar la venta"
         />
       ) : (
-        <DoneView changeCents={phase.changeCents} problems={phase.problems} onContinue={() => onFinished(true)} />
+        <DoneView
+          folio={phase.folio}
+          changeCents={phase.changeCents}
+          problems={phase.problems}
+          reprintMessage={reprintMessage}
+          onReprint={() => void reprint()}
+          onContinue={() => onFinished(true)}
+        />
       )}
       {message !== null && (
         <p className="notice" role="alert">
@@ -109,18 +126,24 @@ export function CheckoutDialog({ posApi, sale, onFinished }: CheckoutDialogProps
 }
 
 interface DoneViewProps {
+  readonly folio: string;
   readonly changeCents: number;
   readonly problems: readonly CheckoutProblem[];
+  readonly reprintMessage: string | null;
+  readonly onReprint: () => void;
   readonly onContinue: () => void;
 }
 
 /** Keeps the change on the screen while it is handed over. Enter or Esc starts the next sale, and F2 does not, so a double tap cannot hide the change. */
-function DoneView({ changeCents, problems, onContinue }: DoneViewProps): ReactElement {
+function DoneView({ folio, changeCents, problems, reprintMessage, onReprint, onContinue }: DoneViewProps): ReactElement {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Enter' || event.key === 'Escape') {
         event.preventDefault();
         onContinue();
+      } else if (event.key === 'F8') {
+        event.preventDefault();
+        onReprint();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -129,6 +152,7 @@ function DoneView({ changeCents, problems, onContinue }: DoneViewProps): ReactEl
 
   return (
     <div className="payment-done">
+      <p className="payment-folio">Folio {folio}</p>
       <p className="payment-change" role="status" aria-label="Cambio a entregar">
         {changeCents === 0 ? 'Sin cambio' : `Entrega ${formatCents(changeCents)} de cambio`}
       </p>
@@ -137,6 +161,14 @@ function DoneView({ changeCents, problems, onContinue }: DoneViewProps): ReactEl
           La venta quedó registrada, pero falló un aparato: {problem.message}
         </p>
       ))}
+      {reprintMessage !== null && (
+        <p className="notice notice-info" role="status">
+          {reprintMessage}
+        </p>
+      )}
+      <button type="button" className="button" tabIndex={-1} onClick={onReprint}>
+        Reimprimir ticket <kbd>F8</kbd>
+      </button>
       <button type="button" className="button button-primary" tabIndex={-1} onClick={onContinue}>
         Nueva venta <kbd>Enter</kbd>
       </button>

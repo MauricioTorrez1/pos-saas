@@ -13,6 +13,8 @@ import { uuidV7 } from '../uuid-v7';
 import { PendingSales } from './pending-sales';
 import { SaleCheckout } from './sale-checkout';
 import { SalePayments } from './sale-payments';
+import { renderTicket } from './ticket/ticket';
+import { toTicketData } from './ticket/ticket-data';
 
 const TENANT = 'tenant-a';
 const REFERENCE = 'SPEI-778812';
@@ -29,7 +31,16 @@ beforeEach(() => {
   const sales = new SaleStore(store, TENANT);
   hardware = createFakeHardware();
   pendingSales = new PendingSales(new ProductCatalog(store, TENANT), sales);
-  salePayments = new SalePayments(sales, new SaleCheckout({ hardware, sales, renderTicket: () => new Uint8Array([1]) }));
+  const businessName = (): string => 'Tlapalería Torres';
+  salePayments = new SalePayments(
+    sales,
+    new SaleCheckout({
+      hardware,
+      sales,
+      renderTicket: (sale, receipt) => renderTicket(toTicketData(businessName(), sale, { ...receipt, isReprint: false })),
+    }),
+    { printer: hardware.printer, businessName },
+  );
 });
 
 afterEach(() => {
@@ -73,11 +84,32 @@ describe('checkout', () => {
 
     const result = await salePayments.checkout(request(saleId, 15000));
 
-    expect(result).toEqual({ status: 'completed', changeCents: 5000, problems: [] });
+    expect(result).toEqual({ status: 'completed', folio: 'T1-000001', changeCents: 5000, problems: [] });
     expect(rowsIn('sale')).toMatchObject([{ id: saleId, status: 'completed' }]);
     expect(rowsIn('payment')).toMatchObject([{ sale_id: saleId, method: 'cash', amount_cents: 10000, reference: null }]);
     expect(hardware.cashDrawer.openCount).toBe(1);
     expect(hardware.printer.jobs).toHaveLength(1);
+  });
+
+  it('prints a ticket with the folio, the VAT, the payments, and the change', async () => {
+    const saleId = saveSaleOf100();
+
+    await salePayments.checkout(request(saleId, 15000));
+
+    const ticket = new TextDecoder('latin1').decode(hardware.printer.printedBytes());
+    expect(ticket).toContain('Tlapaler');
+    expect(ticket).toContain('Folio T1-000001');
+    expect(ticket).toMatch(/Martillo\s+\$100\.00/);
+    expect(ticket).toMatch(/IVA 16%\s+\$13\.79/);
+    expect(ticket).toMatch(/Cambio\s+\$50\.00/);
+    expect(ticket).not.toContain('REIMPRES');
+  });
+
+  it('gives the next folio to each sale', async () => {
+    const first = await salePayments.checkout(request(saveSaleOf100(), 10000));
+    const second = await salePayments.checkout(request(saveSaleOf100(), 10000));
+
+    expect([first, second]).toMatchObject([{ folio: 'T1-000001' }, { folio: 'T1-000002' }]);
   });
 
   it('records $60 in cash and $40 by transfer as two payments of one sale (RF-015)', async () => {
@@ -172,5 +204,39 @@ describe('confirm', () => {
 
   it('says so when the sale does not exist', () => {
     expect(() => salePayments.confirm(request(uuidV7(), 10000))).toThrow(SaleNotFoundError);
+  });
+});
+
+describe('reprintLast', () => {
+  it('says so when no sale was completed yet', async () => {
+    saveSaleOf100();
+
+    expect(await salePayments.reprintLast()).toEqual({ status: 'no_sales' });
+    expect(hardware.printer.jobs).toEqual([]);
+  });
+
+  it('prints the last completed sale again, marked as a reprint and without inventing the change', async () => {
+    await salePayments.checkout(request(saveSaleOf100(), 15000));
+    await salePayments.checkout(request(saveSaleOf100(), 10000, []));
+    const originalJobs = hardware.printer.jobs.length;
+
+    const result = await salePayments.reprintLast();
+
+    expect(result).toEqual({ status: 'printed', folio: 'T1-000002' });
+    const copy = new TextDecoder('latin1').decode(hardware.printer.jobs[originalJobs]);
+    expect(copy).toContain('Folio T1-000002');
+    expect(copy).toContain('REIMPRES');
+    expect(copy).not.toContain('Cambio');
+    expect(hardware.cashDrawer.openCount).toBe(2);
+  });
+
+  it('keeps the sale, and says why, when the printer has no paper', async () => {
+    await salePayments.checkout(request(saveSaleOf100(), 10000));
+    hardware.printer.failNextWith();
+
+    const result = await salePayments.reprintLast();
+
+    expect(result).toEqual({ status: 'printer_failed', folio: 'T1-000001', message: 'The printer is out of paper' });
+    expect(rowsIn('sale')).toMatchObject([{ status: 'completed' }]);
   });
 });

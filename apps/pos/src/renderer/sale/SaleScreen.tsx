@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState, type KeyboardEven
 
 import { MAX_LOOKUP_TEXT_LENGTH, type CatalogProduct, type PendingSale, type PosApi } from '../../shared/pos-api';
 import { CheckoutDialog } from '../checkout/CheckoutDialog';
+import { describeReprint, REPRINT_FAILED } from '../checkout/reprint-message';
 import { SaleLines } from './SaleLines';
 import { EMPTY_SALE, saleReducer } from './sale-state';
 import { SaleSummary } from './SaleSummary';
@@ -45,6 +46,7 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
   const [savedSale, setSavedSale] = useState<PendingSale | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const isSaving = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -82,6 +84,14 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
       setNotice(SAVE_FAILURE);
     } finally {
       isSaving.current = false;
+    }
+  };
+
+  const reprintLast = async (): Promise<void> => {
+    try {
+      setInfo(describeReprint(await posApi.reprintLastTicket()));
+    } catch {
+      setInfo(REPRINT_FAILED);
     }
   };
 
@@ -209,6 +219,10 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
         event.preventDefault();
         void startCheckout();
         return;
+      case 'F8':
+        event.preventDefault();
+        void reprintLast();
+        return;
       default:
         if (isPrintableKey(event)) {
           detector.recordCharacter(event.timeStamp);
@@ -220,6 +234,7 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
 
   const handleInput = (): void => {
     setNotice(null);
+    setInfo(null);
     const text = inputRef.current?.value.trim() ?? '';
     if (text === '') {
       detector.reset();
@@ -279,6 +294,11 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
         {message !== null && (
           <p className="notice" role="alert">
             {message}
+          </p>
+        )}
+        {info !== null && (
+          <p className="notice notice-info" role="status">
+            {info}
           </p>
         )}
         <SaleLines lines={sale.lines} selectedProductId={sale.selectedProductId} onSelect={handleSelectLine} />

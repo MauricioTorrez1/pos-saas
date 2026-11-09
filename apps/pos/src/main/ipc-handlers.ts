@@ -8,6 +8,7 @@ import {
   type CatalogProduct,
   type CheckoutSaleResult,
   type PendingSale,
+  type ReprintResult,
   type SavePendingSaleResult,
 } from '../shared/pos-api';
 import { parsePaymentRequest, parsePendingSaleRequest, parseSaleId } from './checkout/pending-sale-request';
@@ -64,6 +65,7 @@ export function registerIpcHandlers(rendererEntry: string, { catalog, appearance
   answerScreen(IPC_CHANNELS.savePendingSale, (request): SavePendingSaleResult => pendingSales.save(parsePendingSaleRequest(request)));
   answerScreen(IPC_CHANNELS.listPendingSales, (): PendingSale[] => pendingSales.list());
   answerScreen(IPC_CHANNELS.checkoutSale, (request): Promise<CheckoutSaleResult> => salePayments.checkout(parsePaymentRequest(request)));
+  answerScreen(IPC_CHANNELS.reprintLastTicket, (): Promise<ReprintResult> => salePayments.reprintLast());
   answerScreen(IPC_CHANNELS.confirmPendingSale, (request): CheckoutSaleResult => salePayments.confirm(parsePaymentRequest(request)));
   answerScreen(IPC_CHANNELS.cancelPendingSale, (saleId): void => pendingSales.cancel(parseSaleId(saleId)));
 }

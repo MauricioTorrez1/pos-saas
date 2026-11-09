@@ -12,6 +12,7 @@ export const IPC_CHANNELS = {
   saveAppearance: 'appearance:save',
   savePendingSale: 'sales:save-pending',
   checkoutSale: 'sales:checkout',
+  reprintLastTicket: 'sales:reprint-last',
   listPendingSales: 'sales:list-pending',
   confirmPendingSale: 'sales:confirm-pending',
   cancelPendingSale: 'sales:cancel-pending',
@@ -100,12 +101,22 @@ export interface CheckoutProblem {
 export type CheckoutSaleResult =
   | {
       readonly status: 'completed';
+      /** The short folio of the sale, such as `T1-000123`. It is on the ticket. */
+      readonly folio: string;
       /** Cash to give back, in cents. */
       readonly changeCents: number;
       readonly problems: readonly CheckoutProblem[];
     }
   /** What was handed over does not complete the sale (RF-014, RF-015). Nothing was recorded. */
   | { readonly status: 'payment_refused'; readonly plan: PaymentPlan };
+
+/** How asking to print the last ticket again ended. */
+export type ReprintResult =
+  | { readonly status: 'printed'; readonly folio: string }
+  /** No sale has been completed yet, so there is no ticket to print. */
+  | { readonly status: 'no_sales' }
+  /** The printer did not take the job. The sale is not affected. */
+  | { readonly status: 'printer_failed'; readonly folio: string; readonly message: string };
 
 /** Everything the screen can ask of the main process. */
 export interface PosApi {
@@ -163,6 +174,13 @@ export interface PosApi {
    * @returns `completed` with the change, or `payment_refused` with the reason and nothing recorded
    */
   checkoutSale(request: PaymentRequest): Promise<CheckoutSaleResult>;
+
+  /**
+   * Prints the ticket of the last completed sale again, marked as a reprint (RF-018). The sale does not change.
+   *
+   * @returns `printed` with the folio, `no_sales` if there is nothing to print, or `printer_failed` with why
+   */
+  reprintLastTicket(): Promise<ReprintResult>;
 
   /**
    * Reads the sales that were left without being confirmed or cancelled, as after a power cut (RF-017).

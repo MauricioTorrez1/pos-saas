@@ -19,7 +19,7 @@ const CARD_SALE: SaleToCheckout = { ...CASH_SALE, payment: { kind: 'card' } };
 const CASH_PAYMENT: SalePayment = { method: 'cash', amountCents: 5625, reference: null };
 
 /** A stand-in for the ESC/POS generator of E1-13: plain text, so a failing test is easy to read. */
-function renderPlainTicket(sale: SaleToCheckout, payments: readonly SalePayment[]): Uint8Array {
+function renderPlainTicket(sale: SaleToCheckout, { payments }: { payments: readonly SalePayment[] }): Uint8Array {
   const paidWith = payments.map((payment) => ` ${payment.amountCents} ${payment.reference ?? ''}`.trim()).join(', ');
   return new TextEncoder().encode(`Venta ${sale.saleId}\nTotal ${sale.totalCents} centavos\nPago: ${paidWith}\n`);
 }
@@ -41,7 +41,7 @@ describe('SaleCheckout with every device faked', () => {
     const result = await checkout.checkout(CASH_SALE);
 
     expect(weightMilli).toBe(1250);
-    expect(result).toEqual({ status: 'completed', payments: [CASH_PAYMENT], changeCents: 375, problems: [] });
+    expect(result).toEqual({ status: 'completed', payments: [CASH_PAYMENT], folio: 1, changeCents: 375, problems: [] });
     expect(hardware.log.entries).toEqual([
       'scale.readWeightMilli',
       'sales.savePendingPayment',
@@ -52,7 +52,7 @@ describe('SaleCheckout with every device faked', () => {
     expect(sales.find(CASH_SALE.saleId)?.status).toBe('completed');
     expect(hardware.cashDrawer.openCount).toBe(1);
     expect(hardware.cardTerminal.charges).toEqual([]);
-    expect(hardware.printer.printedBytes()).toEqual(renderPlainTicket(CASH_SALE, [CASH_PAYMENT]));
+    expect(hardware.printer.printedBytes()).toEqual(renderPlainTicket(CASH_SALE, { payments: [CASH_PAYMENT] }));
   });
 
   it('charges a card after saving the sale and before completing it, and keeps only the authorization code', async () => {
@@ -62,7 +62,7 @@ describe('SaleCheckout with every device faked', () => {
     const result = await checkout.checkout(CARD_SALE);
 
     const payments = [{ method: 'card', amountCents: 5625, reference: '482913' }] as const;
-    expect(result).toEqual({ status: 'completed', payments, changeCents: 0, problems: [] });
+    expect(result).toEqual({ status: 'completed', payments, folio: 1, changeCents: 0, problems: [] });
     expect(hardware.log.entries).toEqual([
       'sales.savePendingPayment',
       'cardTerminal.charge',
@@ -74,7 +74,7 @@ describe('SaleCheckout with every device faked', () => {
     ]);
     expect(sales.find(CARD_SALE.saleId)).toMatchObject({ status: 'completed', payments });
     expect(hardware.cashDrawer.openCount).toBe(0);
-    expect(hardware.printer.printedBytes()).toEqual(renderPlainTicket(CARD_SALE, payments));
+    expect(hardware.printer.printedBytes()).toEqual(renderPlainTicket(CARD_SALE, { payments }));
   });
 
   it('leaves a declined card sale pending, with the drawer closed and nothing printed', async () => {
@@ -150,6 +150,7 @@ describe('SaleCheckout with every device faked', () => {
     expect(result).toEqual({
       status: 'completed',
       payments: [CASH_PAYMENT],
+      folio: 1,
       changeCents: 375,
       problems: [{ device: 'printer', message: 'The printer is out of paper' }],
     });
@@ -176,7 +177,7 @@ describe('SaleCheckout with every device faked', () => {
 
     const result = await checkout.checkout({ ...CASH_SALE, payment: { kind: 'in_person', payments, changeCents: 1375 } });
 
-    expect(result).toEqual({ status: 'completed', payments, changeCents: 1375, problems: [] });
+    expect(result).toEqual({ status: 'completed', payments, folio: 1, changeCents: 1375, problems: [] });
     expect(sales.find(CASH_SALE.saleId)).toMatchObject({ status: 'completed', payments });
     expect(hardware.cashDrawer.openCount).toBe(1);
   });

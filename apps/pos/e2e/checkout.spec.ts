@@ -49,7 +49,7 @@ function lookupBox(page: Page): Locator {
 }
 
 function payment(page: Page): Locator {
-  return page.getByRole('dialog', { name: 'Cobrar' });
+  return page.getByRole('dialog', { name: /^(Cobrar|Venta cobrada)$/ });
 }
 
 function status(page: Page): Locator {
@@ -104,6 +104,7 @@ test('charges a sale in cash and shows the change, using only the keyboard (RF-0
   await page.keyboard.press('F2');
 
   await expect(page.getByRole('status', { name: 'Cambio a entregar' })).toHaveText('Entrega $34.00 de cambio');
+  await expect(payment(page)).toContainText('Folio T1-000001');
   await page.keyboard.press('Enter');
   await expect(payment(page)).toHaveCount(0);
   await expect(total(page)).toHaveText('$0.00');
@@ -211,6 +212,33 @@ test('asks for the payment method of a sale left pending when the register is ki
     ],
     countedSales: 1,
   });
+});
+
+test('numbers the sales and prints the last ticket again with F8 (RF-018)', async ({ launch }) => {
+  const register = await launch();
+  const page = await register.firstWindow();
+  await expect(lookupBox(page)).toBeFocused();
+  await page.keyboard.press('F8');
+  await expect(page.getByText('Todavía no hay ventas cobradas para reimprimir.')).toBeVisible();
+
+  for (const folio of ['T1-000001', 'T1-000002']) {
+    await scan(page, HAMMER_CODE);
+    await expect(total(page)).toHaveText('$116.00');
+    await page.keyboard.press('F12');
+    await expect(page.getByRole('textbox', { name: 'Efectivo recibido' })).toBeFocused();
+    await page.keyboard.type('116');
+    await page.keyboard.press('F2');
+    await expect(payment(page)).toContainText(`Folio ${folio}`);
+    if (folio === 'T1-000002') {
+      await page.keyboard.press('F8');
+      await expect(payment(page)).toContainText('Ticket T1-000002 reimpreso.');
+    }
+    await page.keyboard.press('Enter');
+    await expect(payment(page)).toHaveCount(0);
+  }
+  await page.keyboard.press('F8');
+
+  await expect(page.getByText('Ticket T1-000002 reimpreso.')).toBeVisible();
 });
 
 test('refuses payment requests that do not follow the rules of the bridge', async ({ launch }) => {

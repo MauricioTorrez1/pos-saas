@@ -207,4 +207,23 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'a transfer needs its reference'); END;
     `,
   },
+  {
+    version: 6,
+    name: 'add_sale_folio',
+    // The short folio of the ticket. Only completed sales get one, so cancelled sales leave no gap, and it never changes
+    // (ADR 0027).
+    sql: `
+      ALTER TABLE sale ADD COLUMN folio INTEGER CHECK (folio IS NULL OR folio >= 1);
+
+      CREATE UNIQUE INDEX sale_folio_per_business ON sale (tenant_id, folio) WHERE folio IS NOT NULL;
+
+      CREATE TRIGGER sale_completes_with_folio BEFORE UPDATE OF status ON sale
+      WHEN NEW.status = 'completed' AND NEW.folio IS NULL
+      BEGIN SELECT RAISE(ABORT, 'a completed sale needs its folio'); END;
+
+      CREATE TRIGGER sale_folio_never_changes BEFORE UPDATE OF folio ON sale
+      WHEN OLD.folio IS NOT NULL
+      BEGIN SELECT RAISE(ABORT, 'the folio of a sale never changes'); END;
+    `,
+  },
 ];

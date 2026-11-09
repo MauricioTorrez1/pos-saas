@@ -1,6 +1,6 @@
 import { CallLog } from '../hardware/fakes/call-log';
 import { NextFailure } from '../hardware/fakes/next-failure';
-import { SaleAlreadyCompletedError, type SalePayment, type SaleRecorder, type SaleToSave } from './sale-recorder';
+import { SaleAlreadyCompletedError, type CompletedSale, type SalePayment, type SaleRecorder, type SaleToSave } from './sale-recorder';
 
 /** What the fake knows about one sale. */
 export type RecordedSale =
@@ -12,6 +12,7 @@ export class InMemorySaleRecorder implements SaleRecorder {
   readonly #sales = new Map<string, RecordedSale>();
   readonly #log: CallLog;
   readonly #nextFailure = new NextFailure();
+  #lastFolio = 0;
 
   /** @param log where the call is recorded, shared with the hardware fakes to check the order of a sale */
   constructor(log: CallLog = new CallLog()) {
@@ -33,7 +34,7 @@ export class InMemorySaleRecorder implements SaleRecorder {
    *
    * @throws Error if the sale is not pending, which would mean checkout skipped a step
    */
-  markCompleted(saleId: string, payments: readonly SalePayment[]): void {
+  markCompleted(saleId: string, payments: readonly SalePayment[]): CompletedSale {
     this.#log.record('sales.markCompleted');
     this.#nextFailure.throwIfArmed();
     const recorded = this.#sales.get(saleId);
@@ -41,6 +42,8 @@ export class InMemorySaleRecorder implements SaleRecorder {
       throw new Error(`Sale ${saleId} must be pending to complete it, but it is ${recorded?.status ?? 'missing'}`);
     }
     this.#sales.set(saleId, { status: 'completed', sale: recorded.sale, payments: payments.map((payment) => ({ ...payment })) });
+    this.#lastFolio += 1;
+    return { folio: this.#lastFolio, completedAt: new Date().toISOString() };
   }
 
   /**

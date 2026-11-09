@@ -1,32 +1,48 @@
 import { planPayments, type PlannedPayment } from '../../shared/payment-plan';
-import type { CheckoutSaleResult, PaymentRequest } from '../../shared/pos-api';
+import type { CheckoutSaleResult, PaymentRequest, ReprintResult } from '../../shared/pos-api';
+import { DeviceError } from '../hardware/device-error';
+import type { PrinterProvider } from '../hardware/printer-provider';
 import type { SaleStore } from '../local-store/sale-store';
 import { SaleNotFoundError } from '../local-store/sale-store';
 import type { SaleCheckout } from './sale-checkout';
 import type { SalePayment, SaleToSave } from './sale-recorder';
+import { renderTicket, formatFolio } from './ticket/ticket';
+import { toTicketData } from './ticket/ticket-data';
+
+type SaleReader = Pick<SaleStore, 'findPendingSale' | 'findLastCompletedSale' | 'markCompleted'>;
+
+/** What a reprint needs besides the sales. */
+export interface ReprintDependencies {
+  readonly printer: PrinterProvider;
+  /** The name printed at the top of the ticket. */
+  readonly businessName: () => string;
+}
 
 /**
  * Collects the sales the screen saved before charging (ADR 0010). It does not trust the screen: the payments are worked
  * out again here from the saved total, so a sale cannot complete with payments that do not add up (invariant 5).
  */
 export class SalePayments {
-  readonly #sales: Pick<SaleStore, 'findPendingSale' | 'markCompleted'>;
+  readonly #sales: SaleReader;
   readonly #checkout: Pick<SaleCheckout, 'checkout'>;
+  readonly #reprint: ReprintDependencies;
 
   /**
    * @param sales where the saved sales are read from and completed
    * @param checkout drives the drawer and the printer once the sale is completed
+   * @param reprint the printer and the business name, for printing a ticket again
    */
-  constructor(sales: Pick<SaleStore, 'findPendingSale' | 'markCompleted'>, checkout: Pick<SaleCheckout, 'checkout'>) {
+  constructor(sales: SaleReader, checkout: Pick<SaleCheckout, 'checkout'>, reprint: ReprintDependencies) {
     this.#sales = sales;
     this.#checkout = checkout;
+    this.#reprint = reprint;
   }
 
   /**
    * Completes a saved sale with what the customer handed over, opens the drawer if there was cash, and prints the ticket.
    *
    * @param request the sale and what the customer handed over
-   * @returns `completed` with the change, or `payment_refused` with nothing recorded
+   * @returns `completed` with the folio and the change, or `payment_refused` with nothing recorded
    * @throws SaleNotFoundError if the sale does not exist or is no longer pending
    */
   async checkout(request: PaymentRequest): Promise<CheckoutSaleResult> {
@@ -43,7 +59,7 @@ export class SalePayments {
       // Only a card can be declined, and this path never charges one.
       throw new Error(`Checkout of sale ${sale.saleId} was declined without a card: ${result.reason}`);
     }
-    return { status: 'completed', changeCents: result.changeCents, problems: result.problems };
+    return { status: 'completed', folio: formatFolio(result.folio), changeCents: result.changeCents, problems: result.problems };
   }
 
   /**
@@ -60,8 +76,35 @@ export class SalePayments {
     if (plan.status !== 'ready') {
       return { status: 'payment_refused', plan };
     }
-    this.#sales.markCompleted(sale.saleId, plan.payments.map(toSalePayment));
-    return { status: 'completed', changeCents: plan.changeCents, problems: [] };
+    const { folio } = this.#sales.markCompleted(sale.saleId, plan.payments.map(toSalePayment));
+    return { status: 'completed', folio: formatFolio(folio), changeCents: plan.changeCents, problems: [] };
+  }
+
+  /**
+   * Prints the ticket of the last completed sale again, marked as a reprint. The change is left out, because it is not
+   * kept and a reprint must not invent it.
+   *
+   * @returns `printed`, `no_sales` if nothing was completed yet, or `printer_failed` if the printer did not take it
+   */
+  async reprintLast(): Promise<ReprintResult> {
+    const last = this.#sales.findLastCompletedSale();
+    if (last === null) {
+      return { status: 'no_sales' };
+    }
+    const folio = formatFolio(last.folio);
+    const ticket = toTicketData(this.#reprint.businessName(), last.sale, {
+      folio: last.folio,
+      completedAt: last.completedAt,
+      payments: last.payments,
+      changeCents: null,
+      isReprint: true,
+    });
+    try {
+      await this.#reprint.printer.print(renderTicket(ticket));
+    } catch (error) {
+      return { status: 'printer_failed', folio, message: error instanceof DeviceError ? error.message : String(error) };
+    }
+    return { status: 'printed', folio };
   }
 
   #requirePending(saleId: string): SaleToSave {

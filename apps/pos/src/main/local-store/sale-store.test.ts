@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createFakeHardware } from '../hardware/fakes/fake-hardware';
 import { SaleCheckout } from '../checkout/sale-checkout';
-import { SaleAlreadyCompletedError, type CheckoutPayment, type SaleLineToSave, type SaleToSave } from '../checkout/sale-recorder';
+import { SaleAlreadyCompletedError, type CheckoutPayment, type CompletedSale, type SaleLineToSave, type SaleToSave } from '../checkout/sale-recorder';
 import { InvalidSaleTransitionError } from '../checkout/sale-state-machine';
 import { uuidV7 } from '../uuid-v7';
 import { LocalStore } from './local-store';
@@ -85,8 +85,8 @@ function runSql(sql: string, ...values: (string | number)[]): void {
   });
 }
 
-function payInCash(sale: SaleToSave, target: SaleStore = sales): void {
-  target.markCompleted(sale.saleId, [{ method: 'cash', amountCents: sale.totalCents, reference: null }]);
+function payInCash(sale: SaleToSave, target: SaleStore = sales): CompletedSale {
+  return target.markCompleted(sale.saleId, [{ method: 'cash', amountCents: sale.totalCents, reference: null }]);
 }
 
 function pendingIds(): string[] {
@@ -322,6 +322,124 @@ describe('completing a sale with several payments (RF-015)', () => {
   });
 });
 
+describe('the short folio of a sale (RF-018)', () => {
+  it('gives each completed sale the next number, starting at 1', () => {
+    const first = aSale();
+    const second = aSale();
+    sales.savePendingPayment(first);
+    sales.savePendingPayment(second);
+
+    const firstDone = payInCash(first);
+    const secondDone = payInCash(second);
+
+    expect([firstDone.folio, secondDone.folio]).toEqual([1, 2]);
+    expect(firstDone.completedAt).toEqual(expect.any(String));
+    expect(rows('SELECT folio FROM sale ORDER BY folio')).toEqual([{ folio: 1 }, { folio: 2 }]);
+  });
+
+  it('leaves no gap when a sale is cancelled, because only completed sales get a folio', () => {
+    const cancelled = aSale();
+    const kept = aSale();
+    sales.savePendingPayment(cancelled);
+    sales.savePendingPayment(kept);
+    sales.cancel(cancelled.saleId);
+
+    expect(payInCash(kept).folio).toBe(1);
+    expect(row('SELECT folio FROM sale WHERE id = ?', cancelled.saleId)?.folio).toBeNull();
+  });
+
+  it('numbers each business on its own', () => {
+    const other = new SaleStore(store, OTHER_TENANT);
+    const mine = aSale();
+    const theirs = aSale();
+    sales.savePendingPayment(mine);
+    other.savePendingPayment(theirs);
+
+    expect(payInCash(mine).folio).toBe(1);
+    expect(payInCash(theirs, other).folio).toBe(1);
+  });
+
+  it('keeps counting after the register restarts', () => {
+    const first = aSale();
+    sales.savePendingPayment(first);
+    payInCash(first);
+    store.close();
+    openStore();
+    const second = aSale();
+    sales.savePendingPayment(second);
+
+    expect(payInCash(second).folio).toBe(2);
+  });
+
+  it('is refused by the database when a sale is completed without one', () => {
+    const sale = aSale();
+    sales.savePendingPayment(sale);
+    runSql(
+      `INSERT INTO payment (id, tenant_id, sale_id, method, amount_cents, recorded_at)
+       VALUES (?, ?, ?, 'cash', ?, '2026-11-08T00:00:00.000Z')`,
+      uuidV7(),
+      TENANT,
+      sale.saleId,
+      sale.totalCents,
+    );
+
+    expect(() => runSql("UPDATE sale SET status = 'completed' WHERE id = ?", sale.saleId)).toThrow('needs its folio');
+  });
+
+  it('is refused by the database when it changes, or repeats', () => {
+    const first = aSale();
+    const second = aSale();
+    sales.savePendingPayment(first);
+    sales.savePendingPayment(second);
+    payInCash(first);
+
+    expect(() => runSql('UPDATE sale SET folio = 9 WHERE id = ?', first.saleId)).toThrow();
+    expect(() => runSql('UPDATE sale SET folio = 1 WHERE id = ?', second.saleId)).toThrow(/UNIQUE/);
+  });
+});
+
+describe('reading the last completed sale (reprint)', () => {
+  it('finds nothing when no sale was completed, and ignores pending and cancelled ones', () => {
+    const pending = aSale();
+    const cancelled = aSale();
+    sales.savePendingPayment(pending);
+    sales.savePendingPayment(cancelled);
+    sales.cancel(cancelled.saleId);
+
+    expect(sales.findLastCompletedSale()).toBeNull();
+  });
+
+  it('gives the sale with its folio, its time, and its payments in the order they were recorded', () => {
+    const older = aSale();
+    const newer = aSale();
+    sales.savePendingPayment(older);
+    sales.savePendingPayment(newer);
+    payInCash(older);
+    const done = sales.markCompleted(newer.saleId, [
+      { method: 'transfer', amountCents: 5694, reference: 'SPEI-778812' },
+      { method: 'cash', amountCents: 10000, reference: null },
+    ]);
+
+    expect(sales.findLastCompletedSale()).toEqual({
+      folio: 2,
+      completedAt: done.completedAt,
+      sale: newer,
+      payments: [
+        { method: 'transfer', amountCents: 5694, reference: 'SPEI-778812' },
+        { method: 'cash', amountCents: 10000, reference: null },
+      ],
+    });
+  });
+
+  it('does not read the sales of another business', () => {
+    const sale = aSale();
+    sales.savePendingPayment(sale);
+    payInCash(sale);
+
+    expect(new SaleStore(store, OTHER_TENANT).findLastCompletedSale()).toBeNull();
+  });
+});
+
 describe('reading a pending sale back', () => {
   it('rebuilds what was saved, so a ticket can be printed from it', () => {
     const sale = aSale();
@@ -554,7 +672,7 @@ describe('the database itself refuses what the rules forbid', () => {
     const sale = savedSale();
     insertPayment(sale.saleId, 100);
 
-    expect(() => runSql("UPDATE sale SET status = 'completed' WHERE id = ?", sale.saleId)).toThrow('must add up to its total');
+    expect(() => runSql("UPDATE sale SET status = 'completed', folio = 1 WHERE id = ?", sale.saleId)).toThrow('must add up to its total');
   });
 
   it('refuses to change a completed sale', () => {

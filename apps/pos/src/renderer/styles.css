@@ -808,6 +808,17 @@ kbd {
   font-size: 2.5rem;
 }
 
+.payment-folio {
+  font-size: 1.25rem;
+  color: var(--ink-soft);
+}
+
+.notice-info {
+  color: var(--ink);
+  background: var(--ground);
+  border-left-color: var(--accent);
+}
+
 .payment-actions,
 .payment-done {
   display: flex;

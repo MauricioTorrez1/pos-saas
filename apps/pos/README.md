@@ -1,6 +1,6 @@
 # Register app
 
-Desktop register built with Electron, React, and TypeScript, using [electron-vite](https://electron-vite.org/) on top of Vite. It keeps its local database up to date and rings up a sale from the keyboard: a scan or a search by name adds a product and updates the totals with VAT. F12 collects the sale with cash, a transfer, or both, and shows the change. A sale left unfinished by a power cut comes back when the register starts. The real printer, drawer, and card terminal arrive in the next tasks of the [roadmap](../../docs/plan/04-roadmap.md).
+Desktop register built with Electron, React, and TypeScript, using [electron-vite](https://electron-vite.org/) on top of Vite. It keeps its local database up to date and rings up a sale from the keyboard: a scan or a search by name adds a product and updates the totals with VAT. F12 collects the sale with cash, a transfer, or both, shows the change, and prints the ticket. A sale left unfinished by a power cut comes back when the register starts. The real drawer and card terminal arrive in the next tasks of the [roadmap](../../docs/plan/04-roadmap.md).
 
 Electron 45 runs on Windows 10 and later, which covers the machines of [ADR 0002](../../docs/adr/0002-caja-electron.md).
 
@@ -76,7 +76,18 @@ F12 saves the sale as pending and opens the payment screen. If the catalog chang
 
 Transfers are exact, because a bank gives no change, so the change always comes out of the cash. A cash payment is recorded for what it paid of the sale, not for what the customer handed over, so the payments of a sale always add up to its total. A transfer without its reference is refused by the screen, by the main process, and by the database. The main process works the payments out again from the saved total, so the screen cannot make a sale complete with the wrong amounts.
 
-After collecting, the change stays on the screen until the cashier presses Enter or Esc.
+After collecting, the screen shows the folio and the change until the cashier presses Enter or Esc. F8 prints the last ticket again, here or on the sale screen.
+
+## Ticket
+Every completed sale gets a short folio such as `T1-000123`, assigned inside the transaction that completes it, so cancelled sales leave no gap. The ticket shows the business, the folio, the date, each product with its quantity and unit price, the base, the VAT of each rate, the total, each payment, and the change. A reprint says REIMPRESIÓN and leaves the change out, because it is not kept ([ADR 0027](../../docs/adr/0027-ticket-escpos-y-folio-corto.md)).
+
+To print on a real printer, share it in Windows and start the register with its name:
+
+```bash
+pnpm --filter @pos-saas/pos start
+```
+
+with the variable `POS_PRINTER_SHARE` set to the shared printer, such as `\\localhost\TM-T20`. Without it the register sells normally and prints nothing, because a missing printer must never stop a sale.
 
 ## Appearance
 F9 opens the dialog where the owner sets the business name, one of six colors, one of three text sizes, and the light or dark theme. Changes show at once and stay only when saved, and Esc undoes them. The stylesheet takes everything from a few tokens, driven by three attributes on the page, and a test checks that the text of every color and theme keeps a contrast of at least 4.5:1.
@@ -95,7 +106,7 @@ The screen never gives orders to a device. It will ask the main process for a bu
 
 `SaleCheckout` follows [ADR 0010](../../docs/adr/0010-guardar-antes-de-cobrar.md): it saves the sale as pending, charges the card if there is one, marks the sale completed, opens the drawer for cash, and prints the ticket. If the sale cannot be saved, nothing is charged. A declined card leaves the sale pending, so the cashier can try another method. Once the sale is completed, a failing drawer or printer becomes a problem to show, never an error, so the screen cannot mistake a completed sale for a failed one and charge again.
 
-The register already runs `SaleCheckout` through the bridge (`checkoutSale`), but with the fakes: the drawer does not really open and no ticket prints. The real printer and drawer arrive with E1-13 and E1-14, the manual scale with E1-08, and the manual card terminal with E1-12.
+The register runs `SaleCheckout` through the bridge (`checkoutSale`). The ticket printer is real when `POS_PRINTER_SHARE` is set (`WindowsSharedPrinter`), and the drawer is still a fake until E1-14. The manual scale arrives with E1-08, and the manual card terminal with E1-12.
 
 ## Local database
 The register keeps its data in `pos.db`, in the user data folder of the app (`%APPDATA%\@pos-saas\pos` on Windows), never in the repository. `LocalStore`, in `src/main/local-store/`, is the only code that talks to SQLite, through the `node:sqlite` module that ships with Electron ([ADR 0021](../../docs/adr/0021-sqlite-de-la-caja.md)).

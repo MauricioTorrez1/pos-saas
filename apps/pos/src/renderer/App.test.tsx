@@ -21,7 +21,7 @@ const CABLE: CatalogProduct = {
 };
 
 const HAMMER_CODE = '2000000000107';
-const COMPLETED: CheckoutSaleResult = { status: 'completed', changeCents: 0, problems: [] };
+const COMPLETED: CheckoutSaleResult = { status: 'completed', folio: 'T1-000001', changeCents: 0, problems: [] };
 
 beforeAll(() => {
   // jsdom has no modal dialogs.
@@ -44,6 +44,7 @@ function fakePosApi(overrides: Partial<PosApi> = {}): PosApi {
     saveAppearance: () => Promise.resolve(),
     savePendingSale: () => Promise.resolve({ status: 'catalog_changed' }),
     checkoutSale: () => Promise.resolve(COMPLETED),
+    reprintLastTicket: () => Promise.resolve({ status: 'no_sales' }),
     listPendingSales: () => Promise.resolve([]),
     confirmPendingSale: () => Promise.resolve(COMPLETED),
     cancelPendingSale: () => Promise.resolve(),
@@ -678,7 +679,7 @@ describe('checkout', () => {
   });
 
   it('shows the change while the cashier types the cash, and collects with F2 (RF-014)', async () => {
-    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve({ status: 'completed', changeCents: 8400, problems: [] }));
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve({ status: 'completed', folio: 'T1-000001', changeCents: 8400, problems: [] }));
     render(<App posApi={posApiThatSaves({ checkoutSale })} />);
     const dialog = await openCheckout();
     await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('Efectivo recibido'));
@@ -695,7 +696,7 @@ describe('checkout', () => {
   });
 
   it('starts a new sale when the cashier has seen the change', async () => {
-    render(<App posApi={posApiThatSaves({ checkoutSale: () => Promise.resolve({ status: 'completed', changeCents: 8400, problems: [] }) })} />);
+    render(<App posApi={posApiThatSaves({ checkoutSale: () => Promise.resolve({ status: 'completed', folio: 'T1-000001', changeCents: 8400, problems: [] }) })} />);
     await openCheckout();
     typeInto('Efectivo recibido', '200');
     pressKey('F2');
@@ -819,7 +820,7 @@ describe('checkout', () => {
   });
 
   it('reports a device that failed after the sale was collected, without calling the sale a failure', async () => {
-    const result: CheckoutSaleResult = { status: 'completed', changeCents: 0, problems: [{ device: 'printer', message: 'Sin papel' }] };
+    const result: CheckoutSaleResult = { status: 'completed', folio: 'T1-000001', changeCents: 0, problems: [{ device: 'printer', message: 'Sin papel' }] };
     render(<App posApi={posApiThatSaves({ checkoutSale: () => Promise.resolve(result) })} />);
     const dialog = await openCheckout();
     typeInto('Efectivo recibido', '116');
@@ -843,6 +844,66 @@ describe('checkout', () => {
 
     await screen.findByRole('status', { name: 'Cambio a entregar', hidden: true });
     expect(checkoutSale).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('reprinting the last ticket', () => {
+  function pressKey(key: string): void {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key });
+  }
+
+  it('shows the folio when a sale is collected, and reprints it from there with F8', async () => {
+    const reprintLastTicket = vi.fn<PosApi['reprintLastTicket']>(() => Promise.resolve({ status: 'printed', folio: 'T1-000001' }));
+    const saved: PendingSale = { id: 'saved-sale', occurredAt: '2026-11-08T20:05:00.000Z', totalCents: 11600, lines: [] };
+    render(<App posApi={fakePosApi({ savePendingSale: () => Promise.resolve({ status: 'saved', sale: saved }), reprintLastTicket })} />);
+    await addByCode();
+    press('F12');
+    await screen.findByRole('textbox', { name: 'Efectivo recibido', hidden: true });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Efectivo recibido', hidden: true }), { target: { value: '116' } });
+    pressKey('F2');
+
+    const dialog = await screen.findByRole('dialog', { name: 'Venta cobrada', hidden: true });
+    expect(dialog.textContent).toContain('Folio T1-000001');
+    pressKey('F8');
+
+    await waitFor(() => expect(dialog.textContent).toContain('Ticket T1-000001 reimpreso.'));
+    expect(reprintLastTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it('reprints from the sale screen with F8', async () => {
+    const reprintLastTicket = vi.fn<PosApi['reprintLastTicket']>(() => Promise.resolve({ status: 'printed', folio: 'T1-000007' }));
+    render(<App posApi={fakePosApi({ reprintLastTicket })} />);
+
+    press('F8');
+
+    expect((await screen.findByText('Ticket T1-000007 reimpreso.')).textContent).toBeDefined();
+  });
+
+  it('says so when there is nothing to reprint', async () => {
+    render(<App posApi={fakePosApi()} />);
+
+    press('F8');
+
+    expect(await screen.findByText('Todavía no hay ventas cobradas para reimprimir.')).toBeDefined();
+  });
+
+  it('says why when the printer fails, and that the sale is safe', async () => {
+    const result = { status: 'printer_failed', folio: 'T1-000003', message: 'Sin papel' } as const;
+    render(<App posApi={fakePosApi({ reprintLastTicket: () => Promise.resolve(result) })} />);
+
+    press('F8');
+
+    const message = await screen.findByText(/No se pudo imprimir el ticket T1-000003/);
+    expect(message.textContent).toContain('Sin papel');
+    expect(message.textContent).toContain('La venta quedó registrada');
+  });
+
+  it('says so when the register cannot even ask', async () => {
+    render(<App posApi={fakePosApi({ reprintLastTicket: () => Promise.reject(new Error('closed')) })} />);
+
+    press('F8');
+
+    expect(await screen.findByText(/No se pudo reimprimir el ticket/)).toBeDefined();
   });
 });
 

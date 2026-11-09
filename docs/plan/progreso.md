@@ -3,7 +3,7 @@
 Actualizado: 2026-11-08. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** ninguna.
+- **Tarea en curso:** E1-13, en revisión.
 - **Siguiente:** la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-13 y E1-14, tras E1-11, que ya está terminada. F0-08 y las demás se retoman después.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
@@ -47,6 +47,14 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
   3. Una venta pagada con $100 en efectivo y un billete de más: el cambio debe salir del efectivo, nunca de la transferencia.
   4. Escanear con el lector estando en el cobro. El Enter del lector no debe cobrar nada.
   5. Pedirle a alguien de la tienda que cobre sin explicarle nada y anotar dónde se atoró (RNF-13).
+- **Imprimir un ticket real (E1-13, RF-018).** Las pruebas automáticas comparan bytes, no papel. Con la TM-T20 conectada y compartida en Windows con un nombre sin espacios (por ejemplo TM-T20):
+  1. Abrir la caja con la variable POS_PRINTER_SHARE en \\localhost\TM-T20 y corepack pnpm --filter @pos-saas/pos start.
+  2. Cobrar una venta con un cable de 3.275 m y un martillo, pagada con $200. Revisar que el ticket diga el nombre del negocio, el folio, la fecha, las dos líneas con su precio, el IVA, el total, el efectivo y el cambio, y que las eñes y los acentos salgan bien.
+  3. Revisar que el papel se corte después del mensaje de agradecimiento y que ningún renglón se parta.
+  4. Oprimir F8. Debe salir el mismo ticket con REIMPRESIÓN y sin cambio.
+  5. Quitar el papel, cobrar otra venta y confirmar que se registra con un aviso. Poner el papel y reimprimir con F8.
+  6. Anotar si la ruta \\localhost\... no funciona, para cambiar WindowsSharedPrinter antes del piloto.
+
 ## Fase 0
 | Tarea | Título | Horas | Estado |
 | --- | --- | --- | --- |
@@ -91,7 +99,7 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | E1-10 | Máquina de estados de la venta | 5 | Terminada |
 | E1-11 | Efectivo, transferencia y pago mixto | 5 | Terminada |
 | E1-12 | Tarjeta tecleada con folio | 2 | Pendiente |
-| E1-13 | Ticket ESC/POS | 5 | Pendiente |
+| E1-13 | Ticket ESC/POS | 5 | En revisión |
 | E1-14 | Cajón y prueba de hardware | 3 | Pendiente |
 | E1-15 | Devoluciones | 6 | Pendiente |
 | E1-16 | Envío desde la caja | 5 | Pendiente |
@@ -274,3 +282,4 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | 2026-11-08 | E1-11 en revisión, en modo automático. ADR 0026: los pagos suman siempre el total (el efectivo guarda lo que pagó, no lo que entregó el cliente), una sola regla (planPayments) decide en la pantalla y otra vez en el proceso principal, y la base rechaza un método desconocido o una transferencia sin referencia (migración 5). F12 guarda la venta antes de abrir el cobro, F2 cobra, Enter solo pasa al siguiente campo para que el Enter del lector no cobre, y Esc cancela la venta guardada. La recuperación ya pregunta con qué se pagó. En local, 393 pruebas en Vitest de la caja (antes 298) y 35 con Playwright (antes 28), incluida una que mata la caja dentro del cobro y registra el pago mixto al reabrir. Cajón e impresora siguen con los falsos. Las compras simuladas quedaron en «Pendientes de Mauricio antes del piloto». CI todavía no corre | Abrir el PR, repetir la rotura en CI y fusionar |
 | 2026-11-08 | E1-11 sigue en revisión, con el PR 22 abierto. En CI, los diez checks en verde en `5e9004a`, con `TypeScript` en 69 segundos. Con la comprobación de pago incompleto desactivada (`23270d7`), `TypeScript` quedó en rojo en 42 segundos y los otros nueve en verde. Sin la rotura, los diez volvieron a verde en `e431605`, con `TypeScript` en 63 segundos | Fusionar el PR 22 |
 | 2026-11-08 | E1-11 terminada. PR 22 fusionado con squash en `2b78050` con `gh pr merge`, con el título revisado. La caja ya cobra con efectivo, transferencia o ambos, muestra el cambio y la recuperación pregunta con qué se pagó. Cajón e impresora siguen con los falsos hasta E1-14 y E1-13. Las compras simuladas siguen pendientes, antes del piloto. Mauricio pidió simplificar: ya no se entregan preguntas de autoevaluación al cerrar cada tarea, y el CI corre en paralelo con la siguiente tarea. También pidió imágenes de producto y vista previa de coincidencias al buscar por código o nombre, que queda como tarea nueva | Empezar E1-13 en una sesión nueva |
+| 2026-11-08 | E1-13 en revisión, en modo automático. ADR 0027: EscPosBuilder arma los bytes (página 858 para acentos y eñes, y el texto nunca lleva comandos), layoutTicket pone 48 columnas, y el folio corto T1-000123 se asigna dentro de la transacción que completa la venta, sin huecos y con la base exigiéndolo (migración 6). F8 reimprime la última venta marcada REIMPRESIÓN y sin cambio. WindowsSharedPrinter imprime en una impresora compartida de Windows si existe POS_PRINTER_SHARE, y si no, la caja vende sin imprimir. En local, 446 pruebas en Vitest de la caja (antes 393) y 36 con Playwright (antes 35). Probar con la TM-T20 real quedó en «Pendientes de Mauricio antes del piloto». CI todavía no corre | Abrir el PR y fusionar |
