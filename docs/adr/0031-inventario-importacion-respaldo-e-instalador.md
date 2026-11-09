@@ -37,3 +37,4 @@ Para sustituir a Eleventa la caja necesita productos y existencias reales, saber
 - No hay actualización automática: actualizar es instalar el nuevo `.exe` encima. Si falla, se vuelve a instalar la versión anterior, y los datos siguen en su lugar.
 - El kardex, los ajustes y mermas (E1-26, E1-27) y el costo promedio (E1-28) se apoyan en este libro.
 - Probar el instalador en la computadora de la tienda con Windows 10 y restaurar un respaldo de verdad quedan en la lista de pendientes antes del piloto.
+- Dos versiones de `minimatch` que trae `electron-builder` tenían el aviso GHSA-g3hv-75wg-m249 (corregido en 11.0.1). Solo sirven para empaquetar y no viajan en la caja. `pnpm-workspace.yaml` las sube a 11.0.1 con `overrides`, y el empaquetado se probó después. Si `electron-builder` publica una versión que ya las trae corregidas, se puede quitar el `override`.

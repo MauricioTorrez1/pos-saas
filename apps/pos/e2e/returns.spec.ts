@@ -132,8 +132,11 @@ test('the refund leaves the drawer: the cut expects less cash after a cash retur
   await page.getByRole('textbox', { name: 'Motivo de la devolución' }).fill('Ya no lo quiere');
   await page.keyboard.press('F2');
   await expect(page.getByRole('status', { name: 'Lo que se entrega' })).toHaveText('Entrega $116.00 en efectivo');
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  // The keys of the finished return start working a moment after it shows, so Enter is retried until the dialog closes.
+  await expect(async () => {
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 1000 });
+  }).toPass();
 
   await page.keyboard.press('F3');
   await expect(page.getByRole('heading', { name: 'Caja abierta' })).toBeVisible();

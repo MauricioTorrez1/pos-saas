@@ -397,5 +397,7 @@ async function openCashIfClosed(page: Page): Promise<void> {
     await page.keyboard.press('F2');
     await expect(state).toHaveText('Caja abierta');
     await expect(page.getByRole('dialog')).toHaveCount(0);
+    // The keyboard comes back to the lookup box a moment later, and a scan typed before that would be lost.
+    await expect(page.getByRole('combobox', { name: 'Buscar producto' })).toBeFocused();
   }
 }
