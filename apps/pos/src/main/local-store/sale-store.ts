@@ -13,6 +13,7 @@ import {
   type SaleToSave,
 } from '../checkout/sale-recorder';
 import { assertSaleTransition, InvalidSaleTransitionError, type SaleStatus } from '../checkout/sale-state-machine';
+import { INSERT_STOCK_MOVEMENT_SQL, postWith } from '../inventory/stock-store';
 import { uuidV7 } from '../uuid-v7';
 import type { LocalStore } from './local-store';
 
@@ -95,6 +96,8 @@ export class SaleStore implements SaleRecorder {
   readonly #insertPayment: StatementSync;
   readonly #resolve: StatementSync;
   readonly #complete: StatementSync;
+  readonly #insertStock: StatementSync;
+  readonly #stockLines: StatementSync;
   readonly #nextFolio: StatementSync;
   readonly #findLastCompleted: StatementSync;
   readonly #paymentsOf: StatementSync;
@@ -145,6 +148,8 @@ export class SaleStore implements SaleRecorder {
     this.#complete = store.prepare(`
       UPDATE sale SET status = 'completed', resolved_at = ?, folio = ? WHERE tenant_id = ? AND id = ?
     `);
+    this.#insertStock = store.prepare(INSERT_STOCK_MOVEMENT_SQL);
+    this.#stockLines = store.prepare('SELECT id, product_id, quantity_milli FROM sale_line WHERE tenant_id = ? AND sale_id = ?');
     this.#nextFolio = store.prepare('SELECT coalesce(max(folio), 0) + 1 AS next FROM sale WHERE tenant_id = ?');
     this.#findLastCompleted = store.prepare(`
       SELECT id, idempotency_key, subtotal_cents, tax_cents, total_cents, folio, resolved_at FROM sale
@@ -190,6 +195,13 @@ export class SaleStore implements SaleRecorder {
       // The folio is taken inside the transaction that completes the sale, so two sales never get the same one.
       const { next: folio } = this.#nextFolio.get(this.#tenantId) as unknown as { next: number };
       this.#complete.run(completedAt, folio, this.#tenantId, saleId);
+      // The sale takes its products out of the stock in the same transaction, so one never exists without the other.
+      const lines = this.#stockLines.all(this.#tenantId, saleId) as unknown as { id: string; product_id: string; quantity_milli: number }[];
+      postWith(
+        this.#insertStock,
+        this.#tenantId,
+        lines.map((line) => ({ productId: line.product_id, type: 'sale', quantityMilli: -line.quantity_milli, source: 'sale_line', sourceId: line.id })),
+      );
       return { folio, completedAt };
     });
   }
