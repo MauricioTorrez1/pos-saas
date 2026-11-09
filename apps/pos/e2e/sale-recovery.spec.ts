@@ -55,7 +55,7 @@ function lookupBox(page: Page): Locator {
   return page.getByRole('combobox', { name: 'Buscar producto' });
 }
 
-/** Saves a sale through the bridge, as the payment screen of E1-11 will. The key comes from the screen itself. */
+/** Saves a sale through the bridge, as the payment screen does. The key comes from the screen itself. */
 async function savePendingSale(page: Page, code: string, totalCents: number): Promise<void> {
   const status = await page.evaluate(
     async ({ barcode, quantityMilli, expectedTotalCents }) => {
@@ -112,6 +112,9 @@ test('shows a pending sale after the register is killed, and confirms it', async
   expect(whilePending).toEqual({ sales: [{ status: 'pending_payment', total_cents: HAMMER_CENTS }], payments: [], countedSales: 0 });
 
   await page.keyboard.press('F2');
+  await expect(question(page).getByRole('heading', { name: '¿Con qué se pagó?' })).toBeVisible();
+  await page.keyboard.type('116');
+  await page.keyboard.press('F2');
 
   await expect(question(page)).toHaveCount(0);
   await expect(lookupBox(page)).toBeFocused();
@@ -151,6 +154,9 @@ test('goes through several pending sales, oldest first, using only the keyboard'
   await expect(question(page)).toContainText('Martillo uña curva 16 oz');
   await expect(question(page)).toContainText('Quedan 2 ventas por revisar');
 
+  await page.keyboard.press('F2');
+  await expect(question(page).getByRole('heading', { name: '¿Con qué se pagó?' })).toBeVisible();
+  await page.keyboard.type('116');
   await page.keyboard.press('F2');
   await expect(question(page)).toContainText('Desarmador plano');
   await expect(question(page)).not.toContainText('por revisar');

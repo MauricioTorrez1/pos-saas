@@ -1,9 +1,22 @@
 import type { LineTotals, Quantity } from '@pos-saas/money';
 
-/** How a sale was paid, as the register records it. A card payment keeps its authorization code, never card data. */
-export type RecordedPayment =
-  | { readonly method: 'cash' }
-  | { readonly method: 'card'; readonly authorizationCode: string };
+/** How a customer can pay. A card payment keeps its authorization code, never card data. */
+export const PAYMENT_METHODS = ['cash', 'transfer', 'card'] as const;
+
+/** One of the ways to pay. */
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+/**
+ * One part of what a sale was paid with. The amounts of all the parts add up to the total of the sale, so a cash part
+ * is what the cash paid and never what the customer handed over (the change is not part of the sale).
+ */
+export interface SalePayment {
+  readonly method: PaymentMethod;
+  /** What this part paid, in cents. Always positive. */
+  readonly amountCents: number;
+  /** The reference of a transfer or the authorization code of a card. Cash has none. */
+  readonly reference: string | null;
+}
 
 /** One product of a sale. It keeps its name and price, so the sale reads the same after the catalog changes. */
 export interface SaleLineToSave {
@@ -33,9 +46,20 @@ export interface SaleToSave {
   readonly totalCents: number;
 }
 
+/** How the customer pays one attempt: at the counter with cash and transfers, or on the card terminal. */
+export type CheckoutPayment =
+  | {
+      readonly kind: 'in_person';
+      /** The parts, which must add up to the total. */
+      readonly payments: readonly SalePayment[];
+      /** Cash to give back, for the ticket and the screen. */
+      readonly changeCents: number;
+    }
+  | { readonly kind: 'card' };
+
 /** The sale as checkout needs it: what gets saved, and how the customer pays this attempt. */
 export interface SaleToCheckout extends SaleToSave {
-  readonly paymentMethod: RecordedPayment['method'];
+  readonly payment: CheckoutPayment;
 }
 
 /** A sale that was already completed. Checking it out again could charge the customer twice. */
@@ -62,10 +86,10 @@ export interface SaleRecorder {
   savePendingPayment(sale: SaleToSave): void;
 
   /**
-   * Marks a pending sale as `completed`, with its payment.
+   * Marks a pending sale as `completed`, with all its payments in the same transaction.
    *
    * @param saleId the sale that was paid
-   * @param payment how it was paid
+   * @param payments the parts it was paid with, which must add up to its total
    */
-  markCompleted(saleId: string, payment: RecordedPayment): void;
+  markCompleted(saleId: string, payments: readonly SalePayment[]): void;
 }

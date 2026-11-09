@@ -54,18 +54,6 @@ export class PendingSales {
   }
 
   /**
-   * Completes a pending sale that was paid, with a cash payment for its whole total. Cash is the only method the
-   * register can take until E1-11.
-   *
-   * @param saleId the sale
-   * @throws SaleNotFoundError if the sale does not exist
-   * @throws InvalidSaleTransitionError if the sale is not pending
-   */
-  confirm(saleId: string): void {
-    this.#sales.markCompleted(saleId, { method: 'cash' });
-  }
-
-  /**
    * Cancels a pending sale that was not paid.
    *
    * @param saleId the sale

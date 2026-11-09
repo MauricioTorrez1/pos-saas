@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { PendingSale, PosApi } from '../../shared/pos-api';
+import type { EnteredPayment } from '../checkout/PaymentForm';
 
-/** What the cashier says about a sale that was left pending. */
-export type PendingSaleAnswer = 'confirm' | 'cancel';
+/** What the cashier says about a sale that was left pending: how it was paid, or that it was not paid. */
+export type PendingSaleAnswer =
+  | { readonly kind: 'confirm'; readonly payment: EnteredPayment }
+  | { readonly kind: 'cancel' };
 
 /** The sales waiting for an answer. */
 export interface PendingSalesReview {
@@ -31,7 +34,14 @@ export function usePendingSales(posApi: PosApi): PendingSalesReview {
 
   const answer = useCallback(
     async (saleId: string, choice: PendingSaleAnswer): Promise<void> => {
-      await (choice === 'confirm' ? posApi.confirmPendingSale(saleId) : posApi.cancelPendingSale(saleId));
+      if (choice.kind === 'confirm') {
+        const result = await posApi.confirmPendingSale({ saleId, ...choice.payment });
+        if (result.status !== 'completed') {
+          throw new Error('The main process refused a payment that the screen thought was valid');
+        }
+      } else {
+        await posApi.cancelPendingSale(saleId);
+      }
       setSales((current) => current.filter(({ id }) => id !== saleId));
     },
     [posApi],

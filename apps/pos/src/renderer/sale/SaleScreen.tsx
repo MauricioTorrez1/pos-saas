@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
 
-import { MAX_LOOKUP_TEXT_LENGTH, type CatalogProduct, type PosApi } from '../../shared/pos-api';
+import { MAX_LOOKUP_TEXT_LENGTH, type CatalogProduct, type PendingSale, type PosApi } from '../../shared/pos-api';
+import { CheckoutDialog } from '../checkout/CheckoutDialog';
 import { SaleLines } from './SaleLines';
 import { EMPTY_SALE, saleReducer } from './sale-state';
 import { SaleSummary } from './SaleSummary';
@@ -9,6 +10,11 @@ import { SearchResults, resultOptionId, SEARCH_RESULTS_ID } from './SearchResult
 import { useProductSearch } from './use-product-search';
 
 const CATALOG_FAILURE = 'No se pudo consultar el catálogo. Intenta de nuevo y, si sigue fallando, reinicia la caja.';
+
+const EMPTY_SALE_MESSAGE = 'Agrega al menos un producto para cobrar.';
+const CATALOG_CHANGED =
+  'El catálogo cambió mientras armabas la venta, y un precio o un producto ya no es el que ves. No se cobró nada. Quita los productos y vuelve a agregarlos para ver los precios nuevos.';
+const SAVE_FAILURE = 'No se pudo guardar la venta. No se cobró nada. Intenta de nuevo y, si sigue fallando, reinicia la caja.';
 
 function notFoundMessage(text: string): string {
   return `No encontramos «${text}». Revisa el código o busca el producto por nombre.`;
@@ -38,16 +44,54 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
+  const [savedSale, setSavedSale] = useState<PendingSale | null>(null);
+  const isSaving = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const showCatalogFailure = useCallback(() => setNotice(CATALOG_FAILURE), []);
   const search = useProductSearch(posApi, showCatalogFailure);
 
   useEffect(() => {
-    if (!isKeyboardElsewhere) {
+    if (!isKeyboardElsewhere && savedSale === null) {
       inputRef.current?.focus();
     }
-  }, [isKeyboardElsewhere]);
+  }, [isKeyboardElsewhere, savedSale]);
+
+  // The sale is saved before the payment screen opens, so a power cut while charging leaves it to recover (ADR 0010).
+  const startCheckout = async (): Promise<void> => {
+    if (sale.lines.length === 0) {
+      setNotice(EMPTY_SALE_MESSAGE);
+      return;
+    }
+    if (isSaving.current || isKeyboardElsewhere) {
+      return;
+    }
+    isSaving.current = true;
+    try {
+      const result = await posApi.savePendingSale({
+        idempotencyKey: crypto.randomUUID(),
+        lines: sale.lines.map((line) => ({ productId: line.product.id, quantityMilli: line.quantity.milli })),
+        expectedTotalCents: sale.totals.totalCents,
+      });
+      if (result.status === 'saved') {
+        setSavedSale(result.sale);
+      } else {
+        setNotice(CATALOG_CHANGED);
+      }
+    } catch {
+      setNotice(SAVE_FAILURE);
+    } finally {
+      isSaving.current = false;
+    }
+  };
+
+  const finishCheckout = (wasCollected: boolean): void => {
+    setSavedSale(null);
+    if (wasCollected) {
+      dispatch({ type: 'clear' });
+      setNotice(null);
+    }
+  };
 
   const clearLookup = (): void => {
     if (inputRef.current !== null) {
@@ -161,6 +205,10 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
         event.preventDefault();
         onOpenAppearance();
         return;
+      case 'F12':
+        event.preventDefault();
+        void startCheckout();
+        return;
       default:
         if (isPrintableKey(event)) {
           detector.recordCharacter(event.timeStamp);
@@ -236,6 +284,7 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance }: Sa
         <SaleLines lines={sale.lines} selectedProductId={sale.selectedProductId} onSelect={handleSelectLine} />
       </section>
       <SaleSummary lineCount={sale.lines.length} totals={sale.totals} />
+      {savedSale !== null && <CheckoutDialog posApi={posApi} sale={savedSale} onFinished={finishCheckout} />}
     </main>
   );
 }

@@ -1,6 +1,7 @@
 import type { Quantity, TaxRate, Unit } from '@pos-saas/money';
 
 import type { Appearance } from './appearance';
+import type { PaymentPlan } from './payment-plan';
 
 /** Channels between the preload bridge and the main process. */
 export const IPC_CHANNELS = {
@@ -10,6 +11,7 @@ export const IPC_CHANNELS = {
   getAppearance: 'appearance:get',
   saveAppearance: 'appearance:save',
   savePendingSale: 'sales:save-pending',
+  checkoutSale: 'sales:checkout',
   listPendingSales: 'sales:list-pending',
   confirmPendingSale: 'sales:confirm-pending',
   cancelPendingSale: 'sales:cancel-pending',
@@ -74,6 +76,37 @@ export type SavePendingSaleResult =
   /** A product no longer exists or its price changed, so the screen shows a sale that does not match. Nothing was saved. */
   | { readonly status: 'catalog_changed' };
 
+/** What the customer handed over for a saved sale. The main process works out the payments and the change itself. */
+export interface PaymentRequest {
+  /** UUIDv7 of the saved sale. */
+  readonly saleId: string;
+  /** All the cash received, in cents. 0 if nothing was paid in cash. */
+  readonly cashReceivedCents: number;
+  readonly transfers: readonly {
+    /** What the transfer paid, in cents. */
+    readonly amountCents: number;
+    /** The reference the bank gave. */
+    readonly reference: string;
+  }[];
+}
+
+/** A device that failed after the sale was completed. The sale stands. */
+export interface CheckoutProblem {
+  readonly device: string;
+  readonly message: string;
+}
+
+/** How a request to collect a sale ended. */
+export type CheckoutSaleResult =
+  | {
+      readonly status: 'completed';
+      /** Cash to give back, in cents. */
+      readonly changeCents: number;
+      readonly problems: readonly CheckoutProblem[];
+    }
+  /** What was handed over does not complete the sale (RF-014, RF-015). Nothing was recorded. */
+  | { readonly status: 'payment_refused'; readonly plan: PaymentPlan };
+
 /** Everything the screen can ask of the main process. */
 export interface PosApi {
   /**
@@ -123,6 +156,15 @@ export interface PosApi {
   savePendingSale(request: PendingSaleRequest): Promise<SavePendingSaleResult>;
 
   /**
+   * Collects a saved sale with cash and transfers (RF-014, RF-015). The main process checks that the payments add up
+   * to the total, records them in one transaction, and only then opens the drawer and prints.
+   *
+   * @param request the sale and what the customer handed over
+   * @returns `completed` with the change, or `payment_refused` with the reason and nothing recorded
+   */
+  checkoutSale(request: PaymentRequest): Promise<CheckoutSaleResult>;
+
+  /**
    * Reads the sales that were left without being confirmed or cancelled, as after a power cut (RF-017).
    *
    * @returns the sales, oldest first
@@ -130,13 +172,13 @@ export interface PosApi {
   listPendingSales(): Promise<readonly PendingSale[]>;
 
   /**
-   * Confirms that a pending sale was paid. It records a cash payment for the whole total, which is the only method the
-   * register can take until E1-11.
+   * Confirms that a pending sale was paid, and how. It records the payments but does not open the drawer or print,
+   * because the customer already left (ADR 0025).
    *
-   * @param saleId the sale
-   * @returns once it is safely on disk
+   * @param request the sale and what the customer paid it with
+   * @returns `completed`, or `payment_refused` if what was told does not add up to the total
    */
-  confirmPendingSale(saleId: string): Promise<void>;
+  confirmPendingSale(request: PaymentRequest): Promise<CheckoutSaleResult>;
 
   /**
    * Cancels a pending sale that was not paid. The sale is kept, marked as cancelled.

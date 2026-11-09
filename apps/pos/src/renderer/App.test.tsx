@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_APPEARANCE, type Appearance } from '../shared/appearance';
-import type { CatalogProduct, PendingSale, PosApi } from '../shared/pos-api';
+import type { CatalogProduct, CheckoutSaleResult, PendingSale, PosApi } from '../shared/pos-api';
 import { App } from './App';
 
 const HAMMER: CatalogProduct = {
@@ -21,6 +21,7 @@ const CABLE: CatalogProduct = {
 };
 
 const HAMMER_CODE = '2000000000107';
+const COMPLETED: CheckoutSaleResult = { status: 'completed', changeCents: 0, problems: [] };
 
 beforeAll(() => {
   // jsdom has no modal dialogs.
@@ -42,8 +43,9 @@ function fakePosApi(overrides: Partial<PosApi> = {}): PosApi {
     getAppearance: () => Promise.resolve(DEFAULT_APPEARANCE),
     saveAppearance: () => Promise.resolve(),
     savePendingSale: () => Promise.resolve({ status: 'catalog_changed' }),
+    checkoutSale: () => Promise.resolve(COMPLETED),
     listPendingSales: () => Promise.resolve([]),
-    confirmPendingSale: () => Promise.resolve(),
+    confirmPendingSale: () => Promise.resolve(COMPLETED),
     cancelPendingSale: () => Promise.resolve(),
     ...overrides,
   };
@@ -392,21 +394,82 @@ describe('pending sales', () => {
     expect(text).toContain('No cuenta en existencias ni en el corte');
   });
 
-  it('confirms the sale with F2 and gives the keyboard back to the lookup box', async () => {
-    const confirmPendingSale = vi.fn(() => Promise.resolve());
-    render(<App posApi={fakePosApi({ ...withPending(OLDER), confirmPendingSale })} />);
-    await findDialog();
+  function typeInto(name: string, value: string): void {
+    fireEvent.change(screen.getByRole('textbox', { name, hidden: true }), { target: { value } });
+  }
 
+  /** F2 asks how it was paid, and then the cashier says it was $156.94 in cash. */
+  async function confirmInCash(dialog: HTMLElement): Promise<void> {
+    pressKey('F2');
+    await within(dialog).findByRole('heading', { name: '¿Con qué se pagó?', hidden: true });
+    typeInto('Efectivo recibido', '156.94');
+    pressKey('F2');
+  }
+
+  it('asks how the sale was paid when the cashier says it was, and records that', async () => {
+    const confirmPendingSale = vi.fn<PosApi['confirmPendingSale']>(() => Promise.resolve(COMPLETED));
+    render(<App posApi={fakePosApi({ ...withPending(OLDER), confirmPendingSale })} />);
+    const dialog = await findDialog();
+
+    await confirmInCash(dialog);
+
+    await dialogGone();
+    expect(confirmPendingSale).toHaveBeenCalledExactlyOnceWith({ saleId: 'older-sale', cashReceivedCents: 15694, transfers: [] });
+    await waitFor(() => expect(document.activeElement).toBe(lookupBox()));
+  });
+
+  it('records a transfer with its reference when the sale was paid that way', async () => {
+    const confirmPendingSale = vi.fn<PosApi['confirmPendingSale']>(() => Promise.resolve(COMPLETED));
+    render(<App posApi={fakePosApi({ ...withPending(OLDER), confirmPendingSale })} />);
+    const dialog = await findDialog();
+
+    pressKey('F2');
+    await within(dialog).findByRole('heading', { name: '¿Con qué se pagó?', hidden: true });
+    typeInto('Efectivo recibido', '56.94');
+    typeInto('Transferencia', '100');
+    typeInto('Referencia de la transferencia', 'SPEI-778812');
     pressKey('F2');
 
     await dialogGone();
-    expect(confirmPendingSale).toHaveBeenCalledExactlyOnceWith('older-sale');
-    await waitFor(() => expect(document.activeElement).toBe(lookupBox()));
+    expect(confirmPendingSale).toHaveBeenCalledExactlyOnceWith({
+      saleId: 'older-sale',
+      cashReceivedCents: 5694,
+      transfers: [{ amountCents: 10000, reference: 'SPEI-778812' }],
+    });
+  });
+
+  it('does not record a payment that does not reach the total', async () => {
+    const confirmPendingSale = vi.fn<PosApi['confirmPendingSale']>(() => Promise.resolve(COMPLETED));
+    render(<App posApi={fakePosApi({ ...withPending(OLDER), confirmPendingSale })} />);
+    const dialog = await findDialog();
+
+    pressKey('F2');
+    await within(dialog).findByRole('heading', { name: '¿Con qué se pagó?', hidden: true });
+    typeInto('Efectivo recibido', '100');
+    pressKey('F2');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(confirmPendingSale).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole('status', { name: 'Estado del cobro', hidden: true }).textContent).toBe('Faltan $56.94');
+  });
+
+  it('goes back to the question with Esc, without answering', async () => {
+    const cancelPendingSale = vi.fn(() => Promise.resolve());
+    render(<App posApi={fakePosApi({ ...withPending(OLDER), cancelPendingSale })} />);
+    const dialog = await findDialog();
+
+    pressKey('F2');
+    await within(dialog).findByRole('heading', { name: '¿Con qué se pagó?', hidden: true });
+    pressKey('Escape');
+
+    await waitFor(() => expect(within(dialog).queryByRole('heading', { name: '¿Con qué se pagó?', hidden: true })).toBeNull());
+    expect(dialog.isConnected).toBe(true);
+    expect(cancelPendingSale).not.toHaveBeenCalled();
   });
 
   it('cancels the sale with F4', async () => {
     const cancelPendingSale = vi.fn(() => Promise.resolve());
-    const confirmPendingSale = vi.fn(() => Promise.resolve());
+    const confirmPendingSale = vi.fn<PosApi['confirmPendingSale']>(() => Promise.resolve(COMPLETED));
     render(<App posApi={fakePosApi({ ...withPending(OLDER), cancelPendingSale, confirmPendingSale })} />);
     await findDialog();
 
@@ -418,36 +481,37 @@ describe('pending sales', () => {
   });
 
   it('answers with the buttons too', async () => {
-    const confirmPendingSale = vi.fn(() => Promise.resolve());
-    render(<App posApi={fakePosApi({ ...withPending(OLDER), confirmPendingSale })} />);
+    const cancelPendingSale = vi.fn(() => Promise.resolve());
+    render(<App posApi={fakePosApi({ ...withPending(OLDER), cancelPendingSale })} />);
     const dialog = await findDialog();
 
-    fireEvent.click(within(dialog).getByRole('button', { name: /Sí, se cobró en efectivo/, hidden: true }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /No se cobró, cancelar venta/, hidden: true }));
 
     await dialogGone();
-    expect(confirmPendingSale).toHaveBeenCalledExactlyOnceWith('older-sale');
+    expect(cancelPendingSale).toHaveBeenCalledExactlyOnceWith('older-sale');
   });
 
   it('goes through several sales one at a time, oldest first', async () => {
-    const confirmPendingSale = vi.fn(() => Promise.resolve());
+    const confirmPendingSale = vi.fn<PosApi['confirmPendingSale']>(() => Promise.resolve(COMPLETED));
     const cancelPendingSale = vi.fn(() => Promise.resolve());
     render(<App posApi={fakePosApi({ ...withPending(OLDER, NEWER), confirmPendingSale, cancelPendingSale })} />);
     const dialog = await findDialog();
     expect(dialog.textContent).toContain('Cable THW');
     expect(dialog.textContent).toContain('Quedan 2 ventas por revisar');
 
-    pressKey('F2');
+    await confirmInCash(dialog);
 
     await waitFor(() => expect(dialog.textContent).not.toContain('Cable THW'));
     expect(dialog.textContent).not.toContain('por revisar');
+    expect(within(dialog).queryByRole('heading', { name: '¿Con qué se pagó?', hidden: true })).toBeNull();
     pressKey('F4');
     await dialogGone();
-    expect(confirmPendingSale).toHaveBeenCalledExactlyOnceWith('older-sale');
+    expect(confirmPendingSale).toHaveBeenCalledExactlyOnceWith({ saleId: 'older-sale', cashReceivedCents: 15694, transfers: [] });
     expect(cancelPendingSale).toHaveBeenCalledExactlyOnceWith('newer-sale');
   });
 
   it('does not take the Enter of a scanner for an answer', async () => {
-    const confirmPendingSale = vi.fn(() => Promise.resolve());
+    const confirmPendingSale = vi.fn<PosApi['confirmPendingSale']>(() => Promise.resolve(COMPLETED));
     const cancelPendingSale = vi.fn(() => Promise.resolve());
     render(<App posApi={fakePosApi({ ...withPending(OLDER), confirmPendingSale, cancelPendingSale })} />);
     const dialog = await findDialog();
@@ -462,10 +526,24 @@ describe('pending sales', () => {
     expect(dialog.isConnected).toBe(true);
   });
 
+  it('does not take the Enter of a scanner for a payment either', async () => {
+    const confirmPendingSale = vi.fn<PosApi['confirmPendingSale']>(() => Promise.resolve(COMPLETED));
+    render(<App posApi={fakePosApi({ ...withPending(OLDER), confirmPendingSale })} />);
+    const dialog = await findDialog();
+
+    pressKey('F2');
+    await within(dialog).findByRole('heading', { name: '¿Con qué se pagó?', hidden: true });
+    typeInto('Efectivo recibido', '156.94');
+    pressKey('Enter');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(confirmPendingSale).not.toHaveBeenCalled();
+  });
+
   it('takes the keyboard off the button that was clicked, before the next sale appears', async () => {
     render(<App posApi={fakePosApi(withPending(OLDER, NEWER))} />);
     const dialog = await findDialog();
-    const button = within(dialog).getByRole('button', { name: /Sí, se cobró en efectivo/, hidden: true });
+    const button = within(dialog).getByRole('button', { name: /No se cobró, cancelar venta/, hidden: true });
     button.focus();
 
     fireEvent.click(button);
@@ -476,27 +554,27 @@ describe('pending sales', () => {
 
   it('ignores a second key while the first answer is being saved', async () => {
     let finishSaving: () => void = () => undefined;
-    const confirmPendingSale = vi.fn(() => new Promise<void>((resolve) => (finishSaving = resolve)));
-    render(<App posApi={fakePosApi({ ...withPending(OLDER, NEWER), confirmPendingSale })} />);
+    const cancelPendingSale = vi.fn(() => new Promise<void>((resolve) => (finishSaving = resolve)));
+    render(<App posApi={fakePosApi({ ...withPending(OLDER, NEWER), cancelPendingSale })} />);
     await findDialog();
 
-    pressKey('F2');
-    pressKey('F2');
+    pressKey('F4');
+    pressKey('F4');
     finishSaving();
 
     await waitFor(() => expect(screen.getByRole('dialog', { hidden: true }).textContent).not.toContain('Cable THW'));
-    expect(confirmPendingSale).toHaveBeenCalledTimes(1);
+    expect(cancelPendingSale).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the sale on the screen and explains when the answer cannot be saved', async () => {
     const confirmPendingSale = vi
       .fn<PosApi['confirmPendingSale']>()
       .mockRejectedValueOnce(new Error('disk full'))
-      .mockResolvedValueOnce();
+      .mockResolvedValueOnce(COMPLETED);
     render(<App posApi={fakePosApi({ ...withPending(OLDER), confirmPendingSale })} />);
     const dialog = await findDialog();
 
-    pressKey('F2');
+    await confirmInCash(dialog);
 
     expect((await within(dialog).findByRole('alert', { hidden: true })).textContent).toContain('No se guardó tu respuesta');
     expect(dialog.textContent).toContain('Cable THW');
@@ -516,6 +594,255 @@ describe('pending sales', () => {
 
     expect((await screen.findByRole('alert')).textContent).toContain('No se pudieron revisar las ventas pendientes');
     expect(document.activeElement).toBe(lookupBox());
+  });
+});
+
+describe('checkout', () => {
+  const SAVED: PendingSale = {
+    id: 'saved-sale',
+    occurredAt: '2026-11-08T20:05:00.000Z',
+    totalCents: 11600,
+    lines: [{ productName: 'Martillo', quantity: { milli: 1000, unit: 'piece' }, unitPriceE4: 1_160_000, totalCents: 11600 }],
+  };
+
+  function posApiThatSaves(overrides: Partial<PosApi> = {}): PosApi {
+    return fakePosApi({ savePendingSale: () => Promise.resolve({ status: 'saved', sale: SAVED }), ...overrides });
+  }
+
+  async function openCheckout(): Promise<HTMLElement> {
+    await addByCode();
+    press('F12');
+    const dialog = await screen.findByRole('dialog', { name: 'Cobrar', hidden: true });
+    // The form is drawn once the dialog is open, so the keys only work from here on.
+    await screen.findByRole('textbox', { name: 'Efectivo recibido', hidden: true });
+    return dialog;
+  }
+
+  function typeInto(name: string, value: string): void {
+    fireEvent.change(screen.getByRole('textbox', { name, hidden: true }), { target: { value } });
+  }
+
+  function pressKey(key: string): void {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key });
+  }
+
+  function status(): string | null {
+    return screen.getByRole('status', { name: 'Estado del cobro', hidden: true }).textContent;
+  }
+
+  it('asks the cashier to add a product before charging an empty sale', async () => {
+    const savePendingSale = vi.fn<PosApi['savePendingSale']>();
+    render(<App posApi={fakePosApi({ savePendingSale })} />);
+
+    press('F12');
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Agrega al menos un producto');
+    expect(savePendingSale).not.toHaveBeenCalled();
+  });
+
+  it('saves the sale with a fresh key before the payment screen opens (ADR 0010)', async () => {
+    const savePendingSale = vi.fn<PosApi['savePendingSale']>(() => Promise.resolve({ status: 'saved', sale: SAVED }));
+    render(<App posApi={fakePosApi({ savePendingSale })} />);
+
+    const dialog = await openCheckout();
+
+    expect(savePendingSale).toHaveBeenCalledExactlyOnceWith({
+      idempotencyKey: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
+      lines: [{ productId: 'hammer', quantityMilli: 1000 }],
+      expectedTotalCents: 11600,
+    });
+    expect(within(dialog).getByRole('status', { name: 'Total a cobrar', hidden: true }).textContent).toBe('$116.00');
+  });
+
+  it('tells the cashier when the catalog changed, and charges nothing', async () => {
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>();
+    render(<App posApi={fakePosApi({ checkoutSale })} />);
+    await addByCode();
+
+    press('F12');
+
+    expect((await screen.findByRole('alert')).textContent).toContain('El catálogo cambió');
+    expect(screen.queryByRole('dialog', { hidden: true })).toBeNull();
+    expect(checkoutSale).not.toHaveBeenCalled();
+    expect(totalShown()).toBe('$116.00');
+  });
+
+  it('says so when the sale cannot be saved', async () => {
+    render(<App posApi={fakePosApi({ savePendingSale: () => Promise.reject(new Error('disk full')) })} />);
+    await addByCode();
+
+    press('F12');
+
+    expect((await screen.findByRole('alert')).textContent).toContain('No se pudo guardar la venta');
+    expect(screen.queryByRole('dialog', { hidden: true })).toBeNull();
+  });
+
+  it('shows the change while the cashier types the cash, and collects with F2 (RF-014)', async () => {
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve({ status: 'completed', changeCents: 8400, problems: [] }));
+    render(<App posApi={posApiThatSaves({ checkoutSale })} />);
+    const dialog = await openCheckout();
+    await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('Efectivo recibido'));
+
+    expect(status()).toBe('Faltan $116.00');
+    typeInto('Efectivo recibido', '$200');
+    expect(status()).toBe('Cambio $84.00');
+    pressKey('F2');
+
+    expect((await within(dialog).findByRole('status', { name: 'Cambio a entregar', hidden: true })).textContent).toBe(
+      'Entrega $84.00 de cambio',
+    );
+    expect(checkoutSale).toHaveBeenCalledExactlyOnceWith({ saleId: 'saved-sale', cashReceivedCents: 20000, transfers: [] });
+  });
+
+  it('starts a new sale when the cashier has seen the change', async () => {
+    render(<App posApi={posApiThatSaves({ checkoutSale: () => Promise.resolve({ status: 'completed', changeCents: 8400, problems: [] }) })} />);
+    await openCheckout();
+    typeInto('Efectivo recibido', '200');
+    pressKey('F2');
+    await screen.findByRole('status', { name: 'Cambio a entregar', hidden: true });
+
+    pressKey('Enter');
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull());
+    expect(totalShown()).toBe('$0.00');
+    expect(screen.getByText('Aún no hay productos en esta venta')).toBeDefined();
+    await waitFor(() => expect(document.activeElement).toBe(lookupBox()));
+  });
+
+  it('records cash and a transfer with its reference as two parts of one sale (RF-015)', async () => {
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve(COMPLETED));
+    render(<App posApi={posApiThatSaves({ checkoutSale })} />);
+    await openCheckout();
+
+    typeInto('Efectivo recibido', '76');
+    typeInto('Transferencia', '40');
+    expect(status()).toBe('Escribe la referencia de la transferencia.');
+    typeInto('Referencia de la transferencia', ' SPEI-778812 ');
+    expect(status()).toBe('Pago exacto');
+    pressKey('F2');
+
+    await waitFor(() => expect(checkoutSale).toHaveBeenCalledTimes(1));
+    expect(checkoutSale).toHaveBeenCalledWith({
+      saleId: 'saved-sale',
+      cashReceivedCents: 7600,
+      transfers: [{ amountCents: 4000, reference: 'SPEI-778812' }],
+    });
+  });
+
+  it('fills the cash that is missing with F5, and the transfer that is missing with F6', async () => {
+    render(<App posApi={posApiThatSaves()} />);
+    await openCheckout();
+
+    typeInto('Transferencia', '16');
+    pressKey('F5');
+    expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'Efectivo recibido', hidden: true }).value).toBe('100');
+    typeInto('Efectivo recibido', '');
+    typeInto('Transferencia', '');
+    typeInto('Efectivo recibido', '116.5');
+    typeInto('Efectivo recibido', '16');
+    pressKey('F6');
+
+    expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'Transferencia', hidden: true }).value).toBe('100');
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Referencia de la transferencia');
+  });
+
+  it.each([
+    ['cash that does not reach the total', '100', '', 'Faltan $16.00'],
+    ['a transfer for more than the total', '', '120', 'no da cambio'],
+    ['cash when the transfer already covers the total', '10', '116', 'Quita el efectivo'],
+    ['text that is not an amount', 'cien', '', 'Escribe solo números'],
+  ])('does not collect with %s', async (_case, cash, transfer, message) => {
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve(COMPLETED));
+    render(<App posApi={posApiThatSaves({ checkoutSale })} />);
+    await openCheckout();
+
+    typeInto('Efectivo recibido', cash);
+    typeInto('Transferencia', transfer);
+    typeInto('Referencia de la transferencia', 'SPEI-1');
+    pressKey('F2');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(status()).toContain(message);
+    expect(checkoutSale).not.toHaveBeenCalled();
+  });
+
+  it('does not collect with the Enter of a scanner, which only moves to the next box', async () => {
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve(COMPLETED));
+    render(<App posApi={posApiThatSaves({ checkoutSale })} />);
+    await openCheckout();
+    typeInto('Efectivo recibido', '200');
+
+    pressKey('Enter');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(checkoutSale).not.toHaveBeenCalled();
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Transferencia');
+  });
+
+  it('cancels the saved sale with Esc, and keeps the products on the screen', async () => {
+    const cancelPendingSale = vi.fn(() => Promise.resolve());
+    render(<App posApi={posApiThatSaves({ cancelPendingSale })} />);
+    await openCheckout();
+
+    pressKey('Escape');
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull());
+    expect(cancelPendingSale).toHaveBeenCalledExactlyOnceWith('saved-sale');
+    expect(totalShown()).toBe('$116.00');
+    await waitFor(() => expect(document.activeElement).toBe(lookupBox()));
+  });
+
+  it('stays on the payment screen and explains when the sale cannot be cancelled', async () => {
+    render(<App posApi={posApiThatSaves({ cancelPendingSale: () => Promise.reject(new Error('disk full')) })} />);
+    const dialog = await openCheckout();
+
+    pressKey('Escape');
+
+    expect((await within(dialog).findByRole('alert', { hidden: true })).textContent).toContain('No se pudo cancelar la venta');
+  });
+
+  it('explains when the payment cannot be recorded, and lets the cashier try again', async () => {
+    const checkoutSale = vi
+      .fn<PosApi['checkoutSale']>()
+      .mockRejectedValueOnce(new Error('disk full'))
+      .mockResolvedValueOnce(COMPLETED);
+    render(<App posApi={posApiThatSaves({ checkoutSale })} />);
+    const dialog = await openCheckout();
+    typeInto('Efectivo recibido', '116');
+
+    pressKey('F2');
+    expect((await within(dialog).findByRole('alert', { hidden: true })).textContent).toContain('No se pudo registrar el cobro');
+    pressKey('F2');
+
+    await within(dialog).findByRole('status', { name: 'Cambio a entregar', hidden: true });
+    expect(checkoutSale).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports a device that failed after the sale was collected, without calling the sale a failure', async () => {
+    const result: CheckoutSaleResult = { status: 'completed', changeCents: 0, problems: [{ device: 'printer', message: 'Sin papel' }] };
+    render(<App posApi={posApiThatSaves({ checkoutSale: () => Promise.resolve(result) })} />);
+    const dialog = await openCheckout();
+    typeInto('Efectivo recibido', '116');
+
+    pressKey('F2');
+
+    expect((await within(dialog).findByRole('alert', { hidden: true })).textContent).toContain('La venta quedó registrada');
+    expect(within(dialog).getByRole('status', { name: 'Cambio a entregar', hidden: true }).textContent).toBe('Sin cambio');
+  });
+
+  it('sends one collection when F2 is pressed twice', async () => {
+    let finish: (result: CheckoutSaleResult) => void = () => undefined;
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => new Promise((resolve) => (finish = resolve)));
+    render(<App posApi={posApiThatSaves({ checkoutSale })} />);
+    await openCheckout();
+    typeInto('Efectivo recibido', '116');
+
+    pressKey('F2');
+    pressKey('F2');
+    finish(COMPLETED);
+
+    await screen.findByRole('status', { name: 'Cambio a entregar', hidden: true });
+    expect(checkoutSale).toHaveBeenCalledTimes(1);
   });
 });
 

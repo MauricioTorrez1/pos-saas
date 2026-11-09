@@ -1,6 +1,8 @@
+import { sumCents } from '@pos-saas/money';
+
 import { DeviceError, type DeviceName } from '../hardware/device-error';
 import type { RegisterHardware } from '../hardware/register-hardware';
-import type { RecordedPayment, SaleRecorder, SaleToCheckout } from './sale-recorder';
+import type { SalePayment, SaleRecorder, SaleToCheckout } from './sale-recorder';
 
 /** A device that failed after the sale was completed. The sale stands; the cashier only needs to know. */
 export interface DeviceProblem {
@@ -10,20 +12,31 @@ export interface DeviceProblem {
 
 /** How a checkout ended. */
 export type CheckoutResult =
-  | { readonly status: 'completed'; readonly payment: RecordedPayment; readonly problems: readonly DeviceProblem[] }
+  | {
+      readonly status: 'completed';
+      /** What the sale was paid with. It adds up to the total. */
+      readonly payments: readonly SalePayment[];
+      /** Cash given back to the customer. */
+      readonly changeCents: number;
+      readonly problems: readonly DeviceProblem[];
+    }
   | { readonly status: 'declined'; readonly reason: string };
 
 /** What checkout needs. The main process passes the real devices or the fakes; checkout cannot tell them apart. */
 export interface CheckoutDependencies {
   readonly hardware: Pick<RegisterHardware, 'printer' | 'cashDrawer' | 'cardTerminal'>;
   readonly sales: SaleRecorder;
-  /** Builds the ticket bytes once the payment is known. E1-13 brings the ESC/POS generator. */
-  readonly renderTicket: (sale: SaleToCheckout, payment: RecordedPayment) => Uint8Array;
+  /** Builds the ticket bytes once the payments are known. E1-13 brings the ESC/POS generator. */
+  readonly renderTicket: (sale: SaleToCheckout, payments: readonly SalePayment[]) => Uint8Array;
 }
+
+type Collected =
+  | { readonly status: 'paid'; readonly payments: readonly SalePayment[]; readonly changeCents: number }
+  | { readonly status: 'declined'; readonly reason: string };
 
 /**
  * Collects a sale and drives the devices in the order of ADR 0010: save it as pending, charge, mark it
- * completed, open the drawer, and print. This is what the screen will ask for through the bridge, so the
+ * completed, open the drawer, and print. This is what the screen asks for through the bridge, so the
  * screen never gives orders to a device.
  */
 export class SaleCheckout {
@@ -39,39 +52,39 @@ export class SaleCheckout {
    *
    * @param sale the sale, its attempt key, its total, and how the customer pays
    * @returns `completed` with any device problems after the sale was saved, or `declined` with the sale still pending
-   * @throws RangeError if the total is not a positive integer of cents
+   * @throws RangeError if the total is not a positive integer of cents, or the payments do not add up to it. Nothing
+   * is saved or charged in that case.
    * @throws SaleAlreadyCompletedError if the sale was already completed, before charging anything
    * @throws DeviceError if the card terminal cannot be reached. The sale stays pending, because the charge may
    * have happened.
    */
   async checkout(sale: SaleToCheckout): Promise<CheckoutResult> {
     assertPositiveCents(sale.totalCents);
+    assertPaymentsCoverTotal(sale);
     const { sales } = this.#dependencies;
 
     sales.savePendingPayment(sale);
-    const payment = await this.#collect(sale);
-    if (payment.status === 'declined') {
-      return payment;
+    const collected = await this.#collect(sale);
+    if (collected.status === 'declined') {
+      return collected;
     }
-    sales.markCompleted(sale.saleId, payment.recorded);
+    sales.markCompleted(sale.saleId, collected.payments);
 
     // From here on the sale is completed. Throwing would tell the screen it failed, and the cashier could
     // charge the customer again, so device failures become problems to show instead.
     const problems: DeviceProblem[] = [];
-    if (payment.recorded.method === 'cash') {
+    if (collected.payments.some(({ method }) => method === 'cash')) {
       await this.#tryDevice('cashDrawer', problems, () => this.#dependencies.hardware.cashDrawer.open());
     }
     await this.#tryDevice('printer', problems, () =>
-      this.#dependencies.hardware.printer.print(this.#dependencies.renderTicket(sale, payment.recorded)),
+      this.#dependencies.hardware.printer.print(this.#dependencies.renderTicket(sale, collected.payments)),
     );
-    return { status: 'completed', payment: payment.recorded, problems };
+    return { status: 'completed', payments: collected.payments, changeCents: collected.changeCents, problems };
   }
 
-  async #collect(
-    sale: SaleToCheckout,
-  ): Promise<{ status: 'paid'; recorded: RecordedPayment } | { status: 'declined'; reason: string }> {
-    if (sale.paymentMethod === 'cash') {
-      return { status: 'paid', recorded: { method: 'cash' } };
+  async #collect(sale: SaleToCheckout): Promise<Collected> {
+    if (sale.payment.kind === 'in_person') {
+      return { status: 'paid', payments: sale.payment.payments, changeCents: sale.payment.changeCents };
     }
     const outcome = await this.#dependencies.hardware.cardTerminal.charge({
       saleId: sale.saleId,
@@ -79,7 +92,11 @@ export class SaleCheckout {
       amountCents: sale.totalCents,
     });
     return outcome.status === 'approved'
-      ? { status: 'paid', recorded: { method: 'card', authorizationCode: outcome.authorizationCode } }
+      ? {
+          status: 'paid',
+          payments: [{ method: 'card', amountCents: sale.totalCents, reference: outcome.authorizationCode }],
+          changeCents: 0,
+        }
       : outcome;
   }
 
@@ -95,5 +112,16 @@ export class SaleCheckout {
 function assertPositiveCents(totalCents: number): void {
   if (!Number.isSafeInteger(totalCents) || totalCents <= 0) {
     throw new RangeError(`A sale total must be a positive integer of cents, got ${totalCents}`);
+  }
+}
+
+/** The invariant that matters most for the cash-up: checked before anything is saved, as the database does after. */
+function assertPaymentsCoverTotal({ payment, totalCents }: SaleToCheckout): void {
+  if (payment.kind !== 'in_person') {
+    return;
+  }
+  const paidCents = sumCents(payment.payments.map(({ amountCents }) => amountCents));
+  if (paidCents !== totalCents) {
+    throw new RangeError(`The payments add up to ${paidCents} cents, but the sale total is ${totalCents}`);
   }
 }

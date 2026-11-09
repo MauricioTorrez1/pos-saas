@@ -6,11 +6,13 @@ import {
   MAX_LOOKUP_TEXT_LENGTH,
   type AppInfo,
   type CatalogProduct,
+  type CheckoutSaleResult,
   type PendingSale,
   type SavePendingSaleResult,
 } from '../shared/pos-api';
-import { parsePendingSaleRequest, parseSaleId } from './checkout/pending-sale-request';
+import { parsePaymentRequest, parsePendingSaleRequest, parseSaleId } from './checkout/pending-sale-request';
 import type { PendingSales } from './checkout/pending-sales';
+import type { SalePayments } from './checkout/sale-payments';
 import type { AppearanceStore } from './local-store/appearance-store';
 import type { ProductCatalog } from './local-store/product-catalog';
 import { assertTrustedSender } from './trusted-url';
@@ -22,6 +24,7 @@ export interface IpcServices {
   readonly catalog: ProductCatalog;
   readonly appearance: AppearanceStore;
   readonly pendingSales: PendingSales;
+  readonly salePayments: SalePayments;
 }
 
 /** Whatever crosses the bridge is checked again here, because the database must not depend on the screen being right. */
@@ -38,7 +41,7 @@ function requireLookupText(value: unknown): string {
  * @param rendererEntry address the register screen was loaded from
  * @param services the local data the answers come from
  */
-export function registerIpcHandlers(rendererEntry: string, { catalog, appearance, pendingSales }: IpcServices): void {
+export function registerIpcHandlers(rendererEntry: string, { catalog, appearance, pendingSales, salePayments }: IpcServices): void {
   const answerScreen = <Result>(channel: string, respond: (argument: unknown) => Result): void => {
     ipcMain.handle(channel, (event, argument: unknown) => {
       assertTrustedSender(event.senderFrame?.url, rendererEntry);
@@ -60,6 +63,7 @@ export function registerIpcHandlers(rendererEntry: string, { catalog, appearance
   });
   answerScreen(IPC_CHANNELS.savePendingSale, (request): SavePendingSaleResult => pendingSales.save(parsePendingSaleRequest(request)));
   answerScreen(IPC_CHANNELS.listPendingSales, (): PendingSale[] => pendingSales.list());
-  answerScreen(IPC_CHANNELS.confirmPendingSale, (saleId): void => pendingSales.confirm(parseSaleId(saleId)));
+  answerScreen(IPC_CHANNELS.checkoutSale, (request): Promise<CheckoutSaleResult> => salePayments.checkout(parsePaymentRequest(request)));
+  answerScreen(IPC_CHANNELS.confirmPendingSale, (request): CheckoutSaleResult => salePayments.confirm(parsePaymentRequest(request)));
   answerScreen(IPC_CHANNELS.cancelPendingSale, (saleId): void => pendingSales.cancel(parseSaleId(saleId)));
 }

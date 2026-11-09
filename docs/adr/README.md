@@ -29,3 +29,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0023](0023-iva-incluido-por-linea.md) | IVA incluido, con la base redondeada por línea y el IVA por diferencia | Aceptada |
 | [0024](0024-pantalla-de-venta.md) | Pantalla de venta con búsqueda FTS5 y apariencia acotada | Aceptada |
 | [0025](0025-maquina-de-estados-de-la-venta.md) | Máquina de estados de la venta, con reglas también en la base | Aceptada |
+| [0026](0026-cobro-con-efectivo-transferencia-y-mixto.md) | Cobro con efectivo, transferencia y pago mixto | Aceptada |
