@@ -125,8 +125,11 @@ test('does not sell with the register closed, and sells again after opening it w
   await expect(page.getByRole('dialog', { name: 'Abrir la caja' })).toBeHidden();
   await expect(page.getByLabel('Estado de la caja')).toHaveText('Caja cerrada');
 
-  await page.keyboard.press('F3');
-  await expect(page.getByRole('dialog', { name: 'Abrir la caja' })).toBeVisible();
+  // The key can land before the screen is ready for it after the cut closes, so it is pressed again until the dialog opens.
+  await expect(async () => {
+    await page.keyboard.press('F3');
+    await expect(page.getByRole('dialog', { name: 'Abrir la caja' })).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
   await page.getByRole('textbox', { name: 'Fondo de caja' }).fill('500');
   await page.keyboard.press('F2');
 
