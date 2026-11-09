@@ -1,10 +1,10 @@
 # Progreso
 
-Actualizado: 2026-11-08. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
+Actualizado: 2026-11-09. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** ninguna.
-- **Siguiente:** probar con datos reales (catálogo de Eleventa, PC de la tienda, impresora y cajón) y, en este orden, E1-26 y E1-27 (ajustes, mermas y kardex), E1-34 (reportes) y E1-09 (artículo varios). La facturación (E1-30 a E1-33) y la sincronización necesitan el servidor.
+- **Tarea en curso:** lote 4 en revisión (E1-26, E1-27 y E1-34, ADR 0032).
+- **Siguiente:** probar con datos reales (catálogo de Eleventa, PC de la tienda, impresora y cajón) y E1-09 (artículo varios y listas de precio), que se difirió del lote 4 por tocar la venta y el cobro. La facturación (E1-30 a E1-33) y la sincronización necesitan el servidor.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
 
@@ -132,15 +132,15 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | E1-23 | Corte con arqueo | 5 | Terminada |
 | E1-24 | Reporte por correo | 3 | Pendiente |
 | E1-25 | Movimientos por venta y devolución | 4 | Terminada |
-| E1-26 | Ajustes y mermas | 3 | Pendiente |
-| E1-27 | Kardex y verificación | 4 | Pendiente |
+| E1-26 | Ajustes y mermas | 3 | En revisión |
+| E1-27 | Kardex y verificación | 4 | En revisión |
 | E1-28 | Costo promedio | 4 | Pendiente |
 | E1-29 | Saldo inicial desde Eleventa | 4 | Terminada |
 | E1-30 | Cliente de Facturapi | 4 | Pendiente |
 | E1-31 | Factura individual | 6 | Pendiente |
 | E1-32 | Factura global | 5 | Pendiente |
 | E1-33 | Cancelación y nota de crédito | 4 | Pendiente |
-| E1-34 | Reportes básicos | 5 | Pendiente |
+| E1-34 | Reportes básicos | 5 | En revisión |
 | E1-35 | Respaldo de la caja | 4 | Terminada |
 | E1-36 | Instalador para Windows | 4 | Terminada |
 | E1-37 | Piloto paralelo | 4 | Pendiente |
@@ -309,3 +309,4 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | 2026-11-08 | Lote 3 en revisión, en modo automático: E1-25 (la parte local), E1-29, E1-35 y E1-36 (ADR 0031). La existencia es la suma de un libro de movimientos que no se edita, y cada venta y devolución lo escriben en su misma transacción. Una prueba encontró que `INSERT OR IGNORE` también se tragaba los errores de `CHECK`, y se cambió a `ON CONFLICT DO NOTHING`. El dueño carga el catálogo y las existencias de Eleventa con F1 y F5, sin duplicar si repite el archivo. Los respaldos cifrados se hacen cada hora a una USB, y la restauración se aplica al reiniciar y conserva la base anterior. electron-builder genera el instalador (`Caja Setup 0.0.0.exe`, 116 MiB), y el `Caja.exe` empaquetado arrancó. En local, 792 pruebas en Vitest de la caja (antes 715) y 53 con Playwright (antes 50). Probarlo con un archivo real de Eleventa y en la PC de la tienda quedó en «Pendientes de Mauricio antes del piloto». CI todavía no corre | Esperar el CI del PR y fusionar |
 | 2026-11-08 | Lote 3 terminado. PR 25 fusionado con squash en `c32626c` con `gh pr merge`, con el título revisado. En el primer intento fallaron `TypeScript`, porque el e2e del respaldo usa la protección de contraseñas de Windows que un runner de Linux no tiene (ahora la configuración se niega con un mensaje claro si no puede protegerla y ese e2e solo corre en Windows), y `Compose observability`, otra vez por Grafana. Sin ellos, los diez checks quedaron en verde. La caja ya puede cargar el catálogo de Eleventa, llevar la existencia por movimientos, respaldar cada hora a una USB y empaquetarse como instalador. Lo que falta es probarlo con un archivo real de Eleventa y en la PC de la tienda | Probar con datos reales |
 | 2026-11-08 | En `main`, tras fusionar el PR 25, `Dependency scan` y `TypeScript` quedaron en rojo. `Dependency scan`: OSV marcó dos versiones de `minimatch` (GHSA-g3hv-75wg-m249) que trae `electron-builder`, solo para empaquetar, y se subieron a 11.0.1 con `overrides`. `TypeScript`: una prueba de devoluciones oprimía Enter antes de que el diálogo atendiera la tecla, y ahora reintenta. Dependabot también falló un job de seguridad sobre ese mismo aviso, y se resuelve solo con el arreglo. Se verificó que `Caja.exe` se empaqueta y arranca con la versión nueva | Fusionar el arreglo y confirmar `main` |
+| 2026-11-09 | Lote 4 en revisión, en modo automático: E1-26, E1-27 y E1-34 (ADR 0032). El dueño corrige un conteo o anota una merma con su motivo, y el movimiento y su entrada en la bitácora (udit_log, que solo se agrega) se escriben en una sola transacción. El kardex muestra el saldo después de cada movimiento, y la revisión compara el libro con las ventas y las devoluciones. El reporte del día da ventas, ticket promedio, devoluciones, margen con el último costo conocido, agotados y productos sin venta en 30 días. Todo se alcanza desde F1: F2 inventario, F3 revisar el libro y F4 reporte. E1-09 (artículo varios y listas de precio) se difirió porque rompe la regla de que el proceso principal pone los precios y toca la venta y el cobro; queda pendiente con su diseño anotado en el ADR. En local, 815 pruebas en Vitest de la caja (antes 792). CI todavía no corre | Abrir el PR y fusionar |

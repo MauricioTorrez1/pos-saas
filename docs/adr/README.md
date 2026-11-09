@@ -35,3 +35,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0029](0029-acceso-con-pin-y-sesion-de-caja.md) | Acceso con PIN, sesión de caja y corte con arqueo | Aceptada |
 | [0030](0030-devoluciones-como-registro-compensatorio.md) | Devoluciones como registro compensatorio | Aceptada |
 | [0031](0031-inventario-importacion-respaldo-e-instalador.md) | Inventario por movimientos, carga desde Eleventa, respaldo cifrado e instalador | Aceptada |
+| [0032](0032-ajustes-kardex-bitacora-y-reporte-del-dia.md) | Ajustes, mermas, kardex, bitácora y reporte del día | Aceptada |
