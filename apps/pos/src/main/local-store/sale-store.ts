@@ -1,12 +1,12 @@
 import type { StatementSync } from 'node:sqlite';
 
-import type { Unit } from '@pos-saas/money';
+import { taxRateOf, type TaxFactor, type Unit } from '@pos-saas/money';
 
 import type { PendingSale, PendingSaleLine } from '../../shared/pos-api';
 import {
   SaleAlreadyCompletedError,
-  type RecordedPayment,
   type SaleLineToSave,
+  type SalePayment,
   type SaleRecorder,
   type SaleToSave,
 } from '../checkout/sale-recorder';
@@ -34,6 +34,28 @@ interface PendingSaleRow {
   readonly total_cents: number;
 }
 
+interface SaleRow {
+  readonly id: string;
+  readonly idempotency_key: string;
+  readonly subtotal_cents: number;
+  readonly tax_cents: number;
+  readonly total_cents: number;
+}
+
+interface SavedLineRow {
+  readonly id: string;
+  readonly product_id: string;
+  readonly product_name: string;
+  readonly unit: Unit;
+  readonly quantity_milli: number;
+  readonly unit_price_e4: number;
+  readonly tax_factor: TaxFactor;
+  readonly tax_rate_bp: number;
+  readonly subtotal_cents: number;
+  readonly tax_cents: number;
+  readonly line_total_cents: number;
+}
+
 interface PendingLineRow {
   readonly product_name: string;
   readonly unit: Unit;
@@ -53,6 +75,8 @@ export class SaleStore implements SaleRecorder {
   readonly #listPending: StatementSync;
   readonly #findPendingByKey: StatementSync;
   readonly #linesOf: StatementSync;
+  readonly #findPendingSale: StatementSync;
+  readonly #fullLinesOf: StatementSync;
   readonly #insertSale: StatementSync;
   readonly #insertLine: StatementSync;
   readonly #insertPayment: StatementSync;
@@ -75,6 +99,15 @@ export class SaleStore implements SaleRecorder {
     `);
     this.#linesOf = store.prepare(`
       SELECT product_name, unit, quantity_milli, unit_price_e4, line_total_cents
+      FROM sale_line WHERE tenant_id = ? AND sale_id = ? ORDER BY line_number
+    `);
+    this.#findPendingSale = store.prepare(`
+      SELECT id, idempotency_key, subtotal_cents, tax_cents, total_cents FROM sale
+      WHERE tenant_id = ? AND id = ? AND status = 'pending_payment'
+    `);
+    this.#fullLinesOf = store.prepare(`
+      SELECT id, product_id, product_name, unit, quantity_milli, unit_price_e4, tax_factor, tax_rate_bp, subtotal_cents,
+        tax_cents, line_total_cents
       FROM sale_line WHERE tenant_id = ? AND sale_id = ? ORDER BY line_number
     `);
     this.#insertSale = store.prepare(`
@@ -112,18 +145,20 @@ export class SaleStore implements SaleRecorder {
   /**
    * {@inheritDoc SaleRecorder.markCompleted}
    *
-   * The payment and the new state are written together, and a payment only exists for a completed sale, so a cash-up
-   * that adds payments cannot count a pending sale.
+   * Every payment and the new state are written together, and a payment only exists for a completed sale, so a cash-up
+   * that adds payments cannot count a pending sale. The database refuses payments that do not add up to the total.
    *
    * @throws SaleNotFoundError if the sale does not exist
    * @throws InvalidSaleTransitionError if the sale is not pending
    */
-  markCompleted(saleId: string, payment: RecordedPayment): void {
+  markCompleted(saleId: string, payments: readonly SalePayment[]): void {
     this.#store.transaction(() => {
-      const { status, total_cents: totalCents } = this.#requireState(saleId);
+      const { status } = this.#requireState(saleId);
       assertSaleTransition(saleId, status, 'completed');
       const now = new Date().toISOString();
-      this.#insertPayment.run(uuidV7(), this.#tenantId, saleId, payment.method, totalCents, referenceOf(payment), now);
+      for (const payment of payments) {
+        this.#insertPayment.run(uuidV7(), this.#tenantId, saleId, payment.method, payment.amountCents, payment.reference, now);
+      }
       this.#resolve.run('completed', now, this.#tenantId, saleId);
     });
   }
@@ -152,6 +187,27 @@ export class SaleStore implements SaleRecorder {
     return rows.map((row) => this.#toPendingSale(row));
   }
 
+  /**
+   * Reads a pending sale back exactly as it was saved, with its lines, so it can be charged and ticketed.
+   *
+   * @param saleId the sale
+   * @returns the sale, or null if it does not exist, is not pending, or belongs to another business
+   */
+  findPendingSale(saleId: string): SaleToSave | null {
+    const row = this.#findPendingSale.get(this.#tenantId, saleId) as unknown as SaleRow | undefined;
+    if (row === undefined) {
+      return null;
+    }
+    const lines = this.#fullLinesOf.all(this.#tenantId, saleId) as unknown as SavedLineRow[];
+    return {
+      saleId: row.id,
+      idempotencyKey: row.idempotency_key,
+      lines: lines.map(toSaleLine),
+      subtotalCents: row.subtotal_cents,
+      taxCents: row.tax_cents,
+      totalCents: row.total_cents,
+    };
+  }
   /**
    * Finds the pending sale created with this key.
    *
@@ -213,10 +269,21 @@ function assertStillPending(saleId: string, status: SaleStatus): void {
   }
 }
 
-function referenceOf(payment: RecordedPayment): string | null {
-  return payment.method === 'card' ? payment.authorizationCode : null;
+function toSaleLine(row: SavedLineRow): SaleLineToSave {
+  return {
+    id: row.id,
+    productId: row.product_id,
+    productName: row.product_name,
+    quantity: { milli: row.quantity_milli, unit: row.unit },
+    unitPriceE4: row.unit_price_e4,
+    totals: {
+      subtotalCents: row.subtotal_cents,
+      taxCents: row.tax_cents,
+      totalCents: row.line_total_cents,
+      taxRate: taxRateOf(row.tax_factor, row.tax_rate_bp),
+    },
+  };
 }
-
 function toPendingSaleLine(row: PendingLineRow): PendingSaleLine {
   return {
     productName: row.product_name,

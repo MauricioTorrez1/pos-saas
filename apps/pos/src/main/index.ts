@@ -4,6 +4,9 @@ import { pathToFileURL } from 'node:url';
 import { app, dialog } from 'electron';
 
 import { PendingSales } from './checkout/pending-sales';
+import { SaleCheckout } from './checkout/sale-checkout';
+import { SalePayments } from './checkout/sale-payments';
+import { createFakeHardware } from './hardware/fakes/fake-hardware';
 import { registerIpcHandlers } from './ipc-handlers';
 import { AppearanceStore } from './local-store/appearance-store';
 import { LocalStore } from './local-store/local-store';
@@ -53,10 +56,14 @@ async function start(): Promise<void> {
   const store = openLocalStore();
   const rendererEntry = resolveRendererEntry();
   const catalog = new ProductCatalog(store, LOCAL_TENANT_ID);
+  const sales = new SaleStore(store, LOCAL_TENANT_ID);
+  // The real drawer and printer arrive with E1-14 and E1-13. Until then the fakes stand in, so no ticket is printed.
+  const checkout = new SaleCheckout({ hardware: createFakeHardware(), sales, renderTicket: () => new Uint8Array() });
   registerIpcHandlers(rendererEntry, {
     catalog,
     appearance: new AppearanceStore(store, LOCAL_TENANT_ID),
-    pendingSales: new PendingSales(catalog, new SaleStore(store, LOCAL_TENANT_ID)),
+    pendingSales: new PendingSales(catalog, sales),
+    salePayments: new SalePayments(sales, checkout),
   });
   await openMainWindow(rendererEntry, PRELOAD_PATH);
 }

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createFakeHardware } from '../hardware/fakes/fake-hardware';
 import { SaleCheckout } from '../checkout/sale-checkout';
-import { SaleAlreadyCompletedError, type SaleLineToSave, type SaleToSave } from '../checkout/sale-recorder';
+import { SaleAlreadyCompletedError, type CheckoutPayment, type SaleLineToSave, type SaleToSave } from '../checkout/sale-recorder';
 import { InvalidSaleTransitionError } from '../checkout/sale-state-machine';
 import { uuidV7 } from '../uuid-v7';
 import { LocalStore } from './local-store';
@@ -85,6 +85,10 @@ function runSql(sql: string, ...values: (string | number)[]): void {
   });
 }
 
+function payInCash(sale: SaleToSave, target: SaleStore = sales): void {
+  target.markCompleted(sale.saleId, [{ method: 'cash', amountCents: sale.totalCents, reference: null }]);
+}
+
 function pendingIds(): string[] {
   return sales.listPending().map(({ id }) => id);
 }
@@ -155,7 +159,7 @@ describe('saving a sale as pending', () => {
   it('refuses to save again a sale that was already completed', () => {
     const sale = aSale();
     sales.savePendingPayment(sale);
-    sales.markCompleted(sale.saleId, { method: 'cash' });
+    payInCash(sale);
 
     expect(() => sales.savePendingPayment(sale)).toThrow(SaleAlreadyCompletedError);
   });
@@ -175,7 +179,7 @@ describe('completing a sale', () => {
     const sale = aSale();
     sales.savePendingPayment(sale);
 
-    sales.markCompleted(sale.saleId, { method: 'cash' });
+    payInCash(sale);
 
     expect(statusOf(sale.saleId)).toBe('completed');
     expect(row('SELECT resolved_at FROM sale')?.resolved_at).toEqual(expect.any(String));
@@ -188,7 +192,7 @@ describe('completing a sale', () => {
     const sale = aSale();
     sales.savePendingPayment(sale);
 
-    sales.markCompleted(sale.saleId, { method: 'card', authorizationCode: '482913' });
+    sales.markCompleted(sale.saleId, [{ method: 'card', amountCents: sale.totalCents, reference: '482913' }]);
 
     expect(row('SELECT method, reference FROM payment')).toEqual({ method: 'card', reference: '482913' });
   });
@@ -203,7 +207,7 @@ describe('completing a sale', () => {
       `);
     });
 
-    expect(() => sales.markCompleted(sale.saleId, { method: 'cash' })).toThrow('disk full');
+    expect(() => payInCash(sale)).toThrow('disk full');
 
     expect(statusOf(sale.saleId)).toBe('pending_payment');
     expect(rows('SELECT id FROM payment')).toEqual([]);
@@ -212,9 +216,9 @@ describe('completing a sale', () => {
   it('refuses to complete a sale twice, so the money is not counted twice', () => {
     const sale = aSale();
     sales.savePendingPayment(sale);
-    sales.markCompleted(sale.saleId, { method: 'cash' });
+    payInCash(sale);
 
-    expect(() => sales.markCompleted(sale.saleId, { method: 'cash' })).toThrow(InvalidSaleTransitionError);
+    expect(() => payInCash(sale)).toThrow(InvalidSaleTransitionError);
 
     expect(rows('SELECT id FROM payment')).toHaveLength(1);
   });
@@ -224,14 +228,118 @@ describe('completing a sale', () => {
     sales.savePendingPayment(sale);
     sales.cancel(sale.saleId);
 
-    expect(() => sales.markCompleted(sale.saleId, { method: 'cash' })).toThrow(InvalidSaleTransitionError);
+    expect(() => payInCash(sale)).toThrow(InvalidSaleTransitionError);
 
     expect(statusOf(sale.saleId)).toBe('cancelled');
     expect(rows('SELECT id FROM payment')).toEqual([]);
   });
 
   it('says so when the sale does not exist', () => {
-    expect(() => sales.markCompleted(uuidV7(), { method: 'cash' })).toThrow(SaleNotFoundError);
+    expect(() => sales.markCompleted(uuidV7(), [{ method: 'cash', amountCents: 100, reference: null }])).toThrow(SaleNotFoundError);
+  });
+});
+
+describe('completing a sale with several payments (RF-015)', () => {
+  it('records each part of a mixed payment, and the sale completes once they add up', () => {
+    const sale = aSale();
+    sales.savePendingPayment(sale);
+
+    sales.markCompleted(sale.saleId, [
+      { method: 'cash', amountCents: 10000, reference: null },
+      { method: 'transfer', amountCents: 5694, reference: 'SPEI-778812' },
+    ]);
+
+    expect(statusOf(sale.saleId)).toBe('completed');
+    expect(rows('SELECT method, amount_cents, reference FROM payment ORDER BY method')).toEqual([
+      { method: 'cash', amount_cents: 10000, reference: null },
+      { method: 'transfer', amount_cents: 5694, reference: 'SPEI-778812' },
+    ]);
+  });
+
+  it('leaves the sale pending, with no payment at all, when the parts do not add up to the total', () => {
+    const sale = aSale();
+    sales.savePendingPayment(sale);
+
+    expect(() =>
+      sales.markCompleted(sale.saleId, [
+        { method: 'cash', amountCents: 10000, reference: null },
+        { method: 'transfer', amountCents: 5000, reference: 'SPEI-778812' },
+      ]),
+    ).toThrow('must add up to its total');
+
+    expect(statusOf(sale.saleId)).toBe('pending_payment');
+    expect(rows('SELECT id FROM payment')).toEqual([]);
+  });
+
+  it('leaves the sale pending when one part passes the total', () => {
+    const sale = aSale();
+    sales.savePendingPayment(sale);
+
+    expect(() =>
+      sales.markCompleted(sale.saleId, [
+        { method: 'cash', amountCents: 15694, reference: null },
+        { method: 'transfer', amountCents: 1, reference: 'SPEI-778812' },
+      ]),
+    ).toThrow('must add up to its total');
+
+    expect(rows('SELECT id FROM payment')).toEqual([]);
+  });
+
+  it('refuses a sale completed with no payment at all', () => {
+    const sale = aSale();
+    sales.savePendingPayment(sale);
+
+    expect(() => sales.markCompleted(sale.saleId, [])).toThrow('must add up to its total');
+  });
+
+  it('refuses a transfer without its reference, in the database too', () => {
+    const sale = aSale();
+    sales.savePendingPayment(sale);
+
+    expect(() =>
+      sales.markCompleted(sale.saleId, [{ method: 'transfer', amountCents: 15694, reference: null }]),
+    ).toThrow('reference');
+    expect(() =>
+      sales.markCompleted(sale.saleId, [{ method: 'transfer', amountCents: 15694, reference: '   ' }]),
+    ).toThrow('reference');
+
+    expect(statusOf(sale.saleId)).toBe('pending_payment');
+  });
+
+  it('refuses a payment method the register does not know', () => {
+    const sale = aSale();
+    sales.savePendingPayment(sale);
+
+    expect(() =>
+      runSql(
+        `INSERT INTO payment (id, tenant_id, sale_id, method, amount_cents, recorded_at)
+         VALUES (?, ?, ?, 'barter', 100, '2026-11-08T00:00:00.000Z')`,
+        uuidV7(),
+        TENANT,
+        sale.saleId,
+      ),
+    ).toThrow('payment method');
+  });
+});
+
+describe('reading a pending sale back', () => {
+  it('rebuilds what was saved, so a ticket can be printed from it', () => {
+    const sale = aSale();
+    sales.savePendingPayment(sale);
+
+    expect(sales.findPendingSale(sale.saleId)).toEqual(sale);
+  });
+
+  it('finds nothing for a sale that is resolved, missing, or from another business', () => {
+    const completed = aSale();
+    const pending = aSale();
+    sales.savePendingPayment(completed);
+    sales.savePendingPayment(pending);
+    sales.markCompleted(completed.saleId, [{ method: 'cash', amountCents: completed.totalCents, reference: null }]);
+
+    expect(sales.findPendingSale(completed.saleId)).toBeNull();
+    expect(sales.findPendingSale(uuidV7())).toBeNull();
+    expect(new SaleStore(store, OTHER_TENANT).findPendingSale(pending.saleId)).toBeNull();
   });
 });
 
@@ -251,7 +359,7 @@ describe('cancelling a sale', () => {
   it('refuses to cancel a completed sale', () => {
     const sale = aSale();
     sales.savePendingPayment(sale);
-    sales.markCompleted(sale.saleId, { method: 'cash' });
+    payInCash(sale);
 
     expect(() => sales.cancel(sale.saleId)).toThrow(InvalidSaleTransitionError);
 
@@ -290,7 +398,7 @@ describe('finding pending sales', () => {
     const pending = aSale();
     [completed, cancelled, pending].forEach((sale) => sales.savePendingPayment(sale));
 
-    sales.markCompleted(completed.saleId, { method: 'cash' });
+    payInCash(completed);
     sales.cancel(cancelled.saleId);
 
     expect(pendingIds()).toEqual([pending.saleId]);
@@ -335,7 +443,7 @@ describe('another business', () => {
     sales.savePendingPayment(sale);
 
     expect(() => otherSales.cancel(sale.saleId)).toThrow(SaleNotFoundError);
-    expect(() => otherSales.markCompleted(sale.saleId, { method: 'cash' })).toThrow(SaleNotFoundError);
+    expect(() => payInCash(sale, otherSales)).toThrow(SaleNotFoundError);
 
     expect(statusOf(sale.saleId)).toBe('pending_payment');
   });
@@ -372,7 +480,7 @@ describe('what counts in stock and in the cash-up (ADR 0010)', () => {
   it('counts a sale once it is completed', () => {
     const sale = aSale();
     sales.savePendingPayment(sale);
-    sales.markCompleted(sale.saleId, { method: 'cash' });
+    payInCash(sale);
 
     expect(counted()).toEqual([sale.saleId]);
   });
@@ -394,7 +502,7 @@ describe('the database itself refuses what the rules forbid', () => {
 
   function completedSale(): SaleToSave {
     const sale = savedSale();
-    sales.markCompleted(sale.saleId, { method: 'cash' });
+    payInCash(sale);
     return sale;
   }
 
@@ -507,6 +615,10 @@ describe('the database itself refuses what the rules forbid', () => {
   });
 });
 
+function cashPayment(sale: SaleToSave): CheckoutPayment {
+  return { kind: 'in_person', payments: [{ method: 'cash', amountCents: sale.totalCents, reference: null }], changeCents: 0 };
+}
+
 describe('checkout on the real database', () => {
   function setUp(): { checkout: SaleCheckout; hardware: ReturnType<typeof createFakeHardware> } {
     const hardware = createFakeHardware();
@@ -516,7 +628,8 @@ describe('checkout on the real database', () => {
 
   it('leaves a cash sale completed, with its payment', async () => {
     const { checkout } = setUp();
-    const sale = { ...aSale(), paymentMethod: 'cash' } as const;
+    const base = aSale();
+    const sale = { ...base, payment: cashPayment(base) };
 
     await checkout.checkout(sale);
 
@@ -527,10 +640,10 @@ describe('checkout on the real database', () => {
   it('leaves a sale with a declined card pending, to be saved again and paid another way', async () => {
     const { checkout, hardware } = setUp();
     hardware.cardTerminal.willRespond({ status: 'declined', reason: 'Fondos insuficientes' });
-    const sale = { ...aSale(), paymentMethod: 'card' } as const;
+    const sale = { ...aSale(), payment: { kind: 'card' } } as const;
 
     await checkout.checkout(sale);
-    await checkout.checkout({ ...sale, idempotencyKey: uuidV7(), paymentMethod: 'cash' });
+    await checkout.checkout({ ...sale, idempotencyKey: uuidV7(), payment: cashPayment(sale) });
 
     expect(statusOf(sale.saleId)).toBe('completed');
     expect(rows('SELECT id FROM sale')).toHaveLength(1);

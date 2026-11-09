@@ -4,7 +4,7 @@ import { DeviceError } from '../hardware/device-error';
 import { createFakeHardware, type FakeHardware } from '../hardware/fakes/fake-hardware';
 import { InMemorySaleRecorder } from './in-memory-sale-recorder';
 import { SaleCheckout } from './sale-checkout';
-import { SaleAlreadyCompletedError, type RecordedPayment, type SaleToCheckout } from './sale-recorder';
+import { SaleAlreadyCompletedError, type SalePayment, type SaleToCheckout } from './sale-recorder';
 
 const CASH_SALE: SaleToCheckout = {
   saleId: '019a5f2e-7c40-7b1a-9d2e-3f4a5b6c7d8e',
@@ -13,13 +13,14 @@ const CASH_SALE: SaleToCheckout = {
   subtotalCents: 4849,
   taxCents: 776,
   totalCents: 5625,
-  paymentMethod: 'cash',
+  payment: { kind: 'in_person', payments: [{ method: 'cash', amountCents: 5625, reference: null }], changeCents: 375 },
 };
-const CARD_SALE: SaleToCheckout = { ...CASH_SALE, paymentMethod: 'card' };
+const CARD_SALE: SaleToCheckout = { ...CASH_SALE, payment: { kind: 'card' } };
+const CASH_PAYMENT: SalePayment = { method: 'cash', amountCents: 5625, reference: null };
 
 /** A stand-in for the ESC/POS generator of E1-13: plain text, so a failing test is easy to read. */
-function renderPlainTicket(sale: SaleToCheckout, payment: RecordedPayment): Uint8Array {
-  const paidWith = payment.method === 'card' ? `tarjeta, folio ${payment.authorizationCode}` : 'efectivo';
+function renderPlainTicket(sale: SaleToCheckout, payments: readonly SalePayment[]): Uint8Array {
+  const paidWith = payments.map((payment) => ` ${payment.amountCents} ${payment.reference ?? ''}`.trim()).join(', ');
   return new TextEncoder().encode(`Venta ${sale.saleId}\nTotal ${sale.totalCents} centavos\nPago: ${paidWith}\n`);
 }
 
@@ -40,7 +41,7 @@ describe('SaleCheckout with every device faked', () => {
     const result = await checkout.checkout(CASH_SALE);
 
     expect(weightMilli).toBe(1250);
-    expect(result).toEqual({ status: 'completed', payment: { method: 'cash' }, problems: [] });
+    expect(result).toEqual({ status: 'completed', payments: [CASH_PAYMENT], changeCents: 375, problems: [] });
     expect(hardware.log.entries).toEqual([
       'scale.readWeightMilli',
       'sales.savePendingPayment',
@@ -51,7 +52,7 @@ describe('SaleCheckout with every device faked', () => {
     expect(sales.find(CASH_SALE.saleId)?.status).toBe('completed');
     expect(hardware.cashDrawer.openCount).toBe(1);
     expect(hardware.cardTerminal.charges).toEqual([]);
-    expect(hardware.printer.printedBytes()).toEqual(renderPlainTicket(CASH_SALE, { method: 'cash' }));
+    expect(hardware.printer.printedBytes()).toEqual(renderPlainTicket(CASH_SALE, [CASH_PAYMENT]));
   });
 
   it('charges a card after saving the sale and before completing it, and keeps only the authorization code', async () => {
@@ -60,8 +61,8 @@ describe('SaleCheckout with every device faked', () => {
 
     const result = await checkout.checkout(CARD_SALE);
 
-    const payment = { method: 'card', authorizationCode: '482913' } as const;
-    expect(result).toEqual({ status: 'completed', payment, problems: [] });
+    const payments = [{ method: 'card', amountCents: 5625, reference: '482913' }] as const;
+    expect(result).toEqual({ status: 'completed', payments, changeCents: 0, problems: [] });
     expect(hardware.log.entries).toEqual([
       'sales.savePendingPayment',
       'cardTerminal.charge',
@@ -71,9 +72,9 @@ describe('SaleCheckout with every device faked', () => {
     expect(hardware.cardTerminal.charges).toEqual([
       { saleId: CARD_SALE.saleId, idempotencyKey: CARD_SALE.idempotencyKey, amountCents: 5625 },
     ]);
-    expect(sales.find(CARD_SALE.saleId)).toMatchObject({ status: 'completed', payment });
+    expect(sales.find(CARD_SALE.saleId)).toMatchObject({ status: 'completed', payments });
     expect(hardware.cashDrawer.openCount).toBe(0);
-    expect(hardware.printer.printedBytes()).toEqual(renderPlainTicket(CARD_SALE, payment));
+    expect(hardware.printer.printedBytes()).toEqual(renderPlainTicket(CARD_SALE, payments));
   });
 
   it('leaves a declined card sale pending, with the drawer closed and nothing printed', async () => {
@@ -96,7 +97,7 @@ describe('SaleCheckout with every device faked', () => {
     const result = await checkout.checkout({ ...CASH_SALE, idempotencyKey: '019a5f2e-7c41-7000-8000-000000000002' });
 
     expect(result.status).toBe('completed');
-    expect(sales.find(CASH_SALE.saleId)).toMatchObject({ status: 'completed', payment: { method: 'cash' } });
+    expect(sales.find(CASH_SALE.saleId)).toMatchObject({ status: 'completed', payments: [CASH_PAYMENT] });
     expect(hardware.cashDrawer.openCount).toBe(1);
   });
 
@@ -148,7 +149,8 @@ describe('SaleCheckout with every device faked', () => {
 
     expect(result).toEqual({
       status: 'completed',
-      payment: { method: 'cash' },
+      payments: [CASH_PAYMENT],
+      changeCents: 375,
       problems: [{ device: 'printer', message: 'The printer is out of paper' }],
     });
     expect(sales.find(CASH_SALE.saleId)?.status).toBe('completed');
@@ -163,5 +165,43 @@ describe('SaleCheckout with every device faked', () => {
 
     expect(result).toMatchObject({ status: 'completed', problems: [{ device: 'cashDrawer' }] });
     expect(hardware.printer.jobs).toHaveLength(1);
+  });
+
+  it('opens the drawer and records every part of a mixed payment, with the change out of the cash', async () => {
+    const { hardware, sales, checkout } = setUpRegister();
+    const payments: SalePayment[] = [
+      { method: 'cash', amountCents: 3625, reference: null },
+      { method: 'transfer', amountCents: 2000, reference: 'SPEI-778812' },
+    ];
+
+    const result = await checkout.checkout({ ...CASH_SALE, payment: { kind: 'in_person', payments, changeCents: 1375 } });
+
+    expect(result).toEqual({ status: 'completed', payments, changeCents: 1375, problems: [] });
+    expect(sales.find(CASH_SALE.saleId)).toMatchObject({ status: 'completed', payments });
+    expect(hardware.cashDrawer.openCount).toBe(1);
+  });
+
+  it('keeps the drawer closed when nothing was paid in cash', async () => {
+    const { hardware, checkout } = setUpRegister();
+    const payments: SalePayment[] = [{ method: 'transfer', amountCents: 5625, reference: 'SPEI-778812' }];
+
+    await checkout.checkout({ ...CASH_SALE, payment: { kind: 'in_person', payments, changeCents: 0 } });
+
+    expect(hardware.cashDrawer.openCount).toBe(0);
+    expect(hardware.printer.jobs).toHaveLength(1);
+  });
+
+  it.each([
+    ['less than', 5624],
+    ['more than', 5626],
+  ])('saves nothing when the payments add up to %s the total', async (_case, amountCents) => {
+    const { hardware, checkout } = setUpRegister();
+    const payments: SalePayment[] = [{ method: 'cash', amountCents, reference: null }];
+
+    await expect(
+      checkout.checkout({ ...CASH_SALE, payment: { kind: 'in_person', payments, changeCents: 0 } }),
+    ).rejects.toThrow(RangeError);
+
+    expect(hardware.log.entries).toEqual([]);
   });
 });

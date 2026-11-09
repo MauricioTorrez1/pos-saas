@@ -155,17 +155,6 @@ describe('list', () => {
   });
 });
 
-describe('confirm', () => {
-  it('completes the sale with a cash payment for the whole total', () => {
-    const saleId = saveCable();
-
-    pendingSales.confirm(saleId);
-
-    expect(rowsIn('sale')).toMatchObject([{ id: saleId, status: 'completed' }]);
-    expect(rowsIn('payment')).toMatchObject([{ sale_id: saleId, method: 'cash', amount_cents: 4094 }]);
-  });
-});
-
 describe('cancel', () => {
   it('keeps the sale, marked as cancelled, with no payment', () => {
     const saleId = saveCable();

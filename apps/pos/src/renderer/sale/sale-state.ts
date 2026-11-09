@@ -30,6 +30,7 @@ export type SaleAction =
   | { readonly type: 'add-product'; readonly product: CatalogProduct }
   | { readonly type: 'change-quantity'; readonly units: 1 | -1 }
   | { readonly type: 'remove-selected' }
+  | { readonly type: 'clear' }
   | { readonly type: 'move-selection'; readonly offset: 1 | -1 }
   | { readonly type: 'select'; readonly productId: string };
 
@@ -58,6 +59,8 @@ export function saleReducer(sale: SaleState, action: SaleAction): SaleState {
       return changeSelectedQuantity(sale, action.units);
     case 'remove-selected':
       return removeSelected(sale);
+    case 'clear':
+      return EMPTY_SALE;
     case 'move-selection':
       return moveSelection(sale, action.offset);
     case 'select':

@@ -1,16 +1,11 @@
 import { CallLog } from '../hardware/fakes/call-log';
 import { NextFailure } from '../hardware/fakes/next-failure';
-import {
-  SaleAlreadyCompletedError,
-  type RecordedPayment,
-  type SaleRecorder,
-  type SaleToSave,
-} from './sale-recorder';
+import { SaleAlreadyCompletedError, type SalePayment, type SaleRecorder, type SaleToSave } from './sale-recorder';
 
 /** What the fake knows about one sale. */
 export type RecordedSale =
   | { readonly status: 'pending_payment'; readonly sale: SaleToSave }
-  | { readonly status: 'completed'; readonly sale: SaleToSave; readonly payment: RecordedPayment };
+  | { readonly status: 'completed'; readonly sale: SaleToSave; readonly payments: readonly SalePayment[] };
 
 /** Keeps sales in memory, so checkout can be tested with a save that fails on demand. */
 export class InMemorySaleRecorder implements SaleRecorder {
@@ -38,21 +33,21 @@ export class InMemorySaleRecorder implements SaleRecorder {
    *
    * @throws Error if the sale is not pending, which would mean checkout skipped a step
    */
-  markCompleted(saleId: string, payment: RecordedPayment): void {
+  markCompleted(saleId: string, payments: readonly SalePayment[]): void {
     this.#log.record('sales.markCompleted');
     this.#nextFailure.throwIfArmed();
     const recorded = this.#sales.get(saleId);
     if (recorded?.status !== 'pending_payment') {
       throw new Error(`Sale ${saleId} must be pending to complete it, but it is ${recorded?.status ?? 'missing'}`);
     }
-    this.#sales.set(saleId, { status: 'completed', sale: recorded.sale, payment: { ...payment } });
+    this.#sales.set(saleId, { status: 'completed', sale: recorded.sale, payments: payments.map((payment) => ({ ...payment })) });
   }
 
   /**
    * Reads what was saved for a sale.
    *
    * @param saleId the sale to look up
-   * @returns its status and payment, or `undefined` if it was never saved
+   * @returns its status and payments, or `undefined` if it was never saved
    */
   find(saleId: string): RecordedSale | undefined {
     return this.#sales.get(saleId);

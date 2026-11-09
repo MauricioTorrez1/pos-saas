@@ -78,6 +78,7 @@ test('exposes only the agreed functions through the bridge', async ({ appWindow 
     'getAppearance',
     'saveAppearance',
     'savePendingSale',
+    'checkoutSale',
     'listPendingSales',
     'confirmPendingSale',
     'cancelPendingSale',

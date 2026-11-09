@@ -1,6 +1,6 @@
 # Register app
 
-Desktop register built with Electron, React, and TypeScript, using [electron-vite](https://electron-vite.org/) on top of Vite. It keeps its local database up to date and rings up a sale from the keyboard: a scan or a search by name adds a product and updates the totals with VAT. A sale left unfinished by a power cut comes back when the register starts. Collecting the payment and the real devices arrive in the next tasks of the [roadmap](../../docs/plan/04-roadmap.md).
+Desktop register built with Electron, React, and TypeScript, using [electron-vite](https://electron-vite.org/) on top of Vite. It keeps its local database up to date and rings up a sale from the keyboard: a scan or a search by name adds a product and updates the totals with VAT. F12 collects the sale with cash, a transfer, or both, and shows the change. A sale left unfinished by a power cut comes back when the register starts. The real printer, drawer, and card terminal arrive in the next tasks of the [roadmap](../../docs/plan/04-roadmap.md).
 
 Electron 45 runs on Windows 10 and later, which covers the machines of [ADR 0002](../../docs/adr/0002-caja-electron.md).
 
@@ -14,6 +14,7 @@ Electron 45 runs on Windows 10 and later, which covers the machines of [ADR 0002
 | `src/renderer/` | React screen | Sandboxed renderer, without Node |
 | `src/renderer/sale/` | Sale screen: lookup box, lines, totals, and scanner detection | Sandboxed renderer, without Node |
 | `src/renderer/appearance/` | Dialog where the owner changes how the register looks | Sandboxed renderer, without Node |
+| `src/renderer/checkout/` | Payment screen: cash received, transfer with its reference, and the change | Sandboxed renderer, without Node |
 | `src/renderer/recovery/` | Dialog that asks about the sales left pending | Sandboxed renderer, without Node |
 | `src/shared/` | Types and channel names used on both sides of the bridge | Compiled into each side |
 | `e2e/` | Startup, database, sale, and recovery tests with Playwright, and the crash drill | Test runner, driving the built app |
@@ -55,10 +56,27 @@ When the register starts, it shows the sales left pending, oldest first, and doe
 
 | Key | What it does |
 | --- | --- |
-| F2 | The sale was paid. It records a cash payment for the whole total |
+| F2 | The sale was paid. It asks how, with the same form as the payment screen, and records it |
 | F4 | The sale was not paid. It stays in the database as cancelled |
 
 The keyboard rests on the dialog rather than on a button, and Esc does nothing, so a scanner or a stray key cannot answer for the cashier.
+
+## Payment
+F12 saves the sale as pending and opens the payment screen. If the catalog changed since the cashier built the sale, nothing is saved and a warning says so. The decisions are in [ADR 0026](../../docs/adr/0026-cobro-con-efectivo-transferencia-y-mixto.md).
+
+![The payment screen with $76 in cash and a $40 transfer for a $116 sale](../../docs/capturas/e1-11-cobro-mixto.png)
+
+| Key | What it does |
+| --- | --- |
+| Enter | Moves to the next box. It never collects, because a scanner ends every code with Enter |
+| F2 | Collects. It only works when the payments add up to the total |
+| F5 | Fills the cash that the transfer leaves to pay |
+| F6 | Fills the transfer that the cash leaves to pay, and moves to its reference |
+| Esc | Cancels the saved sale and goes back to the products |
+
+Transfers are exact, because a bank gives no change, so the change always comes out of the cash. A cash payment is recorded for what it paid of the sale, not for what the customer handed over, so the payments of a sale always add up to its total. A transfer without its reference is refused by the screen, by the main process, and by the database. The main process works the payments out again from the saved total, so the screen cannot make a sale complete with the wrong amounts.
+
+After collecting, the change stays on the screen until the cashier presses Enter or Esc.
 
 ## Appearance
 F9 opens the dialog where the owner sets the business name, one of six colors, one of three text sizes, and the light or dark theme. Changes show at once and stay only when saved, and Esc undoes them. The stylesheet takes everything from a few tokens, driven by three attributes on the page, and a test checks that the text of every color and theme keeps a contrast of at least 4.5:1.
@@ -77,7 +95,7 @@ The screen never gives orders to a device. It will ask the main process for a bu
 
 `SaleCheckout` follows [ADR 0010](../../docs/adr/0010-guardar-antes-de-cobrar.md): it saves the sale as pending, charges the card if there is one, marks the sale completed, opens the drawer for cash, and prints the ticket. If the sale cannot be saved, nothing is charged. A declined card leaves the sale pending, so the cashier can try another method. Once the sale is completed, a failing drawer or printer becomes a problem to show, never an error, so the screen cannot mistake a completed sale for a failed one and charge again.
 
-For now only the tests use the fakes. The real printer and drawer arrive with E1-13 and E1-14, the manual scale with E1-08, and the manual card terminal with E1-12. The bridge gets its checkout call with the payment screen in E1-11.
+The register already runs `SaleCheckout` through the bridge (`checkoutSale`), but with the fakes: the drawer does not really open and no ticket prints. The real printer and drawer arrive with E1-13 and E1-14, the manual scale with E1-08, and the manual card terminal with E1-12.
 
 ## Local database
 The register keeps its data in `pos.db`, in the user data folder of the app (`%APPDATA%\@pos-saas\pos` on Windows), never in the repository. `LocalStore`, in `src/main/local-store/`, is the only code that talks to SQLite, through the `node:sqlite` module that ships with Electron ([ADR 0021](../../docs/adr/0021-sqlite-de-la-caja.md)).

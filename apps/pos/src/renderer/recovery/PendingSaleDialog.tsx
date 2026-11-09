@@ -2,11 +2,11 @@ import { formatCents } from '@pos-saas/money';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 
 import type { PendingSale } from '../../shared/pos-api';
+import { PaymentForm } from '../checkout/PaymentForm';
 import { formatQuantity, formatSaleMoment } from '../sale/format';
 import type { PendingSaleAnswer } from './use-pending-sales';
 
-/** Function keys, because a scanner sends letters, digits, and Enter, and it must never answer for the cashier. */
-const ANSWER_KEYS: Readonly<Record<string, PendingSaleAnswer>> = { F2: 'confirm', F4: 'cancel' };
+type Step = 'ask' | 'pay';
 
 interface PendingSaleDialogProps {
   /** The sales left to resolve, oldest first. There is at least one. */
@@ -26,6 +26,7 @@ interface PendingSaleDialogProps {
  */
 export function PendingSaleDialog({ sales, onAnswer }: PendingSaleDialogProps): ReactElement {
   const sale = sales[0]!;
+  const [step, setStep] = useState<Step>('ask');
   const [saveFailed, setSaveFailed] = useState(false);
   const isSaving = useRef(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -39,6 +40,7 @@ export function PendingSaleDialog({ sales, onAnswer }: PendingSaleDialogProps): 
   }, []);
 
   useEffect(() => {
+    setStep('ask');
     contentRef.current?.focus();
   }, [sale.id]);
 
@@ -62,10 +64,15 @@ export function PendingSaleDialog({ sales, onAnswer }: PendingSaleDialogProps): 
   // so the keys always answer for the sale on the screen.
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
-      const choice = ANSWER_KEYS[event.key];
-      if (choice !== undefined) {
+      if (step !== 'ask') {
+        return;
+      }
+      if (event.key === 'F2') {
         event.preventDefault();
-        answer(choice);
+        setStep('pay');
+      } else if (event.key === 'F4') {
+        event.preventDefault();
+        answer({ kind: 'cancel' });
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -110,14 +117,28 @@ export function PendingSaleDialog({ sales, onAnswer }: PendingSaleDialogProps): 
             No se guardó tu respuesta. Intenta de nuevo y, si sigue fallando, reinicia la caja.
           </p>
         )}
-        <div className="recovery-actions">
-          <button type="button" className="button" onClick={() => answer('cancel')}>
-            No se cobró, cancelar venta <kbd>F4</kbd>
-          </button>
-          <button type="button" className="button button-primary" onClick={() => answer('confirm')}>
-            Sí, se cobró en efectivo <kbd>F2</kbd>
-          </button>
-        </div>
+        {step === 'ask' ? (
+          <div className="recovery-actions">
+            <button type="button" className="button" onClick={() => answer({ kind: 'cancel' })}>
+              No se cobró, cancelar venta <kbd>F4</kbd>
+            </button>
+            <button type="button" className="button button-primary" onClick={() => setStep('pay')}>
+              Sí, se cobró <kbd>F2</kbd>
+            </button>
+          </div>
+        ) : (
+          <div className="recovery-payment">
+            <h3>¿Con qué se pagó?</h3>
+            <PaymentForm
+              totalCents={sale.totalCents}
+              isBusy={isSaving.current}
+              onSubmit={(payment) => answer({ kind: 'confirm', payment })}
+              onBack={() => setStep('ask')}
+              submitLabel="Registrar cobro"
+              backLabel="Volver"
+            />
+          </div>
+        )}
       </section>
     </dialog>
   );

@@ -1,7 +1,13 @@
-import type { PendingSaleRequest } from '../../shared/pos-api';
+import type { PaymentRequest, PendingSaleRequest } from '../../shared/pos-api';
 
 /** More lines than any ticket at the counter, so a broken screen cannot make one request hold the main process. */
 export const MAX_SALE_LINES = 500;
+
+/** More transfers than a sale ever has, so a broken screen cannot make one request hold the main process. */
+export const MAX_TRANSFERS = 10;
+
+/** Longer than any bank reference. */
+export const MAX_REFERENCE_LENGTH = 60;
 
 /** Any UUID, in the lower case that `crypto.randomUUID` produces. */
 const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -68,4 +74,39 @@ export function parsePendingSaleRequest(value: unknown): PendingSaleRequest {
  */
 export function parseSaleId(value: unknown): string {
   return requireMatch(value, UUID_V7_TEXT, 'the UUIDv7 of a sale');
+}
+
+function requireNonNegativeInteger(value: unknown, description: string): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new TypeError(`Expected ${description} as a non-negative integer`);
+  }
+  return value;
+}
+
+function parseTransfer(value: unknown): PaymentRequest['transfers'][number] {
+  const transfer = requireRecord(value, 'a transfer');
+  const { reference } = transfer;
+  if (typeof reference !== 'string' || reference.length > MAX_REFERENCE_LENGTH) {
+    throw new TypeError(`Expected a transfer reference of at most ${MAX_REFERENCE_LENGTH} characters`);
+  }
+  return { amountCents: requirePositiveInteger(transfer.amountCents, 'a transfer amount in cents'), reference };
+}
+
+/**
+ * Checks how the screen says a sale was paid, because the database must not depend on the screen being right.
+ *
+ * @param value whatever crossed the bridge
+ * @returns a request with only the known fields
+ * @throws TypeError if any field is missing or malformed
+ */
+export function parsePaymentRequest(value: unknown): PaymentRequest {
+  const request = requireRecord(value, 'a payment request');
+  if (!Array.isArray(request.transfers) || request.transfers.length > MAX_TRANSFERS) {
+    throw new TypeError(`Expected at most ${MAX_TRANSFERS} transfers`);
+  }
+  return {
+    saleId: parseSaleId(request.saleId),
+    cashReceivedCents: requireNonNegativeInteger(request.cashReceivedCents, 'the cash received in cents'),
+    transfers: request.transfers.map(parseTransfer),
+  };
 }

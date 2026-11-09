@@ -193,4 +193,18 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'a payment is never deleted'); END;
     `,
   },
+  {
+    version: 5,
+    name: 'validate_payment_methods',
+    // The methods live in a trigger rather than a CHECK, so E1-12 can add card_manual by replacing it (ADR 0026).
+    sql: `
+      CREATE TRIGGER payment_has_known_method BEFORE INSERT ON payment
+      WHEN NEW.method NOT IN ('cash', 'transfer', 'card')
+      BEGIN SELECT RAISE(ABORT, 'unknown payment method'); END;
+
+      CREATE TRIGGER payment_transfer_has_reference BEFORE INSERT ON payment
+      WHEN NEW.method = 'transfer' AND length(trim(coalesce(NEW.reference, ''))) = 0
+      BEGIN SELECT RAISE(ABORT, 'a transfer needs its reference'); END;
+    `,
+  },
 ];

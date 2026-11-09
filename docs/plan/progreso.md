@@ -3,8 +3,8 @@
 Actualizado: 2026-11-08. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** ninguna.
-- **Siguiente:** la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-11, E1-13 y E1-14. F0-08 y las demás se retoman después.
+- **Tarea en curso:** E1-11, en revisión.
+- **Siguiente:** la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-13 y E1-14, después de E1-11. F0-08 y las demás se retoman después.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
 
@@ -33,14 +33,20 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
   4. En la PC de la tienda, medir con `corepack pnpm --filter @pos-saas/pos build` y luego `corepack pnpm --filter @pos-saas/pos exec playwright test sale-screen -g "under 100 ms"`. El p95 de «Add a scanned product» debe quedar abajo de 100 ms (RNF-02). En la PC de desarrollo dio 24.5 ms.
   5. Pedirle a alguien de la tienda que haga su primera venta sin explicarle nada y anotar dónde se atoró (RNF-13). Con F9, el dueño revisa que los colores, el tamaño de letra y el tema se vean bien.
 
-- **Apagar la PC en mitad de un cobro (E1-10, RF-017).** Las pruebas automáticas matan el proceso, pero eso no es un corte de luz ([ADR 0025](../adr/0025-maquina-de-estados-de-la-venta.md)). Se puede hacer cuando E1-11 traiga el botón de cobro:
-  1. Abrir la caja con `corepack pnpm --filter @pos-saas/pos start`, agregar dos productos y entrar al cobro sin terminarlo.
+- **Apagar la PC en mitad de un cobro (E1-10, RF-017).** Las pruebas automáticas matan el proceso, pero eso no es un corte de luz ([ADR 0025](../adr/0025-maquina-de-estados-de-la-venta.md)). Ya se puede hacer, porque E1-11 trajo el botón de cobro:
+  1. Abrir la caja con `corepack pnpm --filter @pos-saas/pos start`, agregar dos productos y oprimir F12 para entrar al cobro sin terminarlo.
   2. Cortar la luz de verdad: desconectar la PC de la pared. En una laptop, sacar la batería o mantener oprimido el botón de encendido.
   3. Encender la PC y abrir la caja. Debe aparecer «¿Se cobró esta venta?» con los dos productos y el total correcto, sin dejar vender.
-  4. Oprimir F2. Debe volver a la pantalla de venta. Al cerrar y abrir la caja, ya no debe preguntar.
+  4. Oprimir F2, escribir el efectivo con el que se pagó y oprimir F2 otra vez. Debe volver a la pantalla de venta. Al cerrar y abrir la caja, ya no debe preguntar.
   5. Repetir los pasos 1 a 3 y oprimir F4. La venta no debe volver a aparecer.
   6. Si la caja no abre o la venta no aparece, anotar lo que muestre y avisar, porque E1-37 no debe empezar así.
 
+- **Cobrar compras reales simuladas (E1-11, RF-014 y RF-015).** Las pruebas automáticas usan los dispositivos falsos, así que el cajón y la impresora todavía no hacen nada real (llegan con E1-14 y E1-13). Lo que sí se puede revisar ya es cómo se siente la pantalla de cobro, con la caja abierta con corepack pnpm --filter @pos-saas/pos start:
+  1. Una venta con un cable de 3.275 m a $12.50 y pagar con $50. Debe decir «Cambio .06».
+  2. Una venta de $100 pagada con $60 en efectivo y $40 por transferencia con una referencia de tu banco. Con la referencia vacía, F2 no debe cobrar.
+  3. Una venta pagada con $100 en efectivo y un billete de más: el cambio debe salir del efectivo, nunca de la transferencia.
+  4. Escanear con el lector estando en el cobro. El Enter del lector no debe cobrar nada.
+  5. Pedirle a alguien de la tienda que cobre sin explicarle nada y anotar dónde se atoró (RNF-13).
 ## Fase 0
 | Tarea | Título | Horas | Estado |
 | --- | --- | --- | --- |
@@ -83,7 +89,7 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | E1-08 | Venta por peso y por metro | 4 | Pendiente |
 | E1-09 | Artículo varios y listas de precio | 3 | Pendiente |
 | E1-10 | Máquina de estados de la venta | 5 | Terminada |
-| E1-11 | Efectivo, transferencia y pago mixto | 5 | Pendiente |
+| E1-11 | Efectivo, transferencia y pago mixto | 5 | En revisión |
 | E1-12 | Tarjeta tecleada con folio | 2 | Pendiente |
 | E1-13 | Ticket ESC/POS | 5 | Pendiente |
 | E1-14 | Cajón y prueba de hardware | 3 | Pendiente |
@@ -265,3 +271,4 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | 2026-11-08 | E1-10 en revisión, en modo automático. ADR 0025: la venta va de `pending_payment` a `completed` o `cancelled`, con la regla en TypeScript y también en 12 disparadores de la base, cada uno con una prueba que falla si se quita. `sale`, `sale_line` y `payment` usan las escalas del ADR 0011, UUIDv7, llave de idempotencia y `tenant_id`. La pantalla manda productos, cantidades y el total que ve, y el proceso principal pone los precios; si el total no coincide, no guarda nada. `card_pending` es de la Entrega 2 y no se construyó. Al arrancar, la caja pregunta por cada venta pendiente, con F2 o F4, y no deja vender hasta responder. En local, 298 pruebas en Vitest de la caja (antes 192) y 28 con Playwright (antes 22), incluida una que mata el proceso con una venta pendiente y la confirma al reabrir. Apagar la PC de verdad quedó en «Pendientes de Mauricio antes del piloto». CI todavía no corre | Abrir el PR, repetir la rotura en CI y fusionar |
 | 2026-11-08 | E1-10 sigue en revisión, con el PR 21 abierto. En `fceda9f`, `Secret scan` quedó en rojo y los otros nueve en verde: Gitleaks leyó como credencial un UUID inventado en una prueba. El valor salió del código y `.gitleaksignore` acepta ese único commit, la ruta que marca `.gitleaks.toml`. Diez en verde en `c622a63`, con `TypeScript` en 59 segundos. Al dejar pasar una venta de `completed` a `cancelled`, `TypeScript` quedó en rojo en 24 segundos y los otros nueve en verde, con 3 pruebas fallidas; en una de ellas, el disparador de SQLite rechazó el cambio aunque la regla en TypeScript estaba rota. Sin la rotura, los diez volvieron a verde en `65c4b1d`, con `TypeScript` en 65 segundos | Fusionar el PR 21 |
 | 2026-11-08 | E1-10 terminada. PR 21 fusionado con squash en `535b92c` con `gh pr merge`, con el título revisado. En `main`, los diez checks en verde, con `Java` en 32 segundos y `TypeScript` en 51. La caja ya guarda cada venta antes de cobrar y pregunta al arrancar por las que quedaron pendientes. Apagar la PC de verdad sigue pendiente, antes del piloto. La entrada de `.gitleaksignore` apunta a un commit que no quedó en `main`, así que ya no hace falta allí. Las preguntas de la ficha se le entregaron a Mauricio | Empezar E1-11 en una sesión nueva |
+| 2026-11-08 | E1-11 en revisión, en modo automático. ADR 0026: los pagos suman siempre el total (el efectivo guarda lo que pagó, no lo que entregó el cliente), una sola regla (planPayments) decide en la pantalla y otra vez en el proceso principal, y la base rechaza un método desconocido o una transferencia sin referencia (migración 5). F12 guarda la venta antes de abrir el cobro, F2 cobra, Enter solo pasa al siguiente campo para que el Enter del lector no cobre, y Esc cancela la venta guardada. La recuperación ya pregunta con qué se pagó. En local, 393 pruebas en Vitest de la caja (antes 298) y 35 con Playwright (antes 28), incluida una que mata la caja dentro del cobro y registra el pago mixto al reabrir. Cajón e impresora siguen con los falsos. Las compras simuladas quedaron en «Pendientes de Mauricio antes del piloto». CI todavía no corre | Abrir el PR, repetir la rotura en CI y fusionar |
