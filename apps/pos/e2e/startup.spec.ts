@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { test as base, expect, type ElectronApplication, type Page } from '@playwright/test';
 
-import { createTemporaryUserData, launchRegister, recordStartupOptions, removeTemporaryUserData } from './register-harness.ts';
+import { createTemporaryUserData, launchRegister, recordStartupOptions, removeTemporaryUserData, signInWindow } from './register-harness.ts';
 
 const APP_ROOT = join(import.meta.dirname, '..');
 const OUTSIDE_URL = 'https://example.com/';
@@ -23,7 +23,7 @@ const test = base.extend<{ electronApp: ElectronApplication; appWindow: Page }>(
     await removeTemporaryUserData(userDataDir);
   },
   appWindow: async ({ electronApp }, use) => {
-    await use(await electronApp.firstWindow());
+    await use(await signInWindow(electronApp));
   },
 });
 
@@ -73,6 +73,18 @@ test('exposes only the agreed functions through the bridge', async ({ appWindow 
 
   expect(bridgeFunctions).toEqual([
     'getAppInfo',
+    'getAuthState',
+    'setupOwner',
+    'login',
+    'logout',
+    'createUser',
+    'findReturnableSale',
+    'createReturn',
+    'getCashStatus',
+    'openCashSession',
+    'recordCashMovement',
+    'closeCashSession',
+    'setWithdrawalLimit',
     'findProductByCode',
     'searchProducts',
     'getAppearance',

@@ -32,3 +32,5 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0026](0026-cobro-con-efectivo-transferencia-y-mixto.md) | Cobro con efectivo, transferencia y pago mixto | Aceptada |
 | [0027](0027-ticket-escpos-y-folio-corto.md) | Ticket ESC/POS, folio corto y reimpresión | Aceptada |
 | [0028](0028-tarjeta-tecleada-cajon-y-cantidades-medidas.md) | Tarjeta tecleada, cajón por la impresora y cantidades medidas | Aceptada |
+| [0029](0029-acceso-con-pin-y-sesion-de-caja.md) | Acceso con PIN, sesión de caja y corte con arqueo | Aceptada |
+| [0030](0030-devoluciones-como-registro-compensatorio.md) | Devoluciones como registro compensatorio | Aceptada |

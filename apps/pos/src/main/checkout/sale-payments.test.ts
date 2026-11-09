@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PaymentRequest } from '../../shared/pos-api';
 import { createFakeHardware, type FakeHardware } from '../hardware/fakes/fake-hardware';
+import { CashSessionStore } from '../cash/cash-session-store';
 import { LocalStore } from '../local-store/local-store';
 import { ProductCatalog } from '../local-store/product-catalog';
 import { SaleNotFoundError, SaleStore } from '../local-store/sale-store';
@@ -30,7 +31,8 @@ beforeEach(() => {
   store = LocalStore.open({ path: join(directory, 'pos.db'), appVersion: '1.0.0' });
   const sales = new SaleStore(store, TENANT);
   hardware = createFakeHardware();
-  pendingSales = new PendingSales(new ProductCatalog(store, TENANT), sales);
+  const cashSessionId = new CashSessionStore(store, TENANT).open(uuidV7(), 0);
+  pendingSales = new PendingSales(new ProductCatalog(store, TENANT), sales, () => ({ cashierId: uuidV7(), cashSessionId }));
   const businessName = (): string => 'Tlapalería Torres';
   salePayments = new SalePayments(
     sales,

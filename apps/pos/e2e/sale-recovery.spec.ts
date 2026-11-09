@@ -7,6 +7,7 @@ import {
   readMainPid,
   recordStartupOptions,
   removeTemporaryUserData,
+  signInWindow,
   testSalePaths,
 } from './register-harness.ts';
 
@@ -75,7 +76,7 @@ async function savePendingSale(page: Page, code: string, totalCents: number): Pr
 /** Opens the register, leaves sales pending, and kills it with no chance to clean up. */
 async function crashWithPendingSales(launch: () => Promise<ElectronApplication>, sales: readonly (readonly [string, number])[]): Promise<void> {
   const register = await launch();
-  const page = await register.firstWindow();
+  const page = await signInWindow(register);
   await expect(lookupBox(page)).toBeFocused();
   await expect(question(page)).toHaveCount(0);
   for (const [code, cents] of sales) {
@@ -104,7 +105,7 @@ test('shows a pending sale after the register is killed, and confirms it', async
   await crashWithPendingSales(launch, [[HAMMER_CODE, HAMMER_CENTS]]);
 
   const reopened = await launch();
-  const page = await reopened.firstWindow();
+  const page = await signInWindow(reopened);
   await expect(question(page)).toBeVisible();
   await expect(question(page)).toContainText('Martillo uña curva 16 oz');
   await expect(question(page).getByRole('status', { name: 'Total de la venta pendiente' })).toHaveText('$116.00');
@@ -130,14 +131,14 @@ test('keeps the sale cancelled, and does not ask again after another restart', a
   await crashWithPendingSales(launch, [[HAMMER_CODE, HAMMER_CENTS]]);
 
   const reopened = await launch();
-  const page = await reopened.firstWindow();
+  const page = await signInWindow(reopened);
   await expect(question(page)).toBeVisible();
   await page.keyboard.press('F4');
   await expect(question(page)).toHaveCount(0);
   await reopened.close();
 
   const thirdOpening = await launch();
-  const thirdPage = await thirdOpening.firstWindow();
+  const thirdPage = await signInWindow(thirdOpening);
   await expect(lookupBox(thirdPage)).toBeFocused();
   await expect(question(thirdPage)).toHaveCount(0);
   const rows = await readSavedRows(thirdOpening, testSalePaths(userDataDir).databasePath);
@@ -150,7 +151,7 @@ test('goes through several pending sales, oldest first, using only the keyboard'
     [SCREWDRIVER_CODE, SCREWDRIVER_CENTS],
   ]);
 
-  const page = await (await launch()).firstWindow();
+  const page = await signInWindow(await launch());
   await expect(question(page)).toContainText('Martillo uña curva 16 oz');
   await expect(question(page)).toContainText('Quedan 2 ventas por revisar');
 
@@ -169,7 +170,7 @@ test('keeps asking when the cashier presses Esc or a scanner fires', async ({ us
   await crashWithPendingSales(launch, [[HAMMER_CODE, HAMMER_CENTS]]);
 
   const reopened = await launch();
-  const page = await reopened.firstWindow();
+  const page = await signInWindow(reopened);
   await expect(question(page)).toBeVisible();
 
   await page.keyboard.press('Escape');
@@ -183,7 +184,7 @@ test('keeps asking when the cashier presses Esc or a scanner fires', async ({ us
 });
 
 test('refuses sale requests that do not follow the rules of the bridge', async ({ launch }) => {
-  const page = await (await launch()).firstWindow();
+  const page = await signInWindow(await launch());
   await expect(lookupBox(page)).toBeFocused();
 
   const refusals = await page.evaluate(async () => {
@@ -203,7 +204,7 @@ test('refuses sale requests that do not follow the rules of the bridge', async (
 
 test('does not save a sale whose total is not the one the catalog gives', async ({ userDataDir, launch }) => {
   const register = await launch();
-  const page = await register.firstWindow();
+  const page = await signInWindow(register);
   await expect(lookupBox(page)).toBeFocused();
 
   const status = await page.evaluate(async (code) => {

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatQuantity, formatSaleMoment, formatTaxLabel } from './format';
+import { formatQuantity, formatSaleMoment, formatSignedCents, formatTaxLabel } from './format';
+
+describe('formatSignedCents', () => {
+  it('shows positive and zero amounts like formatCents, and negative ones with a minus sign', () => {
+    expect(formatSignedCents(3500)).toBe('$35.00');
+    expect(formatSignedCents(0)).toBe('$0.00');
+    expect(formatSignedCents(-3500)).toBe('−$35.00');
+  });
+});
 
 describe('formatSaleMoment', () => {
   it('shows the date and the time of the register', () => {
@@ -34,5 +42,13 @@ describe('formatTaxLabel', () => {
     ['exempt', 0, 'Exento'],
   ] as const)('names %s at %i basis points as %s', (factor, rateBp, expected) => {
     expect(formatTaxLabel({ factor, rateBp })).toBe(expected);
+  });
+});
+
+describe('formatSignedCents', () => {
+  it('shows positive and zero amounts like formatCents, and negative ones with a minus sign', () => {
+    expect(formatSignedCents(3500)).toBe('$35.00');
+    expect(formatSignedCents(0)).toBe('$0.00');
+    expect(formatSignedCents(-3500)).toBe('−$35.00');
   });
 });

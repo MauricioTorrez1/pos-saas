@@ -3,7 +3,13 @@ import { pathToFileURL } from 'node:url';
 
 import { app, dialog } from 'electron';
 
+import { AuthService } from './auth/auth-service';
+import { CashService } from './cash/cash-service';
+import { CashSessionStore } from './cash/cash-session-store';
+import { UserStore } from './auth/user-store';
 import { PendingSales } from './checkout/pending-sales';
+import { ReturnService } from './returns/return-service';
+import { ReturnStore } from './returns/return-store';
 import { SaleCheckout } from './checkout/sale-checkout';
 import { SalePayments } from './checkout/sale-payments';
 import { renderTicket } from './checkout/ticket/ticket';
@@ -74,6 +80,8 @@ async function start(): Promise<void> {
   const catalog = new ProductCatalog(store, LOCAL_TENANT_ID);
   const sales = new SaleStore(store, LOCAL_TENANT_ID);
   const appearance = new AppearanceStore(store, LOCAL_TENANT_ID);
+  const auth = new AuthService(new UserStore(store, LOCAL_TENANT_ID));
+  const cash = new CashService(new CashSessionStore(store, LOCAL_TENANT_ID), auth);
   const printer = choosePrinter();
   // The drawer hangs from the printer, so both are real once the printer is configured and fakes until then (ADR 0028).
   const checkout = new SaleCheckout({
@@ -83,9 +91,16 @@ async function start(): Promise<void> {
       renderTicket(toTicketData(appearance.read().businessName || UNNAMED_BUSINESS, sale, { ...receipt, isReprint: false })),
   });
   registerIpcHandlers(rendererEntry, {
+    auth,
+    cash,
+    returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, cash),
     catalog,
     appearance,
-    pendingSales: new PendingSales(catalog, sales),
+    pendingSales: new PendingSales(catalog, sales, () => {
+      const cashierId = auth.currentUser()?.id;
+      const cashSessionId = cash.openSessionId();
+      return cashierId === undefined || cashSessionId === null ? null : { cashierId, cashSessionId };
+    }),
     salePayments: new SalePayments(sales, checkout, {
       printer,
       businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,

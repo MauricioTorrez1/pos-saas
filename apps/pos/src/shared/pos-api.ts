@@ -1,11 +1,33 @@
 import type { Quantity, TaxRate, Unit } from '@pos-saas/money';
 
 import type { Appearance } from './appearance';
+import type { LoginResult, UserRole, UserSummary } from './auth';
+import type { FindReturnableResult, ReturnRequest, ReturnResult } from './returns-api';
+import type {
+  CashMovementRequest,
+  CashMovementResult,
+  CashStatus,
+  CloseCashRequest,
+  CloseCashResult,
+  OpenCashResult,
+} from './cash-api';
 import type { PaymentPlan } from './payment-plan';
 
 /** Channels between the preload bridge and the main process. */
 export const IPC_CHANNELS = {
   getAppInfo: 'app:get-info',
+  getAuthState: 'auth:get-state',
+  setupOwner: 'auth:setup-owner',
+  login: 'auth:login',
+  logout: 'auth:logout',
+  createUser: 'auth:create-user',
+  findReturnableSale: 'returns:find-sale',
+  createReturn: 'returns:create',
+  getCashStatus: 'cash:get-status',
+  openCashSession: 'cash:open',
+  recordCashMovement: 'cash:record-movement',
+  closeCashSession: 'cash:close',
+  setWithdrawalLimit: 'cash:set-limit',
   findProductByCode: 'catalog:find-by-code',
   searchProducts: 'catalog:search',
   getAppearance: 'appearance:get',
@@ -75,7 +97,9 @@ export interface PendingSale {
 export type SavePendingSaleResult =
   | { readonly status: 'saved'; readonly sale: PendingSale }
   /** A product no longer exists or its price changed, so the screen shows a sale that does not match. Nothing was saved. */
-  | { readonly status: 'catalog_changed' };
+  | { readonly status: 'catalog_changed' }
+  /** The register is closed: nothing is sold until somebody opens it with a float (RF-024). */
+  | { readonly status: 'no_cash_session' };
 
 /** What the customer handed over for a saved sale. The main process works out the payments and the change itself. */
 export interface PaymentRequest {
@@ -124,6 +148,14 @@ export type ReprintResult =
   /** The printer did not take the job. The sale is not affected. */
   | { readonly status: 'printer_failed'; readonly folio: string; readonly message: string };
 
+/** Who can sign in at this register and who is signed in. */
+export interface AuthState {
+  /** True when nobody was registered yet, so the first person must become the owner. */
+  readonly needsSetup: boolean;
+  readonly users: readonly UserSummary[];
+  readonly current: UserSummary | null;
+}
+
 /** Everything the screen can ask of the main process. */
 export interface PosApi {
   /**
@@ -132,6 +164,100 @@ export interface PosApi {
    * @returns the app version, as the main process knows it
    */
   getAppInfo(): Promise<AppInfo>;
+
+  /**
+   * Finds the completed sale a customer wants to return from the folio on their ticket (RF-019).
+   *
+   * @param folio what was typed, such as T1-000123 or just 123`
+   * @returns the sale with what can still come back from each line, or why it was not found
+   */
+  findReturnableSale(folio: string): Promise<FindReturnableResult>;
+
+  /**
+   * Records a return as a record next to the sale, which never changes. The owner authorizes it, it is refused by default
+   * after 30 days or for cut-to-measure products, and it can never bring back more than was sold.
+   *
+   * @param request the sale, what comes back from each line, the reason, and the authorization
+   * @returns what to give back by each means, or why the return was refused
+   */
+  createReturn(request: ReturnRequest): Promise<ReturnResult>;
+
+  /**
+   * Reads how the cash of the register stands: whether it is open, what is expected in the drawer, and whether to withdraw.
+   *
+   * @returns the status
+   */
+  getCashStatus(): Promise<CashStatus>;
+
+  /**
+   * Opens the register with the cash the cashier puts in the drawer (RF-024).
+   *
+   * @param request the float, which may be zero
+   * @returns opened, or lready_open, because there is one session at a time
+   */
+  openCashSession(request: { readonly floatCents: number }): Promise<OpenCashResult>;
+
+  /**
+   * Records cash going into or out of the drawer, with its reason (RF-025). A cashier needs an owner's PIN to take cash out.
+   *
+   * @param request the kind, the amount, the reason, and the owner's PIN when needed
+   * @returns ecorded with the new status, or why not
+   */
+  recordCashMovement(request: CashMovementRequest): Promise<CashMovementResult>;
+
+  /**
+   * Makes the cut with what was counted, and closes the register (RF-027).
+   *
+   * @param request the bills and coins, the card and transfer vouchers, and the reason if it does not balance
+   * @returns closed with the cut, or why not
+   */
+  closeCashSession(request: CloseCashRequest): Promise<CloseCashResult>;
+
+  /**
+   * Changes the cash level that triggers the warning to withdraw cash (RF-026). Only the owner.
+   *
+   * @param request the new limit, in cents
+   * @returns the new status
+   */
+  setWithdrawalLimit(request: { readonly limitCents: number }): Promise<CashStatus>;
+
+  /**
+   * Reads who can sign in and who is signed in. Nothing else works until somebody is.
+   *
+   * @returns whether the register needs its owner, the people who can sign in, and the person signed in
+   */
+  getAuthState(): Promise<AuthState>;
+
+  /**
+   * Creates the owner of a register that has nobody. It does not sign them in.
+   *
+   * @param request their name and a PIN of four to eight digits
+   * @returns the owner
+   */
+  setupOwner(request: { readonly name: string; readonly pin: string }): Promise<UserSummary>;
+
+  /**
+   * Signs a person in with their PIN. It works without internet.
+   *
+   * @param request the person and their PIN
+   * @returns ok, or why not: a wrong PIN with the tries left, or a lock after five wrong ones
+   */
+  login(request: { readonly userId: string; readonly pin: string }): Promise<LoginResult>;
+
+  /**
+   * Signs out whoever is signed in.
+   *
+   * @returns once nobody is signed in
+   */
+  logout(): Promise<void>;
+
+  /**
+   * Adds a person. Only the owner who is signed in can.
+   *
+   * @param request their name, their role, and a PIN of four to eight digits
+   * @returns the new person
+   */
+  createUser(request: { readonly name: string; readonly role: UserRole; readonly pin: string }): Promise<UserSummary>;
 
   /**
    * Finds the product that has exactly this barcode.

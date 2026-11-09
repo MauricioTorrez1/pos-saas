@@ -3,7 +3,7 @@
 Actualizado: 2026-11-08. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** E1-13, E1-14, E1-12 y E1-08, en revisión en el mismo PR.
+- **Tarea en curso:** E1-04, E1-21, E1-22, E1-23 y E1-15, en revisión en el mismo PR.
 - **Siguiente:** la caja en el orden del [ADR 0019](../adr/0019-caja-primero.md): E1-13 y E1-14, tras E1-11, que ya está terminada. F0-08 y las demás se retoman después.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
@@ -63,6 +63,15 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
   5. Escanear un kilo de clavo con el lector y teclear 125 en lugar de 1.25 en la cantidad. Debe pedir F2.
   6. Si el cajón no abre con el pulso, anotar la marca del cajón: algunos usan la clavija 5 en lugar de la 2, y se cambia en EscPosBuilder.openDrawer.
 
+- **Un día completo en la tienda con PIN, caja y corte (E1-04, E1-21, E1-22, E1-23).** Con la caja abierta con corepack pnpm --filter @pos-saas/pos start:
+  1. Crear tu usuario de dueño y agregar a un cajero de la familia. Pedirle que entre con su PIN y que haga una venta sin explicarle nada (RNF-13).
+  2. Abrir la caja con un fondo real, vender en efectivo, tarjeta y transferencia, y sacar efectivo para pagar a un proveedor. Como cajero, comprobar que pide el PIN del dueño.
+  3. Hacer el corte contando billete por billete y compararlo con el corte de Eleventa del mismo día: debe dar las mismas cantidades por forma de pago.
+  4. Equivocarse cinco veces con el PIN de un cajero: debe bloquearlo cinco minutos, y seguir bloqueado si se cierra y abre la caja.
+  5. Definir con tu familia el límite de efectivo para el aviso de retiro y cambiarlo con F8 dentro de F3.
+
+- **Devoluciones con casos reales (E1-15).** Con tu familia, probar estos casos con tickets de verdad: devolver una pieza de una venta de dos, un ticket pagado mitad efectivo y mitad transferencia (debe regresar mitad y mitad), un ticket de hace más de 30 días y cable cortado (deben rechazarse y dejar la excepción solo al dueño). Anotar si la regla de 30 días y la de cortado les parecen bien.
+
 ## Fase 0
 | Tarea | Título | Horas | Estado |
 | --- | --- | --- | --- |
@@ -98,26 +107,26 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | E1-01 | Esqueleto de la caja en Electron | 4 | Terminada |
 | E1-02 | SQLite local y migraciones | 4 | Terminada |
 | E1-03 | Interfaces de hardware y falsos | 3 | Terminada |
-| E1-04 | Login con PIN en la caja | 4 | Pendiente |
+| E1-04 | Login con PIN en la caja | 4 | En revisión |
 | E1-05 | Dinero y cantidades | 5 | Terminada |
 | E1-06 | IVA incluido y totales | 4 | Terminada |
 | E1-07 | Pantalla de venta | 5 | Terminada |
-| E1-08 | Venta por peso y por metro | 4 | En revisión |
+| E1-08 | Venta por peso y por metro | 4 | Terminada |
 | E1-09 | Artículo varios y listas de precio | 3 | Pendiente |
 | E1-10 | Máquina de estados de la venta | 5 | Terminada |
 | E1-11 | Efectivo, transferencia y pago mixto | 5 | Terminada |
-| E1-12 | Tarjeta tecleada con folio | 2 | En revisión |
-| E1-13 | Ticket ESC/POS | 5 | En revisión |
-| E1-14 | Cajón y prueba de hardware | 3 | En revisión |
-| E1-15 | Devoluciones | 6 | Pendiente |
+| E1-12 | Tarjeta tecleada con folio | 2 | Terminada |
+| E1-13 | Ticket ESC/POS | 5 | Terminada |
+| E1-14 | Cajón y prueba de hardware | 3 | Terminada |
+| E1-15 | Devoluciones | 6 | En revisión |
 | E1-16 | Envío desde la caja | 5 | Pendiente |
 | E1-17 | Recepción en el núcleo | 6 | Pendiente |
 | E1-18 | Cambios hacia la caja | 5 | Pendiente |
 | E1-19 | Discrepancias y cuarentena | 4 | Pendiente |
 | E1-20 | Prueba de punta a punta sin internet | 4 | Pendiente |
-| E1-21 | Sesión de caja | 5 | Pendiente |
-| E1-22 | Aviso de retiro parcial | 2 | Pendiente |
-| E1-23 | Corte con arqueo | 5 | Pendiente |
+| E1-21 | Sesión de caja | 5 | En revisión |
+| E1-22 | Aviso de retiro parcial | 2 | En revisión |
+| E1-23 | Corte con arqueo | 5 | En revisión |
 | E1-24 | Reporte por correo | 3 | Pendiente |
 | E1-25 | Movimientos por venta y devolución | 4 | Pendiente |
 | E1-26 | Ajustes y mermas | 3 | Pendiente |
@@ -292,3 +301,4 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | 2026-11-08 | E1-11 terminada. PR 22 fusionado con squash en `2b78050` con `gh pr merge`, con el título revisado. La caja ya cobra con efectivo, transferencia o ambos, muestra el cambio y la recuperación pregunta con qué se pagó. Cajón e impresora siguen con los falsos hasta E1-14 y E1-13. Las compras simuladas siguen pendientes, antes del piloto. Mauricio pidió simplificar: ya no se entregan preguntas de autoevaluación al cerrar cada tarea, y el CI corre en paralelo con la siguiente tarea. También pidió imágenes de producto y vista previa de coincidencias al buscar por código o nombre, que queda como tarea nueva | Empezar E1-13 en una sesión nueva |
 | 2026-11-08 | E1-13 en revisión, en modo automático. ADR 0027: EscPosBuilder arma los bytes (página 858 para acentos y eñes, y el texto nunca lleva comandos), layoutTicket pone 48 columnas, y el folio corto T1-000123 se asigna dentro de la transacción que completa la venta, sin huecos y con la base exigiéndolo (migración 6). F8 reimprime la última venta marcada REIMPRESIÓN y sin cambio. WindowsSharedPrinter imprime en una impresora compartida de Windows si existe POS_PRINTER_SHARE, y si no, la caja vende sin imprimir. En local, 446 pruebas en Vitest de la caja (antes 393) y 36 con Playwright (antes 35). Probar con la TM-T20 real quedó en «Pendientes de Mauricio antes del piloto». CI todavía no corre | Abrir el PR y fusionar |
 | 2026-11-08 | E1-13 abierto en el PR 23, con los diez checks en verde en `e5dbd9a`, con `TypeScript` en 74 segundos. Por petición de Mauricio, el PR lleva también E1-14, E1-12 y E1-08 (ADR 0028): el cajón abre con un pulso ESC/POS por la impresora, la tarjeta cobrada en la terminal aparte se guarda como `card_manual` con folio obligatorio y se rechaza un folio que parezca un número de tarjeta (migración 7), y los productos por metro, kilo o litro piden la cantidad con el importe a la vista, con F2 para lo que pasa de 50 kg, 100 m o 50 L. En local, 492 pruebas en Vitest de la caja y 40 con Playwright. Mauricio también pidió una versión web para negocios como un puesto de tacos, que queda como tarea nueva. CI del lote todavía no corre | Esperar el CI del PR y fusionar |
+| 2026-11-08 | Lote 2 en revisión, en modo automático, para acercar la salida de Eleventa: E1-04, E1-21, E1-22, E1-23 y E1-15 (ADR 0029 y 0030). El lote 1 (E1-13, E1-14, E1-12 y E1-08) quedó fusionado en `a0bb6cf`, con los diez checks en verde también en `main`. Acceso con PIN en scrypt y bloqueo tras cinco errores que sobrevive al reinicio; sin sesión de caja abierta no se vende; entradas y salidas con motivo, con el PIN del dueño para que un cajero saque efectivo; aviso de retiro que nunca frena una venta; corte con conteo por denominación y motivo si no cuadra; y devoluciones como registro aparte que reparte el reembolso por los mismos medios y nunca devuelve más de lo vendido. Una prueba encontró un error real: el efectivo esperado podía quedar negativo y dejaba la pantalla en blanco, y ahora se muestra con signo y hay una pantalla de respaldo. En local, 715 pruebas en Vitest de la caja (antes 492) y 53 con Playwright (antes 40). CI todavía no corre | Esperar el CI del PR y fusionar |

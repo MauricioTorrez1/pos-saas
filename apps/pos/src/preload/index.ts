@@ -4,6 +4,18 @@ import { IPC_CHANNELS, type PosApi } from '../shared/pos-api';
 
 const posApi: PosApi = {
   getAppInfo: () => ipcRenderer.invoke(IPC_CHANNELS.getAppInfo),
+  getAuthState: () => ipcRenderer.invoke(IPC_CHANNELS.getAuthState),
+  setupOwner: (request) => ipcRenderer.invoke(IPC_CHANNELS.setupOwner, request),
+  login: (request) => ipcRenderer.invoke(IPC_CHANNELS.login, request),
+  logout: () => ipcRenderer.invoke(IPC_CHANNELS.logout),
+  createUser: (request) => ipcRenderer.invoke(IPC_CHANNELS.createUser, request),
+  findReturnableSale: (folio) => ipcRenderer.invoke(IPC_CHANNELS.findReturnableSale, folio),
+  createReturn: (request) => ipcRenderer.invoke(IPC_CHANNELS.createReturn, request),
+  getCashStatus: () => ipcRenderer.invoke(IPC_CHANNELS.getCashStatus),
+  openCashSession: (request) => ipcRenderer.invoke(IPC_CHANNELS.openCashSession, request),
+  recordCashMovement: (request) => ipcRenderer.invoke(IPC_CHANNELS.recordCashMovement, request),
+  closeCashSession: (request) => ipcRenderer.invoke(IPC_CHANNELS.closeCashSession, request),
+  setWithdrawalLimit: (request) => ipcRenderer.invoke(IPC_CHANNELS.setWithdrawalLimit, request),
   findProductByCode: (code) => ipcRenderer.invoke(IPC_CHANNELS.findProductByCode, code),
   searchProducts: (text) => ipcRenderer.invoke(IPC_CHANNELS.searchProducts, text),
   getAppearance: () => ipcRenderer.invoke(IPC_CHANNELS.getAppearance),

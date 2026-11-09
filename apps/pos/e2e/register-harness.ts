@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { _electron as electron, type ElectronApplication } from '@playwright/test';
+import { _electron as electron, expect, type ElectronApplication, type Page } from '@playwright/test';
 
 const APP_ROOT = join(import.meta.dirname, '..');
 // Outside the Electron runtime, this package only exports the path of its binary.
@@ -356,4 +356,46 @@ export async function readRecoveredState(register: ElectronApplication, paths: T
     },
     { databasePath: paths.databasePath, linesPerSale: LINES_PER_TEST_SALE },
   );
+}
+
+/** The owner that tests create the first time a register starts, and sign in as afterwards. */
+export const TEST_OWNER = { name: 'Mauricio', pin: '4321' } as const;
+
+/**
+ * Opens the window of a running register and gets past the sign-in, the way a person would: the first start creates the
+ * owner, and the next ones enter with the same PIN. It returns once the register screen is there, even if a question about
+ * a sale left pending is covering it.
+ *
+ * @param register the running app
+ * @returns the window, signed in
+ */
+export async function signInWindow(register: ElectronApplication): Promise<Page> {
+  const page = await register.firstWindow();
+  const welcome = page.getByRole('heading', { name: 'Bienvenido' });
+  const whoIsCharging = page.getByRole('heading', { name: '¿Quién cobra?' });
+  await expect(welcome.or(whoIsCharging)).toBeVisible();
+  if (await welcome.isVisible()) {
+    await page.getByRole('textbox', { name: 'Tu nombre' }).fill(TEST_OWNER.name);
+    await page.getByRole('textbox', { name: 'Elige un PIN' }).fill(TEST_OWNER.pin);
+    await page.getByRole('textbox', { name: 'Repite el PIN' }).fill(TEST_OWNER.pin);
+    await page.keyboard.press('Enter');
+  } else {
+    await page.getByLabel('PIN', { exact: true }).fill(TEST_OWNER.pin);
+    await page.keyboard.press('Enter');
+  }
+  await expect(page.getByRole('combobox', { name: 'Buscar producto' })).toBeVisible();
+  await openCashIfClosed(page);
+  return page;
+}
+
+/** The first start has a closed register, which cannot sell, so the test opens it with no float, as a cashier would. */
+async function openCashIfClosed(page: Page): Promise<void> {
+  const state = page.getByLabel('Estado de la caja');
+  await expect(state).toHaveText(/Caja (abierta|cerrada)/);
+  if ((await state.textContent()) === 'Caja cerrada') {
+    await page.getByRole('textbox', { name: 'Fondo de caja' }).fill('0');
+    await page.keyboard.press('F2');
+    await expect(state).toHaveText('Caja abierta');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  }
 }
