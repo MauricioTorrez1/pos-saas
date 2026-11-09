@@ -5,6 +5,8 @@ import type { BackupOutcome, BackupStatus, ImportOutcome, ImportReportView } fro
 import type { PosApi } from '../../shared/pos-api';
 import { Field, Message, useAction } from '../ui/form-parts';
 import { ModalDialog } from '../ui/ModalDialog';
+import { InventoryView } from './InventoryView';
+import { ReportView } from './ReportView';
 import { useWindowKeys } from '../ui/use-window-keys';
 
 const MOMENT = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
@@ -13,7 +15,9 @@ const SHOWN_INVALID_ROWS = 10;
 type View =
   | { readonly kind: 'summary' }
   | { readonly kind: 'passphrase'; readonly purpose: 'configure' | 'restore' }
-  | { readonly kind: 'imported'; readonly report: ImportReportView };
+  | { readonly kind: 'imported'; readonly report: ImportReportView }
+  | { readonly kind: 'inventory' }
+  | { readonly kind: 'report' };
 
 interface AdminDialogProps {
   readonly posApi: PosApi;
@@ -56,6 +60,17 @@ export function AdminDialog({ posApi, onClose }: AdminDialogProps): ReactElement
       showBackup(outcome);
     });
 
+  const checkLedger = (): void =>
+    run(async () => {
+      setNote(null);
+      const check = await posApi.checkLedger();
+      if (check.problems.length === 0) {
+        setNote(`Todo cuadra: ${check.checkedMovements} movimientos revisados contra las ventas y las devoluciones.`);
+      } else {
+        setMessage(`${check.problems.length} movimiento(s) no cuadran con las ventas. No vendas con esta base y avisa a soporte.`);
+      }
+    });
+
   const showBackup = (outcome: BackupOutcome): void => {
     if ('backup' in outcome) {
       setBackup(outcome.backup);
@@ -74,6 +89,9 @@ export function AdminDialog({ posApi, onClose }: AdminDialogProps): ReactElement
   useWindowKeys(
     view.kind === 'summary'
       ? {
+          F2: () => setView({ kind: 'inventory' }),
+          F3: checkLedger,
+          F4: () => setView({ kind: 'report' }),
           F5: importCatalog,
           F6: () => setView({ kind: 'passphrase', purpose: 'configure' }),
           F7: backupNow,
@@ -88,7 +106,11 @@ export function AdminDialog({ posApi, onClose }: AdminDialogProps): ReactElement
 
   return (
     <ModalDialog titleId="admin-title" className="cash">
-      {view.kind === 'passphrase' ? (
+      {view.kind === 'inventory' ? (
+        <InventoryView posApi={posApi} onBack={() => setView({ kind: 'summary' })} />
+      ) : view.kind === 'report' ? (
+        <ReportView posApi={posApi} onBack={() => setView({ kind: 'summary' })} />
+      ) : view.kind === 'passphrase' ? (
         <PassphraseView
           posApi={posApi}
           purpose={view.purpose}
@@ -115,6 +137,15 @@ export function AdminDialog({ posApi, onClose }: AdminDialogProps): ReactElement
           )}
           <Message text={message} />
           <ul className="cash-actions">
+            <li>
+              <kbd>F2</kbd> Inventario: ver el historial de un producto, registrar mermas y ajustes
+            </li>
+            <li>
+              <kbd>F3</kbd> Revisar que el inventario cuadre con las ventas
+            </li>
+            <li>
+              <kbd>F4</kbd> Reporte del día: ventas, ticket promedio, ganancia, agotados
+            </li>
             <li>
               <kbd>F5</kbd> Cargar el catálogo y las existencias de Eleventa
             </li>

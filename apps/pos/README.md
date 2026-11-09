@@ -113,6 +113,8 @@ F1, for the owner only, holds what is done once or rarely. **F5** loads the prod
 
 Stock is the sum of an immutable ledger (stock_movement). A completed sale and a return post their movements in the same transaction, and stock can go below zero.
 
+Also in F1: **F2** opens the inventory of a product, with its kardex (every movement and the balance after it) and a form to write off a loss or correct a count with its reason. The movement and its entry in the append-only audit log are written in one transaction. **F3** checks the ledger against the sales and the returns. **F4** is the report of a day: sales, average ticket, returns, sales by hour and cashier, margin over the last known cost, what ran out and what is not selling ([ADR 0032](../../docs/adr/0032-ajustes-kardex-bitacora-y-reporte-del-dia.md)).
+
 ## Installer
 `pnpm --filter @pos-saas/pos package` builds `dist/Caja Setup <version>.exe` with electron-builder (NSIS, per user, no administrator). Updating is running the new installer, and uninstalling never deletes the data. See [the installation guide](../../docs/instalacion.md), including the SmartScreen warning that an unsigned installer shows.
 ## Appearance
