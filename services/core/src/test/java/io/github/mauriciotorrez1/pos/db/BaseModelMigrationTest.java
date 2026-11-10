@@ -42,7 +42,7 @@ class BaseModelMigrationTest {
                 SELECT success::text FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1
                 """, String.class);
 
-        assertThat(tables).containsExactly("app_user", "branch", "event_publication", "register", "tenant");
+        assertThat(tables).containsExactly("app_user", "audit_log", "branch", "event_publication", "register", "tenant");
         assertThat(latestState).isEqualTo("true");
     }
 
