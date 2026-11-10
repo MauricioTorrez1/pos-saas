@@ -60,6 +60,17 @@ An event that implements `BusinessEvent` and is annotated `@Externalized("topic:
 ## Audit log
 `AuditLog.record(AuditEntry)` appends who did what to which entity, with the value before and after, in the transaction of the change ([ADR 0038](../../docs/adr/0038-bitacora-de-auditoria-solo-agregar.md)). It fails without a transaction. The table is append-only: `pos_app` has no `UPDATE`, `DELETE` or `TRUNCATE`, and a trigger rejects them for every role. Store ids and business values only, never PINs, tokens, card data or needless personal data.
 
+## Invoicing (Facturapi)
+Other modules depend on the `FiscalInvoicing` interface (`invoicing` root package) and never on the client, so tests use a fake ([ADR 0041](../../docs/adr/0041-cliente-de-facturapi.md)). It creates receivers, stamps invoices (including the `global` object and credit notes), reads and cancels them, and downloads PDF and XML. Amounts use the scales of ADR 0011.
+
+Failures are `FacturapiRejectedException` (4xx, do not repeat), `FacturapiUnavailableException` (5xx, 429, timeout; outcome unknown for writes) and `FacturapiNotConfiguredException` (no key). Only reads are retried; a stamp or cancellation is sent once, so look the invoice up before repeating a doubtful one. Messages and logs never carry the key, bodies or fiscal data; `providerMessage()` may, so show it but do not log it.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `FACTURAPI_API_KEY` | empty (calls fail without touching the network) | Secret key of the account; use the test key outside production |
+
+Timeouts and retries are the `facturapi.connect-timeout` (3s), `facturapi.read-timeout` (20s), `facturapi.max-retries` (2) and `facturapi.retry-backoff` (300ms) properties. Tests run against a fake server and need no key.
+
 ## Observability
 The core sends traces, metrics and logs over OTLP to the collector of the `observability` profile and errors to Sentry ([ADR 0037](../../docs/adr/0037-observabilidad-del-nucleo.md)). Every log line shows `[service,traceId,spanId,tenant_id]`; spans carry `tenant.id`, and no metric uses it as a label. Never log names, phones, emails, PINs, tokens or card data, only ids.
 
