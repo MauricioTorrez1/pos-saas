@@ -2,6 +2,7 @@ package io.github.mauriciotorrez1.pos.security;
 
 import static io.github.mauriciotorrez1.pos.security.EndpointRule.authenticated;
 import static io.github.mauriciotorrez1.pos.security.EndpointRule.requires;
+import static org.springframework.http.HttpMethod.DELETE;
 import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.PATCH;
 import static org.springframework.http.HttpMethod.POST;
@@ -23,7 +24,9 @@ public final class EndpointPermissions {
             requires(PUT, "/users/{id}/role", Permission.USER_ROLE_CHANGE),
             requires(GET, "/products", Permission.PRODUCT_READ),
             requires(POST, "/products", Permission.PRODUCT_WRITE),
+            requires(GET, "/products/{id}", Permission.PRODUCT_READ),
             requires(PATCH, "/products/{id}", Permission.PRODUCT_WRITE),
+            requires(DELETE, "/products/{id}", Permission.PRODUCT_WRITE),
             requires(POST, "/imports/catalog", Permission.CATALOG_IMPORT),
             requires(POST, "/price-changes", Permission.PRICE_CHANGE),
             requires(GET, "/discrepancies", Permission.DISCREPANCY_VIEW),
