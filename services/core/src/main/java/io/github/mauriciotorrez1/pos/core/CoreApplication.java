@@ -2,6 +2,8 @@ package io.github.mauriciotorrez1.pos.core;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Import;
+import io.github.mauriciotorrez1.pos.tenant.TenantIsolationConfiguration;
 
 /**
  * Entry point of the core service, a modular monolith.
@@ -10,6 +12,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * the public API of the module, and its subpackages are internal to it.
  */
 @SpringBootApplication
+@Import(TenantIsolationConfiguration.class)
 public class CoreApplication {
 
     /**

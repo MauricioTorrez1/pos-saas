@@ -2,10 +2,15 @@ spring:
   application:
     name: pos-core
   datasource:
-    # Tests get their own database from Testcontainers. The password has no default on purpose (CLAUDE.md).
+    # The application connects as pos_app, a role without BYPASSRLS (ADR 0035). Tests get their own
+    # database from Testcontainers. Passwords have no default on purpose (CLAUDE.md).
     url: ${CORE_DB_URL:jdbc:postgresql://localhost:5432/pos_saas}
-    username: ${CORE_DB_USER:pos_admin}
+    username: ${CORE_DB_USER:pos_app}
     password: ${CORE_DB_PASSWORD:}
   flyway:
     # Migrations are plain SQL in src/main/resources/db/migration and are never edited once applied (ADR 0034).
+    # They run with their own role, the owner of the tables, never with the application role.
     locations: classpath:db/migration
+    url: ${CORE_DB_URL:jdbc:postgresql://localhost:5432/pos_saas}
+    user: ${CORE_MIGRATION_DB_USER:pos_admin}
+    password: ${CORE_MIGRATION_DB_PASSWORD:}
