@@ -3,6 +3,7 @@ package io.github.mauriciotorrez1.pos.db;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.mauriciotorrez1.pos.core.CoreApplication;
 import io.github.mauriciotorrez1.pos.id.Uuid7;
 import java.util.List;
 import java.util.UUID;
@@ -15,7 +16,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Boots the application against an empty PostgreSQL and checks what Flyway left behind. */
-@SpringBootTest
+@SpringBootTest(classes = CoreApplication.class)
 @Import(PostgresTestConfiguration.class)
 class BaseModelMigrationTest {
 
