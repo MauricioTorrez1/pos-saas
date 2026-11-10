@@ -49,3 +49,6 @@ sentry:
   dsn: ${SENTRY_DSN:}
   send-default-pii: false
   environment: ${CORE_ENVIRONMENT:local}
+facturapi:
+  # The key comes only from the environment, never from a file (ADR 0041). Empty means no call is made.
+  api-key: ${FACTURAPI_API_KEY:}
