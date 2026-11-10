@@ -37,7 +37,7 @@ La caja entrega al núcleo cada venta «al menos una vez» (ADR 0040): si muere 
 - **Bitácora.** El corte de caja y los ajustes y mermas de inventario llaman a `AuditLog.record` dentro de la transacción de la operación (ADR 0038), con el usuario que actuó. Si la operación revierte, la entrada también.
 
 ## Consecuencias
-- El `registerId` se guarda pero todavía no se compara con una caja enrolada: el enrolamiento y el token de dispositivo llegan con F0-15, y entonces `POST /sync/push` debe exigir que el `registerId` sea el de la credencial. Hoy cualquier token válido con `tenant_id` puede subir, y F0-14 debe restringirlo por rol.
+- El `registerId` se guarda pero todavía no se compara con una caja enrolada: el enrolamiento y el token de dispositivo llegan con F0-15, y entonces `POST /sync/push` debe exigir que el `registerId` sea el de la credencial. F0-14 ya exige el permiso `sync.push` (dueño, encargado y cajero); F0-15 debe cambiarlo por la credencial de dispositivo.
 - Un lote de 100 son hasta 100 transacciones cortas en lugar de una. Es el costo de que la respuesta sea verdad, y a decenas de ventas por minuto no pesa.
 - Una cuarentena no se reintenta ni se aplica sola: queda en `sync_operation` con su `raw_operation` hasta que E1-19 construya su revisión. Una venta en cuarentena no cuenta en `sale`; el dueño debe poder verla antes del piloto.
 - Las discrepancias de precio (RF-022) y el cursor de bajada (E1-18) no se hacen aquí. Los movimientos de inventario de ventas y devoluciones los deriva E1-25 de `sale` y `sale_return`; por eso `stock_movement` solo recibe ajustes y mermas.

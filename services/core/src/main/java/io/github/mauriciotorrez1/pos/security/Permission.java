@@ -29,7 +29,9 @@ public enum Permission {
     /** See the sales reports. */
     REPORT_VIEW("report.view", Role.OWNER, Role.MANAGER),
     /** Change the role of a user. */
-    USER_ROLE_CHANGE("user.role.change", Role.OWNER);
+    USER_ROLE_CHANGE("user.role.change", Role.OWNER),
+    /** Upload the operations of a register (E1-17). The register acts as the staff member that signed in on it. */
+    SYNC_PUSH("sync.push", Role.OWNER, Role.MANAGER, Role.CASHIER);
 
     private final String id;
     private final Set<Role> roles;

@@ -20,6 +20,7 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 | Endpoint | Permiso | Dueño | Encargado | Cajero |
 | --- | --- | :---: | :---: | :---: |
 | `GET /me` | (authenticated) | Sí | Sí | Sí |
+| `POST /sync/push` | `sync.push` | Sí | Sí | Sí |
 | `PUT /users/{id}/role` | `user.role.change` | Sí | — | — |
 | `GET /products` | `product.read` | Sí | Sí | Sí |
 | `POST /products` | `product.write` | Sí | Sí | — |
@@ -37,6 +38,7 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 
 | Permiso | En palabras sencillas |
 | --- | --- |
+| `sync.push` | Subir a la nube las ventas y movimientos que hizo una caja |
 | `product.read` | Ver productos, sus códigos y sus precios |
 | `product.write` | Dar de alta y editar productos (no su precio: eso es `price.change`) |
 | `catalog.import` | Cargar el catálogo desde un archivo, por ejemplo el de Eleventa |

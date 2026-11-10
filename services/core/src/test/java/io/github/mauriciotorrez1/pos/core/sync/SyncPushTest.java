@@ -444,8 +444,15 @@ class SyncPushTest {
         return JSON.readTree(body);
     }
 
-    private static JwtRequestPostProcessor token(UUID business) {
-        return jwt().jwt(token -> token.subject("register-credential").claim("tenant_id", business.toString()));
+    /** A token of a cashier of the business: the register acts as the staff member signed in on it (ADR 0042). */
+    private JwtRequestPostProcessor token(UUID business) {
+        String subject = "register-" + business;
+        admin.update("""
+                INSERT INTO tenant (id, name) VALUES (?, 'Test business') ON CONFLICT DO NOTHING""", business);
+        admin.update("""
+                INSERT INTO app_user (id, tenant_id, display_name, role, keycloak_subject)
+                VALUES (?, ?, 'Cashier', 'cashier', ?) ON CONFLICT DO NOTHING""", Uuid7.next(), business, subject);
+        return jwt().jwt(token -> token.subject(subject).claim("tenant_id", business.toString()));
     }
 
     private static List<String> statuses(JsonNode response) {
