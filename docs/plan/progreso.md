@@ -3,7 +3,7 @@
 Actualizado: 2026-11-09. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** F0-10 en revisión (outbox hacia Redpanda, ADR 0036). F0-09 quedó terminada (PR 31).
+- **Tarea en curso:** F0-11 en revisión (observabilidad del núcleo, ADR 0037). F0-10 quedó terminada (PR 32).
 - **Siguiente:** probar con datos reales (catálogo de Eleventa, PC de la tienda, impresora y cajón). Las listas de precio necesitan clientes y quedan pendientes. La facturación (E1-30 a E1-33) y la sincronización necesitan el servidor.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
@@ -87,8 +87,8 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | F0-07 | Esqueleto de Spring Boot 4.1 | 4 | Terminada |
 | F0-08 | Flyway y modelo base | 4 | Terminada |
 | F0-09 | RLS y prueba de aislamiento | 5 | Terminada |
-| F0-10 | Outbox hacia Redpanda | 5 | En revisión |
-| F0-11 | Observabilidad del núcleo | 4 | Pendiente |
+| F0-10 | Outbox hacia Redpanda | 5 | Terminada |
+| F0-11 | Observabilidad del núcleo | 4 | En revisión |
 | F0-12 | Bitácora de auditoría | 3 | Pendiente |
 | F0-13 | Keycloak y login con OIDC | 5 | Pendiente |
 | F0-14 | Roles y autorización | 4 | Pendiente |
@@ -316,3 +316,4 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | 2026-11-09 | F0-08 en revisión, en modo automático (ADR 0034): el núcleo trae Flyway con la migración V1, que crea `tenant`, `branch`, `register` y `app_user` con UUIDv7. La base rechaza un UUIDv4 con un `CHECK`, `register` no puede colgar de la sucursal de otro negocio (llave compuesta) y el núcleo genera los ids con `Uuid7`, porque PostgreSQL 16 no tiene `uuidv7()`. Las pruebas de migración usan PostgreSQL 16.15 en Testcontainers; en local no corrieron porque Docker Desktop estaba a medio actualizar, así que las valida CI | Fusionar y seguir con F0-09 |
 | 2026-11-09 | F0-09 en revisión, en modo automático (ADR 0035): la migración V2 activa y fuerza RLS con una política por tabla y crea `pos_app`, un rol sin `BYPASSRLS` distinto del de migraciones. `TenantAwareTransactionManager` fija `app.tenant_id` al abrir cada transacción, venga o no de `@Transactional`. Una prueba recorre el catálogo y rompe CI si una tabla nueva no tiene política; otras prueban acceso cruzado, consulta sin negocio (cero filas) y que el valor no se filtra por el pool. La contraseña de `pos_app` la pone el despliegue, no la migración | Fusionar y seguir con F0-10 |
 | 2026-11-09 | F0-09 terminada (PR 31). F0-10 en revisión, en modo automático (ADR 0036): V3 crea la tabla del outbox de Modulith y los eventos `@Externalized` salen a Redpanda tras el commit, con la llave `tenantId` y el contrato `BusinessEvent` (`eventId` UUIDv7, `tenantId`, versión). Tres pruebas con Testcontainers: confirmado llega, revertido no publica nada y con el broker pausado el evento espera en el outbox y llega al reanudarlo. Falta programar el reenvío periódico (F0-11) | Fusionar y seguir con F0-11 |
+| 2026-11-10 | F0-10 terminada (PR 32). F0-11 en revisión, en modo automático (ADR 0037): el núcleo envía trazas, métricas y logs por OTLP al colector y los errores a Sentry (apagado sin DSN, sin datos personales). Cada línea de log trae `trace_id`, `span_id` y `tenant_id`; el span lleva `tenant.id` y ninguna métrica lo usa como etiqueta. Una prueba de integración comprueba el `trace_id` en el log. Falta seguir una petición en Grafana con el perfil `observability`, que no probé en local | Fusionar y seguir con F0-12 |
