@@ -3,6 +3,7 @@ package io.github.mauriciotorrez1.pos.core;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Import;
+import io.github.mauriciotorrez1.pos.security.SecurityConfiguration;
 import io.github.mauriciotorrez1.pos.tenant.SentryTenantTagging;
 import io.github.mauriciotorrez1.pos.tenant.TenantIsolationConfiguration;
 import io.github.mauriciotorrez1.pos.tenant.TenantObservationFilter;
@@ -14,7 +15,7 @@ import io.github.mauriciotorrez1.pos.tenant.TenantObservationFilter;
  * the public API of the module, and its subpackages are internal to it.
  */
 @SpringBootApplication
-@Import({TenantIsolationConfiguration.class, TenantObservationFilter.class, SentryTenantTagging.class})
+@Import({SecurityConfiguration.class, TenantIsolationConfiguration.class, TenantObservationFilter.class, SentryTenantTagging.class})
 public class CoreApplication {
 
     /**

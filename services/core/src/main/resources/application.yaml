@@ -14,6 +14,15 @@ spring:
     url: ${CORE_DB_URL:jdbc:postgresql://localhost:5432/pos_saas}
     user: ${CORE_MIGRATION_DB_USER:pos_admin}
     password: ${CORE_MIGRATION_DB_PASSWORD:}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keycloak realm "pos" (ADR 0039). Keys and issuer are fetched lazily on the first token, so the
+          # core starts even when Keycloak is down; /actuator/health stays public either way.
+          issuer-uri: ${CORE_OIDC_ISSUER_URI:http://localhost:8180/realms/pos}
+          jwk-set-uri: ${CORE_OIDC_JWK_SET_URI:${CORE_OIDC_ISSUER_URI:http://localhost:8180/realms/pos}/protocol/openid-connect/certs}
+          audiences: pos-core
   modulith:
     events:
       jdbc:
