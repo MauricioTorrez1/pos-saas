@@ -42,7 +42,7 @@ class BaseModelMigrationTest {
                 SELECT success::text FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1
                 """, String.class);
 
-        assertThat(tables).containsExactly("app_user", "branch", "register", "tenant");
+        assertThat(tables).containsExactly("app_user", "branch", "event_publication", "register", "tenant");
         assertThat(latestState).isEqualTo("true");
     }
 
@@ -50,7 +50,7 @@ class BaseModelMigrationTest {
     void everyTableOfTheBusinessCarriesItsTenant() {
         List<String> withoutTenant = jdbc.queryForList("""
                 SELECT table_name FROM information_schema.tables t
-                WHERE table_schema = 'public' AND table_name NOT IN ('flyway_schema_history', 'tenant')
+                WHERE table_schema = 'public' AND table_name NOT IN ('flyway_schema_history', 'event_publication', 'tenant')
                   AND NOT EXISTS (SELECT 1 FROM information_schema.columns c
                                   WHERE c.table_schema = 'public' AND c.table_name = t.table_name
                                     AND c.column_name = 'tenant_id' AND c.is_nullable = 'NO')

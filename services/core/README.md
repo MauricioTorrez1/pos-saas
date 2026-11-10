@@ -10,6 +10,7 @@ Modular monolith built with Java 21, Spring Boot 4.1, and Spring Modulith. For n
 | `src/main/java/.../id/` | `Uuid7`, the UUIDv7 generator ([ADR 0034](../../docs/adr/0034-flyway-y-modelo-base.md)) |
 | `src/main/resources/db/migration/` | Flyway migrations: `tenant`, `branch`, `register` and `app_user` |
 | `src/main/java/.../tenant/` | `TenantContext` and the transaction manager that pins the tenant ([ADR 0035](../../docs/adr/0035-rls-rol-de-aplicacion-y-tenant-por-transaccion.md)) |
+| `src/main/java/.../events/` | `BusinessEvent`, the contract of every event sent to Redpanda through the outbox ([ADR 0036](../../docs/adr/0036-outbox-con-modulith-y-redpanda.md)) |
 | `src/test/java/.../core/` | Startup test and module structure test |
 | `src/test/java/.../money/` | Runs the shared cases of [`packages/contracts`](../../packages/contracts/README.md) |
 
@@ -52,6 +53,9 @@ Connection settings come from environment variables; passwords have no default:
 | `CORE_MIGRATION_DB_PASSWORD` | none | Flyway |
 
 Tests start their own PostgreSQL 16.15 with Testcontainers, so they need Docker running.
+
+## Events and the outbox
+An event that implements `BusinessEvent` and is annotated `@Externalized("topic::#{tenantId()}")` is saved in `event_publication` inside the transaction that publishes it, and sent to Redpanda after the commit ([ADR 0036](../../docs/adr/0036-outbox-con-modulith-y-redpanda.md)). A rollback publishes nothing; if the broker is down, the row waits and `IncompleteEventPublications` resubmits it. Delivery is at least once, so consumers must be idempotent by `eventId`. Externalized types must live in the root package or in a module. The Kafka client uses `spring.kafka.bootstrap-servers` (`localhost:19092` with the compose `core` profile).
 
 ## Modules
 | Module | Responsibility |

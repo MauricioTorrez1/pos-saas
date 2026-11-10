@@ -21,7 +21,7 @@ class RowLevelSecurityCoverageTest {
 
     private static final String BUSINESS_TABLES = """
             SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relname <> 'flyway_schema_history'
+            WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relname NOT IN ('flyway_schema_history', 'event_publication')
             """;
 
     @Autowired
@@ -37,7 +37,7 @@ class RowLevelSecurityCoverageTest {
     void everyTableEnablesAndForcesRowLevelSecurity() {
         List<String> unprotected = admin.queryForList("""
                 SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relname <> 'flyway_schema_history'
+                WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relname NOT IN ('flyway_schema_history', 'event_publication')
                   AND NOT (c.relrowsecurity AND c.relforcerowsecurity)
                 ORDER BY c.relname
                 """, String.class);
@@ -49,7 +49,7 @@ class RowLevelSecurityCoverageTest {
     void everyTableHasAPolicyThatUsesTheTenantOfTheTransaction() {
         List<String> withoutPolicy = admin.queryForList("""
                 SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relname <> 'flyway_schema_history'
+                WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relname NOT IN ('flyway_schema_history', 'event_publication')
                   AND NOT EXISTS (SELECT 1 FROM pg_policies p
                                   WHERE p.schemaname = 'public' AND p.tablename = c.relname
                                     AND p.qual LIKE '%current_tenant_id()%'
@@ -65,7 +65,7 @@ class RowLevelSecurityCoverageTest {
         List<String> withoutTenant = admin.queryForList("""
                 SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
                 WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')
-                  AND c.relname NOT IN ('flyway_schema_history', 'tenant')
+                  AND c.relname NOT IN ('flyway_schema_history', 'event_publication', 'tenant')
                   AND NOT EXISTS (SELECT 1 FROM pg_attribute a
                                   WHERE a.attrelid = c.oid AND a.attname = 'tenant_id' AND a.attnotnull)
                 """, String.class);
