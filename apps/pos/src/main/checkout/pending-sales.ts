@@ -6,6 +6,7 @@ import type { AuditLog } from '../audit/audit-log';
 import type { AuthService } from '../auth/auth-service';
 import type { ProductCatalog } from '../local-store/product-catalog';
 import type { SaleStore } from '../local-store/sale-store';
+import type { PriceHistoryReader } from '../pricing/price-change-service';
 import { uuidV7 } from '../uuid-v7';
 import type { SaleLineToSave, SaleToSave } from './sale-recorder';
 
@@ -24,18 +25,28 @@ export class PendingSales {
   readonly #sales: SaleStore;
   readonly #context: () => SaleContext | null;
   readonly #misc: MiscSupport | null;
+  readonly #priceHistory: PriceHistoryReader | null;
 
   /**
    * @param catalog where the prices come from
    * @param sales where the sales are saved
    * @param context who is selling and in which cash session, or null while the register is closed
    * @param misc who may sell a miscellaneous item and where it is written down. Without it, such a line is refused.
+   * @param priceHistory the price a product had before its latest change, so a sale that was being rung up when the owner
+   * changed a price keeps the price its lines show (ADR 0047). Without it, the catalog price is the only one honored.
    */
-  constructor(catalog: Pick<ProductCatalog, 'findById'>, sales: SaleStore, context: () => SaleContext | null, misc: MiscSupport | null = null) {
+  constructor(
+    catalog: Pick<ProductCatalog, 'findById'>,
+    sales: SaleStore,
+    context: () => SaleContext | null,
+    misc: MiscSupport | null = null,
+    priceHistory: PriceHistoryReader | null = null,
+  ) {
     this.#catalog = catalog;
     this.#sales = sales;
     this.#context = context;
     this.#misc = misc;
+    this.#priceHistory = priceHistory;
   }
 
   /**
@@ -137,14 +148,18 @@ export class PendingSales {
       if (product === null) {
         return null;
       }
+      const unitPriceE4 = this.#honoredPrice(productId, product.unitPriceE4, requested.unitPriceE4);
+      if (unitPriceE4 === null) {
+        return null;
+      }
       const quantity = quantityOf(quantityMilli, product.unit);
       lines.push({
         id: uuidV7(),
         productId,
         productName: product.name,
         quantity,
-        unitPriceE4: product.unitPriceE4,
-        totals: lineTotals(product.unitPriceE4, quantity, product.taxRate),
+        unitPriceE4,
+        totals: lineTotals(unitPriceE4, quantity, product.taxRate),
       });
     }
     const { subtotalCents, taxCents, totalCents } = saleTotals(lines.map((line) => line.totals));
@@ -152,6 +167,18 @@ export class PendingSales {
       return null;
     }
     return { saleId: uuidV7(), idempotencyKey: request.idempotencyKey, lines, subtotalCents, taxCents, totalCents };
+  }
+
+  /**
+   * The price of a line is the one of the catalog, except when the owner changed it while the sale was being rung up: then
+   * the price the cashier saw is honored, but only if it is the one the owner replaced. Any other price is not one the
+   * owner ever approved, so the sale is not saved.
+   */
+  #honoredPrice(productId: string, catalogPrice: number, seenPrice: number | undefined): number | null {
+    if (seenPrice === undefined || seenPrice === catalogPrice) {
+      return catalogPrice;
+    }
+    return this.#priceHistory?.previousPriceOf(productId) === seenPrice ? seenPrice : null;
   }
 
   #miscLine({ name, unitPriceE4 }: { readonly name: string; readonly unitPriceE4: number }, quantityMilli: number): SaleLineToSave {

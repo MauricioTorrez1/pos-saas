@@ -47,3 +47,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0041](0041-cliente-de-facturapi.md) | Cliente de Facturapi detrás de una interfaz, con reintentos solo en lecturas | Aceptada |
 | [0042](0042-roles-y-permisos-por-endpoint.md) | Roles y permisos por endpoint, con rol leído de la base | Aceptada |
 | [0046](0046-recepcion-idempotente-en-el-nucleo.md) | Recepción idempotente de lotes en el núcleo, una transacción por operación | Aceptada |
+| [0047](0047-editar-precio-de-un-producto-en-la-caja.md) | Editar el precio de un producto en la caja, con PIN del dueño, bitácora y outbox en una transacción | Aceptada |

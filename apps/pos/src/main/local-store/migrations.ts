@@ -531,4 +531,31 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'an operation is never deleted from the outbox'); END;
     `,
   },
+  {
+    version: 13,
+    name: 'create_product_price_change',
+    // Every price the owner replaced, in order (E1-39, ADR 0047). A sale line keeps the price it was sold at, so this is not
+    // needed to read the past: it lets a sale that was being rung up when the price changed keep the price its lines show,
+    // and it is the structured record next to the free text of the audit log. Only added to, like the audit log.
+    sql: `
+      CREATE TABLE product_price_change (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        previous_unit_price_e4 INTEGER NOT NULL CHECK (previous_unit_price_e4 >= 0),
+        new_unit_price_e4 INTEGER NOT NULL CHECK (new_unit_price_e4 > 0 AND new_unit_price_e4 <> previous_unit_price_e4),
+        changed_by TEXT NOT NULL,
+        authorized_by TEXT NOT NULL,
+        occurred_at TEXT NOT NULL
+      ) STRICT;
+
+      CREATE INDEX product_price_change_by_product ON product_price_change (tenant_id, product_id);
+
+      CREATE TRIGGER product_price_change_never_changes BEFORE UPDATE ON product_price_change
+      BEGIN SELECT RAISE(ABORT, 'a price change never changes'); END;
+
+      CREATE TRIGGER product_price_change_is_never_deleted BEFORE DELETE ON product_price_change
+      BEGIN SELECT RAISE(ABORT, 'a price change is never deleted'); END;
+    `,
+  },
 ];

@@ -42,6 +42,8 @@ export const IPC_CHANNELS = {
   setWithdrawalLimit: 'cash:set-limit',
   findProductByCode: 'catalog:find-by-code',
   searchProducts: 'catalog:search',
+  getPriceInfo: 'catalog:get-price-info',
+  changePrice: 'catalog:change-price',
   getAppearance: 'appearance:get',
   saveAppearance: 'appearance:save',
   savePendingSale: 'sales:save-pending',
@@ -88,6 +90,11 @@ export type PendingSaleRequestLine =
       readonly productId: string;
       /** Thousandths of the base unit of the product: 3.275 m is 3275. */
       readonly quantityMilli: number;
+      /**
+       * The price per unit the cashier saw when adding the product, in ten-thousandths. The main process prices with the
+       * catalog and only honors this one if it is the price the owner just replaced (E1-39, ADR 0047).
+       */
+      readonly unitPriceE4?: number;
     }
   | {
       /** What it is, as it will appear on the ticket. */

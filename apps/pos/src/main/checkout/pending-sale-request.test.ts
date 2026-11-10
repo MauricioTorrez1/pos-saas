@@ -22,10 +22,25 @@ describe('parsePendingSaleRequest', () => {
     const parsed = parsePendingSaleRequest({
       ...VALID,
       status: 'completed',
-      lines: [{ ...LINE, unitPriceE4: 1 }],
+      lines: [{ ...LINE, discountCents: 1 }],
     });
 
     expect(parsed).toEqual(VALID);
+  });
+
+  it('keeps the price the screen saw, which the main process only honors if it is the one the owner just replaced (ADR 0047)', () => {
+    const parsed = parsePendingSaleRequest({ ...VALID, lines: [{ ...LINE, unitPriceE4: 1_160_000 }] });
+
+    expect(parsed.lines).toEqual([{ ...LINE, unitPriceE4: 1_160_000 }]);
+  });
+
+  it.each([
+    ['a price of zero', 0],
+    ['a negative price', -1],
+    ['a price with decimals', 1.5],
+    ['a price in text', '1160000'],
+  ])('refuses %s as the price the screen saw', (_name, unitPriceE4) => {
+    expect(() => parsePendingSaleRequest({ ...VALID, lines: [{ ...LINE, unitPriceE4 }] })).toThrow(TypeError);
   });
 
   it.each([

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { DEFAULT_APPEARANCE, type Appearance } from '../shared/appearance';
 import type { UserSummary } from '../shared/auth';
 import type { AuthState, PosApi } from '../shared/pos-api';
+import type { PricingApi } from '../shared/pricing';
 import { applyAppearance } from './appearance/apply-appearance';
 import { AppearanceDialog } from './appearance/AppearanceDialog';
 import type { CashStatus } from '../shared/cash-api';
@@ -28,12 +29,15 @@ const SHORTCUTS: readonly { readonly keys: string; readonly action: string }[] =
   { keys: 'F2', action: 'Varios' },
   { keys: 'F3', action: 'Caja' },
   { keys: 'F4', action: 'Devolución' },
+  { keys: 'F7', action: 'Precio' },
   { keys: 'F8', action: 'Reimprimir' },
   { keys: 'F6', action: 'Salir' },
 ];
 
 interface AppProps {
   readonly posApi: PosApi;
+  /** Changing the price of a product (E1-39). Without it, the register offers no price change. */
+  readonly pricingApi?: PricingApi;
 }
 
 /**
@@ -41,9 +45,10 @@ interface AppProps {
  * person enters, and the register screen after that.
  *
  * @param props.posApi bridge to the main process
+ * @param props.pricingApi bridge for changing prices, when the register offers it
  * @returns the screen
  */
-export function App({ posApi }: AppProps): ReactElement {
+export function App({ posApi, pricingApi }: AppProps): ReactElement {
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [authState, setAuthState] = useState<AuthState | null>(null);
   const [authFailed, setAuthFailed] = useState(false);
@@ -81,19 +86,27 @@ export function App({ posApi }: AppProps): ReactElement {
     return <LoginScreen posApi={posApi} authState={authState} onSignedIn={loadAuthState} />;
   }
   return (
-    <RegisterScreen posApi={posApi} user={authState.current} appearance={appearance} onAppearanceSaved={setAppearance} onSignOut={signOut} />
+    <RegisterScreen
+      posApi={posApi}
+      {...(pricingApi === undefined ? {} : { pricingApi })}
+      user={authState.current}
+      appearance={appearance}
+      onAppearanceSaved={setAppearance}
+      onSignOut={signOut}
+    />
   );
 }
 
 interface RegisterScreenProps {
   readonly posApi: PosApi;
+  readonly pricingApi?: PricingApi;
   readonly user: UserSummary;
   readonly appearance: Appearance;
   readonly onAppearanceSaved: (appearance: Appearance) => void;
   readonly onSignOut: () => void;
 }
 
-function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
+function RegisterScreen({ posApi, pricingApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
   const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
   const [cash, setCash] = useState<CashStatus | null>(null);
@@ -181,6 +194,7 @@ function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut
       )}
       <SaleScreen
         posApi={posApi}
+        {...(pricingApi === undefined ? {} : { pricingApi })}
         isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering}
         isOwner={isOwner}
         onOpenAppearance={openAppearance}
@@ -210,7 +224,7 @@ function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut
           </p>
         )}
       </footer>
-      {isAdministering && !hasPendingSales && <AdminDialog posApi={posApi} onClose={closeAdmin} />}
+      {isAdministering && !hasPendingSales && <AdminDialog posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} onClose={closeAdmin} />}
       {isReturning && !hasPendingSales && <ReturnDialog posApi={posApi} user={user} onReturned={refreshCash} onClose={closeReturns} />}
       {isEditingCash && !hasPendingSales && cash !== null && (
         <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} onClose={closeCash} />

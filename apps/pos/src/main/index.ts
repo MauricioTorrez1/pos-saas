@@ -33,6 +33,7 @@ import { AppearanceStore } from './local-store/appearance-store';
 import { LocalStore } from './local-store/local-store';
 import { LOCAL_TENANT_ID } from './local-store/local-tenant';
 import { ProductCatalog } from './local-store/product-catalog';
+import { PriceChangeService } from './pricing/price-change-service';
 import { seedSampleCatalogIfEmpty } from './local-store/sample-catalog';
 import { SaleStore } from './local-store/sale-store';
 import { openMainWindow } from './main-window';
@@ -146,9 +147,11 @@ async function start(): Promise<void> {
     renderTicket: (sale, receipt) =>
       renderTicket(toTicketData(appearance.read().businessName || UNNAMED_BUSINESS, sale, { ...receipt, isReprint: false })),
   });
+  const prices = new PriceChangeService(store, LOCAL_TENANT_ID, auth, catalog, new AuditLog(store, LOCAL_TENANT_ID));
   registerIpcHandlers(rendererEntry, {
     auth,
     cash,
+    prices,
     returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, cash),
     admin,
     inventory: new InventoryService(store, LOCAL_TENANT_ID, auth, new StockStore(store, LOCAL_TENANT_ID), new AuditLog(store, LOCAL_TENANT_ID), catalog),
@@ -159,7 +162,7 @@ async function start(): Promise<void> {
       const cashierId = auth.currentUser()?.id;
       const cashSessionId = cash.openSessionId();
       return cashierId === undefined || cashSessionId === null ? null : { cashierId, cashSessionId };
-    }, { auth, audit: new AuditLog(store, LOCAL_TENANT_ID) }),
+    }, { auth, audit: new AuditLog(store, LOCAL_TENANT_ID) }, prices),
     salePayments: new SalePayments(sales, checkout, {
       printer,
       businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,

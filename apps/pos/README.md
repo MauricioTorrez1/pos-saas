@@ -14,6 +14,8 @@ Electron 45 runs on Windows 10 and later, which covers the machines of [ADR 0002
 | `src/preload/` | The `window.pos` bridge | Sandboxed preload script |
 | `src/renderer/` | React screen | Sandboxed renderer, without Node |
 | `src/renderer/sale/` | Sale screen: lookup box, lines, totals, and scanner detection | Sandboxed renderer, without Node |
+| `src/main/pricing/` | Price changes: who may, one transaction, and the history of prices | Main process, with Node |
+| `src/renderer/pricing/` | Dialog to change the price of a product, with the margin | Sandboxed renderer, without Node |
 | `src/renderer/appearance/` | Dialog where the owner changes how the register looks | Sandboxed renderer, without Node |
 | `src/renderer/checkout/` | Payment screen: cash received, transfer with its reference, and the change | Sandboxed renderer, without Node |
 | `src/renderer/recovery/` | Dialog that asks about the sales left pending | Sandboxed renderer, without Node |
@@ -39,6 +41,7 @@ The lookup box always holds the keyboard, so a scan lands there even after a cli
 | Supr | Removes the selected line, when the box is empty |
 | Esc | Clears the box and the matches |
 | F9 | Opens the appearance dialog |
+| F7 | Opens the dialog to change the price of a product |
 
 A barcode scanner acts as a keyboard, so the register tells it apart by speed: at least 4 characters with no more than 50 ms between them. Only what happens to an unknown code changes: from the scanner it shows a warning, and from a person it searches by name.
 
@@ -47,6 +50,20 @@ Search runs on an FTS5 index in the local database. It matches the beginning of 
 **F2** sells something that is not in the catalog: type what it is, the price of each (VAT included) and how many pieces. The owner approves a price typed by hand, either by being signed in or, when a cashier sells it, with the owner's PIN. Each one is written to the audit log with who approved it, and it never moves stock ([ADR 0033](../../docs/adr/0033-articulo-varios-con-precio-libre.md)). Price lists are not built yet.
 
 Until the real catalog arrives with F0-16, the register fills an empty catalog with sample products marked `is_sample`. Their barcodes are valid EAN-13 codes that start with 2, a range reserved for use inside a store. `2000000000107` is the first one, a hammer at $116.00.
+
+## Change the price of a product
+The owner can change the price of a product that is already in the catalog ([ADR 0047](../../docs/adr/0047-editar-precio-de-un-producto-en-la-caja.md)). **F7** on the sale screen opens "Cambiar precio" on the product the cashier is pointing at (the highlighted match, or else the selected line) or, with none, asks to find one. In the inventory of the administration, the view of a product has a **Cambiar precio** button and **F8**. The dialog shows the current price with VAT included and its margin over the last known cost, and while the new price is typed it shows "before → after" with the new margin, and a warning when it falls below the cost. **F2** saves and **Esc** cancels.
+
+| Rule | How it works |
+| --- | --- |
+| Who | The owner signed in. A cashier types the PIN of an owner, with the usual tries and lock. A wrong PIN, a lock, or a missing PIN is written in the audit log as `product.price_change_denied` |
+| Price | Pesos with VAT included and up to 4 decimals ([ADR 0011](../../docs/adr/0011-precision-monetaria.md)), read without `float`. Zero is refused, and so is anything above $1,000,000.00 |
+| One transaction | The new price, a row in `product_price_change`, the `product.price_change` audit entry (who, when, before, after), and the `product.price_changed` operation in `sync_outbox` are written together or not at all |
+| Sales already made | They keep the price on their own lines. Nothing in `sale`, `sale_line`, or a ticket is touched |
+| Sale in progress | Its lines keep the price they show. If the catalog says the price changed, the screen offers the sale once more with those prices, and the main process honors one only if it is the price the owner just replaced. A new sale gets the new price |
+| Offline | Nothing needs the core. The operation waits in the outbox and travels in order; its shape is in [`packages/contracts`](../../packages/contracts/README.md) |
+
+Only a person at the register changes a price here. The panel will have its own editor (F0-21), and the core processes `product.price_changed` in E1-17.
 
 ## Sale states and recovery
 A sale is saved as `pending_payment` before anything is charged, so a power cut can never leave money without a record ([ADR 0010](../../docs/adr/0010-guardar-antes-de-cobrar.md)). From there it can only become `completed` or `cancelled`, and each change is one transaction. `src/main/checkout/sale-state-machine.ts` gives a clear error, and triggers in the database refuse the same changes if the code ever gets it wrong ([ADR 0025](../../docs/adr/0025-maquina-de-estados-de-la-venta.md)).
@@ -151,7 +168,7 @@ The register keeps its data in `pos.db`, in the user data folder of the app (`%A
 The tests never touch the real database, because each run gets a temporary user data folder.
 
 ## Sync with the core
-Every sale, return, cash movement, cut, and stock adjustment is also written to the `sync_outbox` table, **in the same transaction** as the change. The register never waits for the network: a sale only writes to SQLite, and a separate loop sends the outbox to the core ([ADR 0040](../../docs/adr/0040-envio-desde-la-caja-con-outbox.md)).
+Every sale, return, cash movement, cut, stock adjustment, and price change is also written to the `sync_outbox` table, **in the same transaction** as the change. The register never waits for the network: a sale only writes to SQLite, and a separate loop sends the outbox to the core ([ADR 0040](../../docs/adr/0040-envio-desde-la-caja-con-outbox.md)).
 
 - **Order:** each operation gets a `device_seq` (`AUTOINCREMENT`, never reused) and a UUIDv7 `op_id`, the idempotency key. The core orders by the sequence and never by the clock.
 - **Batches:** every 5 seconds the loop sends up to 100 pending operations in order to `POST /sync/push`. The contract is in [`packages/contracts`](../../packages/contracts/README.md): `sync-push-request.schema.json`, `sync-push-response.schema.json`, and shared cases.
