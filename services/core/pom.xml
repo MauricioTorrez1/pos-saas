@@ -24,6 +24,7 @@
     <opentelemetry.version>1.67.0</opentelemetry.version>
     <!-- Each Spring Modulith line pairs with one Spring Boot line: 2.1.x goes with 4.1.x. -->
     <spring-modulith.version>2.1.2</spring-modulith.version>
+    <json-schema-validator.version>3.0.6</json-schema-validator.version>
   </properties>
 
   <dependencyManagement>
@@ -105,6 +106,13 @@
       <artifactId>spring-boot-starter-kafka</artifactId>
     </dependency>
 
+    <!-- Validates each operation of a batch against the shared JSON Schema of packages/contracts (ADR 0046). -->
+    <dependency>
+      <groupId>com.networknt</groupId>
+      <artifactId>json-schema-validator</artifactId>
+      <version>${json-schema-validator.version}</version>
+    </dependency>
+
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-webmvc-test</artifactId>
@@ -113,6 +121,11 @@
     <dependency>
       <groupId>org.springframework.modulith</groupId>
       <artifactId>spring-modulith-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -138,6 +151,16 @@
   </dependencies>
 
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <!-- The register and the core read the same schemas, so the contract cannot drift (ADR 0040, ADR 0046). -->
+      <resource>
+        <directory>../../packages/contracts/schemas</directory>
+        <targetPath>contracts/schemas</targetPath>
+      </resource>
+    </resources>
     <testResources>
       <testResource>
         <directory>src/test/resources</directory>

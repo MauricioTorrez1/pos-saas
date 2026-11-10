@@ -46,3 +46,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0040](0040-envio-desde-la-caja-con-outbox.md) | Envío desde la caja con outbox local, lotes en orden y reintentos con retroceso | Aceptada |
 | [0041](0041-cliente-de-facturapi.md) | Cliente de Facturapi detrás de una interfaz, con reintentos solo en lecturas | Aceptada |
 | [0042](0042-roles-y-permisos-por-endpoint.md) | Roles y permisos por endpoint, con rol leído de la base | Aceptada |
+| [0046](0046-recepcion-idempotente-en-el-nucleo.md) | Recepción idempotente de lotes en el núcleo, una transacción por operación | Aceptada |
