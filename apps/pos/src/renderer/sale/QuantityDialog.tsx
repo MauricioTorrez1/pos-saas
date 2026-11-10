@@ -1,5 +1,5 @@
 import { formatCents, formatUnitPriceE4 } from '@pos-saas/money';
-import { useEffect, useRef, useState, type ChangeEvent, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type ReactElement } from 'react';
 
 import type { CatalogProduct } from '../../shared/pos-api';
 import { formatQuantity, unitLabel } from './format';
@@ -45,7 +45,7 @@ export function QuantityDialog({ product, onConfirm, onCancel }: QuantityDialogP
   }, [isOpen]);
 
   // On the window, so the keys work wherever the focus ended up. It runs after every render to see what is typed.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         event.preventDefault();

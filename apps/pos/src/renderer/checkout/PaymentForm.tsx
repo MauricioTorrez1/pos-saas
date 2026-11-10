@@ -1,5 +1,5 @@
 import { formatCents } from '@pos-saas/money';
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
 
 import { planPayments, type PaymentPlan, type PaymentTender } from '../../shared/payment-plan';
 import { describePlan, readTypedCents } from './amount-input';
@@ -111,7 +111,7 @@ export function PaymentForm({ totalCents, isBusy, onSubmit, onBack, submitLabel,
 
   // On the window, because a click on the backdrop leaves the keyboard outside the form. It runs after every render so
   // the keys always act on what is on the screen.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent): void => {
       const actions: Readonly<Record<string, (() => void) | undefined>> = { F2: submit, F5: fillCash, F6: fillTransfer, F7: fillCard, Escape: onBack };
       const action = actions[event.key];

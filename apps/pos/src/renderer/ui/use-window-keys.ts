@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 
 /**
  * Runs an action when a key is pressed anywhere in the window, not just in the box that has the focus. A click on the
@@ -9,7 +9,9 @@ import { useEffect } from 'react';
  * @param isPaused while true, the keys are left alone, as when something is being saved
  */
 export function useWindowKeys(actions: Readonly<Record<string, (() => void) | undefined>>, isPaused = false): void {
-  useEffect(() => {
+  // A layout effect, so the keys work as soon as the screen shows them: a passive effect runs after the paint, and a key
+  // pressed in between (a fast hand or a script) would find no listener and be lost.
+  useLayoutEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       const action = actions[event.key];
       if (action === undefined) {
