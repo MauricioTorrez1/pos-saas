@@ -25,6 +25,7 @@ const SHORTCUTS: readonly { readonly keys: string; readonly action: string }[] =
   { keys: 'Supr', action: 'Quitar' },
   { keys: 'Esc', action: 'Limpiar' },
   { keys: 'F12', action: 'Cobrar' },
+  { keys: 'F2', action: 'Varios' },
   { keys: 'F3', action: 'Caja' },
   { keys: 'F4', action: 'Devolución' },
   { keys: 'F8', action: 'Reimprimir' },
@@ -181,6 +182,7 @@ function RegisterScreen({ posApi, user, appearance, onAppearanceSaved, onSignOut
       <SaleScreen
         posApi={posApi}
         isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering}
+        isOwner={isOwner}
         onOpenAppearance={openAppearance}
         onSignOut={onSignOut}
         onOpenCash={openCash}

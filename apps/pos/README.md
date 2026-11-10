@@ -43,6 +43,8 @@ A barcode scanner acts as a keyboard, so the register tells it apart by speed: a
 
 Search runs on an FTS5 index in the local database. It matches the beginning of each word and ignores accents and capitals. With 5,000 products on the development PC, adding a scanned product took 24.5 ms at the 95th percentile, against a limit of 100 ms.
 
+**F2** sells something that is not in the catalog: type what it is, the price of each (VAT included) and how many pieces. The owner approves a price typed by hand, either by being signed in or, when a cashier sells it, with the owner's PIN. Each one is written to the audit log with who approved it, and it never moves stock ([ADR 0033](../../docs/adr/0033-articulo-varios-con-precio-libre.md)). Price lists are not built yet.
+
 Until the real catalog arrives with F0-16, the register fills an empty catalog with sample products marked `is_sample`. Their barcodes are valid EAN-13 codes that start with 2, a range reserved for use inside a store. `2000000000107` is the first one, a hammer at $116.00.
 
 ## Sale states and recovery
