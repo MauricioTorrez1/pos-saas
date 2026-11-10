@@ -3,7 +3,7 @@
 Actualizado: 2026-11-09. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** F0-08 en revisión (Flyway y modelo base, ADR 0034).
+- **Tarea en curso:** F0-09 en revisión (RLS y prueba de aislamiento, ADR 0035). F0-08 quedó terminada (PR 30).
 - **Siguiente:** probar con datos reales (catálogo de Eleventa, PC de la tienda, impresora y cajón). Las listas de precio necesitan clientes y quedan pendientes. La facturación (E1-30 a E1-33) y la sincronización necesitan el servidor.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
@@ -85,8 +85,8 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | F0-05 | Compose: perfil `observability` | 5 | Terminada |
 | F0-06 | Compose: perfiles `automation` y `analytics` | 4 | Terminada |
 | F0-07 | Esqueleto de Spring Boot 4.1 | 4 | Terminada |
-| F0-08 | Flyway y modelo base | 4 | En revisión |
-| F0-09 | RLS y prueba de aislamiento | 5 | Pendiente |
+| F0-08 | Flyway y modelo base | 4 | Terminada |
+| F0-09 | RLS y prueba de aislamiento | 5 | En revisión |
 | F0-10 | Outbox hacia Redpanda | 5 | Pendiente |
 | F0-11 | Observabilidad del núcleo | 4 | Pendiente |
 | F0-12 | Bitácora de auditoría | 3 | Pendiente |
@@ -314,3 +314,4 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | 2026-11-09 | E1-09 en revisión, en modo automático (ADR 0033): F2 en la venta abre «Artículo varios», con descripción, precio con IVA incluido y piezas. El precio lo aprueba el dueño: con su sesión, o con su PIN si vende un cajero (el mismo conteo de intentos de siempre). Antes de guardar la venta se anota en la bitácora quién lo aprobó, y el artículo nunca mueve existencia, porque se guarda bajo un identificador fijo que `postWith` ignora y que la revisión del libro tampoco espera. Las listas de precio no se hicieron: piden clientes que todavía no existen. En local, 827 pruebas en Vitest de la caja (antes 815) y una prueba más con Playwright. CI todavía no corre | Abrir el PR y fusionar |
 | 2026-11-09 | E1-09 terminada. PR 29 fusionado con squash en `4779cb4` con `gh pr merge`; en `main`, los diez checks en verde a la primera. La caja vende un artículo varios con F2, aprobado por el dueño, anotado en la bitácora y sin mover existencia. Las listas de precio quedan pendientes hasta que haya clientes. Con esto queda hecho todo lo de la Entrega 1 que no necesita servidor: lo que sigue son las pruebas con datos reales de la lista de pendientes de Mauricio | Probar con datos reales |
 | 2026-11-09 | F0-08 en revisión, en modo automático (ADR 0034): el núcleo trae Flyway con la migración V1, que crea `tenant`, `branch`, `register` y `app_user` con UUIDv7. La base rechaza un UUIDv4 con un `CHECK`, `register` no puede colgar de la sucursal de otro negocio (llave compuesta) y el núcleo genera los ids con `Uuid7`, porque PostgreSQL 16 no tiene `uuidv7()`. Las pruebas de migración usan PostgreSQL 16.15 en Testcontainers; en local no corrieron porque Docker Desktop estaba a medio actualizar, así que las valida CI | Fusionar y seguir con F0-09 |
+| 2026-11-09 | F0-09 en revisión, en modo automático (ADR 0035): la migración V2 activa y fuerza RLS con una política por tabla y crea `pos_app`, un rol sin `BYPASSRLS` distinto del de migraciones. `TenantAwareTransactionManager` fija `app.tenant_id` al abrir cada transacción, venga o no de `@Transactional`. Una prueba recorre el catálogo y rompe CI si una tabla nueva no tiene política; otras prueban acceso cruzado, consulta sin negocio (cero filas) y que el valor no se filtra por el pool. La contraseña de `pos_app` la pone el despliegue, no la migración | Fusionar y seguir con F0-10 |

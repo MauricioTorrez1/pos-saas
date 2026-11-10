@@ -10,6 +10,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -20,7 +21,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @Import(PostgresTestConfiguration.class)
 class BaseModelMigrationTest {
 
+    /** Seeds and queries as the migration role: the table owner's data setup must not depend on RLS. */
     @Autowired
+    @Qualifier("adminJdbc")
     private JdbcTemplate jdbc;
 
     @BeforeEach

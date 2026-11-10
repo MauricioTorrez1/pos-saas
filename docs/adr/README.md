@@ -38,3 +38,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0032](0032-ajustes-kardex-bitacora-y-reporte-del-dia.md) | Ajustes, mermas, kardex, bitácora y reporte del día | Aceptada |
 | [0033](0033-articulo-varios-con-precio-libre.md) | Artículo varios con precio libre | Aceptada |
 | [0034](0034-flyway-y-modelo-base.md) | Flyway, UUIDv7 generado por el núcleo y modelo base | Aceptada |
+| [0035](0035-rls-rol-de-aplicacion-y-tenant-por-transaccion.md) | RLS, rol de aplicación y `tenant_id` fijado en cada transacción | Aceptada |
