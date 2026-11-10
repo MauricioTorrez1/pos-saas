@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactElement } from 'react';
 
 import type { BackupOutcome, BackupStatus, ImportOutcome, ImportReportView } from '../../shared/admin-api';
 import type { PosApi } from '../../shared/pos-api';
+import type { PricingApi } from '../../shared/pricing';
 import { Field, Message, useAction } from '../ui/form-parts';
 import { ModalDialog } from '../ui/ModalDialog';
 import { InventoryView } from './InventoryView';
@@ -21,6 +22,8 @@ type View =
 
 interface AdminDialogProps {
   readonly posApi: PosApi;
+  /** The prices of the catalog. Without it, the product view offers no price change. */
+  readonly pricingApi?: PricingApi;
   readonly onClose: () => void;
 }
 
@@ -29,10 +32,11 @@ interface AdminDialogProps {
  * restore one. Everything is from the keyboard, and the windows to choose a file or a folder are the ones of Windows.
  *
  * @param props.posApi bridge to the main process
+ * @param props.pricingApi bridge for changing prices, when the register offers it
  * @param props.onClose called when the dialog is done
  * @returns the dialog
  */
-export function AdminDialog({ posApi, onClose }: AdminDialogProps): ReactElement {
+export function AdminDialog({ posApi, pricingApi, onClose }: AdminDialogProps): ReactElement {
   const [view, setView] = useState<View>({ kind: 'summary' });
   const [backup, setBackup] = useState<BackupStatus | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -107,7 +111,7 @@ export function AdminDialog({ posApi, onClose }: AdminDialogProps): ReactElement
   return (
     <ModalDialog titleId="admin-title" className="cash">
       {view.kind === 'inventory' ? (
-        <InventoryView posApi={posApi} onBack={() => setView({ kind: 'summary' })} />
+        <InventoryView posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} onBack={() => setView({ kind: 'summary' })} />
       ) : view.kind === 'report' ? (
         <ReportView posApi={posApi} onBack={() => setView({ kind: 'summary' })} />
       ) : view.kind === 'passphrase' ? (

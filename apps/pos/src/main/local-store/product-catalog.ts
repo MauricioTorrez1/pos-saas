@@ -28,6 +28,7 @@ export class ProductCatalog {
   readonly #findById: StatementSync;
   readonly #findByCode: StatementSync;
   readonly #searchByName: StatementSync;
+  readonly #updatePrice: StatementSync;
 
   /**
    * @param store the open local database
@@ -50,6 +51,21 @@ export class ProductCatalog {
       ORDER BY product_search.rank, product.name
       LIMIT ?
     `);
+    this.#updatePrice = store.prepare('UPDATE product SET unit_price_e4 = ? WHERE tenant_id = ? AND id = ? AND unit_price_e4 = ?');
+  }
+
+  /**
+   * Replaces the price of a product, but only if it still has the price the caller saw, so two changes never overwrite each
+   * other without anyone noticing. It does not open a transaction: the caller writes the audit entry and the operation to
+   * send in the same one.
+   *
+   * @param id the UUIDv7 of the product
+   * @param expectedUnitPriceE4 the price the caller believes the product has
+   * @param newUnitPriceE4 the new price with VAT included, in ten-thousandths of a peso
+   * @returns true if the product had that price and now has the new one
+   */
+  replaceUnitPrice(id: string, expectedUnitPriceE4: number, newUnitPriceE4: number): boolean {
+    return Number(this.#updatePrice.run(newUnitPriceE4, this.#tenantId, id, expectedUnitPriceE4).changes) === 1;
   }
 
   /**

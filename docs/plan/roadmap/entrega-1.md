@@ -1,6 +1,6 @@
 # Entrega 1: Reemplazar a Eleventa
 
-Duración estimada: 160 horas. Reparto: Claude escribe y explica; tú revisas, pruebas y apruebas.
+Duración estimada: 163 horas. Reparto: Claude escribe y explica; tú revisas, pruebas y apruebas.
 
 ## Hito E1-A: Caja base
 
@@ -155,6 +155,16 @@ Duración estimada: 160 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** E1-11 · **Estimación:** 6 h
 - **Autoevaluación:** (1) ¿Por qué no se edita la venta? (2) ¿Cómo se reparte un pago mixto? (3) ¿Qué pasa con el inventario?
 - **Entrevista:** (1) ¿Qué es una transacción compensatoria? (2) ¿Cómo modelas una devolución parcial?
+
+### E1-39 · Editar precio de un producto en la caja
+- **Objetivo:** el dueño cambia el precio de un producto ya dado de alta, sin tocar las ventas hechas ni la que está en curso.
+- **Conceptos:** [Autorización en la caja], [Transacciones en SQLite]
+- **Claude / tú:** Claude escribe el diálogo (F7, y F8 desde el inventario), la regla de permisos y el contrato `product.price_changed`. Tú pruebas con productos reales y decides si el cajero puede pedirlo con el PIN del dueño.
+- **Pruebas:** permisos por rol, precios inválidos (cero, negativo, demasiados decimales), bitácora con intentos negados, outbox en la misma transacción, ventas cerradas intactas y total de una venta nueva con el precio nuevo.
+- **Criterios:** cumple RF-040 y ADR 0047; escalas del ADR 0011; el servidor lo procesa en E1-17.
+- **Depende de:** E1-07, E1-04, E1-16 · **Estimación:** 3 h
+- **Autoevaluación:** (1) ¿Por qué la venta en curso conserva el precio de sus líneas? (2) ¿Qué se anota cuando un cajero se equivoca de PIN? (3) ¿Por qué el precio anterior viaja en la operación?
+- **Entrevista:** (1) ¿Cómo cambias un precio sin reescribir la historia? (2) ¿Cómo evitas que dos cambios se pisen?
 
 ## Hito E1-C: Sincronización
 

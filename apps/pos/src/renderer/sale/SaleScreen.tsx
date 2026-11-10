@@ -1,8 +1,11 @@
+import { formatUnitPriceE4 } from '@pos-saas/money';
 import { useCallback, useEffect, useReducer, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
 
 import { isMiscLineId, MISC_LINE_ID_PREFIX, MISC_TAX_RATE_BP } from '../../shared/miscellaneous';
 import { MAX_LOOKUP_TEXT_LENGTH, type CatalogProduct, type PendingSale, type PosApi, type SavePendingSaleResult } from '../../shared/pos-api';
+import type { PricingApi } from '../../shared/pricing';
 import { CheckoutDialog } from '../checkout/CheckoutDialog';
+import { PriceChangeDialog } from '../pricing/PriceChangeDialog';
 import { describeReprint, REPRINT_FAILED } from '../checkout/reprint-message';
 import { MiscItemDialog, type MiscItem } from './MiscItemDialog';
 import { QuantityDialog } from './QuantityDialog';
@@ -43,6 +46,8 @@ function isPrintableKey(event: KeyboardEvent): boolean {
 
 interface SaleScreenProps {
   readonly posApi: PosApi;
+  /** The prices of the catalog. Without it, F7 does nothing and the sale is saved with the catalog prices only. */
+  readonly pricingApi?: PricingApi;
   /** While true, another part of the screen has the keyboard, and the lookup box waits. */
   readonly isKeyboardElsewhere: boolean;
   /** Whether the owner is signed in. A cashier who sells a miscellaneous item needs the PIN of the owner. */
@@ -65,6 +70,7 @@ interface SaleScreenProps {
  * controlled input: a scan is a burst of keys, and redrawing the screen on each one would only slow it down.
  *
  * @param props.posApi bridge to the main process
+ * @param props.pricingApi bridge for changing the price of a product, when the register offers it
  * @param props.isKeyboardElsewhere whether a dialog is using the keyboard
  * @param props.onOpenAppearance called when the cashier asks for the appearance dialog
  * @param props.onSignOut called when the cashier asks to sign out
@@ -74,7 +80,7 @@ interface SaleScreenProps {
  * @param props.onCashChanged called after a sale was collected
  * @returns the screen
  */
-export function SaleScreen({ posApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onCashChanged }: SaleScreenProps): ReactElement {
+export function SaleScreen({ posApi, pricingApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onCashChanged }: SaleScreenProps): ReactElement {
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
@@ -82,6 +88,8 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, isOwner = false, onOpe
   const [info, setInfo] = useState<string | null>(null);
   const [measuring, setMeasuring] = useState<CatalogProduct | null>(null);
   const [isAddingMisc, setIsAddingMisc] = useState(false);
+  /** The price dialog, with the product it starts from. Null while it is closed. */
+  const [priceChange, setPriceChange] = useState<{ readonly product: CatalogProduct | null } | null>(null);
   const isSaving = useRef(false);
   /** The PIN the owner typed for the miscellaneous items of this sale. It lives only until the sale is saved or cleared. */
   const ownerPin = useRef<string | undefined>(undefined);
@@ -91,10 +99,10 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, isOwner = false, onOpe
   const search = useProductSearch(posApi, showCatalogFailure);
 
   useEffect(() => {
-    if (!isKeyboardElsewhere && savedSale === null && measuring === null && !isAddingMisc) {
+    if (!isKeyboardElsewhere && savedSale === null && measuring === null && !isAddingMisc && priceChange === null) {
       inputRef.current?.focus();
     }
-  }, [isKeyboardElsewhere, savedSale, measuring, isAddingMisc]);
+  }, [isKeyboardElsewhere, savedSale, measuring, isAddingMisc, priceChange]);
 
   const addMiscItem = ({ name, unitPriceE4, quantityMilli, ownerPin: pin }: MiscItem): void => {
     const product: CatalogProduct = {
@@ -125,22 +133,31 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, isOwner = false, onOpe
       setNotice(EMPTY_SALE_MESSAGE);
       return;
     }
-    if (isSaving.current || isKeyboardElsewhere || measuring !== null || isAddingMisc) {
+    if (isSaving.current || isKeyboardElsewhere || measuring !== null || isAddingMisc || priceChange !== null) {
       return;
     }
     isSaving.current = true;
     try {
       const hasMisc = sale.lines.some((line) => isMiscLineId(line.product.id));
-      const result = await posApi.savePendingSale({
-        idempotencyKey: crypto.randomUUID(),
-        lines: sale.lines.map(({ product, quantity }) =>
-          isMiscLineId(product.id)
-            ? { miscellaneous: { name: product.name, unitPriceE4: product.unitPriceE4 }, quantityMilli: quantity.milli }
-            : { productId: product.id, quantityMilli: quantity.milli },
-        ),
-        expectedTotalCents: sale.totals.totalCents,
-        ...(hasMisc && ownerPin.current !== undefined ? { ownerPin: ownerPin.current } : {}),
-      });
+      const idempotencyKey = crypto.randomUUID();
+      const saveSale = (withSeenPrices: boolean): Promise<SavePendingSaleResult> =>
+        posApi.savePendingSale({
+          idempotencyKey,
+          lines: sale.lines.map(({ product, quantity }) =>
+            isMiscLineId(product.id)
+              ? { miscellaneous: { name: product.name, unitPriceE4: product.unitPriceE4 }, quantityMilli: quantity.milli }
+              : { productId: product.id, quantityMilli: quantity.milli, ...(withSeenPrices ? { unitPriceE4: product.unitPriceE4 } : {}) },
+          ),
+          expectedTotalCents: sale.totals.totalCents,
+          ...(hasMisc && ownerPin.current !== undefined ? { ownerPin: ownerPin.current } : {}),
+        });
+      let result = await saveSale(false);
+      // The owner may have changed a price while this sale was being rung up. The lines keep the price they show, so the
+      // sale is offered again with those prices, and the main process honors them only if they are the price just replaced
+      // (ADR 0047). Nothing was saved the first time.
+      if (result.status === 'catalog_changed' && pricingApi !== undefined) {
+        result = await saveSale(true);
+      }
       if (result.status === 'saved') {
         setSavedSale(result.sale);
       } else if (result.status === 'no_cash_session') {
@@ -157,6 +174,26 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, isOwner = false, onOpe
     } finally {
       isSaving.current = false;
     }
+  };
+
+  // The product to start from is the one the cashier is pointing at: the highlighted result, or else the selected line.
+  const openPriceChange = (): void => {
+    if (pricingApi === undefined || isSaving.current) {
+      return;
+    }
+    const highlighted = search.results[search.highlightedIndex];
+    const selectedLine = sale.lines.find((line) => line.product.id === sale.selectedProductId);
+    const product = highlighted ?? (selectedLine !== undefined && !isMiscLineId(selectedLine.product.id) ? selectedLine.product : null);
+    setPriceChange({ product });
+  };
+
+  const finishPriceChange = (product: CatalogProduct, previousUnitPriceE4: number): void => {
+    setPriceChange(null);
+    // What the lookup box listed still shows the old price, and the next search must show the new one.
+    clearLookup();
+    setInfo(
+      `Precio de ${product.name}: ${formatUnitPriceE4(previousUnitPriceE4)} → ${formatUnitPriceE4(product.unitPriceE4)}. La venta que armaste conserva los precios de sus productos.`,
+    );
   };
 
   const reprintLast = async (): Promise<void> => {
@@ -306,6 +343,10 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, isOwner = false, onOpe
         event.preventDefault();
         void reprintLast();
         return;
+      case 'F7':
+        event.preventDefault();
+        openPriceChange();
+        return;
       case 'F6':
         event.preventDefault();
         onSignOut();
@@ -404,6 +445,16 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, isOwner = false, onOpe
       </section>
       <SaleSummary lineCount={sale.lines.length} totals={sale.totals} />
       {isAddingMisc && <MiscItemDialog isOwner={isOwner} onAdd={addMiscItem} onCancel={() => setIsAddingMisc(false)} />}
+      {priceChange !== null && pricingApi !== undefined && (
+        <PriceChangeDialog
+          posApi={posApi}
+          pricingApi={pricingApi}
+          isOwner={isOwner}
+          initialProduct={priceChange.product}
+          onChanged={finishPriceChange}
+          onCancel={() => setPriceChange(null)}
+        />
+      )}
       {measuring !== null && <QuantityDialog product={measuring} onConfirm={confirmQuantity} onCancel={() => setMeasuring(null)} />}
       {savedSale !== null && <CheckoutDialog posApi={posApi} sale={savedSale} onFinished={finishCheckout} />}
     </main>

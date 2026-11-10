@@ -187,6 +187,44 @@
           }
         ]
       }
+    },
+    {
+      "name": "Two price changes of the same product: the cashier asked and an owner approved with a PIN, then the owner raised it again",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000018",
+            "deviceSeq": 3001,
+            "type": "product.price_changed",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-12T15:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000a0",
+              "productId": "0193a5c0-0000-7000-8000-000000000050",
+              "previousUnitPriceE4": 125000,
+              "newUnitPriceE4": 135000,
+              "changedBy": "0193a5c0-0000-7000-8000-000000000040",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          },
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000019",
+            "deviceSeq": 3002,
+            "type": "product.price_changed",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-12T16:30:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000a1",
+              "productId": "0193a5c0-0000-7000-8000-000000000050",
+              "previousUnitPriceE4": 135000,
+              "newUnitPriceE4": 1530,
+              "changedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
     }
   ],
   "request_rejections": [
@@ -431,6 +469,77 @@
               "counted": { "cashCents": -1, "cardCents": 0, "transferCents": 0 },
               "denominations": {},
               "reason": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A price change to zero",
+      "reason": "minimum",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000018",
+            "deviceSeq": 1,
+            "type": "product.price_changed",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-12T15:00:00Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000a0",
+              "productId": "0193a5c0-0000-7000-8000-000000000050",
+              "previousUnitPriceE4": 125000,
+              "newUnitPriceE4": 0,
+              "changedBy": "0193a5c0-0000-7000-8000-000000000040",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A price with decimals",
+      "reason": "type",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000018",
+            "deviceSeq": 1,
+            "type": "product.price_changed",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-12T15:00:00Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000a0",
+              "productId": "0193a5c0-0000-7000-8000-000000000050",
+              "previousUnitPriceE4": 125000,
+              "newUnitPriceE4": 135000.5,
+              "changedBy": "0193a5c0-0000-7000-8000-000000000040",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A price change that nobody approved",
+      "reason": "required",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000018",
+            "deviceSeq": 1,
+            "type": "product.price_changed",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-12T15:00:00Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000a0",
+              "productId": "0193a5c0-0000-7000-8000-000000000050",
+              "previousUnitPriceE4": 125000,
+              "newUnitPriceE4": 135000,
+              "changedBy": "0193a5c0-0000-7000-8000-000000000040"
             }
           }
         ]

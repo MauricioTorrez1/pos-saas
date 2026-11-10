@@ -50,6 +50,7 @@ function parseLine(value: unknown): PendingSaleRequest['lines'][number] {
   return {
     productId: requireMatch(line.productId, UUID_V7_TEXT, 'the UUIDv7 of a product'),
     quantityMilli: requirePositiveInteger(line.quantityMilli, 'a quantity in thousandths'),
+    ...(line.unitPriceE4 === undefined ? {} : { unitPriceE4: requirePositiveInteger(line.unitPriceE4, 'a unit price in ten-thousandths') }),
   };
 }
 

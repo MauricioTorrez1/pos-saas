@@ -42,7 +42,7 @@
         "opId": { "$ref": "#/$defs/uuid_v7" },
         "deviceSeq": { "$ref": "#/$defs/positive_int" },
         "type": {
-          "enum": ["sale.completed", "return.registered", "cash_session.opened", "cash_movement.recorded", "cash_session.closed", "stock.adjusted"]
+          "enum": ["sale.completed", "return.registered", "cash_session.opened", "cash_movement.recorded", "cash_session.closed", "stock.adjusted", "product.price_changed"]
         },
         "schemaVersion": { "const": 1 },
         "occurredAt": { "$ref": "#/$defs/timestamp" },
@@ -54,7 +54,8 @@
         { "if": { "properties": { "type": { "const": "cash_session.opened" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/cash_session_opened" } } } },
         { "if": { "properties": { "type": { "const": "cash_movement.recorded" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/cash_movement_recorded" } } } },
         { "if": { "properties": { "type": { "const": "cash_session.closed" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/cash_session_closed" } } } },
-        { "if": { "properties": { "type": { "const": "stock.adjusted" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/stock_adjusted" } } } }
+        { "if": { "properties": { "type": { "const": "stock.adjusted" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/stock_adjusted" } } } },
+        { "if": { "properties": { "type": { "const": "product.price_changed" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/product_price_changed" } } } }
       ]
     },
 
@@ -218,6 +219,21 @@
         "quantityMilli": { "$ref": "values.schema.json#/$defs/quantity_milli", "not": { "const": 0 } },
         "reason": { "$ref": "#/$defs/text" },
         "userId": { "$ref": "#/$defs/uuid_v7" }
+      }
+    },
+
+    "product_price_changed": {
+      "description": "The owner, or a cashier with the PIN of an owner, changed the price of a product (E1-39, ADR 0047). Prices include VAT and use the unit price scale of values.schema.json. Sales already made keep the price on their own lines, so the core applies this to the catalog only. changeId identifies the change and the core stores it once; opId already makes the push idempotent.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["changeId", "productId", "previousUnitPriceE4", "newUnitPriceE4", "changedBy", "authorizedBy"],
+      "properties": {
+        "changeId": { "$ref": "#/$defs/uuid_v7" },
+        "productId": { "$ref": "#/$defs/uuid_v7" },
+        "previousUnitPriceE4": { "$ref": "values.schema.json#/$defs/unit_price_e4", "minimum": 0 },
+        "newUnitPriceE4": { "$ref": "values.schema.json#/$defs/unit_price_e4", "minimum": 1, "maximum": 10000000000 },
+        "changedBy": { "$ref": "#/$defs/uuid_v7" },
+        "authorizedBy": { "$ref": "#/$defs/uuid_v7" }
       }
     }
   }
