@@ -14,3 +14,9 @@ spring:
     url: ${CORE_DB_URL:jdbc:postgresql://localhost:5432/pos_saas}
     user: ${CORE_MIGRATION_DB_USER:pos_admin}
     password: ${CORE_MIGRATION_DB_PASSWORD:}
+  modulith:
+    events:
+      jdbc:
+        # The outbox table comes from Flyway (V3), never from Modulith, so it is versioned like the rest.
+        schema-initialization:
+          enabled: false

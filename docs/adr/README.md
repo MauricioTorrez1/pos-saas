@@ -39,3 +39,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0033](0033-articulo-varios-con-precio-libre.md) | Artículo varios con precio libre | Aceptada |
 | [0034](0034-flyway-y-modelo-base.md) | Flyway, UUIDv7 generado por el núcleo y modelo base | Aceptada |
 | [0035](0035-rls-rol-de-aplicacion-y-tenant-por-transaccion.md) | RLS, rol de aplicación y `tenant_id` fijado en cada transacción | Aceptada |
+| [0036](0036-outbox-con-modulith-y-redpanda.md) | Outbox con Spring Modulith, tabla por Flyway y eventos con contrato | Aceptada |
