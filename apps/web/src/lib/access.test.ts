@@ -7,16 +7,16 @@ describe('canAccess', () => {
     expect(canAccess('/dashboard', ['cashier'])).toBe(true);
   });
 
-  it('lets the owner and the storekeeper open the catalog, and nobody else', () => {
+  it('lets the owner and the manager open the catalog, and nobody else', () => {
     expect(canAccess('/catalog', ['owner'])).toBe(true);
-    expect(canAccess('/catalog/new', ['storekeeper'])).toBe(true);
+    expect(canAccess('/catalog/new', ['manager'])).toBe(true);
     expect(canAccess('/catalog', ['cashier'])).toBe(false);
     expect(canAccess('/catalog', [])).toBe(false);
   });
 
   it('lets only the owner open the settings', () => {
     expect(canAccess('/settings', ['owner'])).toBe(true);
-    expect(canAccess('/settings', ['storekeeper', 'technician'])).toBe(false);
+    expect(canAccess('/settings', ['manager', 'cashier'])).toBe(false);
   });
 
   it('does not confuse a route that only starts with the same letters', () => {

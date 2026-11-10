@@ -4,7 +4,7 @@ Web panel of the business, built with Next.js (App Router), React, and TypeScrip
 
 ## Run it
 1. Start the stack with the realm: `docker compose --profile core up -d` (see [Compose](../../infra/compose/README.md)).
-2. Create a user in the realm `pos` (admin console at <http://localhost:8180>) with a password, and set its attribute `tenant_id` to a UUIDv7. Optionally create the realm roles `owner`, `cashier`, `storekeeper`, or `technician` and give one to the user.
+2. Create a user in the realm `pos` (admin console at <http://localhost:8180>) with a password, and set its attribute `tenant_id` to a UUIDv7. Optionally create the realm roles `owner`, `manager`, or `cashier`, as in ADR 0042 and give one to the user.
 3. Copy [`.env.example`](.env.example) to `.env.local` and fill `PANEL_SESSION_SECRET` (`openssl rand -base64 48`).
 4. Start the core (`services/core`) if you want to see the connected state, then run `pnpm --filter @pos-saas/web dev` and open <http://localhost:3000>.
 

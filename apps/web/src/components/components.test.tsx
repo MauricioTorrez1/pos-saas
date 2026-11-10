@@ -8,10 +8,10 @@ afterEach(cleanup);
 
 describe('RoleList', () => {
   it('shows the Spanish name of each role', () => {
-    render(<RoleList roles={['owner', 'storekeeper']} />);
+    render(<RoleList roles={['owner', 'manager']} />);
 
     expect(screen.getByText('Dueño')).toBeTruthy();
-    expect(screen.getByText('Almacenista')).toBeTruthy();
+    expect(screen.getByText('Encargado')).toBeTruthy();
   });
 
   it('explains that no role is assigned', () => {

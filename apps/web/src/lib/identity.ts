@@ -1,7 +1,7 @@
 import { decodeJwt } from 'jose';
 
-/** Roles of the business (RF-008). F0-14 creates them in the realm; the panel only reads them. */
-export const APP_ROLES = ['owner', 'cashier', 'storekeeper', 'technician'] as const;
+/** Roles of the business (RF-008). The same three roles as app_user.role in the core (ADR 0042). The core keeps the real role in its database; the panel only reads the realm roles of the token, which must mirror it until GET /me returns the role. */
+export const APP_ROLES = ['owner', 'manager', 'cashier'] as const;
 
 /** One of the roles of {@link APP_ROLES}. */
 export type AppRole = (typeof APP_ROLES)[number];
@@ -43,6 +43,5 @@ export function extractIdentity(accessToken: string): Identity {
 export const ROLE_LABELS: Record<AppRole, string> = {
   owner: 'Dueño',
   cashier: 'Cajero',
-  storekeeper: 'Almacenista',
-  technician: 'Técnico',
+  manager: 'Encargado',
 };

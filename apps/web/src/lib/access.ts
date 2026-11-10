@@ -10,7 +10,7 @@ interface RouteRule {
  * Catalog and settings arrive in F0-21; the rules are here so they are born protected.
  */
 const ROUTE_RULES: readonly RouteRule[] = [
-  { prefix: '/catalog', roles: ['owner', 'storekeeper'] },
+  { prefix: '/catalog', roles: ['owner', 'manager'] },
   { prefix: '/settings', roles: ['owner'] },
 ];
 

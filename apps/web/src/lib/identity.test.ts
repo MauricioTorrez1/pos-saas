@@ -11,10 +11,10 @@ describe('extractIdentity', () => {
 
   it('drops the default roles of Keycloak', async () => {
     const token = await fakeAccessToken({
-      realm_access: { roles: ['offline_access', 'uma_authorization', 'default-roles-pos', 'storekeeper'] },
+      realm_access: { roles: ['offline_access', 'uma_authorization', 'default-roles-pos', 'manager'] },
     });
 
-    expect(extractIdentity(token).roles).toEqual(['storekeeper']);
+    expect(extractIdentity(token).roles).toEqual(['manager']);
   });
 
   it('returns no tenant when the claim is missing', async () => {
