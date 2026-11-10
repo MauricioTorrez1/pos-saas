@@ -37,3 +37,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0031](0031-inventario-importacion-respaldo-e-instalador.md) | Inventario por movimientos, carga desde Eleventa, respaldo cifrado e instalador | Aceptada |
 | [0032](0032-ajustes-kardex-bitacora-y-reporte-del-dia.md) | Ajustes, mermas, kardex, bitácora y reporte del día | Aceptada |
 | [0033](0033-articulo-varios-con-precio-libre.md) | Artículo varios con precio libre | Aceptada |
+| [0034](0034-flyway-y-modelo-base.md) | Flyway, UUIDv7 generado por el núcleo y modelo base | Aceptada |
