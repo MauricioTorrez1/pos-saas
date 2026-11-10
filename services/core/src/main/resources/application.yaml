@@ -25,6 +25,8 @@ spring:
           audiences: pos-core
   modulith:
     events:
+      # An event whose listener was interrupted by a restart is offered again when the core starts (ADR 0052).
+      republish-outstanding-events-on-restart: true
       jdbc:
         # The outbox table comes from Flyway (V3), never from Modulith, so it is versioned like the rest.
         schema-initialization:
@@ -61,3 +63,11 @@ sentry:
 facturapi:
   # The key comes only from the environment, never from a file (ADR 0041). Empty means no call is made.
   api-key: ${FACTURAPI_API_KEY:}
+resend:
+  # E-mail provider of the cash cut reports (ADR 0052). The key comes only from the environment; without it
+  # the core starts and the reports are skipped with a warning.
+  api-key: ${RESEND_API_KEY:}
+  from: ${RESEND_FROM:}
+reporting:
+  # Used when the business has no owner_email yet. Empty means none.
+  default-recipient: ${REPORT_DEFAULT_RECIPIENT:}

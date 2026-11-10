@@ -49,3 +49,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0044](0044-panel-next-con-login-oidc.md) | Panel Next.js con login OIDC del lado del servidor y sesión en cookie cifrada | Aceptada |
 | [0046](0046-recepcion-idempotente-en-el-nucleo.md) | Recepción idempotente de lotes en el núcleo, una transacción por operación | Aceptada |
 | [0047](0047-editar-precio-de-un-producto-en-la-caja.md) | Editar el precio de un producto en la caja, con PIN del dueño, bitácora y outbox en una transacción | Aceptada |
+| [0052](0052-reporte-del-corte-por-correo.md) | Reporte del corte por correo, asíncrono desde el outbox y sin duplicados | Aceptada |

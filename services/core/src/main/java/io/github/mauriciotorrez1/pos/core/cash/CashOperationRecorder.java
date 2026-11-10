@@ -5,9 +5,13 @@ import io.github.mauriciotorrez1.pos.core.reporting.AuditLog;
 import io.github.mauriciotorrez1.pos.ingest.OperationRecorder;
 import io.github.mauriciotorrez1.pos.ingest.OperationRejectedException;
 import io.github.mauriciotorrez1.pos.ingest.Payload;
+import io.github.mauriciotorrez1.pos.events.CashCutRecorded;
+import io.github.mauriciotorrez1.pos.id.Uuid7;
 import io.github.mauriciotorrez1.pos.ingest.RegisterOperation;
+import io.github.mauriciotorrez1.pos.tenant.TenantContext;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -18,7 +22,8 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Stores the cash sessions, cash movements and cuts that a register uploads (RF-021, ADR 0046). A cut
- * closes a session and is sensitive, so it also goes to the audit log in the same transaction.
+ * closes a session and is sensitive, so it also goes to the audit log in the same transaction, and it
+ * publishes {@link CashCutRecorded} so that its report can be sent.
  */
 @Component
 class CashOperationRecorder implements OperationRecorder {
@@ -30,10 +35,12 @@ class CashOperationRecorder implements OperationRecorder {
 
     private final JdbcTemplate jdbc;
     private final AuditLog auditLog;
+    private final ApplicationEventPublisher events;
 
-    CashOperationRecorder(JdbcTemplate jdbc, AuditLog auditLog) {
+    CashOperationRecorder(JdbcTemplate jdbc, AuditLog auditLog, ApplicationEventPublisher events) {
         this.jdbc = jdbc;
         this.auditLog = auditLog;
+        this.events = events;
     }
 
     @Override
@@ -95,6 +102,9 @@ class CashOperationRecorder implements OperationRecorder {
                 payload.get("denominations").toString(), Payload.nullableText(payload, "reason"),
                 Payload.at(operation.occurredAt()));
         auditLog.record(new AuditEntry(closedBy, "cash_session.closed", "cash_cut", cutId, null, auditValue(sessionId, expected, counted, payload)));
+        // Saved with the cut or not at all: the report of the cut is sent later, by whoever listens (ADR 0052).
+        UUID tenant = TenantContext.current().orElseThrow(() -> new IllegalStateException("A cut needs the business of the transaction"));
+        events.publishEvent(CashCutRecorded.of(Uuid7.next(), tenant, cutId, sessionId));
     }
 
     /** Ids and amounts of the cut; the denominations stay in the cut itself. */
