@@ -58,6 +58,11 @@ jobs:
       # The startup test of the register opens a real window, so it needs a virtual display.
       - name: Run tests
         run: xvfb-run --auto-servernum pnpm test
+      # The panel signs in against a fake identity provider, so no Keycloak is needed. Only Chromium is downloaded.
+      - name: Install the browser of the panel tests
+        run: pnpm --filter @pos-saas/web exec playwright install --with-deps chromium
+      - name: Test the panel sign-in in a browser
+        run: pnpm --filter @pos-saas/web test:e2e
 
   python:
     name: Python
