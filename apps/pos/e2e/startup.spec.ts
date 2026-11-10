@@ -96,6 +96,8 @@ test('exposes only the agreed functions through the bridge', async ({ appWindow 
     'setWithdrawalLimit',
     'findProductByCode',
     'searchProducts',
+    'getPriceInfo',
+    'changePrice',
     'getAppearance',
     'saveAppearance',
     'savePendingSale',
