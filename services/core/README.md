@@ -9,6 +9,7 @@ Modular monolith built with Java 21, Spring Boot 4.1, and Spring Modulith. For n
 | `src/main/java/.../money/` | `Money`, `UnitPrice`, `Quantity`, `LineAmount`, and the VAT of `LineTotals` and `SaleTotals`, outside the modules ([ADR 0020](../../docs/adr/0020-casos-compartidos.md), [ADR 0022](../../docs/adr/0022-libreria-de-dinero.md), [ADR 0023](../../docs/adr/0023-iva-incluido-por-linea.md)) |
 | `src/main/java/.../id/` | `Uuid7`, the UUIDv7 generator ([ADR 0034](../../docs/adr/0034-flyway-y-modelo-base.md)) |
 | `src/main/resources/db/migration/` | Flyway migrations: `tenant`, `branch`, `register` and `app_user` |
+| `src/main/java/.../security/` | Resource server, `TenantFromTokenFilter` and `GET /me` ([ADR 0039](../../docs/adr/0039-keycloak-oidc-y-tenant-en-el-token.md)) |
 | `src/main/java/.../tenant/` | `TenantContext` and the transaction manager that pins the tenant ([ADR 0035](../../docs/adr/0035-rls-rol-de-aplicacion-y-tenant-por-transaccion.md)) |
 | `src/main/java/.../events/` | `BusinessEvent`, the contract of every event sent to Redpanda through the outbox ([ADR 0036](../../docs/adr/0036-outbox-con-modulith-y-redpanda.md)) |
 | `src/test/java/.../core/` | Startup test and module structure test |
@@ -53,6 +54,16 @@ Connection settings come from environment variables; passwords have no default:
 | `CORE_MIGRATION_DB_PASSWORD` | none | Flyway |
 
 Tests start their own PostgreSQL 16.15 with Testcontainers, so they need Docker running.
+
+## Authentication
+The core is an OAuth2 resource server of the Keycloak realm `pos` ([ADR 0039](../../docs/adr/0039-keycloak-oidc-y-tenant-en-el-token.md)). Every request needs `Authorization: Bearer <JWT>` except `GET /actuator/health`. The core checks the signature, expiry, issuer and the audience `pos-core`; a missing or invalid token gets **401**. `TenantFromTokenFilter` then pins the `tenant_id` claim in `TenantContext` for the whole request, so row-level security and the logs receive it; a valid token without a usable `tenant_id` gets **403**. `GET /me` returns the token `subject` and the `tenantId` (ids only, no personal data).
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CORE_OIDC_ISSUER_URI` | `http://localhost:8180/realms/pos` | Issuer that tokens must come from |
+| `CORE_OIDC_JWK_SET_URI` | issuer + `/protocol/openid-connect/certs` | Where the signing keys are fetched, lazily |
+
+`KeycloakResourceServerTest` starts a real Keycloak with the realm file of the repository and covers 401, 403, a valid token and the isolation between two businesses.
 
 ## Events and the outbox
 An event that implements `BusinessEvent` and is annotated `@Externalized("topic::#{tenantId()}")` is saved in `event_publication` inside the transaction that publishes it, and sent to Redpanda after the commit ([ADR 0036](../../docs/adr/0036-outbox-con-modulith-y-redpanda.md)). A rollback publishes nothing; if the broker is down, the row waits and `IncompleteEventPublications` resubmits it. Delivery is at least once, so consumers must be idempotent by `eventId`. Externalized types must live in the root package or in a module. The Kafka client uses `spring.kafka.bootstrap-servers` (`localhost:19092` with the compose `core` profile).

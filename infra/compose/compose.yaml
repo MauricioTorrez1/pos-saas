@@ -32,7 +32,10 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.8.1@sha256:3f3c5f8e03c614774b4bd9173b88391fefa4153bfc010d8012d59ad825377332
     profiles: [core]
-    command: ["start-dev"]
+    # --import-realm loads the realm of keycloak/ only when it does not exist yet (ADR 0039).
+    command: ["start-dev", "--import-realm"]
+    volumes:
+      - ./keycloak/pos-realm.json:/opt/keycloak/data/import/pos-realm.json:ro
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:?Set KEYCLOAK_ADMIN_USER in .env}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}

@@ -13,6 +13,18 @@ Docker Compose profiles for the local stack: `core`, `observability`, `automatio
 
 Ports listen on `127.0.0.1` only. Users and passwords are in your `.env`.
 
+### Keycloak realm
+Keycloak imports the realm `pos` from [`keycloak/pos-realm.json`](keycloak/pos-realm.json) when it starts, with no manual steps ([ADR 0039](../../docs/adr/0039-keycloak-oidc-y-tenant-en-el-token.md)). The file has no users, passwords or secrets.
+
+| Client | Purpose |
+| --- | --- |
+| `pos-core` | The core API as a resource server. It only validates tokens |
+| `pos-panel` | Public client of the web panel: authorization code with PKCE, no secret |
+
+Tokens of `pos-panel` carry the claim `tenant_id` (an attribute of the user that only an administrator can edit) and the audience `pos-core`. To try a login, open the admin console at <http://localhost:8180> with the admin of your `.env`, switch to the realm `pos`, create a user, and set its attribute `tenant_id` to a UUIDv7.
+
+The import runs only when the realm does not exist yet. After editing the file, delete the volumes (`docker compose --profile core down -v`) to import it again.
+
 ## Profile `observability`
 Applications send everything to the collector, which routes traces to Tempo, metrics to Prometheus, and logs to Loki. Grafana reads all three.
 

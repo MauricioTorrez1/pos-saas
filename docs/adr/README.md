@@ -42,4 +42,5 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0036](0036-outbox-con-modulith-y-redpanda.md) | Outbox con Spring Modulith, tabla por Flyway y eventos con contrato | Aceptada |
 | [0037](0037-observabilidad-del-nucleo.md) | Observabilidad del núcleo con OpenTelemetry, `tenant_id` y Sentry | Aceptada |
 | [0038](0038-bitacora-de-auditoria-solo-agregar.md) | Bitácora de auditoría de solo agregar | Aceptada |
+| [0039](0039-keycloak-oidc-y-tenant-en-el-token.md) | Keycloak con OIDC, `tenant_id` en el token y tenant fijado por petición | Aceptada |
 | [0041](0041-cliente-de-facturapi.md) | Cliente de Facturapi detrás de una interfaz, con reintentos solo en lecturas | Aceptada |
