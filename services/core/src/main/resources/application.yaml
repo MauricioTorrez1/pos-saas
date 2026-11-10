@@ -20,3 +20,32 @@ spring:
         # The outbox table comes from Flyway (V3), never from Modulith, so it is versioned like the rest.
         schema-initialization:
           enabled: false
+management:
+  tracing:
+    sampling:
+      # Every request in development; lower it with a property in production.
+      probability: ${CORE_TRACING_SAMPLING:1.0}
+  opentelemetry:
+    # Reads the standard OTEL_EXPORTER_OTLP_* variables, so the collector address is not hard coded.
+    map-environment-variables: true
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+    logging:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/logs
+  otlp:
+    metrics:
+      export:
+        url: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/metrics
+logging:
+  pattern:
+    # trace and span ids come from the active span; the tenant from TenantContext. No personal data.
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{tenant_id:-}] "
+sentry:
+  # An empty DSN turns Sentry off. Personal data is never sent.
+  dsn: ${SENTRY_DSN:}
+  send-default-pii: false
+  environment: ${CORE_ENVIRONMENT:local}
