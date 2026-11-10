@@ -105,7 +105,7 @@ test('shows a pending sale after the register is killed, and confirms it', async
   await crashWithPendingSales(launch, [[HAMMER_CODE, HAMMER_CENTS]]);
 
   const reopened = await launch();
-  const page = await signInWindow(reopened);
+  const page = await signInWindow(reopened, { hasPendingSales: true });
   await expect(question(page)).toBeVisible();
   await expect(question(page)).toContainText('Martillo uña curva 16 oz');
   await expect(question(page).getByRole('status', { name: 'Total de la venta pendiente' })).toHaveText('$116.00');
@@ -131,7 +131,7 @@ test('keeps the sale cancelled, and does not ask again after another restart', a
   await crashWithPendingSales(launch, [[HAMMER_CODE, HAMMER_CENTS]]);
 
   const reopened = await launch();
-  const page = await signInWindow(reopened);
+  const page = await signInWindow(reopened, { hasPendingSales: true });
   await expect(question(page)).toBeVisible();
   await page.keyboard.press('F4');
   await expect(question(page)).toHaveCount(0);
@@ -151,7 +151,7 @@ test('goes through several pending sales, oldest first, using only the keyboard'
     [SCREWDRIVER_CODE, SCREWDRIVER_CENTS],
   ]);
 
-  const page = await signInWindow(await launch());
+  const page = await signInWindow(await launch(), { hasPendingSales: true });
   await expect(question(page)).toContainText('Martillo uña curva 16 oz');
   await expect(question(page)).toContainText('Quedan 2 ventas por revisar');
 
@@ -170,7 +170,7 @@ test('keeps asking when the cashier presses Esc or a scanner fires', async ({ us
   await crashWithPendingSales(launch, [[HAMMER_CODE, HAMMER_CENTS]]);
 
   const reopened = await launch();
-  const page = await signInWindow(reopened);
+  const page = await signInWindow(reopened, { hasPendingSales: true });
   await expect(question(page)).toBeVisible();
 
   await page.keyboard.press('Escape');

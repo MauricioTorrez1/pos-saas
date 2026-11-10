@@ -549,7 +549,7 @@ describe('pending sales', () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     expect(screen.queryByRole('dialog', { hidden: true })).toBeNull();
-    expect(document.activeElement).toBe(lookupBox());
+    await waitFor(() => expect(document.activeElement).toBe(lookupBox()));
   });
 
   it('shows a sale left pending as soon as the register starts, with what is needed to recognize it', async () => {
@@ -767,7 +767,7 @@ describe('pending sales', () => {
     await renderApp(fakePosApi({ listPendingSales: () => Promise.reject(new Error('closed')) }));
 
     expect((await screen.findByRole('alert')).textContent).toContain('No se pudieron revisar las ventas pendientes');
-    expect(document.activeElement).toBe(lookupBox());
+    await waitFor(() => expect(document.activeElement).toBe(lookupBox()));
   });
 });
 
@@ -1213,7 +1213,7 @@ describe('signing in (E1-04)', () => {
     expect(await screen.findByRole('heading', { name: '¿Quién cobra?' })).toBeDefined();
     expect(screen.getAllByRole('radio').map((radio) => radio.getAttribute('value'))).toEqual([OWNER.id, ANA.id]);
     expect(screen.queryByRole('combobox', { name: 'Buscar producto' })).toBeNull();
-    expect(document.activeElement).toBe(pinBox());
+    await waitFor(() => expect(document.activeElement).toBe(pinBox()));
   });
 
   it('signs in the person with their PIN, and shows the register with their name', async () => {
@@ -1354,6 +1354,17 @@ describe('the cash of the register (E1-21, E1-22, E1-23)', () => {
     await waitFor(() => expect(openCashSession).toHaveBeenCalledExactlyOnceWith({ floatCents: 50000 }));
     await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull());
     expect(screen.getByLabelText('Estado de la caja').textContent).toBe('Caja abierta');
+  });
+
+  it('keeps the cash dialog open when it is asked for before the first answer about the cash arrives', async () => {
+    let answerCash: (status: CashStatus) => void = () => undefined;
+    const getCashStatus = vi.fn<PosApi['getCashStatus']>(() => new Promise<CashStatus>((resolve) => (answerCash = resolve)));
+    await renderApp(fakePosApi({ getCashStatus }));
+
+    press('F3');
+    answerCash(OPEN_CASH);
+
+    expect(await screen.findByRole('dialog', { name: 'Caja abierta', hidden: true })).toBeDefined();
   });
 
   it('refuses a float that is not an amount', async () => {

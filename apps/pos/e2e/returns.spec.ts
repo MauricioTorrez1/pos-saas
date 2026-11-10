@@ -52,10 +52,8 @@ async function sellTwoHammersMixed(page: Page): Promise<void> {
   await expect(page.getByRole('status', { name: 'Estado del cobro' })).toHaveText('Pago exacto');
   await page.keyboard.press('F2');
   await expect(page.getByRole('status', { name: 'Cambio a entregar' })).toHaveText('Sin cambio');
-  await expect(async () => {
-    await page.keyboard.press('Enter');
-    await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 1000 });
-  }).toPass();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: 'Buscar producto' })).toBeFocused();
 }
 
@@ -120,10 +118,8 @@ test('the refund leaves the drawer: the cut expects less cash after a cash retur
   await page.keyboard.type('116');
   await page.keyboard.press('F2');
   await expect(page.getByRole('status', { name: 'Cambio a entregar' })).toHaveText('Sin cambio');
-  await expect(async () => {
-    await page.keyboard.press('Enter');
-    await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 1000 });
-  }).toPass();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.keyboard.press('F4');
   await page.getByRole('textbox', { name: 'Folio del ticket' }).fill('1');
   await page.keyboard.press('Enter');
@@ -132,11 +128,8 @@ test('the refund leaves the drawer: the cut expects less cash after a cash retur
   await page.getByRole('textbox', { name: 'Motivo de la devolución' }).fill('Ya no lo quiere');
   await page.keyboard.press('F2');
   await expect(page.getByRole('status', { name: 'Lo que se entrega' })).toHaveText('Entrega $116.00 en efectivo');
-  // The keys of the finished return start working a moment after it shows, so Enter is retried until the dialog closes.
-  await expect(async () => {
-    await page.keyboard.press('Enter');
-    await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 1000 });
-  }).toPass();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 
   await page.keyboard.press('F3');
   await expect(page.getByRole('heading', { name: 'Caja abierta' })).toBeVisible();
