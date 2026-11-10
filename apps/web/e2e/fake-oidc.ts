@@ -16,7 +16,7 @@ const ISSUER = `${ORIGIN}/realms/pos`;
 const OIDC = `${ISSUER}/protocol/openid-connect`;
 const TENANT_ID = '0192f3a4-7b1c-7e2d-8a3f-5c9d1e2b4a60';
 
-type Persona = 'owner' | 'cashier' | 'norole' | 'notenant';
+type Persona = 'owner' | 'manager' | 'cashier' | 'norole' | 'notenant';
 
 interface Control {
   persona: Persona;
@@ -38,12 +38,13 @@ const refreshTokens = new Set<string>();
 const { publicKey, privateKey } = await generateKeyPair('RS256');
 const jwk = { ...(await exportJWK(publicKey)), kid: 'fake-key', alg: 'RS256', use: 'sig' };
 
+/** The role the fake core returns in /me, like app_user.role. The tokens carry no roles. */
+function roleOf(persona: Persona): string | null {
+  return persona === 'owner' || persona === 'manager' || persona === 'cashier' ? persona : null;
+}
+
 function claimsFor(persona: Persona): Record<string, unknown> {
-  const roles = persona === 'owner' ? ['owner', 'default-roles-pos'] : persona === 'cashier' ? ['cashier'] : [];
-  return {
-    ...(persona === 'notenant' ? {} : { tenant_id: TENANT_ID }),
-    realm_access: { roles },
-  };
+  return persona === 'notenant' ? {} : { tenant_id: TENANT_ID };
 }
 
 function sign(claims: Record<string, unknown>, audience: string, ttlSeconds: number): Promise<string> {
@@ -117,7 +118,7 @@ async function handleMe(request: IncomingMessage, response: ServerResponse): Pro
     if (typeof payload.tenant_id !== 'string') {
       return send(response, 403);
     }
-    return send(response, 200, { subject: payload.sub, tenantId: payload.tenant_id });
+    return send(response, 200, { subject: payload.sub, tenantId: payload.tenant_id, role: roleOf(control.persona) });
   } catch {
     return send(response, 401);
   }

@@ -1,12 +1,18 @@
 import { ROLE_LABELS, type AppRole } from '@/lib/identity';
 
 interface RoleListProps {
-  roles: readonly AppRole[];
+  /** Role of the user according to the core, or `null` when the user has none. */
+  role: AppRole | null;
+  /** `false` when the core could not answer, so the role is unknown and not just missing. */
+  known: boolean;
 }
 
-/** Shows the roles of the user, or a note when the realm has not assigned one yet. */
-export function RoleList({ roles }: RoleListProps) {
-  if (roles.length === 0) {
+/** Shows the role of the user, a note when none is assigned, or a note when the core did not answer. */
+export function RoleList({ role, known }: RoleListProps) {
+  if (!known) {
+    return <p className="panel__detail">Lo mostramos en cuanto el sistema central responda.</p>;
+  }
+  if (role === null) {
     return (
       <>
         <p className="panel__value">Sin rol asignado</p>
@@ -15,12 +21,8 @@ export function RoleList({ roles }: RoleListProps) {
     );
   }
   return (
-    <ul className="roles" aria-label="Roles">
-      {roles.map((role) => (
-        <li key={role} className="pill">
-          {ROLE_LABELS[role]}
-        </li>
-      ))}
-    </ul>
+    <p className="panel__value" data-testid="role">
+      {ROLE_LABELS[role]}
+    </p>
   );
 }

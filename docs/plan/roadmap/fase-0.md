@@ -1,6 +1,6 @@
 # Fase 0: Base técnica, catálogo y panel
 
-Duración estimada: 107 horas. Reparto: Claude escribe y explica; tú revisas, pruebas y apruebas.
+Duración estimada: 108 horas. Reparto: Claude escribe y explica; tú revisas, pruebas y apruebas.
 
 ## Hito F0-A: Repositorio y CI
 
@@ -265,6 +265,16 @@ Duración estimada: 107 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** F0-24, F0-20, F0-11 · **Estimación:** 5 h
 - **Autoevaluación:** (1) ¿Qué son RPO y RTO? (2) ¿Por qué probar una restauración? (3) ¿Cómo renuevas un certificado?
 - **Entrevista:** (1) ¿Cómo despliegas sin tiempo fuera? (2) ¿Cómo diseñas una estrategia de respaldos?
+
+### F0-26 · El rol en `GET /me`
+- **Objetivo:** el panel decide por el rol que guarda el núcleo, no por roles del realm que nadie mantiene.
+- **Conceptos:** [Autorización en Spring], [Next.js]
+- **Claude / tú:** Claude agrega `role` a `GET /me` y hace que el panel lo lea en el servidor. Tú cambias el rol de un usuario y compruebas que el panel lo refleja sin iniciar sesión otra vez.
+- **Pruebas:** `/me` con Keycloak real por cada rol y sin usuario (rol vacío); Vitest y Playwright del panel con el rol que responde el núcleo.
+- **Criterios:** un cambio de rol se ve en la siguiente petición; un token sin usuario conserva el negocio y no tiene rol.
+- **Depende de:** F0-14, F0-20 · **Estimación:** 1 h
+- **Autoevaluación:** (1) ¿Por qué el rol no va en el token? (2) ¿Qué pasa si el núcleo no responde al pedir el rol? (3) ¿Por qué un rol oculto en el panel no basta?
+- **Entrevista:** (1) ¿Roles en el token o en la base? (2) ¿Cómo evitas una consulta extra por petición?
 
 [Git]: https://git-scm.com/doc
 [pnpm workspaces]: https://pnpm.io/workspaces

@@ -37,7 +37,6 @@ function sessionWithBigTokens(): Session {
     idToken: blob(2000),
     accessExpiresAt: 1,
     tenantId: null,
-    roles: [],
   };
 }
 

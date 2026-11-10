@@ -1,40 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { extractIdentity } from './identity';
+import { extractIdentity, parseRole } from './identity';
 import { TENANT_ID, fakeAccessToken } from './test-support';
 
 describe('extractIdentity', () => {
-  it('reads the tenant and the known roles', async () => {
-    const token = await fakeAccessToken({ realm_access: { roles: ['owner', 'cashier'] } });
-
-    expect(extractIdentity(token)).toEqual({ tenantId: TENANT_ID, roles: ['owner', 'cashier'] });
+  it('reads the tenant', async () => {
+    expect(extractIdentity(await fakeAccessToken())).toEqual({ tenantId: TENANT_ID });
   });
 
-  it('drops the default roles of Keycloak', async () => {
-    const token = await fakeAccessToken({
-      realm_access: { roles: ['offline_access', 'uma_authorization', 'default-roles-pos', 'manager'] },
-    });
+  it('ignores the roles of the token: the core owns the role', async () => {
+    const token = await fakeAccessToken({ realm_access: { roles: ['owner'] } });
 
-    expect(extractIdentity(token).roles).toEqual(['manager']);
+    expect(extractIdentity(token)).toEqual({ tenantId: TENANT_ID });
   });
 
   it('returns no tenant when the claim is missing', async () => {
-    const token = await fakeAccessToken({ tenant_id: undefined });
-
-    expect(extractIdentity(token).tenantId).toBeNull();
+    expect(extractIdentity(await fakeAccessToken({ tenant_id: undefined })).tenantId).toBeNull();
   });
 
   it('returns no tenant when the claim is not a UUID', async () => {
-    const token = await fakeAccessToken({ tenant_id: 'acme' });
-
-    expect(extractIdentity(token).tenantId).toBeNull();
-  });
-
-  it('returns no roles when realm_access is missing or malformed', async () => {
-    expect(extractIdentity(await fakeAccessToken({ realm_access: undefined })).roles).toEqual([]);
-    expect(extractIdentity(await fakeAccessToken({ realm_access: { roles: 'owner' } })).roles).toEqual([]);
+    expect(extractIdentity(await fakeAccessToken({ tenant_id: 'acme' })).tenantId).toBeNull();
   });
 
   it('throws on a string that is not a JWT', () => {
     expect(() => extractIdentity('not-a-token')).toThrow();
+  });
+});
+
+describe('parseRole', () => {
+  it('accepts the three roles of the core', () => {
+    expect(['owner', 'manager', 'cashier'].map(parseRole)).toEqual(['owner', 'manager', 'cashier']);
+  });
+
+  it('returns null for anything else', () => {
+    expect([null, undefined, 'admin', 'Owner', 7].map(parseRole)).toEqual([null, null, null, null, null]);
   });
 });

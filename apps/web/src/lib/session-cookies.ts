@@ -9,7 +9,7 @@ export const LOGIN_COOKIE = 'pos_login';
 /** Seconds a login may take between leaving for Keycloak and coming back. */
 export const LOGIN_MAX_AGE_SECONDS = 600;
 
-// Browsers drop a cookie above 4096 bytes. Tokens grow with the roles, so the sealed value is split.
+// Browsers drop a cookie above 4096 bytes. Tokens can grow with the claims of the realm, so the sealed value is split.
 const CHUNK_SIZE = 3600;
 const MAX_CHUNKS = 8;
 

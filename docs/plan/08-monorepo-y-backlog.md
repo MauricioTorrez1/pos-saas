@@ -55,7 +55,7 @@ Fuera del repositorio siempre: `.env`, archivos de Eleventa, listas de proveedor
 ### Milestones
 | Milestone | Tareas | Horas | Crear ahora |
 | --- | --- | --- | --- |
-| Fase 0: Base | 25 | 107 | Sí |
+| Fase 0: Base | 26 | 108 | Sí |
 | Entrega 1: Reemplazar a Eleventa | 39 | 163 | Sí |
 | Entrega 2: Terminal integrada | 9 | 34 | Más adelante |
 | Fase 2: Operación completa | 24 | 104 | Más adelante |
