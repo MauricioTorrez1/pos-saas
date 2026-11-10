@@ -46,10 +46,8 @@ async function sellHammerInCash(page: Page): Promise<void> {
   await page.keyboard.type('116');
   await page.keyboard.press('F2');
   await expect(page.getByRole('status', { name: 'Cambio a entregar' })).toHaveText('Sin cambio');
-  await expect(async () => {
-    await page.keyboard.press('Enter');
-    await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 1000 });
-  }).toPass();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: 'Buscar producto' })).toBeFocused();
 }
 
@@ -125,11 +123,10 @@ test('does not sell with the register closed, and sells again after opening it w
   await expect(page.getByRole('dialog', { name: 'Abrir la caja' })).toBeHidden();
   await expect(page.getByLabel('Estado de la caja')).toHaveText('Caja cerrada');
 
-  // The key can land before the screen is ready for it after the cut closes, so it is pressed again until the dialog opens.
-  await expect(async () => {
-    await page.keyboard.press('F3');
-    await expect(page.getByRole('dialog', { name: 'Abrir la caja' })).toBeVisible({ timeout: 1000 });
-  }).toPass({ timeout: 10_000 });
+  // The keyboard goes back to the lookup box once the cut closes, and F3 is read there, so it waits for that.
+  await expect(page.getByRole('combobox', { name: 'Buscar producto' })).toBeFocused();
+  await page.keyboard.press('F3');
+  await expect(page.getByRole('dialog', { name: 'Abrir la caja' })).toBeVisible();
   await page.getByRole('textbox', { name: 'Fondo de caja' }).fill('500');
   await page.keyboard.press('F2');
 
