@@ -1,3 +1,4 @@
+import { MAX_MISC_NAME_LENGTH } from '../../shared/miscellaneous';
 import type { PaymentRequest, PendingSaleRequest } from '../../shared/pos-api';
 
 /** More lines than any ticket at the counter, so a broken screen cannot make one request hold the main process. */
@@ -36,6 +37,16 @@ function requireRecord(value: unknown, description: string): Record<string, unkn
 
 function parseLine(value: unknown): PendingSaleRequest['lines'][number] {
   const line = requireRecord(value, 'a sale line');
+  if (line.miscellaneous !== undefined) {
+    const item = requireRecord(line.miscellaneous, 'a miscellaneous item');
+    if (typeof item.name !== 'string' || item.name.trim() === '' || item.name.length > MAX_MISC_NAME_LENGTH) {
+      throw new TypeError(`Expected a description of at most ${MAX_MISC_NAME_LENGTH} characters`);
+    }
+    return {
+      miscellaneous: { name: item.name.trim(), unitPriceE4: requirePositiveInteger(item.unitPriceE4, 'a unit price in ten-thousandths') },
+      quantityMilli: requirePositiveInteger(line.quantityMilli, 'a quantity in thousandths'),
+    };
+  }
   return {
     productId: requireMatch(line.productId, UUID_V7_TEXT, 'the UUIDv7 of a product'),
     quantityMilli: requirePositiveInteger(line.quantityMilli, 'a quantity in thousandths'),
@@ -58,10 +69,15 @@ function parseLines(value: unknown): PendingSaleRequest['lines'] {
  */
 export function parsePendingSaleRequest(value: unknown): PendingSaleRequest {
   const request = requireRecord(value, 'a sale request');
+  const { ownerPin } = request;
+  if (ownerPin !== undefined && (typeof ownerPin !== 'string' || ownerPin.length > 8)) {
+    throw new TypeError('Expected the PIN of the owner as text of at most 8 characters');
+  }
   return {
     idempotencyKey: requireMatch(request.idempotencyKey, UUID_TEXT, 'a UUID as the idempotency key'),
     lines: parseLines(request.lines),
     expectedTotalCents: requirePositiveInteger(request.expectedTotalCents, 'a total in cents'),
+    ...(ownerPin === undefined ? {} : { ownerPin }),
   };
 }
 
