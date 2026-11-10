@@ -116,6 +116,15 @@ Failures are `FacturapiRejectedException` (4xx, do not repeat), `FacturapiUnavai
 
 Timeouts and retries are the `facturapi.connect-timeout` (3s), `facturapi.read-timeout` (20s), `facturapi.max-retries` (2) and `facturapi.retry-backoff` (300ms) properties. Tests run against a fake server and need no key.
 
+### Individual invoice (`POST /invoices`)
+Invoices a sale the core already received ([ADR 0050](../../docs/adr/0050-factura-individual.md), RF-035). It needs the `invoice.issue` permission (owner and manager).
+
+```json
+{ "saleId": "<uuid>", "receiver": { "legalName": "ACME FERRETERIA", "taxId": "ABC010203AB1", "taxRegime": "601", "cfdiUse": "G03", "zipCode": "64000" },
+  "paymentForm": "03", "satProductKeys": { "<saleLineId>": "27112700" } }
+```
+`paymentForm` and `satProductKeys` are optional: the payment form comes from the sale and the SAT product key from `invoicing.default-sat-product-key` until the catalog carries it. Answers: `201` stamped invoice (`fiscalUuid`, `providerInvoiceId`, `totalCents`), `404` unknown sale, `409` already invoiced or being invoiced, `422` invalid fiscal data (field and rule, never the value) or refused by the provider, `503` no API key or no answer from the provider. Sending the same request again is always safe: a doubtful stamping is looked up at the provider (`external_id`) before it is repeated, and the `invoice` table allows one invoice per sale. Only the receiver's RFC is stored; the PDF and XML are downloaded from the provider with `providerInvoiceId`.
+
 ## Observability
 The core sends traces, metrics and logs over OTLP to the collector of the `observability` profile and errors to Sentry ([ADR 0037](../../docs/adr/0037-observabilidad-del-nucleo.md)). Every log line shows `[service,traceId,spanId,tenant_id]`; spans carry `tenant.id`, and no metric uses it as a label. Never log names, phones, emails, PINs, tokens or card data, only ids.
 
