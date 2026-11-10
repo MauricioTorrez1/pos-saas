@@ -21,6 +21,7 @@ public class KeycloakTestClient {
     private static final String PASSWORD = "test-user-password-1";
 
     private final String baseUrl;
+    private boolean passwordGrantAllowed;
     private final HttpClient http = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
 
@@ -33,6 +34,10 @@ public class KeycloakTestClient {
      * it: a real login uses the authorization code flow with PKCE.
      */
     void allowPasswordGrant() {
+        if (passwordGrantAllowed) {
+            return;
+        }
+        passwordGrantAllowed = true;
         JsonNode client = get("/admin/realms/" + KeycloakTestConfiguration.REALM + "/clients?clientId=" + CLIENT).get(0);
         ((tools.jackson.databind.node.ObjectNode) client).put("directAccessGrantsEnabled", true);
         send(HttpRequest.newBuilder(uri("/admin/realms/" + KeycloakTestConfiguration.REALM + "/clients/" + client.get("id").asString()))
@@ -46,8 +51,9 @@ public class KeycloakTestClient {
      *
      * @param username the login name
      * @param tenantId the business to store in the {@code tenant_id} attribute, or {@code null} for none
+     * @return the id of the user in Keycloak, which is the {@code sub} claim of its tokens
      */
-    void createUser(String username, UUID tenantId) {
+    String createUser(String username, UUID tenantId) {
         Map<String, Object> user = new LinkedHashMap<>();
         user.put("username", username);
         user.put("enabled", true);
@@ -55,10 +61,12 @@ public class KeycloakTestClient {
         if (tenantId != null) {
             user.put("attributes", Map.of("tenant_id", List.of(tenantId.toString())));
         }
-        send(HttpRequest.newBuilder(uri("/admin/realms/" + KeycloakTestConfiguration.REALM + "/users"))
+        HttpResponse<String> created = send(HttpRequest.newBuilder(uri("/admin/realms/" + KeycloakTestConfiguration.REALM + "/users"))
                 .header("Authorization", "Bearer " + adminToken())
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(user))), 201);
+        String location = created.headers().firstValue("Location").orElseThrow();
+        return location.substring(location.lastIndexOf('/') + 1);
     }
 
     /**

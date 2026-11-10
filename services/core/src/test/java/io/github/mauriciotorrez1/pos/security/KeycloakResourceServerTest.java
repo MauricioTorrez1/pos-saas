@@ -140,6 +140,12 @@ class KeycloakResourceServerTest {
         BranchesController branchesController(JdbcTemplate app, TransactionTemplate transaction) {
             return new BranchesController(app, transaction);
         }
+
+        /** The endpoint table denies what it does not list (ADR 0042), so the test endpoint is listed here. */
+        @Bean
+        EndpointRule branchesRule() {
+            return EndpointRule.authenticated(org.springframework.http.HttpMethod.GET, "/test/branches");
+        }
     }
 
     @RestController
