@@ -155,7 +155,7 @@ async function start(): Promise<void> {
       const cashierId = auth.currentUser()?.id;
       const cashSessionId = cash.openSessionId();
       return cashierId === undefined || cashSessionId === null ? null : { cashierId, cashSessionId };
-    }),
+    }, { auth, audit: new AuditLog(store, LOCAL_TENANT_ID) }),
     salePayments: new SalePayments(sales, checkout, {
       printer,
       businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,

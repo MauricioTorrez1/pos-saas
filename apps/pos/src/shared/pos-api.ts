@@ -75,14 +75,26 @@ export interface CatalogProduct {
 export interface PendingSaleRequest {
   /** A UUID the screen creates once per sale. Sending it again returns the same sale instead of a second one. */
   readonly idempotencyKey: string;
-  readonly lines: readonly {
-    readonly productId: string;
-    /** Thousandths of the base unit of the product: 3.275 m is 3275. */
-    readonly quantityMilli: number;
-  }[];
+  readonly lines: readonly PendingSaleRequestLine[];
   /** The total the customer sees, in cents. If the catalog gives another total, the sale is not saved. */
   readonly expectedTotalCents: number;
+  /** The PIN of the owner, when a cashier sells a miscellaneous item. The owner needs no PIN. */
+  readonly ownerPin?: string;
 }
+
+/** A line of a sale to save: a product of the catalog, or a miscellaneous item with a price the person typed (RF-003). */
+export type PendingSaleRequestLine =
+  | {
+      readonly productId: string;
+      /** Thousandths of the base unit of the product: 3.275 m is 3275. */
+      readonly quantityMilli: number;
+    }
+  | {
+      /** What it is, as it will appear on the ticket. */
+      readonly miscellaneous: { readonly name: string; readonly unitPriceE4: number };
+      /** Thousandths of a piece, always a whole number of pieces. */
+      readonly quantityMilli: number;
+    };
 
 /** One product of a sale waiting to be resolved. */
 export interface PendingSaleLine {
@@ -111,7 +123,11 @@ export type SavePendingSaleResult =
   /** A product no longer exists or its price changed, so the screen shows a sale that does not match. Nothing was saved. */
   | { readonly status: 'catalog_changed' }
   /** The register is closed: nothing is sold until somebody opens it with a float (RF-024). */
-  | { readonly status: 'no_cash_session' };
+  | { readonly status: 'no_cash_session' }
+  /** A cashier sold a miscellaneous item without the PIN of the owner. Nothing was saved. */
+  | { readonly status: 'authorization_required' }
+  | { readonly status: 'wrong_pin'; readonly attemptsLeft: number }
+  | { readonly status: 'locked'; readonly until: string };
 
 /** What the customer handed over for a saved sale. The main process works out the payments and the change itself. */
 export interface PaymentRequest {

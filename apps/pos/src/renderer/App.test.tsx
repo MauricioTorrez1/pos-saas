@@ -828,6 +828,69 @@ describe('checkout', () => {
     expect(within(dialog).getByRole('status', { name: 'Total a cobrar', hidden: true }).textContent).toBe('$116.00');
   });
 
+  async function addMiscItem(): Promise<void> {
+    press('F2');
+    await screen.findByRole('dialog', { name: 'Artículo varios', hidden: true });
+    await screen.findByRole('textbox', { name: 'Qué es', hidden: true });
+    typeInto('Qué es', 'Tornillo suelto');
+    typeInto('Precio de cada uno', '12.50');
+    typeInto('Cantidad', '2');
+  }
+
+  it('sells an item that is not in the catalog at the price the owner typed, and sends it as such', async () => {
+    const savePendingSale = vi.fn<PosApi['savePendingSale']>(() => Promise.resolve({ status: 'saved', sale: SAVED }));
+    await renderApp(fakePosApi({ savePendingSale }));
+    await addMiscItem();
+
+    pressKey('F2');
+    await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull());
+    expect(totalShown()).toBe('$25.00');
+    press('F12');
+
+    await waitFor(() => expect(savePendingSale).toHaveBeenCalledTimes(1));
+    expect(savePendingSale).toHaveBeenCalledWith({
+      idempotencyKey: expect.any(String),
+      lines: [{ miscellaneous: { name: 'Tornillo suelto', unitPriceE4: 125_000 }, quantityMilli: 2000 }],
+      expectedTotalCents: 2500,
+    });
+  });
+
+  it('asks a cashier for the PIN of the owner, sends it with the sale, and drops it when the owner refuses', async () => {
+    const cashier = { id: 'c', name: 'Ana', role: 'cashier' as const };
+    const savePendingSale = vi.fn<PosApi['savePendingSale']>(() => Promise.resolve({ status: 'wrong_pin', attemptsLeft: 4 }));
+    await renderApp(fakePosApi({ savePendingSale, getAuthState: () => Promise.resolve({ needsSetup: false, users: [cashier], current: cashier }) }));
+    await addMiscItem();
+
+    pressKey('F2');
+    expect((await screen.findByRole('alert', { hidden: true })).textContent).toContain('Pídele al dueño');
+    fireEvent.change(screen.getByLabelText('PIN del dueño'), { target: { value: '4321' } });
+    pressKey('F2');
+    await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull());
+    press('F12');
+
+    await waitFor(() => expect(savePendingSale).toHaveBeenCalledTimes(1));
+    expect(savePendingSale).toHaveBeenCalledWith(expect.objectContaining({ ownerPin: '4321' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Quedan 4 intentos');
+    press('F12');
+    await waitFor(() => expect(savePendingSale).toHaveBeenCalledTimes(2));
+    expect(savePendingSale.mock.calls[1]![0]).not.toHaveProperty('ownerPin');
+  });
+
+  it('refuses a description that is empty and a price that is not a number, before adding anything', async () => {
+    await renderApp(fakePosApi());
+    press('F2');
+    await screen.findByRole('textbox', { name: 'Qué es', hidden: true });
+
+    typeInto('Precio de cada uno', 'doce');
+    pressKey('F2');
+    expect((await screen.findByRole('alert', { hidden: true })).textContent).toContain('Revisa el precio');
+
+    typeInto('Precio de cada uno', '12.50');
+    pressKey('F2');
+    await waitFor(() => expect(screen.getByRole('alert', { hidden: true }).textContent).toContain('Escribe qué es'));
+    expect(totalShown()).toBe('$0.00');
+  });
+
   it('tells the cashier when the catalog changed, and charges nothing', async () => {
     const checkoutSale = vi.fn<PosApi['checkoutSale']>();
     await renderApp(fakePosApi({ checkoutSale }));

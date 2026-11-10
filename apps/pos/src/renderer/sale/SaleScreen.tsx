@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
 
-import { MAX_LOOKUP_TEXT_LENGTH, type CatalogProduct, type PendingSale, type PosApi } from '../../shared/pos-api';
+import { isMiscLineId, MISC_LINE_ID_PREFIX, MISC_TAX_RATE_BP } from '../../shared/miscellaneous';
+import { MAX_LOOKUP_TEXT_LENGTH, type CatalogProduct, type PendingSale, type PosApi, type SavePendingSaleResult } from '../../shared/pos-api';
 import { CheckoutDialog } from '../checkout/CheckoutDialog';
 import { describeReprint, REPRINT_FAILED } from '../checkout/reprint-message';
+import { MiscItemDialog, type MiscItem } from './MiscItemDialog';
 import { QuantityDialog } from './QuantityDialog';
 import { needsMeasuring } from './quantity-entry';
 import { SaleLines } from './SaleLines';
@@ -20,6 +22,17 @@ const CATALOG_CHANGED =
 const CASH_CLOSED = 'La caja está cerrada. Ábrela con su fondo para poder cobrar.';
 const SAVE_FAILURE = 'No se pudo guardar la venta. No se cobró nada. Intenta de nuevo y, si sigue fallando, reinicia la caja.';
 
+function describeMiscRefusal(result: Extract<SavePendingSaleResult, { status: 'authorization_required' | 'wrong_pin' | 'locked' }>): string {
+  switch (result.status) {
+    case 'authorization_required':
+      return 'El artículo varios lo aprueba el dueño. Quítalo y agrégalo otra vez con su PIN. No se cobró nada.';
+    case 'wrong_pin':
+      return `PIN del dueño incorrecto. Quedan ${result.attemptsLeft} intentos. Quita el artículo varios y agrégalo otra vez. No se cobró nada.`;
+    case 'locked':
+      return 'Demasiados intentos con el PIN del dueño. Espera unos minutos. No se cobró nada.';
+  }
+}
+
 function notFoundMessage(text: string): string {
   return `No encontramos «${text}». Revisa el código o busca el producto por nombre.`;
 }
@@ -32,6 +45,8 @@ interface SaleScreenProps {
   readonly posApi: PosApi;
   /** While true, another part of the screen has the keyboard, and the lookup box waits. */
   readonly isKeyboardElsewhere: boolean;
+  /** Whether the owner is signed in. A cashier who sells a miscellaneous item needs the PIN of the owner. */
+  readonly isOwner?: boolean;
   readonly onOpenAppearance: () => void;
   /** Called when the cashier asks to sign out. */
   readonly onSignOut: () => void;
@@ -59,24 +74,43 @@ interface SaleScreenProps {
  * @param props.onCashChanged called after a sale was collected
  * @returns the screen
  */
-export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onCashChanged }: SaleScreenProps): ReactElement {
+export function SaleScreen({ posApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onCashChanged }: SaleScreenProps): ReactElement {
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
   const [savedSale, setSavedSale] = useState<PendingSale | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [measuring, setMeasuring] = useState<CatalogProduct | null>(null);
+  const [isAddingMisc, setIsAddingMisc] = useState(false);
   const isSaving = useRef(false);
+  /** The PIN the owner typed for the miscellaneous items of this sale. It lives only until the sale is saved or cleared. */
+  const ownerPin = useRef<string | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const showCatalogFailure = useCallback(() => setNotice(CATALOG_FAILURE), []);
   const search = useProductSearch(posApi, showCatalogFailure);
 
   useEffect(() => {
-    if (!isKeyboardElsewhere && savedSale === null && measuring === null) {
+    if (!isKeyboardElsewhere && savedSale === null && measuring === null && !isAddingMisc) {
       inputRef.current?.focus();
     }
-  }, [isKeyboardElsewhere, savedSale, measuring]);
+  }, [isKeyboardElsewhere, savedSale, measuring, isAddingMisc]);
+
+  const addMiscItem = ({ name, unitPriceE4, quantityMilli, ownerPin: pin }: MiscItem): void => {
+    const product: CatalogProduct = {
+      id: `${MISC_LINE_ID_PREFIX}${crypto.randomUUID()}`,
+      name,
+      unit: 'piece',
+      unitPriceE4,
+      taxRate: { factor: 'rate', rateBp: MISC_TAX_RATE_BP },
+    };
+    dispatch({ type: 'add-product', product, quantityMilli });
+    if (pin !== undefined) {
+      ownerPin.current = pin;
+    }
+    setIsAddingMisc(false);
+    setNotice(null);
+  };
 
   const confirmQuantity = (quantityMilli: number): void => {
     if (measuring !== null) {
@@ -91,21 +125,30 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSi
       setNotice(EMPTY_SALE_MESSAGE);
       return;
     }
-    if (isSaving.current || isKeyboardElsewhere || measuring !== null) {
+    if (isSaving.current || isKeyboardElsewhere || measuring !== null || isAddingMisc) {
       return;
     }
     isSaving.current = true;
     try {
+      const hasMisc = sale.lines.some((line) => isMiscLineId(line.product.id));
       const result = await posApi.savePendingSale({
         idempotencyKey: crypto.randomUUID(),
-        lines: sale.lines.map((line) => ({ productId: line.product.id, quantityMilli: line.quantity.milli })),
+        lines: sale.lines.map(({ product, quantity }) =>
+          isMiscLineId(product.id)
+            ? { miscellaneous: { name: product.name, unitPriceE4: product.unitPriceE4 }, quantityMilli: quantity.milli }
+            : { productId: product.id, quantityMilli: quantity.milli },
+        ),
         expectedTotalCents: sale.totals.totalCents,
+        ...(hasMisc && ownerPin.current !== undefined ? { ownerPin: ownerPin.current } : {}),
       });
       if (result.status === 'saved') {
         setSavedSale(result.sale);
       } else if (result.status === 'no_cash_session') {
         setNotice(CASH_CLOSED);
         onOpenCash();
+      } else if (result.status === 'authorization_required' || result.status === 'wrong_pin' || result.status === 'locked') {
+        ownerPin.current = undefined;
+        setNotice(describeMiscRefusal(result));
       } else {
         setNotice(CATALOG_CHANGED);
       }
@@ -127,6 +170,7 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSi
   const finishCheckout = (wasCollected: boolean): void => {
     setSavedSale(null);
     if (wasCollected) {
+      ownerPin.current = undefined;
       dispatch({ type: 'clear' });
       setNotice(null);
       onCashChanged();
@@ -254,6 +298,10 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSi
         event.preventDefault();
         void startCheckout();
         return;
+      case 'F2':
+        event.preventDefault();
+        setIsAddingMisc(true);
+        return;
       case 'F8':
         event.preventDefault();
         void reprintLast();
@@ -355,6 +403,7 @@ export function SaleScreen({ posApi, isKeyboardElsewhere, onOpenAppearance, onSi
         <SaleLines lines={sale.lines} selectedProductId={sale.selectedProductId} onSelect={handleSelectLine} />
       </section>
       <SaleSummary lineCount={sale.lines.length} totals={sale.totals} />
+      {isAddingMisc && <MiscItemDialog isOwner={isOwner} onAdd={addMiscItem} onCancel={() => setIsAddingMisc(false)} />}
       {measuring !== null && <QuantityDialog product={measuring} onConfirm={confirmQuantity} onCancel={() => setMeasuring(null)} />}
       {savedSale !== null && <CheckoutDialog posApi={posApi} sale={savedSale} onFinished={finishCheckout} />}
     </main>

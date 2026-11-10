@@ -293,3 +293,42 @@ test('refuses payment requests that do not follow the rules of the bridge', asyn
 
   expect(refusals).toEqual(['rejected', 'rejected', 'rejected', 'rejected', 'rejected']);
 });
+
+test('sells an item that is not in the catalog with a typed price, writes who approved it, and moves no stock (RF-003)', async ({ userDataDir, launch }) => {
+  const register = await launch();
+  const page = await signInWindow(register);
+  await expect(lookupBox(page)).toBeFocused();
+
+  await page.keyboard.press('F2');
+  await expect(page.getByRole('dialog', { name: 'Artículo varios' })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Qué es' }).fill('Tornillo suelto');
+  await page.getByRole('textbox', { name: 'Precio de cada uno' }).fill('12.50');
+  await page.getByRole('textbox', { name: 'Cantidad' }).fill('2');
+  await page.keyboard.press('F2');
+  await expect(total(page)).toHaveText('$25.00');
+
+  await expect(async () => {
+    await page.keyboard.press('F12');
+    await expect(payment(page)).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await expect(page.getByRole('textbox', { name: 'Efectivo recibido' })).toBeFocused();
+  await page.keyboard.type('25');
+  await page.keyboard.press('F2');
+  await expect(payment(page)).toContainText('Folio T1-000001');
+  await closeDone(page);
+
+  const rows = await register.evaluate((_electron, path) => {
+    const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
+    const database = new DatabaseSync(path, { readOnly: true });
+    try {
+      return {
+        sales: database.prepare('SELECT status, total_cents FROM sale').all(),
+        audit: database.prepare('SELECT action FROM audit_log').all(),
+        saleMovements: (database.prepare("SELECT count(*) AS total FROM stock_movement WHERE type = 'sale'").get() as { total: number }).total,
+      };
+    } finally {
+      database.close();
+    }
+  }, testSalePaths(userDataDir).databasePath);
+  expect(rows).toEqual({ sales: [{ status: 'completed', total_cents: 2500 }], audit: [{ action: 'sale.misc_item' }], saleMovements: 0 });
+});

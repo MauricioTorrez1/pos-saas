@@ -1,5 +1,6 @@
 import type { StatementSync } from 'node:sqlite';
 
+import { MISC_PRODUCT_ID } from '../../shared/miscellaneous';
 import type { LocalStore } from '../local-store/local-store';
 import { uuidV7 } from '../uuid-v7';
 
@@ -96,6 +97,10 @@ export function postWith(insert: StatementSync, tenantId: string, movements: rea
   const occurredAt = new Date().toISOString();
   let created = 0;
   for (const movement of movements) {
+    // A miscellaneous item is not a product with stock, so selling or returning it moves nothing (ADR 0033).
+    if (movement.productId === MISC_PRODUCT_ID) {
+      continue;
+    }
     const result = insert.run(
       uuidV7(),
       tenantId,

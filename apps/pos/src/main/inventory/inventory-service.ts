@@ -1,6 +1,7 @@
 import type { StatementSync } from 'node:sqlite';
 
 import type { AdjustStockRequest, AdjustStockResult, Kardex, KardexRow, LedgerCheck, LedgerProblem } from '../../shared/inventory-api';
+import { MISC_PRODUCT_ID } from '../../shared/miscellaneous';
 import type { AuditLog } from '../audit/audit-log';
 import type { AuthService } from '../auth/auth-service';
 import type { LocalStore } from '../local-store/local-store';
@@ -155,7 +156,7 @@ export class InventoryService {
          WHERE sale.tenant_id = ? AND sale.status = 'completed'`,
       )
       .all(this.#tenantId) as unknown as SourceRow[];
-    for (const line of soldLines) {
+    for (const line of soldLines.filter((sold) => sold.product_id !== MISC_PRODUCT_ID)) {
       expected.set(`sale_line:${line.id}`, { productId: line.product_id, quantityMilli: -line.quantity_milli });
     }
     const returnedLines = this.#store
@@ -165,7 +166,7 @@ export class InventoryService {
          WHERE sale_return_line.tenant_id = ?`,
       )
       .all(this.#tenantId) as unknown as SourceRow[];
-    for (const line of returnedLines) {
+    for (const line of returnedLines.filter((returned) => returned.product_id !== MISC_PRODUCT_ID)) {
       expected.set(`return_line:${line.id}`, { productId: line.product_id, quantityMilli: line.quantity_milli });
     }
 
