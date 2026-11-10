@@ -14,6 +14,7 @@ import {
 } from '../checkout/sale-recorder';
 import { assertSaleTransition, InvalidSaleTransitionError, type SaleStatus } from '../checkout/sale-state-machine';
 import { INSERT_STOCK_MOVEMENT_SQL, postWith } from '../inventory/stock-store';
+import { SyncOutbox } from '../sync/sync-outbox';
 import { uuidV7 } from '../uuid-v7';
 import type { LocalStore } from './local-store';
 
@@ -101,6 +102,9 @@ export class SaleStore implements SaleRecorder {
   readonly #nextFolio: StatementSync;
   readonly #findLastCompleted: StatementSync;
   readonly #paymentsOf: StatementSync;
+  readonly #sessionOf: StatementSync;
+  readonly #findTotals: StatementSync;
+  readonly #outbox: SyncOutbox;
 
   /**
    * @param store the open local database
@@ -109,6 +113,9 @@ export class SaleStore implements SaleRecorder {
   constructor(store: LocalStore, tenantId: string) {
     this.#store = store;
     this.#tenantId = tenantId;
+    this.#outbox = new SyncOutbox(store, tenantId);
+    this.#findTotals = store.prepare('SELECT id, idempotency_key, subtotal_cents, tax_cents, total_cents FROM sale WHERE tenant_id = ? AND id = ?');
+    this.#sessionOf = store.prepare('SELECT cash_session_id, cashier_id FROM sale WHERE tenant_id = ? AND id = ?');
     this.#findState = store.prepare('SELECT status, total_cents FROM sale WHERE tenant_id = ? AND id = ?');
     this.#listPending = store.prepare(`
       SELECT id, occurred_at, total_cents FROM sale WHERE tenant_id = ? AND status = 'pending_payment' ORDER BY id
@@ -189,9 +196,10 @@ export class SaleStore implements SaleRecorder {
       const { status } = this.#requireState(saleId);
       assertSaleTransition(saleId, status, 'completed');
       const completedAt = new Date().toISOString();
-      for (const payment of payments) {
-        this.#insertPayment.run(uuidV7(), this.#tenantId, saleId, payment.method, payment.amountCents, payment.reference, completedAt);
-      }
+      const paymentIds = payments.map(() => uuidV7());
+      payments.forEach((payment, index) => {
+        this.#insertPayment.run(paymentIds[index]!, this.#tenantId, saleId, payment.method, payment.amountCents, payment.reference, completedAt);
+      });
       // The folio is taken inside the transaction that completes the sale, so two sales never get the same one.
       const { next: folio } = this.#nextFolio.get(this.#tenantId) as unknown as { next: number };
       this.#complete.run(completedAt, folio, this.#tenantId, saleId);
@@ -202,8 +210,50 @@ export class SaleStore implements SaleRecorder {
         this.#tenantId,
         lines.map((line) => ({ productId: line.product_id, type: 'sale', quantityMilli: -line.quantity_milli, source: 'sale_line', sourceId: line.id })),
       );
+      // The core hears about the sale in the same transaction, so a completed sale is never left out of the outbox.
+      this.#queueCompletedSale(saleId, folio, completedAt, payments, paymentIds);
       return { folio, completedAt };
     });
+  }
+
+  #queueCompletedSale(saleId: string, folio: number, completedAt: string, payments: readonly SalePayment[], paymentIds: readonly string[]): void {
+    const sale = this.#findTotals.get(this.#tenantId, saleId) as unknown as SaleRow;
+    const origin = this.#sessionOf.get(this.#tenantId, saleId) as unknown as { cash_session_id: string | null; cashier_id: string | null };
+    const lines = this.#fullLinesOf.all(this.#tenantId, saleId) as unknown as SavedLineRow[];
+    this.#outbox.enqueue(
+      'sale.completed',
+      {
+        saleId,
+        folio,
+        cashSessionId: origin.cash_session_id,
+        cashierId: origin.cashier_id,
+        completedAt,
+        subtotalCents: sale.subtotal_cents,
+        taxCents: sale.tax_cents,
+        totalCents: sale.total_cents,
+        lines: lines.map((line, index) => ({
+          id: line.id,
+          lineNumber: index + 1,
+          productId: line.product_id,
+          productName: line.product_name,
+          unit: line.unit,
+          quantityMilli: line.quantity_milli,
+          unitPriceE4: line.unit_price_e4,
+          taxFactor: line.tax_factor,
+          taxRateBp: line.tax_rate_bp,
+          subtotalCents: line.subtotal_cents,
+          taxCents: line.tax_cents,
+          lineTotalCents: line.line_total_cents,
+        })),
+        payments: payments.map((payment, index) => ({
+          id: paymentIds[index],
+          method: payment.method,
+          amountCents: payment.amountCents,
+          reference: payment.reference,
+        })),
+      },
+      completedAt,
+    );
   }
 
   /**

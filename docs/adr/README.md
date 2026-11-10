@@ -43,4 +43,5 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0037](0037-observabilidad-del-nucleo.md) | Observabilidad del núcleo con OpenTelemetry, `tenant_id` y Sentry | Aceptada |
 | [0038](0038-bitacora-de-auditoria-solo-agregar.md) | Bitácora de auditoría de solo agregar | Aceptada |
 | [0039](0039-keycloak-oidc-y-tenant-en-el-token.md) | Keycloak con OIDC, `tenant_id` en el token y tenant fijado por petición | Aceptada |
+| [0040](0040-envio-desde-la-caja-con-outbox.md) | Envío desde la caja con outbox local, lotes en orden y reintentos con retroceso | Aceptada |
 | [0041](0041-cliente-de-facturapi.md) | Cliente de Facturapi detrás de una interfaz, con reintentos solo en lecturas | Aceptada |

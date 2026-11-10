@@ -9,6 +9,7 @@ Electron 45 runs on Windows 10 and later, which covers the machines of [ADR 0002
 | --- | --- | --- |
 | `src/main/` | Window, navigation limits, answers to the screen, and the local database | Main process, with Node |
 | `src/main/hardware/` | Device interfaces, and their fakes in `fakes/` | Main process, with Node |
+| `src/main/sync/` | Outbox, batch sender with retries, and the transport to the core | Main process, with Node |
 | `src/main/checkout/` | Checkout, which drives the devices in the order of ADR 0010, and the states of a sale | Main process, with Node |
 | `src/preload/` | The `window.pos` bridge | Sandboxed preload script |
 | `src/renderer/` | React screen | Sandboxed renderer, without Node |
@@ -148,6 +149,17 @@ The register keeps its data in `pos.db`, in the user data folder of the app (`%A
 - **When it cannot open:** if a migration fails or the file comes from a newer version of the app, the register shows an error box, opens no window, and exits with code 1.
 
 The tests never touch the real database, because each run gets a temporary user data folder.
+
+## Sync with the core
+Every sale, return, cash movement, cut, and stock adjustment is also written to the `sync_outbox` table, **in the same transaction** as the change. The register never waits for the network: a sale only writes to SQLite, and a separate loop sends the outbox to the core ([ADR 0040](../../docs/adr/0040-envio-desde-la-caja-con-outbox.md)).
+
+- **Order:** each operation gets a `device_seq` (`AUTOINCREMENT`, never reused) and a UUIDv7 `op_id`, the idempotency key. The core orders by the sequence and never by the clock.
+- **Batches:** every 5 seconds the loop sends up to 100 pending operations in order to `POST /sync/push`. The contract is in [`packages/contracts`](../../packages/contracts/README.md): `sync-push-request.schema.json`, `sync-push-response.schema.json`, and shared cases.
+- **Delivered means confirmed:** an operation is marked only when the core answers for that very operation (`accepted`, `duplicate`, or `quarantined`). If the connection drops halfway, everything not confirmed is sent again, and the core answers `duplicate` for what it already had, so nothing is lost or counted twice.
+- **Retries:** after a failure the loop waits 5 s, 10 s, 20 s, and so on up to 1 minute, with a random part so registers do not all return at once. A success goes back to every 5 seconds.
+- **Switch:** the loop only runs when `POS_SYNC_URL` points at the core, such as `https://core.example.com`. Without it the register sells the same and keeps its operations in the outbox. Sign-in for the register arrives with its enrollment (F0-15).
+
+The tests use `FakeSyncTransport`, a core in memory that can drop the network before a batch arrives or after it was stored but before the answer comes back.
 
 ## Commands
 Run them from the repository root. The first time, Electron downloads its binary, about 150 MiB.

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "POST /sync/push response",
+  "description": "Sent with HTTP 200 whenever the envelope is well formed, with one result per operation the core handled. The core may stop early and leave the rest out, and the register then sends them again: an operation that is not in results has not been confirmed, so it stays pending. Any other HTTP status means nothing was confirmed (ADR 0040).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["results"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "results": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/result" }
+    }
+  },
+  "$defs": {
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["opId", "status"],
+      "properties": {
+        "opId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "status": {
+          "description": "accepted: stored now. duplicate: stored earlier with the same opId. quarantined: kept for the owner to review, and never retried (RF-022).",
+          "enum": ["accepted", "duplicate", "quarantined"]
+        },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+      },
+      "if": { "properties": { "status": { "const": "quarantined" } }, "required": ["status"] },
+      "then": { "required": ["reason"] }
+    }
+  }
+}

@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "POST /sync/push request",
+  "description": "The batch a register uploads to the core (E1-16, ADR 0040). It holds up to 100 operations in ascending deviceSeq, and the register sends the lowest pending ones first without skipping any. Money and quantities use the integer scales of values.schema.json (ADR 0011). Each operation carries its own opId, the idempotency key the core stores once per business (RF-021, E1-17).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["registerId", "operations"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "registerId": { "$ref": "#/$defs/uuid_v7" },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/operation" }
+    }
+  },
+  "$defs": {
+    "uuid_v7": {
+      "description": "A UUIDv7 in its usual text form, lowercase.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "nullable_uuid_v7": { "oneOf": [{ "$ref": "#/$defs/uuid_v7" }, { "type": "null" }] },
+    "timestamp": {
+      "description": "UTC moment with a trailing Z. It is informative: the order of operations comes from deviceSeq, never from the clock.",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$"
+    },
+    "text": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "payment_method": { "enum": ["cash", "transfer", "card", "card_manual"] },
+    "cents": { "$ref": "values.schema.json#/$defs/amount_cents", "minimum": 0 },
+    "positive_cents": { "$ref": "values.schema.json#/$defs/amount_cents", "minimum": 1 },
+    "positive_int": { "$ref": "values.schema.json#/$defs/safe_integer", "minimum": 1 },
+    "reference": { "type": ["string", "null"], "maxLength": 100 },
+
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["opId", "deviceSeq", "type", "schemaVersion", "occurredAt", "payload"],
+      "properties": {
+        "opId": { "$ref": "#/$defs/uuid_v7" },
+        "deviceSeq": { "$ref": "#/$defs/positive_int" },
+        "type": {
+          "enum": ["sale.completed", "return.registered", "cash_session.opened", "cash_movement.recorded", "cash_session.closed", "stock.adjusted"]
+        },
+        "schemaVersion": { "const": 1 },
+        "occurredAt": { "$ref": "#/$defs/timestamp" },
+        "payload": { "type": "object" }
+      },
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "sale.completed" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/sale_completed" } } } },
+        { "if": { "properties": { "type": { "const": "return.registered" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/return_registered" } } } },
+        { "if": { "properties": { "type": { "const": "cash_session.opened" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/cash_session_opened" } } } },
+        { "if": { "properties": { "type": { "const": "cash_movement.recorded" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/cash_movement_recorded" } } } },
+        { "if": { "properties": { "type": { "const": "cash_session.closed" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/cash_session_closed" } } } },
+        { "if": { "properties": { "type": { "const": "stock.adjusted" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/stock_adjusted" } } } }
+      ]
+    },
+
+    "sale_completed": {
+      "description": "A sale that was charged. The totals are what the register showed the customer.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["saleId", "folio", "cashSessionId", "cashierId", "completedAt", "subtotalCents", "taxCents", "totalCents", "lines", "payments"],
+      "properties": {
+        "saleId": { "$ref": "#/$defs/uuid_v7" },
+        "folio": { "$ref": "#/$defs/positive_int" },
+        "cashSessionId": { "$ref": "#/$defs/nullable_uuid_v7" },
+        "cashierId": { "$ref": "#/$defs/nullable_uuid_v7" },
+        "completedAt": { "$ref": "#/$defs/timestamp" },
+        "subtotalCents": { "$ref": "#/$defs/cents" },
+        "taxCents": { "$ref": "#/$defs/cents" },
+        "totalCents": { "$ref": "#/$defs/positive_cents" },
+        "lines": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/sale_line" } },
+        "payments": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/money_flow" } }
+      }
+    },
+    "sale_line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "lineNumber", "productId", "productName", "unit", "quantityMilli", "unitPriceE4", "taxFactor", "taxRateBp", "subtotalCents", "taxCents", "lineTotalCents"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid_v7" },
+        "lineNumber": { "$ref": "#/$defs/positive_int" },
+        "productId": { "$ref": "#/$defs/uuid_v7" },
+        "productName": { "$ref": "#/$defs/text" },
+        "unit": { "$ref": "values.schema.json#/$defs/unit" },
+        "quantityMilli": { "$ref": "#/$defs/positive_int" },
+        "unitPriceE4": { "$ref": "values.schema.json#/$defs/unit_price_e4", "minimum": 0 },
+        "taxFactor": { "$ref": "values.schema.json#/$defs/tax_factor" },
+        "taxRateBp": { "$ref": "values.schema.json#/$defs/valid_tax_rate_bp" },
+        "subtotalCents": { "$ref": "#/$defs/cents" },
+        "taxCents": { "$ref": "#/$defs/cents" },
+        "lineTotalCents": { "$ref": "#/$defs/cents" }
+      }
+    },
+    "money_flow": {
+      "description": "A payment received, or a refund given back.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "method", "amountCents", "reference"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid_v7" },
+        "method": { "$ref": "#/$defs/payment_method" },
+        "amountCents": { "$ref": "#/$defs/positive_cents" },
+        "reference": { "$ref": "#/$defs/reference" }
+      }
+    },
+
+    "return_registered": {
+      "description": "A refund recorded next to a completed sale. The sale itself never changes (ADR 0030).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["returnId", "saleId", "cashSessionId", "requestedBy", "authorizedBy", "reason", "totalCents", "lines", "refunds"],
+      "properties": {
+        "returnId": { "$ref": "#/$defs/uuid_v7" },
+        "saleId": { "$ref": "#/$defs/uuid_v7" },
+        "cashSessionId": { "$ref": "#/$defs/uuid_v7" },
+        "requestedBy": { "$ref": "#/$defs/uuid_v7" },
+        "authorizedBy": { "$ref": "#/$defs/uuid_v7" },
+        "reason": { "$ref": "#/$defs/text" },
+        "totalCents": { "$ref": "#/$defs/positive_cents" },
+        "lines": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "saleLineId", "quantityMilli", "refundCents"],
+            "properties": {
+              "id": { "$ref": "#/$defs/uuid_v7" },
+              "saleLineId": { "$ref": "#/$defs/uuid_v7" },
+              "quantityMilli": { "$ref": "#/$defs/positive_int" },
+              "refundCents": { "$ref": "#/$defs/positive_cents" }
+            }
+          }
+        },
+        "refunds": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/money_flow" } }
+      }
+    },
+
+    "cash_session_opened": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sessionId", "openedBy", "openingFloatCents"],
+      "properties": {
+        "sessionId": { "$ref": "#/$defs/uuid_v7" },
+        "openedBy": { "$ref": "#/$defs/uuid_v7" },
+        "openingFloatCents": { "$ref": "#/$defs/cents" }
+      }
+    },
+
+    "cash_movement_recorded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["movementId", "sessionId", "kind", "amountCents", "reason", "recordedBy", "authorizedBy"],
+      "properties": {
+        "movementId": { "$ref": "#/$defs/uuid_v7" },
+        "sessionId": { "$ref": "#/$defs/uuid_v7" },
+        "kind": { "enum": ["in", "out"] },
+        "amountCents": { "$ref": "#/$defs/positive_cents" },
+        "reason": { "$ref": "#/$defs/text" },
+        "recordedBy": { "$ref": "#/$defs/uuid_v7" },
+        "authorizedBy": { "$ref": "#/$defs/nullable_uuid_v7" }
+      }
+    },
+
+    "cut_totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cashCents", "cardCents", "transferCents"],
+      "properties": {
+        "cashCents": { "$ref": "values.schema.json#/$defs/amount_cents" },
+        "cardCents": { "$ref": "values.schema.json#/$defs/amount_cents" },
+        "transferCents": { "$ref": "values.schema.json#/$defs/amount_cents" }
+      }
+    },
+    "cash_session_closed": {
+      "description": "The cut that closes a cash session. What was expected may be negative when refunds exceed sales, but what was counted never is.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sessionId", "cutId", "closedBy", "expected", "counted", "denominations", "reason"],
+      "properties": {
+        "sessionId": { "$ref": "#/$defs/uuid_v7" },
+        "cutId": { "$ref": "#/$defs/uuid_v7" },
+        "closedBy": { "$ref": "#/$defs/uuid_v7" },
+        "expected": { "$ref": "#/$defs/cut_totals" },
+        "counted": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cashCents", "cardCents", "transferCents"],
+          "properties": {
+            "cashCents": { "$ref": "#/$defs/cents" },
+            "cardCents": { "$ref": "#/$defs/cents" },
+            "transferCents": { "$ref": "#/$defs/cents" }
+          }
+        },
+        "denominations": {
+          "description": "How many bills and coins of each value were counted: the key is the value in cents.",
+          "type": "object",
+          "propertyNames": { "pattern": "^[1-9][0-9]*$" },
+          "additionalProperties": { "$ref": "#/$defs/cents" }
+        },
+        "reason": { "type": ["string", "null"], "maxLength": 500 }
+      }
+    },
+
+    "stock_adjusted": {
+      "description": "A count correction or a write-off by the owner. Sales and returns move stock on the core by themselves (E1-25), so they are not sent as stock.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["movementId", "productId", "movementType", "quantityMilli", "reason", "userId"],
+      "properties": {
+        "movementId": { "$ref": "#/$defs/uuid_v7" },
+        "productId": { "$ref": "#/$defs/uuid_v7" },
+        "movementType": { "enum": ["adjustment", "waste"] },
+        "quantityMilli": { "$ref": "values.schema.json#/$defs/quantity_milli", "not": { "const": 0 } },
+        "reason": { "$ref": "#/$defs/text" },
+        "userId": { "$ref": "#/$defs/uuid_v7" }
+      }
+    }
+  }
+}

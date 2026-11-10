@@ -493,4 +493,42 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'the audit log is never deleted'); END;
     `,
   },
+  {
+    version: 12,
+    name: 'create_sync_outbox',
+    // What has to reach the core, in the order it happened (ADR 0040). It is written in the same transaction as the change
+    // it describes, so a change never lacks its operation and an operation never describes a change that was undone.
+    // device_seq is AUTOINCREMENT so a number is never reused, even after rows are pruned: the core orders by it, never by
+    // the clock. op_id is the idempotency key. Only the delivery columns change after the insert.
+    sql: `
+      CREATE TABLE sync_outbox (
+        device_seq INTEGER PRIMARY KEY AUTOINCREMENT,
+        op_id TEXT NOT NULL UNIQUE,
+        tenant_id TEXT NOT NULL,
+        type TEXT NOT NULL CHECK (length(type) > 0),
+        schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
+        occurred_at TEXT NOT NULL,
+        payload TEXT NOT NULL CHECK (json_valid(payload)),
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'delivered')),
+        server_status TEXT CHECK (server_status IN ('accepted', 'duplicate', 'quarantined')),
+        attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+        last_error TEXT,
+        last_attempt_at TEXT,
+        delivered_at TEXT,
+        CHECK ((status = 'delivered') = (server_status IS NOT NULL))
+      ) STRICT;
+
+      CREATE INDEX sync_outbox_pending ON sync_outbox (tenant_id, device_seq) WHERE status = 'pending';
+
+      CREATE TRIGGER sync_outbox_keeps_its_content BEFORE UPDATE OF device_seq, op_id, tenant_id, type, schema_version, occurred_at, payload ON sync_outbox
+      BEGIN SELECT RAISE(ABORT, 'an operation never changes after it is queued'); END;
+
+      CREATE TRIGGER sync_outbox_never_goes_back BEFORE UPDATE ON sync_outbox
+      WHEN OLD.status = 'delivered'
+      BEGIN SELECT RAISE(ABORT, 'a delivered operation never changes'); END;
+
+      CREATE TRIGGER sync_outbox_is_never_deleted BEFORE DELETE ON sync_outbox
+      BEGIN SELECT RAISE(ABORT, 'an operation is never deleted from the outbox'); END;
+    `,
+  },
 ];
