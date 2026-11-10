@@ -59,6 +59,12 @@
       <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
     </dependency>
     <dependency>
+      <!-- Argon2id for PIN hashes (ADR 0043). Spring Security's Argon2PasswordEncoder needs it on the classpath. -->
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+      <version>1.86</version>
+    </dependency>
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>

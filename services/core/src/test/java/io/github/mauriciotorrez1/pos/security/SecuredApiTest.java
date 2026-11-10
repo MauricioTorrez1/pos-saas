@@ -24,7 +24,7 @@ import org.springframework.test.web.servlet.client.RestTestClient;
  */
 @SpringBootTest(classes = CoreApplication.class, webEnvironment = WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
-@Import({PostgresTestConfiguration.class, KeycloakTestConfiguration.class})
+@Import({PostgresTestConfiguration.class, KeycloakTestConfiguration.class, TestClockConfiguration.class})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class SecuredApiTest {
 
@@ -33,6 +33,9 @@ abstract class SecuredApiTest {
 
     @Autowired
     protected KeycloakTestClient keycloak;
+
+    @Autowired
+    protected TestClockConfiguration.MutableClock clock;
 
     @Autowired
     @Qualifier("adminJdbc")
@@ -109,6 +112,10 @@ abstract class SecuredApiTest {
         return new Actor(username, Uuid7.next(), keycloak);
     }
 
+    /** What a call answered. */
+    protected record Reply(int status, String body, org.springframework.http.HttpHeaders headers) {
+    }
+
     /**
      * Calls the API and returns only the status code.
      *
@@ -119,14 +126,26 @@ abstract class SecuredApiTest {
      * @return the HTTP status code
      */
     protected int status(Actor actor, HttpMethod method, String path, String body) {
+        return call(actor, method, path, body).status();
+    }
+
+    /**
+     * Calls the API.
+     *
+     * @param actor  who calls, or {@code null} for no token
+     * @param method the HTTP method
+     * @param path   the path, with every placeholder already replaced
+     * @param body   the JSON body, or {@code null}
+     * @return the status, body and headers
+     */
+    protected Reply call(Actor actor, HttpMethod method, String path, String body) {
         RestTestClient.RequestBodySpec request = client.method(method).uri(path);
         if (actor != null) {
             request = request.header("Authorization", actor.bearer());
         }
-        if (body != null) {
-            request = request.contentType(MediaType.APPLICATION_JSON);
-            return request.body(body).exchange().expectBody(String.class).returnResult().getStatus().value();
-        }
-        return request.exchange().expectBody(String.class).returnResult().getStatus().value();
+        var result = body == null
+                ? request.exchange().expectBody(String.class).returnResult()
+                : request.contentType(MediaType.APPLICATION_JSON).body(body).exchange().expectBody(String.class).returnResult();
+        return new Reply(result.getStatus().value(), result.getResponseBody(), result.getResponseHeaders());
     }
 }
