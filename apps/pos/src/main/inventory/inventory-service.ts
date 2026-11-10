@@ -7,6 +7,7 @@ import type { AuthService } from '../auth/auth-service';
 import type { LocalStore } from '../local-store/local-store';
 import type { ProductCatalog } from '../local-store/product-catalog';
 import { uuidV7 } from '../uuid-v7';
+import { SyncOutbox } from '../sync/sync-outbox';
 import type { StockStore } from './stock-store';
 
 /** How many movements the kardex shows. */
@@ -44,6 +45,7 @@ export class InventoryService {
   readonly #catalog: ProductCatalog;
   readonly #kardexRows: StatementSync;
   readonly #movementCount: StatementSync;
+  readonly #outbox: SyncOutbox;
 
   /**
    * @param store the open local database
@@ -60,6 +62,7 @@ export class InventoryService {
     this.#stock = stock;
     this.#audit = audit;
     this.#catalog = catalog;
+    this.#outbox = new SyncOutbox(store, tenantId);
     // The balance is summed over the whole history and only then cut, so the rows shown always add up to the stock.
     this.#kardexRows = store.prepare(`
       SELECT occurred_at AS occurredAt, type, quantity_milli AS quantityMilli, balance AS balanceMilli
@@ -112,6 +115,14 @@ export class InventoryService {
         entity: 'product',
         entityId: request.productId,
         detail: `${request.quantityMilli} thousandths: ${reason}`,
+      });
+      this.#outbox.enqueue('stock.adjusted', {
+        movementId,
+        productId: request.productId,
+        movementType: request.type,
+        quantityMilli: request.quantityMilli,
+        reason,
+        userId: user.id,
       });
     });
     return { status: 'recorded', kardex: this.kardex(request.productId)! };

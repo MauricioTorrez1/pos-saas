@@ -3,6 +3,7 @@ import type { StatementSync } from 'node:sqlite';
 import type { CashTotals, ExpectedCut } from '../../shared/cash';
 import type { CashMovementKind } from '../../shared/cash-api';
 import type { LocalStore } from '../local-store/local-store';
+import { SyncOutbox } from '../sync/sync-outbox';
 import { uuidV7 } from '../uuid-v7';
 
 /** A session that is open, as the database has it. */
@@ -64,6 +65,7 @@ export class CashSessionStore {
   readonly #closeSession: StatementSync;
   readonly #readSetting: StatementSync;
   readonly #writeSetting: StatementSync;
+  readonly #outbox: SyncOutbox;
 
   /**
    * @param store the open local database
@@ -72,6 +74,7 @@ export class CashSessionStore {
   constructor(store: LocalStore, tenantId: string) {
     this.#store = store;
     this.#tenantId = tenantId;
+    this.#outbox = new SyncOutbox(store, tenantId);
     this.#findOpen = store.prepare(`
       SELECT s.id, s.opened_at, s.opening_float_cents, u.name AS opened_by_name
       FROM cash_session s JOIN app_user u ON u.id = s.opened_by
@@ -145,7 +148,9 @@ export class CashSessionStore {
   open(userId: string, openingFloatCents: number): string {
     const id = uuidV7();
     this.#store.transaction(() => {
-      this.#insertSession.run(id, this.#tenantId, userId, new Date().toISOString(), openingFloatCents);
+      const openedAt = new Date().toISOString();
+      this.#insertSession.run(id, this.#tenantId, userId, openedAt, openingFloatCents);
+      this.#outbox.enqueue('cash_session.opened', { sessionId: id, openedBy: userId, openingFloatCents }, openedAt);
     });
     return id;
   }
@@ -191,18 +196,11 @@ export class CashSessionStore {
     recordedBy: string,
     authorizedBy: string | null,
   ): void {
+    const movementId = uuidV7();
     this.#store.transaction(() => {
-      this.#insertMovement.run(
-        uuidV7(),
-        this.#tenantId,
-        sessionId,
-        kind,
-        amountCents,
-        reason,
-        recordedBy,
-        authorizedBy,
-        new Date().toISOString(),
-      );
+      const recordedAt = new Date().toISOString();
+      this.#insertMovement.run(movementId, this.#tenantId, sessionId, kind, amountCents, reason, recordedBy, authorizedBy, recordedAt);
+      this.#outbox.enqueue('cash_movement.recorded', { movementId, sessionId, kind, amountCents, reason, recordedBy, authorizedBy }, recordedAt);
     });
   }
 
@@ -242,6 +240,19 @@ export class CashSessionStore {
         cut.reason,
       );
       this.#closeSession.run(cut.cutBy, cutAt, this.#tenantId, sessionId);
+      this.#outbox.enqueue(
+        'cash_session.closed',
+        {
+          sessionId,
+          cutId: id,
+          closedBy: cut.cutBy,
+          expected: { cashCents: cut.expected.cashCents, cardCents: cut.expected.cardCents, transferCents: cut.expected.transferCents },
+          counted: { cashCents: cut.counted.cashCents, cardCents: cut.counted.cardCents, transferCents: cut.counted.transferCents },
+          denominations: cut.denominations,
+          reason: cut.reason,
+        },
+        cutAt,
+      );
     });
     return { id, cutAt };
   }

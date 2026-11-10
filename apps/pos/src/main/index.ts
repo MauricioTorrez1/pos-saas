@@ -36,6 +36,7 @@ import { ProductCatalog } from './local-store/product-catalog';
 import { seedSampleCatalogIfEmpty } from './local-store/sample-catalog';
 import { SaleStore } from './local-store/sale-store';
 import { openMainWindow } from './main-window';
+import { startSyncIfConfigured } from './sync/start-sync';
 
 const PRELOAD_PATH = join(import.meta.dirname, '../preload/index.cjs');
 const RENDERER_HTML_PATH = join(import.meta.dirname, '../renderer/index.html');
@@ -114,6 +115,9 @@ async function pickPath(properties: ('openFile' | 'openDirectory')[], title: str
 async function start(): Promise<void> {
   await app.whenReady();
   const store = openLocalStore();
+  // Without POS_SYNC_URL the register sells as usual and keeps its operations until a core is configured.
+  const sync = startSyncIfConfigured(store, LOCAL_TENANT_ID, process.env.POS_SYNC_URL);
+  app.once('will-quit', () => sync?.stop());
   const rendererEntry = resolveRendererEntry();
   const catalog = new ProductCatalog(store, LOCAL_TENANT_ID);
   const sales = new SaleStore(store, LOCAL_TENANT_ID);

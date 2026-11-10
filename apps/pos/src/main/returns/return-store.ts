@@ -5,6 +5,7 @@ import type { Unit } from '@pos-saas/money';
 import type { RefundShare } from '../../shared/returns';
 import type { LocalStore } from '../local-store/local-store';
 import { INSERT_STOCK_MOVEMENT_SQL, postWith } from '../inventory/stock-store';
+import { SyncOutbox } from '../sync/sync-outbox';
 import { uuidV7 } from '../uuid-v7';
 
 /** A completed sale, as the database has it. */
@@ -85,6 +86,7 @@ export class ReturnStore {
   readonly #insertRefund: StatementSync;
   readonly #insertStock: StatementSync;
   readonly #productOfLine: StatementSync;
+  readonly #outbox: SyncOutbox;
 
   /**
    * @param store the open local database
@@ -93,6 +95,7 @@ export class ReturnStore {
   constructor(store: LocalStore, tenantId: string) {
     this.#store = store;
     this.#tenantId = tenantId;
+    this.#outbox = new SyncOutbox(store, tenantId);
     this.#findByFolio = store.prepare(`
       SELECT id, folio, resolved_at, total_cents FROM sale WHERE tenant_id = ? AND folio = ? AND status = 'completed'
     `);
@@ -203,16 +206,33 @@ export class ReturnStore {
         record.totalCents,
         new Date().toISOString(),
       );
+      const queuedLines: { id: string; saleLineId: string; quantityMilli: number; refundCents: number }[] = [];
       for (const line of record.lines) {
         const lineId = uuidV7();
+        queuedLines.push({ id: lineId, saleLineId: line.saleLineId, quantityMilli: line.quantityMilli, refundCents: line.refundCents });
         this.#insertLine.run(lineId, this.#tenantId, id, line.saleLineId, line.quantityMilli, line.refundCents);
         // What comes back goes back on the shelf, in the same transaction as the return.
         const { product_id: productId } = this.#productOfLine.get(this.#tenantId, line.saleLineId) as unknown as { product_id: string };
         postWith(this.#insertStock, this.#tenantId, [{ productId, type: 'return', quantityMilli: line.quantityMilli, source: 'return_line', sourceId: lineId }]);
       }
+      const queuedRefunds: { id: string; method: string; amountCents: number; reference: string | null }[] = [];
       for (const refund of record.refunds) {
-        this.#insertRefund.run(uuidV7(), this.#tenantId, id, refund.method, refund.amountCents, refund.reference);
+        const refundId = uuidV7();
+        queuedRefunds.push({ id: refundId, method: refund.method, amountCents: refund.amountCents, reference: refund.reference });
+        this.#insertRefund.run(refundId, this.#tenantId, id, refund.method, refund.amountCents, refund.reference);
       }
+      // The core hears about the return in the same transaction, so a refund is never left out of the outbox.
+      this.#outbox.enqueue('return.registered', {
+        returnId: id,
+        saleId: record.saleId,
+        cashSessionId: record.cashSessionId,
+        requestedBy: record.requestedBy,
+        authorizedBy: record.authorizedBy,
+        reason: record.reason,
+        totalCents: record.totalCents,
+        lines: queuedLines,
+        refunds: queuedRefunds,
+      });
     });
     return id;
   }

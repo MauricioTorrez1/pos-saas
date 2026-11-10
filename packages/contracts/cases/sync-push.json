@@ -1,0 +1,467 @@
+{
+  "requests": [
+    {
+      "name": "One completed sale paid with cash and a transfer",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000010",
+            "deviceSeq": 1042,
+            "type": "sale.completed",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-10T18:21:04.123Z",
+            "payload": {
+              "saleId": "0193a5c0-0000-7000-8000-000000000020",
+              "folio": 87,
+              "cashSessionId": "0193a5c0-0000-7000-8000-000000000030",
+              "cashierId": "0193a5c0-0000-7000-8000-000000000040",
+              "completedAt": "2026-12-10T18:21:04.123Z",
+              "subtotalCents": 10000,
+              "taxCents": 1600,
+              "totalCents": 11600,
+              "lines": [
+                {
+                  "id": "0193a5c0-0000-7000-8000-000000000021",
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000050",
+                  "productName": "Cable THW",
+                  "unit": "meter",
+                  "quantityMilli": 3275,
+                  "unitPriceE4": 125000,
+                  "taxFactor": "rate",
+                  "taxRateBp": 1600,
+                  "subtotalCents": 10000,
+                  "taxCents": 1600,
+                  "lineTotalCents": 11600
+                }
+              ],
+              "payments": [
+                { "id": "0193a5c0-0000-7000-8000-000000000022", "method": "cash", "amountCents": 7600, "reference": null },
+                { "id": "0193a5c0-0000-7000-8000-000000000023", "method": "transfer", "amountCents": 4000, "reference": "SPEI-8841" }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A sale made before the cash session existed has no session and no cashier",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000011",
+            "deviceSeq": 1,
+            "type": "sale.completed",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-10T18:21:04Z",
+            "payload": {
+              "saleId": "0193a5c0-0000-7000-8000-000000000024",
+              "folio": 1,
+              "cashSessionId": null,
+              "cashierId": null,
+              "completedAt": "2026-12-10T18:21:04Z",
+              "subtotalCents": 100,
+              "taxCents": 0,
+              "totalCents": 100,
+              "lines": [
+                {
+                  "id": "0193a5c0-0000-7000-8000-000000000025",
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000051",
+                  "productName": "Tornillo",
+                  "unit": "piece",
+                  "quantityMilli": 1000,
+                  "unitPriceE4": 1000000,
+                  "taxFactor": "exempt",
+                  "taxRateBp": 0,
+                  "subtotalCents": 100,
+                  "taxCents": 0,
+                  "lineTotalCents": 100
+                }
+              ],
+              "payments": [{ "id": "0193a5c0-0000-7000-8000-000000000026", "method": "card_manual", "amountCents": 100, "reference": "004711" }]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A return, a cash entry, a cash exit, a stock write-off, and a cut, in the order they happened",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000012",
+            "deviceSeq": 2001,
+            "type": "cash_session.opened",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T14:00:00.000Z",
+            "payload": {
+              "sessionId": "0193a5c0-0000-7000-8000-000000000031",
+              "openedBy": "0193a5c0-0000-7000-8000-000000000040",
+              "openingFloatCents": 50000
+            }
+          },
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000013",
+            "deviceSeq": 2002,
+            "type": "cash_movement.recorded",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T15:00:00.000Z",
+            "payload": {
+              "movementId": "0193a5c0-0000-7000-8000-000000000060",
+              "sessionId": "0193a5c0-0000-7000-8000-000000000031",
+              "kind": "out",
+              "amountCents": 20000,
+              "reason": "Pago a proveedor",
+              "recordedBy": "0193a5c0-0000-7000-8000-000000000040",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          },
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000014",
+            "deviceSeq": 2003,
+            "type": "cash_movement.recorded",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T15:30:00.000Z",
+            "payload": {
+              "movementId": "0193a5c0-0000-7000-8000-000000000061",
+              "sessionId": "0193a5c0-0000-7000-8000-000000000031",
+              "kind": "in",
+              "amountCents": 5000,
+              "reason": "Cambio",
+              "recordedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": null
+            }
+          },
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000015",
+            "deviceSeq": 2004,
+            "type": "return.registered",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T16:00:00.000Z",
+            "payload": {
+              "returnId": "0193a5c0-0000-7000-8000-000000000070",
+              "saleId": "0193a5c0-0000-7000-8000-000000000020",
+              "cashSessionId": "0193a5c0-0000-7000-8000-000000000031",
+              "requestedBy": "0193a5c0-0000-7000-8000-000000000040",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "reason": "No era la medida",
+              "totalCents": 2900,
+              "lines": [{ "id": "0193a5c0-0000-7000-8000-000000000071", "saleLineId": "0193a5c0-0000-7000-8000-000000000021", "quantityMilli": 1000, "refundCents": 2900 }],
+              "refunds": [{ "id": "0193a5c0-0000-7000-8000-000000000072", "method": "cash", "amountCents": 2900, "reference": null }]
+            }
+          },
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000016",
+            "deviceSeq": 2005,
+            "type": "stock.adjusted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T17:00:00.000Z",
+            "payload": {
+              "movementId": "0193a5c0-0000-7000-8000-000000000080",
+              "productId": "0193a5c0-0000-7000-8000-000000000050",
+              "movementType": "waste",
+              "quantityMilli": -1500,
+              "reason": "Cable cortado mal",
+              "userId": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          },
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000017",
+            "deviceSeq": 2006,
+            "type": "cash_session.closed",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T22:00:00.000Z",
+            "payload": {
+              "sessionId": "0193a5c0-0000-7000-8000-000000000031",
+              "cutId": "0193a5c0-0000-7000-8000-000000000090",
+              "closedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "expected": { "cashCents": 33000, "cardCents": 0, "transferCents": 4000 },
+              "counted": { "cashCents": 32950, "cardCents": 0, "transferCents": 4000 },
+              "denominations": { "50000": 0, "10000": 3, "2000": 1, "500": 1, "100": 0 },
+              "reason": "Faltaron 50 centavos de cambio"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "request_rejections": [
+    { "name": "A batch with no operations", "reason": "minItems", "request": { "registerId": "0193a5c0-0000-7000-8000-000000000001", "operations": [] } },
+    {
+      "name": "A register id that is a UUIDv4",
+      "reason": "pattern",
+      "request": {
+        "registerId": "9b2f5a43-6c1e-4d0b-8a77-2f4c1e9d7a10",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000012",
+            "deviceSeq": 1,
+            "type": "cash_session.opened",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T14:00:00Z",
+            "payload": { "sessionId": "0193a5c0-0000-7000-8000-000000000031", "openedBy": "0193a5c0-0000-7000-8000-000000000040", "openingFloatCents": 0 }
+          }
+        ]
+      }
+    },
+    {
+      "name": "An operation id that is a UUIDv4",
+      "reason": "pattern",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "9b2f5a43-6c1e-4d0b-8a77-2f4c1e9d7a10",
+            "deviceSeq": 1,
+            "type": "cash_session.opened",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T14:00:00Z",
+            "payload": { "sessionId": "0193a5c0-0000-7000-8000-000000000031", "openedBy": "0193a5c0-0000-7000-8000-000000000040", "openingFloatCents": 0 }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A sequence number of zero",
+      "reason": "minimum",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000012",
+            "deviceSeq": 0,
+            "type": "cash_session.opened",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T14:00:00Z",
+            "payload": { "sessionId": "0193a5c0-0000-7000-8000-000000000031", "openedBy": "0193a5c0-0000-7000-8000-000000000040", "openingFloatCents": 0 }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A type the core does not know",
+      "reason": "enum",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000012",
+            "deviceSeq": 1,
+            "type": "sale.deleted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T14:00:00Z",
+            "payload": {}
+          }
+        ]
+      }
+    },
+    {
+      "name": "A schema version from the future",
+      "reason": "const",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000012",
+            "deviceSeq": 1,
+            "type": "cash_session.opened",
+            "schemaVersion": 2,
+            "occurredAt": "2026-12-11T14:00:00Z",
+            "payload": { "sessionId": "0193a5c0-0000-7000-8000-000000000031", "openedBy": "0193a5c0-0000-7000-8000-000000000040", "openingFloatCents": 0 }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A time without a time zone",
+      "reason": "pattern",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000012",
+            "deviceSeq": 1,
+            "type": "cash_session.opened",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T14:00:00",
+            "payload": { "sessionId": "0193a5c0-0000-7000-8000-000000000031", "openedBy": "0193a5c0-0000-7000-8000-000000000040", "openingFloatCents": 0 }
+          }
+        ]
+      }
+    },
+    {
+      "name": "An opening float with decimals",
+      "reason": "type",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000012",
+            "deviceSeq": 1,
+            "type": "cash_session.opened",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T14:00:00Z",
+            "payload": { "sessionId": "0193a5c0-0000-7000-8000-000000000031", "openedBy": "0193a5c0-0000-7000-8000-000000000040", "openingFloatCents": 500.5 }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A payload field the contract does not define",
+      "reason": "additionalProperties",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000012",
+            "deviceSeq": 1,
+            "type": "cash_session.opened",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T14:00:00Z",
+            "payload": { "sessionId": "0193a5c0-0000-7000-8000-000000000031", "openedBy": "0193a5c0-0000-7000-8000-000000000040", "openingFloatCents": 0, "discount": 5 }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A payload that belongs to another type",
+      "reason": "required",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000012",
+            "deviceSeq": 1,
+            "type": "sale.completed",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T14:00:00Z",
+            "payload": { "sessionId": "0193a5c0-0000-7000-8000-000000000031", "openedBy": "0193a5c0-0000-7000-8000-000000000040", "openingFloatCents": 0 }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A sale without payments",
+      "reason": "minItems",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000010",
+            "deviceSeq": 1,
+            "type": "sale.completed",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-10T18:21:04Z",
+            "payload": {
+              "saleId": "0193a5c0-0000-7000-8000-000000000024",
+              "folio": 1,
+              "cashSessionId": null,
+              "cashierId": null,
+              "completedAt": "2026-12-10T18:21:04Z",
+              "subtotalCents": 100,
+              "taxCents": 0,
+              "totalCents": 100,
+              "lines": [
+                {
+                  "id": "0193a5c0-0000-7000-8000-000000000025",
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000051",
+                  "productName": "Tornillo",
+                  "unit": "piece",
+                  "quantityMilli": 1000,
+                  "unitPriceE4": 1000000,
+                  "taxFactor": "exempt",
+                  "taxRateBp": 0,
+                  "subtotalCents": 100,
+                  "taxCents": 0,
+                  "lineTotalCents": 100
+                }
+              ],
+              "payments": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A stock adjustment of zero",
+      "reason": "not",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000016",
+            "deviceSeq": 1,
+            "type": "stock.adjusted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T17:00:00Z",
+            "payload": {
+              "movementId": "0193a5c0-0000-7000-8000-000000000080",
+              "productId": "0193a5c0-0000-7000-8000-000000000050",
+              "movementType": "adjustment",
+              "quantityMilli": 0,
+              "reason": "Conteo",
+              "userId": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A cut that counted a negative amount",
+      "reason": "minimum",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000017",
+            "deviceSeq": 1,
+            "type": "cash_session.closed",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T22:00:00Z",
+            "payload": {
+              "sessionId": "0193a5c0-0000-7000-8000-000000000031",
+              "cutId": "0193a5c0-0000-7000-8000-000000000090",
+              "closedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "expected": { "cashCents": 0, "cardCents": 0, "transferCents": 0 },
+              "counted": { "cashCents": -1, "cardCents": 0, "transferCents": 0 },
+              "denominations": {},
+              "reason": null
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "responses": [
+    {
+      "name": "Every operation was handled and one was already stored",
+      "response": {
+        "results": [
+          { "opId": "0193a5c0-0000-7000-8000-000000000010", "status": "accepted" },
+          { "opId": "0193a5c0-0000-7000-8000-000000000011", "status": "duplicate" }
+        ]
+      }
+    },
+    {
+      "name": "An invalid operation was kept for review and the rest went through",
+      "response": {
+        "results": [
+          { "opId": "0193a5c0-0000-7000-8000-000000000010", "status": "quarantined", "reason": "The payments do not add up to the total" },
+          { "opId": "0193a5c0-0000-7000-8000-000000000011", "status": "accepted" }
+        ]
+      }
+    },
+    { "name": "The core stopped before handling anything", "response": { "results": [] } }
+  ],
+  "response_rejections": [
+    { "name": "A status the register does not know", "reason": "enum", "response": { "results": [{ "opId": "0193a5c0-0000-7000-8000-000000000010", "status": "rejected" }] } },
+    { "name": "A quarantine without its reason", "reason": "required", "response": { "results": [{ "opId": "0193a5c0-0000-7000-8000-000000000010", "status": "quarantined" }] } },
+    { "name": "A result without its operation id", "reason": "required", "response": { "results": [{ "status": "accepted" }] } },
+    { "name": "A body without results", "reason": "required", "response": {} }
+  ]
+}

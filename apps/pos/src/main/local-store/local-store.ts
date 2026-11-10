@@ -100,6 +100,16 @@ export class LocalStore {
   }
 
   /**
+   * Tells whether a transaction is open right now. Code that must only run together with another change, such as queuing
+   * a sync operation, uses it to refuse to run alone.
+   *
+   * @returns true between the start of `transaction` and its commit or rollback
+   */
+  get isInTransaction(): boolean {
+    return this.#connection.isTransaction;
+  }
+
+  /**
    * Compiles a statement once, so a lookup that runs on every scan does not parse its SQL each time. Reads do not
    * need `transaction`, which would take the write lock.
    *

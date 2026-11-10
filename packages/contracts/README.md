@@ -11,6 +11,9 @@ JSON schemas and calculation cases shared by the TypeScript register and the Jav
 | `cases/amount-sum.json` | Totals of a sale: `sums` must add up, and `rejections` must fail |
 | `cases/line-tax.json` | Lines with VAT included at 16%, 8%, 0%, and exempt: `lines` must split into base and VAT, and `rejections` must fail |
 | `cases/sale-totals.json` | Sales with their VAT grouped by rate: `sales` must add up, and `rejections` must fail |
+| `schemas/sync-push-request.schema.json` | The batch the register uploads to `POST /sync/push` and the shape of each of its six kinds of operation ([ADR 0040](../../docs/adr/0040-envio-desde-la-caja-con-outbox.md)) |
+| `schemas/sync-push-response.schema.json` | The answer of the core: one result per operation, `accepted`, `duplicate`, or `quarantined` |
+| `cases/sync-push.json` | Batches and answers: `requests` and `responses` must pass the schema, and `request_rejections` and `response_rejections` must fail, each naming the schema keyword that rejects it |
 | `src/cases.test.ts` | Checks that the cases follow their schema, and that the schema rejects bad ones |
 
 Each rejection names the error it expects. Both languages use the same codes: `negative_input`, `fractional_piece`, `overflow`, `invalid_format`, `too_many_decimals`, and `invalid_tax_rate` ([ADR 0022](../../docs/adr/0022-libreria-de-dinero.md), [ADR 0023](../../docs/adr/0023-iva-incluido-por-linea.md)).
