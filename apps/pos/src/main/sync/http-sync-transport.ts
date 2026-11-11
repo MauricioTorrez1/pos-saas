@@ -1,11 +1,12 @@
 import { parsePushResponse, type SyncPushRequest, type SyncPushResponse } from './sync-protocol';
-import { SyncTransportError, type SyncTransport } from './sync-transport';
+import { parsePullResponse, type PullPage } from './pull-protocol';
+import { SyncTransportError, type PullTransport, type SyncTransport } from './sync-transport';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
 /** What `HttpSyncTransport` needs. */
 export interface HttpSyncTransportOptions {
-  /** Address of the core, such as `https://core.example.com`. The path `/sync/push` is added. */
+  /** Address of the core, such as `https://core.example.com`. The paths `/sync/push` and `/sync/pull` are added. */
   readonly baseUrl: string;
   /** Longest a push may take before it counts as a failure, so a dead connection never hangs the loop. */
   readonly timeoutMs?: number;
@@ -19,24 +20,23 @@ export interface HttpSyncTransportOptions {
   readonly fetchImpl?: typeof fetch;
 }
 
-/** Sends batches to `POST /sync/push` over HTTP. The register signs in with its device credential (E1-41). */
-export class HttpSyncTransport implements SyncTransport {
+/** Sends batches to `POST /sync/push` and reads `GET /sync/pull` over HTTP. The register signs in with its device credential (E1-41). */
+export class HttpSyncTransport implements SyncTransport, PullTransport {
   readonly #url: string;
+  readonly #pullUrl: string;
   readonly #timeoutMs: number;
   readonly #fetch: typeof fetch;
-  readonly #headers: Record<string, string>;
+  readonly #auth: Record<string, string>;
 
   /** @param options where the core is and the credential of this register */
   constructor({ baseUrl, timeoutMs = DEFAULT_TIMEOUT_MS, deviceToken, fetchImpl = fetch }: HttpSyncTransportOptions) {
-    this.#url = `${baseUrl.replace(/\/+$/, '')}/sync/push`;
+    const root = baseUrl.replace(/\/+$/, '');
+    this.#url = `${root}/sync/push`;
+    this.#pullUrl = `${root}/sync/pull`;
     this.#timeoutMs = timeoutMs;
     this.#fetch = fetchImpl;
     const token = deviceToken?.trim();
-    this.#headers = {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...(token === undefined || token === '' ? {} : { Authorization: `Device ${token}` }),
-    };
+    this.#auth = token === undefined || token === '' ? {} : { Authorization: `Device ${token}` };
   }
 
   /** {@inheritDoc SyncTransport.push} */
@@ -45,7 +45,7 @@ export class HttpSyncTransport implements SyncTransport {
     try {
       response = await this.#fetch(this.#url, {
         method: 'POST',
-        headers: this.#headers,
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...this.#auth },
         body: JSON.stringify(request),
         signal: AbortSignal.timeout(this.#timeoutMs),
       });
@@ -64,5 +64,30 @@ export class HttpSyncTransport implements SyncTransport {
       throw new SyncTransportError('The answer of the core was cut off', response.status, cause);
     }
     return parsePushResponse(body);
+  }
+
+  /** {@inheritDoc PullTransport.pull} */
+  async pull(cursor: string, limit: number): Promise<PullPage> {
+    let response: Response;
+    try {
+      response = await this.#fetch(`${this.#pullUrl}?${new URLSearchParams({ cursor, limit: String(limit) })}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json', ...this.#auth },
+        signal: AbortSignal.timeout(this.#timeoutMs),
+      });
+    } catch (cause) {
+      throw new SyncTransportError('The core could not be reached', null, cause);
+    }
+    if (!response.ok) {
+      throw new SyncTransportError(`The core answered ${response.status}`, response.status);
+    }
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch (cause) {
+      // Nothing was applied, so asking again with the same cursor is safe.
+      throw new SyncTransportError('The answer of the core was cut off', response.status, cause);
+    }
+    return parsePullResponse(body);
   }
 }

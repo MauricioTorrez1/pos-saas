@@ -21,8 +21,9 @@ public final class EndpointPermissions {
     /** Every rule of the API, in the order the documentation shows them. */
     public static final List<EndpointRule> RULES = List.of(
             authenticated(GET, "/me"),
-            // A register sends with its device credential, never with a person's token (ADR 0054).
+            // A register uses the sync endpoints with its device credential, never with a person's token (ADR 0054).
             device(POST, "/sync/push"),
+            device(GET, "/sync/pull"),
             requires(PUT, "/users/{id}/role", Permission.USER_ROLE_CHANGE),
             requires(PUT, "/users/{id}/pin", Permission.PIN_SET),
             requires(POST, "/users/{id}/pin/verify", Permission.PIN_VERIFY),

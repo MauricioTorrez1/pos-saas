@@ -21,6 +21,7 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 | --- | --- | :---: | :---: | :---: |
 | `GET /me` | (authenticated) | Sí | Sí | Sí |
 | `POST /sync/push` | (device) | — | — | — |
+| `GET /sync/pull` | (device) | — | — | — |
 | `PUT /users/{id}/role` | `user.role.change` | Sí | — | — |
 | `PUT /users/{id}/pin` | `pin.set` | Sí | Sí | — |
 | `POST /users/{id}/pin/verify` | `pin.verify` | Sí | Sí | Sí |
@@ -65,7 +66,7 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 - Una persona desactivada, o con sesión pero sin registro en el negocio, no puede llamar nada protegido; solo `GET /me`.
 - `POST /registers/enroll` no pide sesión: el código de enrolamiento es la credencial, dura 15 minutos y sirve una sola vez.
 - Cinco PIN incorrectos seguidos bloquean ese PIN cinco minutos.
-- Las cajas se identifican con su credencial de dispositivo, no con estos roles: `POST /sync/push` solo lo abre una caja enrolada (ninguna persona, ni el dueño) y una caja dada de baja deja de enviar.
+- Las cajas se identifican con su credencial de dispositivo, no con estos roles: `POST /sync/push` y `GET /sync/pull` solo los abre una caja enrolada (ninguna persona, ni el dueño) y una caja dada de baja deja de enviar.
 
 ## Preguntas para la familia
 

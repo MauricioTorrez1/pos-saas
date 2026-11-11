@@ -558,4 +558,29 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'a price change is never deleted'); END;
     `,
   },
+  {
+    version: 14,
+    name: 'create_sync_pull_state',
+    // What came down from the core (E1-18, ADR 0048). sync_pull_state holds the cursor: the number of the last change of the
+    // core this register applied, kept as text because the register never computes with it. It is changed in the same
+    // transaction as the changes it covers, so the cursor never claims more than what was applied. staff_permission is what
+    // the core says each person may do; the PIN sign-in table app_user stays apart because it holds the PIN hash, which the
+    // core never sees.
+    sql: `
+      CREATE TABLE sync_pull_state (
+        tenant_id TEXT PRIMARY KEY,
+        cursor TEXT NOT NULL DEFAULT '0' CHECK (cursor GLOB '[0-9]*' AND cursor NOT GLOB '*[^0-9]*'),
+        updated_at TEXT NOT NULL
+      ) STRICT;
+
+      CREATE TABLE staff_permission (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        display_name TEXT NOT NULL CHECK (length(trim(display_name)) > 0),
+        role TEXT NOT NULL CHECK (role IN ('owner', 'manager', 'cashier')),
+        permissions TEXT NOT NULL CHECK (json_valid(permissions)),
+        is_active INTEGER NOT NULL CHECK (is_active IN (0, 1))
+      ) STRICT;
+    `,
+  },
 ];

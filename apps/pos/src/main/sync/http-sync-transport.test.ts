@@ -131,3 +131,62 @@ describe('reading the answer of the core', () => {
     expect(() => parsePushResponse(body)).toThrow(SyncProtocolError);
   });
 });
+
+describe('pulling over HTTP', () => {
+  const CABLE = '0193a5c0-0000-7000-8000-000000000050';
+  const PAGE = {
+    changes: [
+      {
+        seq: 1,
+        entityType: 'product',
+        entityId: CABLE,
+        deleted: false,
+        schemaVersion: 1,
+        changedAt: '2026-12-10T18:21:04.123Z',
+        payload: { name: 'Cable', baseUnit: 'meter', unitPriceE4: 386_667, taxFactor: 'rate', taxRateBp: 1600, barcodes: [] },
+      },
+    ],
+    nextCursor: '1',
+    hasMore: false,
+  };
+
+  it('asks GET /sync/pull with the cursor and the page size, and reads the page', async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+
+    const page = await transportAnswering(() => Response.json(PAGE), calls).pull('0', 200);
+
+    expect(page.nextCursor).toBe('1');
+    expect(page.changes[0]).toMatchObject({ seq: 1, entityId: CABLE, deleted: false });
+    expect(calls[0]!.url).toBe('https://core.example.com/sync/pull?cursor=0&limit=200');
+    expect(calls[0]!.init.method).toBe('GET');
+  });
+
+  it('signs the pull with the device credential, and sends none when the register is not enrolled', async () => {
+    const token = '0193a5c0-0000-7000-8000-000000000001.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP1';
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetchImpl = ((url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return Promise.resolve(Response.json(PAGE));
+    }) as typeof fetch;
+
+    await new HttpSyncTransport({ baseUrl: 'https://core.example.com', deviceToken: token, fetchImpl }).pull('0', 200);
+    await new HttpSyncTransport({ baseUrl: 'https://core.example.com', fetchImpl }).pull('0', 200);
+
+    expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe(`Device ${token}`);
+    expect(calls[0]!.url).not.toContain(token);
+    expect(Object.keys(calls[1]!.init.headers as Record<string, string>)).toEqual(['Accept']);
+  });
+
+  it('counts a status that is not 200 as no answer, and keeps the status so a 409 can be told apart', async () => {
+    await expect(transportAnswering(() => new Response('', { status: 409 })).pull('9', 200)).rejects.toMatchObject({ name: 'SyncTransportError', status: 409 });
+    await expect(transportAnswering(() => new Response('', { status: 503 })).pull('0', 200)).rejects.toBeInstanceOf(SyncTransportError);
+  });
+
+  it('counts a cut answer as no answer', async () => {
+    await expect(transportAnswering(() => new Response('{"changes": [', { status: 200 })).pull('0', 200)).rejects.toBeInstanceOf(SyncTransportError);
+  });
+
+  it('refuses an answer that is not the contract', async () => {
+    await expect(transportAnswering(() => Response.json({ changes: 'many' })).pull('0', 200)).rejects.toBeInstanceOf(SyncProtocolError);
+  });
+});
