@@ -12,17 +12,19 @@ import org.springframework.modulith.events.Externalized;
  *
  * @param eventId       the UUIDv7 of this event
  * @param tenantId      the business
- * @param schemaVersion the version of this payload, 1
+ * @param schemaVersion the version of this payload, 2
  * @param productId     the product
  * @param name          its name
  * @param status        {@code active} or {@code inactive}
  * @param unit          its base unit
  * @param codes         its codes
- * @param changeSeq     its position in the change feed of the business
+ * @param unitPriceE4   its price with VAT included, in ten-thousandths of a peso
+ * @param taxFactor     {@code rate} or {@code exempt}
+ * @param taxRateBp     its VAT rate in basis points
  * @param occurredAt    when it happened
  */
 @Externalized("pos.catalog.product-created.v1::#{tenantId()}")
 public record ProductCreated(UUID eventId, UUID tenantId, int schemaVersion, UUID productId, String name,
-                             String status, String unit, List<String> codes, long changeSeq,
-                             Instant occurredAt) implements BusinessEvent {
+                             String status, String unit, List<String> codes, long unitPriceE4,
+                             String taxFactor, int taxRateBp, Instant occurredAt) implements BusinessEvent {
 }

@@ -38,11 +38,14 @@ class PriceChangeOperationRecorder implements OperationRecorder {
     private final JdbcTemplate jdbc;
     private final AuditLog auditLog;
     private final ApplicationEventPublisher events;
+    private final ProductCatalog catalog;
 
-    PriceChangeOperationRecorder(JdbcTemplate jdbc, AuditLog auditLog, ApplicationEventPublisher events) {
+    PriceChangeOperationRecorder(JdbcTemplate jdbc, AuditLog auditLog, ApplicationEventPublisher events,
+                                 ProductCatalog catalog) {
         this.jdbc = jdbc;
         this.auditLog = auditLog;
         this.events = events;
+        this.catalog = catalog;
     }
 
     @Override
@@ -68,7 +71,8 @@ class PriceChangeOperationRecorder implements OperationRecorder {
         // price the other left. The lock is released with the transaction.
         jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))::text", String.class,
                 "price:" + productId);
-        Long serverPrice = latestPrice(productId);
+        // The catalog holds the price once the product exists in it (ADR 0056); before that, the latest change does.
+        Long serverPrice = catalog.livePrice(productId).orElseGet(() -> latestPrice(productId));
         boolean discrepancy = serverPrice != null && serverPrice != previous;
 
         jdbc.update("""
@@ -84,6 +88,8 @@ class PriceChangeOperationRecorder implements OperationRecorder {
                 value(previous, null, null, null), value(current, changeId, authorizedBy, discrepancy ? serverPrice : null)));
         events.publishEvent(new ProductPriceChanged(Uuid7.next(), TenantContext.current().orElseThrow(), 1, changeId,
                 productId, previous, current, changedBy, authorizedBy, operation.occurredAt(), discrepancy));
+        // A product in the catalog takes the price the register charged and is republished to every register.
+        catalog.applyRegisterPrice(productId, current, changedBy);
     }
 
     private boolean exists(UUID changeId) {
@@ -91,7 +97,7 @@ class PriceChangeOperationRecorder implements OperationRecorder {
         return count != null && count > 0;
     }
 
-    /** The price the core holds is the one of the latest change it stored; the catalog will give it when F0-16 exists. */
+    /** The price of the latest change stored, used while the product is not in the catalog. */
     private Long latestPrice(UUID productId) {
         List<Long> latest = jdbc.queryForList(
                 "SELECT new_unit_price_e4 FROM product_price_change WHERE product_id = ? ORDER BY seq DESC LIMIT 1",

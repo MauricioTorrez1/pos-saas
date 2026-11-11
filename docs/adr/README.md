@@ -55,3 +55,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0051](0051-catalogo-de-productos-codigos-y-unidades.md) | Catálogo de productos, códigos únicos por negocio y unidad base fija | Aceptada |
 | [0048](0048-cambios-hacia-la-caja-con-cursor.md) | Cambios hacia la caja con cursor numerado por negocio, tombstones y aplicación atómica | Aceptada |
 | [0049](0049-costo-promedio-en-el-servidor.md) | Costo promedio ponderado móvil, recalculado en el servidor desde el libro | Aceptada |
+| [0056](0056-precio-impuesto-y-claves-sat-del-producto.md) | Precio con IVA incluido, impuesto y claves SAT del producto, publicados a las cajas | Aceptada |

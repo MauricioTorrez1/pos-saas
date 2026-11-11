@@ -11,8 +11,13 @@ import io.github.mauriciotorrez1.pos.core.catalog.ProductCode;
 import io.github.mauriciotorrez1.pos.core.catalog.ProductPage;
 import io.github.mauriciotorrez1.pos.core.catalog.ProductStatus;
 import io.github.mauriciotorrez1.pos.core.identity.UserDirectory;
+import io.github.mauriciotorrez1.pos.core.identity.AppUser;
 import io.github.mauriciotorrez1.pos.money.MoneyException;
+import io.github.mauriciotorrez1.pos.money.TaxFactor;
+import io.github.mauriciotorrez1.pos.money.TaxRate;
 import io.github.mauriciotorrez1.pos.money.Unit;
+import io.github.mauriciotorrez1.pos.money.UnitPrice;
+import io.github.mauriciotorrez1.pos.security.Permission;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
@@ -63,9 +68,15 @@ class ProductsController {
     @PostMapping
     ResponseEntity<ProductView> create(@RequestHeader(name = IDEMPOTENCY_KEY, required = false) String key,
                                        @RequestBody ProductRequest request, @AuthenticationPrincipal Jwt jwt) {
-        ProductCatalog.Created created = catalog.create(actorOf(jwt), new NewProduct(idempotencyKey(key),
+        AppUser actor = actorOf(jwt);
+        if (request.unitPrice() != null && !Permission.PRICE_CHANGE.grantedTo(actor.role())) {
+            // Setting a price is a price change (RF-008): only who may change prices may create a product with one.
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the owner sets a price");
+        }
+        ProductCatalog.Created created = catalog.create(actor.id(), new NewProduct(idempotencyKey(key),
                 request.name(), status(request.status()), unit(request.unit()), codes(request.codes()),
-                drafts(request.presentations())));
+                drafts(request.presentations()), request.unitPrice() == null ? null : price(request.unitPrice()),
+                tax(request.taxFactor(), request.taxRateBp()), request.satProductKey(), request.satUnitKey()));
         ProductView view = ProductView.of(created.product());
         if (created.replayed()) {
             return ResponseEntity.ok(view);
@@ -110,12 +121,33 @@ class ProductsController {
      */
     @PatchMapping("/{id}")
     ProductView update(@PathVariable UUID id, @RequestBody ProductRequest request, @AuthenticationPrincipal Jwt jwt) {
+        if (request.unitPrice() != null) {
+            throw new InvalidProductException("the price changes with PATCH /products/{id}/price");
+        }
         ProductChanges changes = new ProductChanges(request.name(),
                 request.status() == null ? null : status(request.status()),
                 request.unit() == null ? null : unit(request.unit()),
                 request.codes() == null ? null : codes(request.codes()),
-                request.presentations() == null ? null : drafts(request.presentations()));
-        return ProductView.of(catalog.update(actorOf(jwt), id, changes));
+                request.presentations() == null ? null : drafts(request.presentations()),
+                tax(request.taxFactor(), request.taxRateBp()), request.satProductKey(), request.satUnitKey());
+        return ProductView.of(catalog.update(actorOf(jwt).id(), id, changes));
+    }
+
+    /**
+     * Changes the price of a product, VAT included. Only who holds {@code price.change} gets here (RF-008); the
+     * old and the new price are audited (RF-040) and the registers receive the product with the new price.
+     *
+     * @param id      the product
+     * @param request the new price
+     * @param jwt     the token of the caller
+     * @return the product after the change
+     */
+    @PatchMapping("/{id}/price")
+    ProductView changePrice(@PathVariable UUID id, @RequestBody PriceRequest request, @AuthenticationPrincipal Jwt jwt) {
+        if (request.unitPrice() == null) {
+            throw new InvalidProductException("unitPrice is required");
+        }
+        return ProductView.of(catalog.changePrice(actorOf(jwt).id(), id, price(request.unitPrice())));
     }
 
     /**
@@ -127,12 +159,33 @@ class ProductsController {
     @DeleteMapping("/{id}")
     @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
     void delete(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
-        catalog.delete(actorOf(jwt), id);
+        catalog.delete(actorOf(jwt).id(), id);
     }
 
-    private UUID actorOf(Jwt jwt) {
+    private AppUser actorOf(Jwt jwt) {
         return directory.findActiveBySubject(jwt.getSubject())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN)).id();
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN));
+    }
+
+    private static UnitPrice price(String text) {
+        try {
+            return UnitPrice.parse(text);
+        } catch (MoneyException e) {
+            throw new InvalidProductException("unitPrice must be digits with up to 4 decimals: " + e.getMessage());
+        }
+    }
+
+    /** The tax of a request: nothing sent means nothing changes (or 16% on creation, decided by the catalog). */
+    private static TaxRate tax(String factor, Integer rateBp) {
+        if (factor == null && rateBp == null) {
+            return null;
+        }
+        try {
+            TaxFactor parsed = factor == null ? TaxFactor.RATE : TaxFactor.fromCode(factor);
+            return new TaxRate(parsed, rateBp == null ? (parsed == TaxFactor.RATE ? 1600 : 0) : rateBp);
+        } catch (MoneyException e) {
+            throw new InvalidProductException("tax must be a rate of 16%, 8% or 0%, or exempt without a rate");
+        }
     }
 
     private static UUID idempotencyKey(String key) {
@@ -185,9 +238,24 @@ class ProductsController {
      * @param status        {@code active} (default) or {@code inactive}
      * @param codes         the codes; on PATCH it replaces the whole list
      * @param presentations the bulk presentations; on PATCH it replaces the whole list
+     * @param unitPrice     the price with VAT included, such as {@code "116.0000"}; only on creation and only for
+     *                      who may change prices (later changes use {@code PATCH /products/{id}/price})
+     * @param taxFactor     {@code rate} (default) or {@code exempt}
+     * @param taxRateBp     the rate in basis points: 1600 (default), 800 or 0
+     * @param satProductKey the SAT {@code c_ClaveProdServ} key; {@code ""} on PATCH clears it
+     * @param satUnitKey    the SAT {@code c_ClaveUnidad} key; {@code ""} on PATCH clears it
      */
     record ProductRequest(String name, String unit, String status, List<CodeRequest> codes,
-                          List<PresentationRequest> presentations) {
+                          List<PresentationRequest> presentations, String unitPrice, String taxFactor,
+                          Integer taxRateBp, String satProductKey, String satUnitKey) {
+    }
+
+    /**
+     * Body of {@code PATCH /products/{id}/price}.
+     *
+     * @param unitPrice the new price per base unit with VAT included, with up to 4 decimals
+     */
+    record PriceRequest(String unitPrice) {
     }
 
     /**
@@ -218,12 +286,19 @@ class ProductsController {
      * @param unitKind      what the unit measures: count, weight, length or volume
      * @param codes         the codes
      * @param presentations the bulk presentations
-     * @param changeSeq     the position of its last change in the change feed of the business
+     * @param unitPrice     the price per base unit with VAT included, with 4 decimals
+     * @param taxFactor     {@code rate} or {@code exempt}
+     * @param taxRateBp     the VAT rate in basis points
+     * @param satProductKey the SAT product key, or {@code null}
+     * @param satUnitKey    the SAT unit key, or {@code null}
+     * @param invoiceable   whether both SAT keys are set, so an invoice can be issued (RF-004)
      * @param createdAt     when it was created
      * @param updatedAt     when it last changed
      */
     record ProductView(UUID id, String name, String status, String unit, String unitKind, List<CodeView> codes,
-                       List<PresentationView> presentations, long changeSeq, Instant createdAt, Instant updatedAt) {
+                       List<PresentationView> presentations, String unitPrice, String taxFactor, int taxRateBp,
+                       String satProductKey, String satUnitKey, boolean invoiceable, Instant createdAt,
+                       Instant updatedAt) {
 
         static ProductView of(Product product) {
             return new ProductView(product.id(), product.name(), product.status().code(), product.unit().code(),
@@ -231,7 +306,13 @@ class ProductsController {
                     product.codes().stream().map(code -> new CodeView(code.code(), code.kind().code())).toList(),
                     product.presentations().stream()
                             .map(p -> new PresentationView(p.name(), milliText(p.baseQuantity().milli()))).toList(),
-                    product.changeSeq(), product.createdAt(), product.updatedAt());
+                    priceText(product.unitPrice().e4()), product.tax().factor().code(), product.tax().bp(),
+                    product.satProductKey(), product.satUnitKey(), product.invoiceable(), product.createdAt(),
+                    product.updatedAt());
+        }
+
+        private static String priceText(long e4) {
+            return "%d.%04d".formatted(e4 / 10_000, e4 % 10_000);
         }
 
         private static String milliText(long milli) {
