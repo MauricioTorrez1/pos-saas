@@ -23,6 +23,10 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 | `POST /sync/push` | `sync.push` | Sí | Sí | Sí |
 | `GET /sync/pull` | `sync.pull` | Sí | Sí | Sí |
 | `PUT /users/{id}/role` | `user.role.change` | Sí | — | — |
+| `PUT /users/{id}/pin` | `pin.set` | Sí | Sí | — |
+| `POST /users/{id}/pin/verify` | `pin.verify` | Sí | Sí | Sí |
+| `POST /registers/enrollment-codes` | `register.enrollment.issue` | Sí | Sí | — |
+| `POST /registers/enroll` | (public) | Sí | Sí | Sí |
 | `GET /products` | `product.read` | Sí | Sí | Sí |
 | `POST /products` | `product.write` | Sí | Sí | — |
 | `PATCH /products/{id}` | `product.write` | Sí | Sí | — |
@@ -50,6 +54,9 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 | `invoice.cancel` | Cancelar una factura ante el SAT |
 | `report.view` | Ver los reportes de ventas |
 | `user.role.change` | Cambiar el rol de una persona |
+| `pin.set` | Poner o cambiar el PIN de una persona (el encargado solo el de cajeros y el suyo) |
+| `pin.verify` | Comprobar un PIN (el cajero solo el suyo) |
+| `register.enrollment.issue` | Generar el código de un solo uso que registra una caja nueva |
 
 ## Reglas que no están en la tabla
 
@@ -57,6 +64,8 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 - Un cambio de rol y cada acceso denegado quedan en la bitácora de auditoría, que nadie puede editar.
 - El rol se lee de la base de datos en cada petición, no del token de inicio de sesión: un cambio de rol aplica de inmediato.
 - Una persona desactivada, o con sesión pero sin registro en el negocio, no puede llamar nada protegido; solo `GET /me`.
+- `POST /registers/enroll` no pide sesión: el código de enrolamiento es la credencial, dura 15 minutos y sirve una sola vez.
+- Cinco PIN incorrectos seguidos bloquean ese PIN cinco minutos.
 - Las cajas se identifican con credenciales de dispositivo, no con estos roles (se agregan con el registro de cajas).
 
 ## Preguntas para la familia

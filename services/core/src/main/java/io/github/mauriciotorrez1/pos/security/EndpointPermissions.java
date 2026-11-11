@@ -1,6 +1,7 @@
 package io.github.mauriciotorrez1.pos.security;
 
 import static io.github.mauriciotorrez1.pos.security.EndpointRule.authenticated;
+import static io.github.mauriciotorrez1.pos.security.EndpointRule.open;
 import static io.github.mauriciotorrez1.pos.security.EndpointRule.requires;
 import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.PATCH;
@@ -22,6 +23,11 @@ public final class EndpointPermissions {
             requires(POST, "/sync/push", Permission.SYNC_PUSH),
             requires(GET, "/sync/pull", Permission.SYNC_PULL),
             requires(PUT, "/users/{id}/role", Permission.USER_ROLE_CHANGE),
+            requires(PUT, "/users/{id}/pin", Permission.PIN_SET),
+            requires(POST, "/users/{id}/pin/verify", Permission.PIN_VERIFY),
+            requires(POST, "/registers/enrollment-codes", Permission.REGISTER_ENROLLMENT_CODE_ISSUE),
+            // The enrollment code is the credential: it works once and expires (ADR 0043).
+            open(POST, "/registers/enroll"),
             requires(GET, "/products", Permission.PRODUCT_READ),
             requires(POST, "/products", Permission.PRODUCT_WRITE),
             requires(PATCH, "/products/{id}", Permission.PRODUCT_WRITE),
