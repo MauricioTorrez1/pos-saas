@@ -13,6 +13,8 @@ import java.util.Objects;
  * @param type {@link InvoiceType#INCOME} for a sale, {@link InvoiceType#CREDIT_NOTE} for a return
  * @param globalPeriod set only for a global invoice, otherwise {@code null}
  * @param relatedInvoiceUuids fiscal UUIDs of the invoices a credit note refers to; empty otherwise
+ * @param externalId our own reference, sent to the provider as {@code external_id} so an invoice whose stamping
+ *     had an unknown outcome can be found again with {@link FiscalInvoicing#findByExternalId}; may be {@code null}
  */
 public record InvoiceDraft(
         String customerId,
@@ -21,7 +23,14 @@ public record InvoiceDraft(
         String cfdiUse,
         InvoiceType type,
         GlobalPeriod globalPeriod,
-        List<String> relatedInvoiceUuids) {
+        List<String> relatedInvoiceUuids,
+        String externalId) {
+
+    /** Creates a draft without an external reference. */
+    public InvoiceDraft(String customerId, List<InvoiceLineDraft> lines, String paymentForm, String cfdiUse,
+            InvoiceType type, GlobalPeriod globalPeriod, List<String> relatedInvoiceUuids) {
+        this(customerId, lines, paymentForm, cfdiUse, type, globalPeriod, relatedInvoiceUuids, null);
+    }
 
     public InvoiceDraft {
         Objects.requireNonNull(customerId, "customerId");

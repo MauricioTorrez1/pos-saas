@@ -33,11 +33,45 @@ describe('pushing over HTTP', () => {
     expect(JSON.parse(calls[0]!.init.body as string)).toEqual(REQUEST);
   });
 
-  it('sends no card data and no credentials in the headers', async () => {
+  it('sends no credential at all when the register is not enrolled', async () => {
     const calls: { url: string; init: RequestInit }[] = [];
     await transportAnswering(() => Response.json({ results: [] }), calls).push(REQUEST);
 
     expect(Object.keys(calls[0]!.init.headers as Record<string, string>)).toEqual(['Content-Type', 'Accept']);
+  });
+
+  it('sends the device credential in the Authorization header and nowhere else', async () => {
+    const token = '0193a5c0-0000-7000-8000-000000000001.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP1';
+    const calls: { url: string; init: RequestInit }[] = [];
+    const transport = new HttpSyncTransport({
+      baseUrl: 'https://core.example.com',
+      deviceToken: ` ${token}
+`,
+      fetchImpl: ((url: string, init: RequestInit) => {
+        calls.push({ url, init });
+        return Promise.resolve(Response.json({ results: [] }));
+      }) as typeof fetch,
+    });
+
+    await transport.push(REQUEST);
+
+    expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe(`Device ${token}`);
+    expect(calls[0]!.url).not.toContain(token);
+    expect(calls[0]!.init.body as string).not.toContain(token);
+  });
+
+  it('keeps the credential out of the error when the core refuses it', async () => {
+    const token = '0193a5c0-0000-7000-8000-000000000001.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP1';
+    const transport = new HttpSyncTransport({
+      baseUrl: 'https://core.example.com',
+      deviceToken: token,
+      fetchImpl: (() => Promise.resolve(new Response('revoked', { status: 401 }))) as typeof fetch,
+    });
+
+    const failure = await transport.push(REQUEST).catch((error: unknown) => error as Error);
+
+    expect(failure).toMatchObject({ name: 'SyncTransportError', status: 401 });
+    expect(String((failure as Error).message)).not.toContain(token);
   });
 
   it.each([400, 401, 429, 500, 503])('fails with the status when the core answers %s, so nothing is confirmed', async (status) => {
@@ -125,6 +159,22 @@ describe('pulling over HTTP', () => {
     expect(page.changes[0]).toMatchObject({ seq: 1, entityId: CABLE, deleted: false });
     expect(calls[0]!.url).toBe('https://core.example.com/sync/pull?cursor=0&limit=200');
     expect(calls[0]!.init.method).toBe('GET');
+  });
+
+  it('signs the pull with the device credential, and sends none when the register is not enrolled', async () => {
+    const token = '0193a5c0-0000-7000-8000-000000000001.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP1';
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetchImpl = ((url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return Promise.resolve(Response.json(PAGE));
+    }) as typeof fetch;
+
+    await new HttpSyncTransport({ baseUrl: 'https://core.example.com', deviceToken: token, fetchImpl }).pull('0', 200);
+    await new HttpSyncTransport({ baseUrl: 'https://core.example.com', fetchImpl }).pull('0', 200);
+
+    expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe(`Device ${token}`);
+    expect(calls[0]!.url).not.toContain(token);
+    expect(Object.keys(calls[1]!.init.headers as Record<string, string>)).toEqual(['Accept']);
   });
 
   it('counts a status that is not 200 as no answer, and keeps the status so a 409 can be told apart', async () => {

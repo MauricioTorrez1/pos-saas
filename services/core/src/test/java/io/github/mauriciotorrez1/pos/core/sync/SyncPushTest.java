@@ -4,7 +4,6 @@ import static io.github.mauriciotorrez1.pos.core.sync.SyncFixtures.JSON;
 import static io.github.mauriciotorrez1.pos.core.sync.SyncFixtures.batch;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,6 +16,7 @@ import io.github.mauriciotorrez1.pos.core.CoreApplication;
 import io.github.mauriciotorrez1.pos.db.PostgresTestConfiguration;
 import io.github.mauriciotorrez1.pos.id.Uuid7;
 import io.github.mauriciotorrez1.pos.ingest.OperationRecorder;
+import io.github.mauriciotorrez1.pos.security.DeviceFixtures;
 import io.github.mauriciotorrez1.pos.ingest.RegisterOperation;
 import io.github.mauriciotorrez1.pos.tenant.TenantContext;
 import java.util.ArrayList;
@@ -45,7 +45,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -96,6 +96,8 @@ class SyncPushTest {
     private final UUID tenant = Uuid7.next();
     private final UUID otherTenant = Uuid7.next();
     private final UUID register = Uuid7.next();
+    private final UUID otherRegister = Uuid7.next();
+    private final java.util.Map<UUID, String> credentials = new java.util.concurrent.ConcurrentHashMap<>();
 
     @BeforeEach
     void stockWorks() {
@@ -350,7 +352,7 @@ class SyncPushTest {
 
         assertThat(statuses(push(tenant, batch(register, sale)))).containsExactly("accepted");
         // Another business uses the same ids: the key is per business, so it is a new operation, not a duplicate.
-        assertThat(statuses(push(otherTenant, batch(register, sale)))).containsExactly("accepted");
+        assertThat(statuses(push(otherTenant, batch(otherRegister, sale)))).containsExactly("accepted");
 
         assertThat(count("sale", tenant)).isOne();
         assertThat(count("sale", otherTenant)).isOne();
@@ -427,12 +429,10 @@ class SyncPushTest {
     }
 
     @Test
-    void theEndpointNeedsAValidTokenWithABusiness() throws Exception {
+    void theEndpointNeedsTheDeviceCredentialOfARegister() throws Exception {
         String body = batch(register, SyncFixtures.sale(Uuid7.next())).toString();
 
         mvc.perform(post("/sync/push").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isUnauthorized());
-        mvc.perform(post("/sync/push").with(jwt().jwt(token -> token.subject("someone"))).contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isForbidden());
         mvc.perform(post("/sync/push").with(token(tenant)).contentType(MediaType.TEXT_PLAIN).content(body))
                 .andExpect(status().isUnsupportedMediaType());
     }
@@ -444,15 +444,11 @@ class SyncPushTest {
         return JSON.readTree(body);
     }
 
-    /** A token of a cashier of the business: the register acts as the staff member signed in on it (ADR 0042). */
-    private JwtRequestPostProcessor token(UUID business) {
-        String subject = "register-" + business;
-        admin.update("""
-                INSERT INTO tenant (id, name) VALUES (?, 'Test business') ON CONFLICT DO NOTHING""", business);
-        admin.update("""
-                INSERT INTO app_user (id, tenant_id, display_name, role, keycloak_subject)
-                VALUES (?, ?, 'Cashier', 'cashier', ?) ON CONFLICT DO NOTHING""", Uuid7.next(), business, subject);
-        return jwt().jwt(token -> token.subject(subject).claim("tenant_id", business.toString()));
+    /** The device credential of the register of the business, enrolled on first use (ADR 0054). */
+    private RequestPostProcessor token(UUID business) {
+        String credential = credentials.computeIfAbsent(business,
+                id -> DeviceFixtures.enroll(admin, id, id.equals(tenant) ? register : otherRegister));
+        return DeviceFixtures.device(credential);
     }
 
     private static List<String> statuses(JsonNode response) {

@@ -7,6 +7,7 @@ import io.github.mauriciotorrez1.pos.core.identity.InvalidRequestDataException;
 import io.github.mauriciotorrez1.pos.core.identity.LastOwnerException;
 import io.github.mauriciotorrez1.pos.core.identity.NotAllowedException;
 import io.github.mauriciotorrez1.pos.core.identity.RegisterCodeTakenException;
+import io.github.mauriciotorrez1.pos.core.identity.RegisterNotFoundException;
 import io.github.mauriciotorrez1.pos.core.identity.UserNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -28,6 +29,11 @@ class IdentityExceptionHandler {
     @ExceptionHandler(BranchNotFoundException.class)
     ProblemDetail branchNotFound(BranchNotFoundException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "The branch does not exist");
+    }
+
+    @ExceptionHandler(RegisterNotFoundException.class)
+    ProblemDetail registerNotFound(RegisterNotFoundException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "The register does not exist");
     }
 
     @ExceptionHandler(LastOwnerException.class)

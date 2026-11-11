@@ -38,6 +38,10 @@ final class EndpointAuthorizationManager implements AuthorizationManager<Request
             return new AuthorizationDecision(true);
         }
         Authentication current = authentication.get();
+        if (current instanceof DeviceAuthentication) {
+            // A register opens only the endpoints made for registers, and nothing else.
+            return new AuthorizationDecision(rule.isPresent() && rule.get().access() == EndpointRule.Access.DEVICE);
+        }
         if (!(current instanceof org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken)) {
             // Not signed in: Spring answers 401. Nothing to audit, there is no user and no business.
             return new AuthorizationDecision(false);
@@ -49,6 +53,10 @@ final class EndpointAuthorizationManager implements AuthorizationManager<Request
         }
         if (rule.get().access() == EndpointRule.Access.AUTHENTICATED) {
             return new AuthorizationDecision(true);
+        }
+        if (rule.get().access() == EndpointRule.Access.DEVICE) {
+            auditor.record(user, request.getMethod(), rule.get(), "device_credential_required");
+            return new AuthorizationDecision(false);
         }
         if (user == null) {
             auditor.record(null, request.getMethod(), rule.get(), "no_user");

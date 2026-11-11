@@ -14,11 +14,14 @@ import io.github.mauriciotorrez1.pos.core.invoicing.IssuedInvoice;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -89,6 +92,16 @@ public class FacturapiClient implements FiscalInvoicing {
     }
 
     @Override
+    public Optional<IssuedInvoice> findByExternalId(String externalId) {
+        String path = "/invoices?external_id=" + URLEncoder.encode(externalId, StandardCharsets.UTF_8) + "&limit=2";
+        JsonNode data = parse("findInvoice", send("findInvoice", HttpMethod.GET, path, null, true)).path("data");
+        if (!data.isArray() || data.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(toInvoice("findInvoice", data.get(0)));
+    }
+
+    @Override
     public IssuedInvoice cancelInvoice(String invoiceId, CancellationMotive motive, String substituteInvoiceId) {
         String path = "/invoices/" + invoiceId + "?motive=" + motive.satCode()
                 + (substituteInvoiceId != null ? "&substitution=" + substituteInvoiceId : "");
@@ -114,6 +127,9 @@ public class FacturapiClient implements FiscalInvoicing {
         List<Map<String, Object>> items = new ArrayList<>();
         draft.lines().forEach(line -> items.add(itemBody(line)));
         body.put("items", items);
+        if (draft.externalId() != null) {
+            body.put("external_id", draft.externalId());
+        }
         GlobalPeriod period = draft.globalPeriod();
         if (period != null) {
             body.put("global", Map.of("periodicity", period.periodicity(), "months", period.months(), "year", period.year()));
@@ -197,7 +213,10 @@ public class FacturapiClient implements FiscalInvoicing {
     }
 
     private IssuedInvoice toInvoice(String operation, byte[] response) {
-        JsonNode node = parse(operation, response);
+        return toInvoice(operation, parse(operation, response));
+    }
+
+    private IssuedInvoice toInvoice(String operation, JsonNode node) {
         BigDecimal total = node.path("total").isNumber() ? node.path("total").decimalValue() : BigDecimal.ZERO;
         return new IssuedInvoice(
                 requiredText(operation, node, "id"),

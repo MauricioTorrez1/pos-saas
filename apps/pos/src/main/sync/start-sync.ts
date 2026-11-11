@@ -24,13 +24,19 @@ export interface SyncLoops {
  * @param store the open local database
  * @param tenantId the business of this register
  * @param coreUrl the address of the core, such as `https://core.example.com`, or undefined to stay offline
+ * @param deviceToken the device credential received when the register enrolled, or undefined if it is not enrolled yet
  * @returns the running loops, or null when no address was given
  */
-export function startSyncIfConfigured(store: LocalStore, tenantId: string, coreUrl: string | undefined): SyncLoops | null {
+export function startSyncIfConfigured(
+  store: LocalStore,
+  tenantId: string,
+  coreUrl: string | undefined,
+  deviceToken?: string,
+): SyncLoops | null {
   if (coreUrl === undefined || coreUrl.trim() === '') {
     return null;
   }
-  const transport = new HttpSyncTransport({ baseUrl: coreUrl.trim() });
+  const transport = new HttpSyncTransport({ baseUrl: coreUrl.trim(), ...(deviceToken === undefined ? {} : { deviceToken }) });
   const pusher = new SyncScheduler({
     synchronizer: new OutboxSynchronizer({
       outbox: new SyncOutbox(store, tenantId),
