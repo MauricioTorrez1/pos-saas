@@ -1,5 +1,7 @@
 package io.github.mauriciotorrez1.pos.core.invoicing;
 
+import java.util.Optional;
+
 /**
  * Port to the CFDI stamping provider. The rest of the core depends on this interface only, so tests
  * can replace it with a fake and the provider can change without touching the invoicing flows.
@@ -32,6 +34,15 @@ public interface FiscalInvoicing {
      * @return the current state of the invoice
      */
     IssuedInvoice getInvoice(String invoiceId);
+
+    /**
+     * Looks an invoice up by the {@link InvoiceDraft#externalId()} it was stamped with. This is how a stamping
+     * with an unknown outcome (timeout, lost response) is resolved before trying again. Safe to retry.
+     *
+     * @param externalId the reference sent when the invoice was created
+     * @return the invoice, or empty if the provider has none with that reference
+     */
+    Optional<IssuedInvoice> findByExternalId(String externalId);
 
     /**
      * Requests the cancellation of an invoice before the SAT.
