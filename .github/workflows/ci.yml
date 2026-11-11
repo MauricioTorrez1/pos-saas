@@ -37,7 +37,7 @@ jobs:
   typescript:
     name: TypeScript
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -59,8 +59,16 @@ jobs:
       - name: Run tests
         run: xvfb-run --auto-servernum pnpm test
       # The panel signs in against a fake identity provider, so no Keycloak is needed. Only Chromium is downloaded.
+      # The system packages come from the Ubuntu mirrors through apt, which has hung or failed to resolve its hosts
+      # and froze the job for ten minutes. Try them once with a limit; if apt is unreachable, install only the
+      # browser (its libraries are already in the runner image). A missing library then fails the e2e step by name.
       - name: Install the browser of the panel tests
-        run: pnpm --filter @pos-saas/web exec playwright install --with-deps chromium
+        timeout-minutes: 6
+        run: |
+          timeout 90 pnpm --filter @pos-saas/web exec playwright install --with-deps chromium || {
+            echo "apt is unreachable, installing the browser without system packages"
+            pnpm --filter @pos-saas/web exec playwright install chromium
+          }
       - name: Test the panel sign-in in a browser
         run: pnpm --filter @pos-saas/web test:e2e
 
