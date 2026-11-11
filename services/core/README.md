@@ -123,6 +123,15 @@ curl -X POST http://localhost:8080/products -H "Authorization: Bearer $TOKEN" -H
   --data '{"name":"Cable THW 12","unit":"meter","codes":[{"code":"7501234567890","kind":"barcode"}],"presentations":[{"name":"roll","baseQuantity":"100.000"}]}'
 ```
 
+## Average cost (inventory)
+The weighted moving average cost of a product is computed only in the core ([ADR 0049](../../docs/adr/0049-costo-promedio-en-el-servidor.md), RF-033). It is never stored: `InventoryValuation` replays the ledger of the product (entries in `stock_receipt`, sales, returns, adjustments and write-offs) in the order the events *happened*, so a late sale or a late entry lands where it belongs and recalculating always gives the same result. Costs are integers in millionths of a peso (`unit_cost_e6`, [ADR 0011](../../docs/adr/0011-precision-monetaria.md)), rounded half up. Sales and adjustments do not move the average, a return comes back at the cost of its sale, and stock at or below zero is worth zero.
+
+```java
+valuation.recordReceipt(new StockReceipt(opId, productId, Source.PURCHASE, 10_000, 10_000_000, arrivedAt, userId)); // 10 units at $10.00
+ProductCost cost = valuation.costOf(productId);   // quantityMilli, averageCostE6, valueCents()
+InventoryValue all = valuation.inventoryValue();   // total in cents and products without a known cost
+```
+
 ## Invoicing (Facturapi)
 Other modules depend on the `FiscalInvoicing` interface (`invoicing` root package) and never on the client, so tests use a fake ([ADR 0041](../../docs/adr/0041-cliente-de-facturapi.md)). It creates receivers, stamps invoices (including the `global` object and credit notes), reads and cancels them, and downloads PDF and XML. Amounts use the scales of ADR 0011.
 
@@ -152,7 +161,7 @@ The core sends traces, metrics and logs over OTLP to the collector of the `obser
 | `sales` | Sales and returns |
 | `payments` | Manually entered card payments and the integrated terminal |
 | `cash` | Register sessions and cash closings |
-| `inventory` | The inventory movement ledger |
+| `inventory` | The inventory movement ledger and the average cost |
 | `invoicing` | CFDI invoices through Facturapi |
 | `sync` | Register batches, cursors, and discrepancies |
 | `reporting` | Reports and the audit log |
