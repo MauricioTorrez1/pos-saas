@@ -53,3 +53,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0050](0050-factura-individual.md) | Factura individual con un intento registrado antes de timbrar y consulta antes de repetir | Aceptada |
 | [0052](0052-reporte-del-corte-por-correo.md) | Reporte del corte por correo, asíncrono desde el outbox y sin duplicados | Aceptada |
 | [0053](0053-recepcion-de-cambios-de-precio.md) | Recepción de cambios de precio en el núcleo, sin rechazar lo que aún no se conoce | Aceptada |
+| [0049](0049-costo-promedio-en-el-servidor.md) | Costo promedio ponderado móvil, recalculado en el servidor desde el libro | Aceptada |
