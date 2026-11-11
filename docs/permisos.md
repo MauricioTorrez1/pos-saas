@@ -30,7 +30,9 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 | `POST /registers/enroll` | (public) | Sí | Sí | Sí |
 | `GET /products` | `product.read` | Sí | Sí | Sí |
 | `POST /products` | `product.write` | Sí | Sí | — |
+| `GET /products/{id}` | `product.read` | Sí | Sí | Sí |
 | `PATCH /products/{id}` | `product.write` | Sí | Sí | — |
+| `DELETE /products/{id}` | `product.write` | Sí | Sí | — |
 | `POST /imports/catalog` | `catalog.import` | Sí | Sí | — |
 | `POST /price-changes` | `price.change` | Sí | — | — |
 | `GET /discrepancies` | `discrepancy.view` | Sí | Sí | — |
@@ -45,7 +47,7 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 | Permiso | En palabras sencillas |
 | --- | --- |
 | `product.read` | Ver productos, sus códigos y sus precios |
-| `product.write` | Dar de alta y editar productos (no su precio: eso es `price.change`) |
+| `product.write` | Dar de alta, editar y borrar (de forma lógica, sin perder el historial) productos, con sus códigos y presentaciones (no su precio: eso es `price.change`) |
 | `catalog.import` | Cargar el catálogo desde un archivo, por ejemplo el de Eleventa |
 | `price.change` | Cambiar un precio, uno por uno o en bloque |
 | `discrepancy.view` | Ver las diferencias entre lo que dice la caja y lo que dice el servidor |

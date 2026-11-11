@@ -104,6 +104,24 @@ When a cut is stored, the core publishes `CashCutRecorded` in the same transacti
 | `RESEND_API_KEY` | none | API key of the e-mail provider; only from the environment |
 | `RESEND_FROM` | none | Verified sender, such as `Reportes <reportes@your-domain.com>` |
 | `REPORT_DEFAULT_RECIPIENT` | none | Recipient when the business has no `owner_email` |
+## Catalog: products, codes and units
+`/products` is the catalog of the business ([ADR 0051](../../docs/adr/0051-catalogo-de-productos-codigos-y-unidades.md), RF-001, RF-002). A product has a name, a status (`active` or `inactive`), a **base unit that never changes** (`piece`, `meter`, `kilogram`, `liter`, each of a kind: count, weight, length, volume), any number of codes (barcode or alternate) and optional bulk presentations such as a roll of `"100.000"` m. Quantities are text with 3 decimals. A code points at **one product per business** (`UNIQUE (tenant_id, code)`, `409` otherwise), even after the product is deleted. There are no prices or taxes yet (F0-17).
+
+| Endpoint | Who | What |
+| --- | --- | --- |
+| `POST /products` | owner, manager | Create; needs an `Idempotency-Key` UUID header, and repeating it answers `200` with the first product |
+| `GET /products?q=&page=&size=` | all roles | Search by words of the name (any case or accent) or an exact code; pages from 0, size 1 to 100 |
+| `GET /products/{id}` | all roles | Read one |
+| `PATCH /products/{id}` | owner, manager | Edit what is sent; a list of codes or presentations replaces the old one |
+| `DELETE /products/{id}` | owner, manager | Logical delete (`204`, also if repeated) |
+
+Every change writes its audit entry, takes the next number of the change feed of the business (`product.change_seq`, handed out by `catalog_change_counter`; the pull of E1-18 will read "everything after my cursor") and publishes `ProductCreated` or `ProductUpdated` through the outbox, all in the same transaction.
+
+```bash
+curl -X POST http://localhost:8080/products -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  --data '{"name":"Cable THW 12","unit":"meter","codes":[{"code":"7501234567890","kind":"barcode"}],"presentations":[{"name":"roll","baseQuantity":"100.000"}]}'
+```
 
 
 ## Changes for the registers
@@ -155,7 +173,7 @@ The core sends traces, metrics and logs over OTLP to the collector of the `obser
 | Module | Responsibility |
 | --- | --- |
 | `identity` | Businesses, registers, users, and PINs |
-| `catalog` | Products, prices, and SAT codes |
+| `catalog` | Products, codes, units, prices, and SAT codes (prices and SAT codes arrive with F0-17) |
 | `sales` | Sales and returns |
 | `payments` | Manually entered card payments and the integrated terminal |
 | `cash` | Register sessions and cash closings |
