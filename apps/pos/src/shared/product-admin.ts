@@ -1,5 +1,7 @@
 import type { TaxRate, Unit } from '@pos-saas/money';
 
+import type { KardexRow } from './inventory-api';
+
 /** The longest name of a product. It is the limit of the contract with the core. */
 export const MAX_PRODUCT_NAME_LENGTH = 200;
 /** The longest barcode, in characters. It is the limit of the contract with the core. */
@@ -72,6 +74,61 @@ export type CreateProductResult =
   | { readonly status: 'wrong_pin'; readonly attemptsLeft: number }
   | { readonly status: 'locked'; readonly until: string };
 
+/** A product found by the product panel. Unlike the sale, the panel also finds the products that were given up. */
+export interface ProductSummary {
+  /** UUIDv7 of the product. */
+  readonly id: string;
+  readonly name: string;
+  readonly unit: Unit;
+  /** Price per unit with VAT, in ten-thousandths of a peso. */
+  readonly unitPriceE4: number;
+  readonly isActive: boolean;
+}
+
+/** A product with its latest movements, which is everything the product panel shows (E1-43). */
+export interface ProductPanelDetail extends ProductDetail {
+  /** The newest movements of the ledger first, at most 10, each with the balance it left. */
+  readonly recentMovements: readonly KardexRow[];
+}
+
+/**
+ * What the person at the panel wants the product to be: the new state of every field that is edited here. The price and the
+ * stock are not here: the price changes with `PricingApi` and the stock only moves with adjustments.
+ */
+export interface UpdateProductRequest {
+  readonly productId: string;
+  /** The revision the screen loaded. If the product has another one, it changed while it was being edited and nothing is written. */
+  readonly expectedRevision: number;
+  readonly name: string;
+  /** Can only differ from the current unit while the product has no movements in the ledger. */
+  readonly unit: Unit;
+  readonly taxRate: TaxRate;
+  /** Cost per unit in millionths of a peso, or null for none. */
+  readonly unitCostE6: number | null;
+  /** False gives the product up (a logical delete: it is never removed). */
+  readonly isActive: boolean;
+  /** Every barcode the product should have afterwards. The ones that are not in it are removed, and the new ones are added. */
+  readonly barcodes: readonly string[];
+  /** The PIN of an owner, when a cashier asks. The owner who is signed in needs none. */
+  readonly ownerPin?: string;
+}
+
+/** How saving the changes of a product ended. */
+export type UpdateProductResult =
+  | { readonly status: 'updated'; readonly product: ProductPanelDetail }
+  /** The product already is what was asked. Nothing was written. */
+  | { readonly status: 'unchanged'; readonly product: ProductPanelDetail }
+  | { readonly status: 'not_found' }
+  /** The product changed after the screen loaded it. Nothing was written, and this is how it is now. */
+  | { readonly status: 'stale'; readonly product: ProductPanelDetail }
+  /** Another product already has one of the codes that were added. Nothing was written. */
+  | { readonly status: 'duplicate_code'; readonly code: string; readonly productId: string; readonly productName: string }
+  /** The product already has movements, so its unit cannot change. Nothing was written. */
+  | { readonly status: 'unit_locked'; readonly movementCount: number }
+  | { readonly status: 'authorization_required' }
+  | { readonly status: 'wrong_pin'; readonly attemptsLeft: number }
+  | { readonly status: 'locked'; readonly until: string };
+
 /** What the screen can ask of the main process about the products of the catalog, besides selling them. */
 export interface ProductAdminApi {
   /**
@@ -82,6 +139,32 @@ export interface ProductAdminApi {
    * @returns the product that was created, or why nothing was written
    */
   createProduct(request: NewProductRequest): Promise<CreateProductResult>;
+
+  /**
+   * Finds products by a barcode or by the beginning of the words of their names, including the ones that were given up (E1-43).
+   *
+   * @param text what was typed or scanned
+   * @returns the best matches first, at most 20
+   */
+  findProducts(text: string): Promise<readonly ProductSummary[]>;
+
+  /**
+   * Reads a product whole, with its stock, its cost and its latest movements. Anyone signed in can look.
+   *
+   * @param productId the UUIDv7 of the product
+   * @returns the product, or null if it does not exist
+   */
+  getProductDetail(productId: string): Promise<ProductPanelDetail | null>;
+
+  /**
+   * Saves the changes of a product: name, barcodes, unit, VAT, cost and state (E1-43). Only the owner, or a cashier with the
+   * PIN of an owner. Each change is written with its old and new value in the audit log and queued for the core in the same
+   * transaction. It never deletes a product, and it never writes the price or the stock.
+   *
+   * @param request what the product should be, and the revision the screen saw
+   * @returns the product as it is now, or why nothing was written
+   */
+  updateProduct(request: UpdateProductRequest): Promise<UpdateProductResult>;
 }
 
 /**
@@ -196,4 +279,16 @@ export function formatUnitCost(unitCostE6: number): string {
   const decimals = String(unitCostE6 % 1_000_000).padStart(6, '0').replace(/0+$/, '').padEnd(2, '0');
   const wholePesos = Math.floor(unitCostE6 / 1_000_000);
   return `$${wholePesos.toLocaleString('en-US')}.${decimals}`;
+}
+
+/**
+ * Writes a cost the way a person types it in a box: pesos with at least two decimals, no peso sign and no commas, so what
+ * a box shows can be read back by `readUnitCost`.
+ *
+ * @param unitCostE6 the cost in millionths of a peso
+ * @returns the text, such as "58.25" or "0.000001"
+ */
+export function unitCostText(unitCostE6: number): string {
+  const decimals = String(unitCostE6 % 1_000_000).padStart(6, '0').replace(/0+$/, '').padEnd(2, '0');
+  return `${Math.floor(unitCostE6 / 1_000_000)}.${decimals}`;
 }

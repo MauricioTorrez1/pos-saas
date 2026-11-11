@@ -32,6 +32,7 @@ const SHORTCUTS: readonly { readonly keys: string; readonly action: string }[] =
   { keys: 'F4', action: 'Devolución' },
   { keys: 'F7', action: 'Precio' },
   { keys: 'F5', action: 'Producto nuevo' },
+  { keys: 'F10', action: 'Producto' },
   { keys: 'F8', action: 'Reimprimir' },
   { keys: 'F6', action: 'Salir' },
 ];
@@ -235,7 +236,9 @@ function RegisterScreen({ posApi, pricingApi, productApi, user, appearance, onAp
           </p>
         )}
       </footer>
-      {isAdministering && !hasPendingSales && <AdminDialog posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} onClose={closeAdmin} />}
+      {isAdministering && !hasPendingSales && (
+        <AdminDialog posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} {...(productApi === undefined ? {} : { productApi })} onClose={closeAdmin} />
+      )}
       {isReturning && !hasPendingSales && <ReturnDialog posApi={posApi} user={user} onReturned={refreshCash} onClose={closeReturns} />}
       {isEditingCash && !hasPendingSales && cash !== null && (
         <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} onClose={closeCash} />

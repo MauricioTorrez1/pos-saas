@@ -41,7 +41,7 @@ Generado el 2026-11-10 desde `docs/plan/progreso.md` y los roadmaps. Se excluyen
 - **E1-33 · Cancelación y nota de crédito** (4 h): se cancela una factura o se emite egreso por una devolución.
 - **E1-34 · Reportes básicos** (5 h) _(En revisión)_: el dueño ve ventas, ticket promedio, margen, agotados y productos sin venta.
 - **E1-42 · Alta de nuevos productos en la caja** (4 h) _(En revisión)_: el dueño da de alta, desde la venta y sin internet, un producto que no está en el catálogo.
-- **E1-43 · Panel de modificación de productos** (5 h): el dueño modifica nombre, códigos, unidad, impuesto, costo, estado, precio e inventario de un producto sin perder el historial.
+- **E1-43 · Panel de modificación de productos** (5 h) _(En revisión)_: el dueño modifica nombre, códigos, unidad, impuesto, costo, estado, precio e inventario de un producto sin perder el historial.
 - **E1-37 · Piloto paralelo** (4 h): 1 a 2 semanas registrando en ambos sistemas.
 - **E1-38 · Salida de Eleventa** (4 h): la tienda opera solo con este sistema y tiene plan de regreso.
 

@@ -45,6 +45,7 @@ The lookup box always holds the keyboard, so a scan lands there even after a cli
 | F9 | Opens the appearance dialog |
 | F7 | Opens the dialog to change the price of a product |
 | F5 | Opens the form to add a product that is not in the catalog |
+| F10 | Opens the panel of a product: edit it, change its price, adjust its stock |
 
 A barcode scanner acts as a keyboard, so the register tells it apart by speed: at least 4 characters with no more than 50 ms between them. Only what happens to an unknown code changes: from the scanner it shows a warning, and from a person it searches by name.
 
@@ -80,6 +81,22 @@ When a customer brings something that is not in the catalog imported from Eleven
 | One transaction | The product with its UUIDv7 (made in the register), its codes, the movement, the `product.create` audit entry (who, when, values), and the `product.created` operation in `sync_outbox` are written together or not at all |
 | Sales already made | Nothing in `sale`, `sale_line`, or a ticket is touched |
 | Offline | Nothing needs the core. The core receives `product.created` in a later task; until then it keeps it for review |
+
+## Edit a product
+**F10** on the sale screen opens "Producto" on the product the cashier is pointing at (the highlighted match, or else the selected line) or, with none, asks to find one. In the inventory of the administration, the view of a product has **Modificar producto** and **F9** ([ADR 0058](../../docs/adr/0058-panel-de-modificacion-de-productos.md)). The panel shows the stock, the price, the cost, the margin and the latest movements, and below them the same form as a new product. **F2** saves, **F8** changes the price, **F9** adjusts the stock, and **Esc** closes.
+
+| Rule | How it works |
+| --- | --- |
+| Who | The owner edits. A cashier sees everything and types the PIN of an owner to save, with the usual tries and lock. A refusal is written in the audit log as `product.update_denied` |
+| What it edits | Name, VAT rate, cost, barcodes, unit, and state. The price and the stock have no box: they go through their own dialogs |
+| Barcodes | Added and removed from the list. One that another product has, active or given up, is refused, naming that product |
+| Unit | Only while the product has no movement in the ledger. After that it is locked, and the main process answers `unit_locked` |
+| Giving up | "A la venta" unticked sets `is_active = 0`. The product disappears from the sale and its lookups but nothing is deleted, and it can be brought back. Its codes stay taken |
+| Price | The same dialog and service as E1-39 (`PriceChangeService`), so the same rules, PIN and `product.price_changed` |
+| Inventory | The same service as the adjustments of the administration (`InventoryService.adjust`), with a reason. The stock is never typed: it is the sum of the ledger. A cashier needs the PIN of an owner |
+| Concurrency | Every change of a product raises its `revision`. If the product changed after the panel loaded it, nothing is written (`stale`) and the panel shows how it is now |
+| One transaction | The update, the barcodes, the `product.update` audit entry (old and new value of each field), and the `product.updated` operation in `sync_outbox` are written together or not at all |
+| Sales already made | Nothing in `sale`, `sale_line`, a ticket or the ledger is touched |
 
 ## Sale states and recovery
 A sale is saved as `pending_payment` before anything is charged, so a power cut can never leave money without a record ([ADR 0010](../../docs/adr/0010-guardar-antes-de-cobrar.md)). From there it can only become `completed` or `cancelled`, and each change is one transaction. `src/main/checkout/sale-state-machine.ts` gives a clear error, and triggers in the database refuse the same changes if the code ever gets it wrong ([ADR 0025](../../docs/adr/0025-maquina-de-estados-de-la-venta.md)).

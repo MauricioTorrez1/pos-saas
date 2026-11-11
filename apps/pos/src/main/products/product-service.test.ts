@@ -15,6 +15,7 @@ import { CashService } from '../cash/cash-service';
 import { CashSessionStore } from '../cash/cash-session-store';
 import { PendingSales } from '../checkout/pending-sales';
 import type { SaleToSave } from '../checkout/sale-recorder';
+import { InventoryService } from '../inventory/inventory-service';
 import { StockStore } from '../inventory/stock-store';
 import { LocalStore } from '../local-store/local-store';
 import { ProductCatalog } from '../local-store/product-catalog';
@@ -52,14 +53,16 @@ beforeEach(() => {
   catalog = new ProductCatalog(store, TENANT);
   reader = new ProductReader(store, TENANT);
   const audit = new AuditLog(store, TENANT);
-  products = new ProductService(store, TENANT, auth, audit, reader);
+  const inventory = new InventoryService(store, TENANT, auth, new StockStore(store, TENANT), audit, catalog);
+  products = new ProductService(store, TENANT, auth, audit, reader, catalog, inventory);
+  const prices = new PriceChangeService(store, TENANT, auth, catalog, audit);
   sales = new SaleStore(store, TENANT);
   pending = new PendingSales(
     catalog,
     sales,
     () => ({ cashierId: auth.currentUser()!.id, cashSessionId: cash.openSessionId()! }),
     { auth, audit },
-    new PriceChangeService(store, TENANT, auth, catalog, audit),
+    prices,
   );
   owner = auth.setupOwner('Mauricio', '4321');
   auth.login(owner.id, '4321');

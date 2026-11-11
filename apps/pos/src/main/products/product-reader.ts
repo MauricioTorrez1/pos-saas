@@ -35,6 +35,7 @@ export class ProductReader {
   readonly #detail: StatementSync;
   readonly #barcodes: StatementSync;
   readonly #codeOwner: StatementSync;
+  readonly #isActive: StatementSync;
 
   /**
    * @param store the open local database
@@ -59,6 +60,7 @@ export class ProductReader {
       WHERE product.tenant_id = ? AND product.id = ?
     `);
     this.#barcodes = store.prepare('SELECT code FROM product_barcode WHERE tenant_id = ? AND product_id = ? ORDER BY code');
+    this.#isActive = store.prepare('SELECT is_active AS isActive FROM product WHERE tenant_id = ? AND id = ?');
     this.#codeOwner = store.prepare(`
       SELECT product.id AS productId, product.name AS productName
       FROM product_barcode JOIN product ON product.id = product_barcode.product_id
@@ -92,6 +94,17 @@ export class ProductReader {
       stockMilli: row.stock_milli,
       movementCount: row.movement_count,
     };
+  }
+
+  /**
+   * Tells whether a product can be sold.
+   *
+   * @param productId the UUIDv7 of the product
+   * @returns true if the product exists and was not given up
+   */
+  isActive(productId: string): boolean {
+    const row = this.#isActive.get(this.#tenantId, productId) as unknown as { isActive: number } | undefined;
+    return row?.isActive === 1;
   }
 
   /**
