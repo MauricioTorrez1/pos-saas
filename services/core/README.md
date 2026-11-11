@@ -85,6 +85,8 @@ Idempotency lives in PostgreSQL: `sync_operation` has `UNIQUE (tenant_id, op_id)
 
 Records go to the module that owns them through `OperationRecorder` (`pos.ingest`): `sales` (sales, returns), `cash` (sessions, movements, cuts) and `inventory` (adjustments and write-offs). To accept a new type, add a recorder; `sync` never depends on those modules. Cuts and stock adjustments are also written to the audit log in the same transaction. These tables are append-only and carry `tenant_id` with row-level security. A quarantined operation is stored whole in `sync_operation.raw_operation`.
 
+**Price changes** (`product.price_changed`, E1-40, [ADR 0053](../../docs/adr/0053-recepcion-de-cambios-de-precio.md)) go to `catalog`. The change is stored in `product_price_change` (append-only, `tenant_id`, RLS), audited as `product.price_change` (who, when, before, after) and announced as `ProductPriceChanged` through the outbox, all in one transaction. It is idempotent by `op_id` and by `changeId`. The core never rejects a change for what it does not know yet: a product that is not in the core is kept (the catalog applies the latest change of each product when F0-16 creates it), and a previous price that differs from the one the core holds is kept and marked `discrepancy` for the owner to review (RF-022, E1-19).
+
 ```bash
 curl -X POST http://localhost:8080/sync/push   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   --data @batch.json   # same file twice: the second answer has only "duplicate"
 ```

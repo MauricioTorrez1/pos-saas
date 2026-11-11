@@ -1,6 +1,6 @@
 # Entrega 1: Reemplazar a Eleventa
 
-Duración estimada: 163 horas. Reparto: Claude escribe y explica; tú revisas, pruebas y apruebas.
+Duración estimada: 166 horas. Reparto: Claude escribe y explica; tú revisas, pruebas y apruebas.
 
 ## Hito E1-A: Caja base
 
@@ -165,6 +165,16 @@ Duración estimada: 163 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** E1-07, E1-04, E1-16 · **Estimación:** 3 h
 - **Autoevaluación:** (1) ¿Por qué la venta en curso conserva el precio de sus líneas? (2) ¿Qué se anota cuando un cajero se equivoca de PIN? (3) ¿Por qué el precio anterior viaja en la operación?
 - **Entrevista:** (1) ¿Cómo cambias un precio sin reescribir la historia? (2) ¿Cómo evitas que dos cambios se pisen?
+
+### E1-40 · Recepción de cambios de precio en el núcleo
+- **Objetivo:** el núcleo guarda, audita y anuncia los cambios de precio que hace la caja, aunque todavía no conozca el producto.
+- **Conceptos:** [Idempotencia], [Outbox transaccional]
+- **Claude / tú:** Claude escribe la tabla, el recorder y las pruebas. Tú decides qué ves en la revisión de discrepancias (E1-19).
+- **Pruebas:** Testcontainers: aceptado, duplicado por `op_id` y por `changeId`, concurrencia, producto desconocido, discrepancia, aislamiento entre negocios, auditoría atómica y los casos de `packages/contracts`.
+- **Criterios:** cumple RF-022 y RF-040; ADR 0053.
+- **Depende de:** E1-17, E1-39 · **Estimación:** 3 h
+- **Autoevaluación:** (1) ¿Por qué no se rechaza un cambio de un producto desconocido? (2) ¿Qué marca una discrepancia? (3) ¿Por qué el registro no se actualiza?
+- **Entrevista:** (1) ¿Cómo garantizas idempotencia con dos llaves? (2) ¿Cómo evitas que dos escritores concurrentes se pisen?
 
 ## Hito E1-C: Sincronización
 

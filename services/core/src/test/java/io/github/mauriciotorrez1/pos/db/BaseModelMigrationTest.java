@@ -43,9 +43,9 @@ class BaseModelMigrationTest {
                 """, String.class);
 
         assertThat(tables).containsExactly("app_user", "audit_log", "branch", "cash_cut", "cash_movement", "cash_session",
-                "cut_report_delivery", "enrollment_code", "event_publication", "register", "register_device", "sale", "sale_line",
-                "sale_payment", "sale_return", "sale_return_line", "sale_return_refund", "stock_movement", "sync_operation",
-                "tenant", "user_pin");
+                "cut_report_delivery", "enrollment_code", "event_publication", "product_price_change", "register", "register_device",
+                "sale", "sale_line", "sale_payment", "sale_return", "sale_return_line", "sale_return_refund", "stock_movement",
+                "sync_operation", "tenant", "user_pin");
         assertThat(latestState).isEqualTo("true");
     }
 

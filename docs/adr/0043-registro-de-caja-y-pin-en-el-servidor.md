@@ -29,7 +29,7 @@ Una caja física debe unirse a un negocio una sola vez y en línea, y recibir lo
 - **Bloqueo:** 5 fallos seguidos bloquean 5 minutos. Mientras dura, el PIN ni se compara: ni el correcto entra. Al verificar se toma `SELECT ... FOR UPDATE`, así que los intentos en paralelo cuentan uno por uno. Un PIN correcto pone el contador en cero; fijar un PIN nuevo también quita el bloqueo.
 - **Respuestas de verificación:** 200 con `valid` (verdadero o falso y `attemptsLeft`) porque preguntar si un PIN es correcto no es un error de autenticación; 423 con `Retry-After` mientras está bloqueado; 404 si la persona no tiene PIN.
 - **Nada sensible en logs ni bitácora:** los registros de petición redactan el PIN y el código en `toString`, los mensajes de error son textos fijos, y la bitácora guarda `user.pin_set`, `user.pin_locked`, `register.enrollment_code_issued` y `register.enrolled` solo con ids y valores de negocio. Una prueba busca el PIN y su hash en los logs capturados y otra en toda la bitácora.
-- **RLS:** `user_pin`, `enrollment_code` y `register_device` llevan `tenant_id`, RLS forzada y la política del ADR 0035; la prueba de cobertura recorre el catálogo. La migración es V7.
+- **RLS:** `user_pin`, `enrollment_code` y `register_device` llevan `tenant_id`, RLS forzada y la política del ADR 0035; la prueba de cobertura recorre el catálogo. La migración es V8.
 
 ## Consecuencias
 - Un PIN de 4 a 8 dígitos tiene como máximo 10^8 combinaciones: si alguien copia la base, ningún hash lo protege de verdad. El bloqueo defiende la ruta en línea; el hash solo encarece la ruta fuera de línea. Un pimienta (clave en el entorno) lo mitigaría, pero impediría que la caja verifique el hash sin internet, que es el objetivo; queda anotado.
