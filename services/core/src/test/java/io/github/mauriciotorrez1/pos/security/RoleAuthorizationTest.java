@@ -40,7 +40,11 @@ class RoleAuthorizationTest extends SecuredApiTest {
     @ParameterizedTest(name = "{0} on {1}")
     @MethodSource("roleAndRule")
     void everyRoleGetsWhatTheMatrixSaysOnEveryEndpoint(Role role, EndpointRule rule) {
-        boolean allowed = rule.access() != EndpointRule.Access.PERMISSION || rule.permission().grantedTo(role);
+        boolean allowed = switch (rule.access()) {
+            case PUBLIC, AUTHENTICATED -> true;
+            case DEVICE -> false;
+            case PERMISSION -> rule.permission().grantedTo(role);
+        };
 
         int status = status(actors.get(role), rule.method(), rule.pattern().replace("{id}", actors.get(role).id().toString()),
                 rule.method() == HttpMethod.GET ? null : "{}");

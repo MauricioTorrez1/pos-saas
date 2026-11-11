@@ -20,11 +20,12 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 | Endpoint | Permiso | Dueño | Encargado | Cajero |
 | --- | --- | :---: | :---: | :---: |
 | `GET /me` | (authenticated) | Sí | Sí | Sí |
-| `POST /sync/push` | `sync.push` | Sí | Sí | Sí |
+| `POST /sync/push` | (device) | — | — | — |
 | `PUT /users/{id}/role` | `user.role.change` | Sí | — | — |
 | `PUT /users/{id}/pin` | `pin.set` | Sí | Sí | — |
 | `POST /users/{id}/pin/verify` | `pin.verify` | Sí | Sí | Sí |
 | `POST /registers/enrollment-codes` | `register.enrollment.issue` | Sí | Sí | — |
+| `POST /registers/{id}/revoke` | `register.revoke` | Sí | Sí | — |
 | `POST /registers/enroll` | (public) | Sí | Sí | Sí |
 | `GET /products` | `product.read` | Sí | Sí | Sí |
 | `POST /products` | `product.write` | Sí | Sí | — |
@@ -42,7 +43,6 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 
 | Permiso | En palabras sencillas |
 | --- | --- |
-| `sync.push` | Subir a la nube las ventas y movimientos que hizo una caja |
 | `product.read` | Ver productos, sus códigos y sus precios |
 | `product.write` | Dar de alta y editar productos (no su precio: eso es `price.change`) |
 | `catalog.import` | Cargar el catálogo desde un archivo, por ejemplo el de Eleventa |
@@ -55,6 +55,7 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 | `pin.set` | Poner o cambiar el PIN de una persona (el encargado solo el de cajeros y el suyo) |
 | `pin.verify` | Comprobar un PIN (el cajero solo el suyo) |
 | `register.enrollment.issue` | Generar el código de un solo uso que registra una caja nueva |
+| `register.revoke` | Dar de baja una caja (perdida, robada o reemplazada): deja de enviar al instante |
 
 ## Reglas que no están en la tabla
 
@@ -64,7 +65,7 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 - Una persona desactivada, o con sesión pero sin registro en el negocio, no puede llamar nada protegido; solo `GET /me`.
 - `POST /registers/enroll` no pide sesión: el código de enrolamiento es la credencial, dura 15 minutos y sirve una sola vez.
 - Cinco PIN incorrectos seguidos bloquean ese PIN cinco minutos.
-- Las cajas se identifican con credenciales de dispositivo, no con estos roles (se agregan con el registro de cajas).
+- Las cajas se identifican con su credencial de dispositivo, no con estos roles: `POST /sync/push` solo lo abre una caja enrolada (ninguna persona, ni el dueño) y una caja dada de baja deja de enviar.
 
 ## Preguntas para la familia
 

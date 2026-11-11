@@ -64,7 +64,7 @@ final class TenantFromTokenFilter extends OncePerRequestFilter {
     }
 
     /** Runs the rest of the chain inside the tenant, carrying the checked exceptions out of the lambda. */
-    private static void runAs(UUID tenant, HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+    static void runAs(UUID tenant, HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         try {
             TenantContext.runAs(tenant, () -> {

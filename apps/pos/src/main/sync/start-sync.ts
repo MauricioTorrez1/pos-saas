@@ -13,16 +13,22 @@ import { SyncScheduler } from './sync-scheduler';
  * @param store the open local database
  * @param tenantId the business of this register
  * @param coreUrl the address of the core, such as `https://core.example.com`, or undefined to stay offline
+ * @param deviceToken the device credential received when the register enrolled, or undefined if it is not enrolled yet
  * @returns the running loop, or null when no address was given
  */
-export function startSyncIfConfigured(store: LocalStore, tenantId: string, coreUrl: string | undefined): SyncScheduler | null {
+export function startSyncIfConfigured(
+  store: LocalStore,
+  tenantId: string,
+  coreUrl: string | undefined,
+  deviceToken?: string,
+): SyncScheduler | null {
   if (coreUrl === undefined || coreUrl.trim() === '') {
     return null;
   }
   const scheduler = new SyncScheduler({
     synchronizer: new OutboxSynchronizer({
       outbox: new SyncOutbox(store, tenantId),
-      transport: new HttpSyncTransport({ baseUrl: coreUrl.trim() }),
+      transport: new HttpSyncTransport({ baseUrl: coreUrl.trim(), ...(deviceToken === undefined ? {} : { deviceToken }) }),
       registerId: registerIdOf(store, tenantId),
     }),
     onRun: ({ failure, remaining }) => {

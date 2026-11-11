@@ -1,13 +1,13 @@
 package io.github.mauriciotorrez1.pos.core.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.github.mauriciotorrez1.pos.core.CoreApplication;
 import io.github.mauriciotorrez1.pos.db.PostgresTestConfiguration;
 import io.github.mauriciotorrez1.pos.id.Uuid7;
+import io.github.mauriciotorrez1.pos.security.DeviceFixtures;
 import io.github.mauriciotorrez1.pos.tenant.TenantContext;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,7 +31,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -70,6 +70,8 @@ class PriceChangeReceptionTest {
     private final UUID tenant = Uuid7.next();
     private final UUID otherTenant = Uuid7.next();
     private final UUID register = Uuid7.next();
+    private final UUID otherRegister = Uuid7.next();
+    private final java.util.Map<UUID, String> credentials = new java.util.concurrent.ConcurrentHashMap<>();
     private final UUID product = Uuid7.next();
     private final UUID cashier = Uuid7.next();
     private final UUID owner = Uuid7.next();
@@ -322,20 +324,21 @@ class PriceChangeReceptionTest {
     }
 
     private JsonNode push(UUID business, ObjectNode batch) throws Exception {
+        // A register sends batches that name itself, so the batch of another business names its own register.
+        batch.put("registerId", registerOf(business).toString());
         String body = mvc.perform(post("/sync/push").with(token(business)).contentType(MediaType.APPLICATION_JSON).content(batch.toString()))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return JSON.readTree(body);
     }
 
-    /** A token of a cashier of the business: the register acts as the staff member signed in on it (ADR 0042). */
-    private JwtRequestPostProcessor token(UUID business) {
-        String subject = "register-" + business;
-        admin.update("INSERT INTO tenant (id, name) VALUES (?, 'Test business') ON CONFLICT DO NOTHING", business);
-        admin.update("""
-                INSERT INTO app_user (id, tenant_id, display_name, role, keycloak_subject)
-                VALUES (?, ?, 'Cashier', 'cashier', ?) ON CONFLICT DO NOTHING""", Uuid7.next(), business, subject);
-        return jwt().jwt(token -> token.subject(subject).claim("tenant_id", business.toString()));
+    private UUID registerOf(UUID business) {
+        return business.equals(tenant) ? register : otherRegister;
+    }
+
+    /** The device credential of the register of the business, enrolled on first use (ADR 0054). */
+    private RequestPostProcessor token(UUID business) {
+        return DeviceFixtures.device(credentials.computeIfAbsent(business, id -> DeviceFixtures.enroll(admin, id, registerOf(id))));
     }
 
     private static List<String> statuses(JsonNode response) {

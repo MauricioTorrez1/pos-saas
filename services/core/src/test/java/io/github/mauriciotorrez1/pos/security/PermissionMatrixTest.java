@@ -83,6 +83,10 @@ class PermissionMatrixTest {
     }
 
     private static String cell(EndpointRule rule, Role role) {
-        return rule.access() != EndpointRule.Access.PERMISSION || rule.permission().grantedTo(role) ? "Sí" : "—";
+        return switch (rule.access()) {
+            case PUBLIC, AUTHENTICATED -> "Sí";
+            case DEVICE -> "—";
+            case PERMISSION -> rule.permission().grantedTo(role) ? "Sí" : "—";
+        };
     }
 }
