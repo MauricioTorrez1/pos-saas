@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.github.mauriciotorrez1.pos.core.CoreApplication;
 import io.github.mauriciotorrez1.pos.db.PostgresTestConfiguration;
 import io.github.mauriciotorrez1.pos.id.Uuid7;
+import io.github.mauriciotorrez1.pos.security.DeviceFixtures;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.context.DynamicPropertyRegistrar;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -60,6 +62,7 @@ class ReviewTest {
     private final UUID otherTenant = Uuid7.next();
     private final UUID register = Uuid7.next();
     private final Map<String, UUID> users = new java.util.HashMap<>();
+    private final Map<UUID, String> credentials = new java.util.HashMap<>();
 
     // listing and detail --------------------------------------------------------------------------------------------
 
@@ -252,8 +255,8 @@ class ReviewTest {
         UUID opId = quarantineSale();
         resolve("/quarantine/" + opId + "/resolution", "manager", "{\"action\":\"reject\",\"reason\":\"Duplicated ticket\"}").andExpect(status().isCreated());
 
-        JsonNode mine = getJson("/sync/pull", token(tenant, "cashier"));
-        JsonNode theirs = getJson("/sync/pull", token(otherTenant, "cashier"));
+        JsonNode mine = getJson("/sync/pull", device(tenant));
+        JsonNode theirs = getJson("/sync/pull", device(otherTenant));
 
         JsonNode notice = mine.get("changes").get(0);
         assertThat(notice.get("entityType").asString()).isEqualTo("review_resolution");
@@ -311,7 +314,7 @@ class ReviewTest {
         UUID opId = Uuid7.next();
         ObjectNode sale = SyncFixtures.sale(opId);
         ((ObjectNode) sale.get("payload")).put("totalCents", 0);
-        String body = mvc.perform(post("/sync/push").with(token(tenant, "cashier")).contentType(MediaType.APPLICATION_JSON)
+        String body = mvc.perform(post("/sync/push").with(device(tenant)).contentType(MediaType.APPLICATION_JSON)
                         .content(SyncFixtures.batch(register, sale).toString()))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         assertThat(JSON.readTree(body).get("results").get(0).get("status").asString()).isEqualTo("quarantined");
@@ -339,7 +342,7 @@ class ReviewTest {
     }
 
     private void push(ObjectNode operation) throws Exception {
-        mvc.perform(post("/sync/push").with(token(tenant, "cashier")).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/sync/push").with(device(tenant)).contentType(MediaType.APPLICATION_JSON)
                         .content(SyncFixtures.batch(register, operation).toString()))
                 .andExpect(status().isOk());
     }
@@ -367,7 +370,7 @@ class ReviewTest {
         return mvc.perform(post(path).with(token).contentType(MediaType.APPLICATION_JSON).content(body)).andReturn().getResponse().getStatus();
     }
 
-    private JsonNode getJson(String path, JwtRequestPostProcessor token) throws Exception {
+    private JsonNode getJson(String path, RequestPostProcessor token) throws Exception {
         return JSON.readTree(mvc.perform(get(path).with(token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
     }
 
@@ -396,6 +399,14 @@ class ReviewTest {
 
     private int count(String table) {
         return admin.queryForObject("SELECT count(*) FROM " + table + " WHERE tenant_id = ?", Integer.class, tenant);
+    }
+
+    /** The device credential of the register of the business, enrolled on first use (ADR 0054). */
+    private RequestPostProcessor device(UUID business) {
+        admin.update("INSERT INTO tenant (id, name) VALUES (?, 'Test business') ON CONFLICT DO NOTHING", business);
+        String credential = credentials.computeIfAbsent(business,
+                id -> DeviceFixtures.enroll(admin, id, id.equals(tenant) ? register : Uuid7.next()));
+        return DeviceFixtures.device(credential);
     }
 
     private JwtRequestPostProcessor token(UUID business, String role) {
