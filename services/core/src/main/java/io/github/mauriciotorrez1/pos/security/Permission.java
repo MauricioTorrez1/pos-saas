@@ -30,6 +30,12 @@ public enum Permission {
     REPORT_VIEW("report.view", Role.OWNER, Role.MANAGER),
     /** Change the role of a user. */
     USER_ROLE_CHANGE("user.role.change", Role.OWNER),
+    /** Set the PIN of a user (a manager only for cashiers and itself). */
+    PIN_SET("pin.set", Role.OWNER, Role.MANAGER),
+    /** Check a PIN (a cashier only its own). */
+    PIN_VERIFY("pin.verify", Role.OWNER, Role.MANAGER, Role.CASHIER),
+    /** Issue the one-time code that enrolls a register. */
+    REGISTER_ENROLLMENT_CODE_ISSUE("register.enrollment.issue", Role.OWNER, Role.MANAGER),
     /** Upload the operations of a register (E1-17). The register acts as the staff member that signed in on it. */
     SYNC_PUSH("sync.push", Role.OWNER, Role.MANAGER, Role.CASHIER);
 
