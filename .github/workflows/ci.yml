@@ -59,17 +59,16 @@ jobs:
       - name: Run tests
         run: xvfb-run --auto-servernum pnpm test
       # The panel signs in against a fake identity provider, so no Keycloak is needed. Only Chromium is downloaded.
-      # The download and the system packages come from the network, and the step hung more than once and
-      # froze the whole job for ten minutes. A short limit per try and three tries keep it from blocking the build.
+      # The system packages come from the Ubuntu mirrors through apt, which has hung or failed to resolve its hosts
+      # and froze the job for ten minutes. Try them once with a limit; if apt is unreachable, install only the
+      # browser (its libraries are already in the runner image). A missing library then fails the e2e step by name.
       - name: Install the browser of the panel tests
         timeout-minutes: 6
         run: |
-          for attempt in 1 2 3; do
-            timeout 90 pnpm --filter @pos-saas/web exec playwright install --with-deps chromium && exit 0
-            echo "Attempt $attempt failed, trying again"
-            sleep 10
-          done
-          exit 1
+          timeout 90 pnpm --filter @pos-saas/web exec playwright install --with-deps chromium || {
+            echo "apt is unreachable, installing the browser without system packages"
+            pnpm --filter @pos-saas/web exec playwright install chromium
+          }
       - name: Test the panel sign-in in a browser
         run: pnpm --filter @pos-saas/web test:e2e
 
