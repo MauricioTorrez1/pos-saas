@@ -26,7 +26,7 @@ import org.springframework.test.web.servlet.client.RestTestClient;
 @AutoConfigureRestTestClient
 @Import({PostgresTestConfiguration.class, KeycloakTestConfiguration.class, TestClockConfiguration.class})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class SecuredApiTest {
+public abstract class SecuredApiTest {
 
     @Autowired
     protected RestTestClient client;
@@ -42,7 +42,7 @@ abstract class SecuredApiTest {
     protected JdbcTemplate admin;
 
     /** A person with a Keycloak login and a user row, as the panel would have after the owner invites them. */
-    protected static final class Actor {
+    public static final class Actor {
 
         private final String username;
         private final UUID userId;
@@ -57,12 +57,12 @@ abstract class SecuredApiTest {
         }
 
         /** The id of the user row. */
-        protected UUID id() {
+        public UUID id() {
             return userId;
         }
 
         /** The {@code Authorization} header value of a real access token, requested again when it is two minutes old. */
-        protected String bearer() {
+        public String bearer() {
             // Tokens live 5 minutes and a slow machine can take longer than that to run a class.
             if (token == null || System.currentTimeMillis() - tokenFetchedAt > 120_000) {
                 token = keycloak.accessToken(username);
