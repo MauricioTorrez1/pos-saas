@@ -12,6 +12,7 @@ import io.github.mauriciotorrez1.pos.money.Quantity;
 import io.github.mauriciotorrez1.pos.money.TaxRate;
 import io.github.mauriciotorrez1.pos.money.Unit;
 import io.github.mauriciotorrez1.pos.money.UnitPrice;
+import io.github.mauriciotorrez1.pos.security.DeviceFixtures;
 import io.github.mauriciotorrez1.pos.security.SecuredApiTest;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -63,6 +64,25 @@ class ProductPricingApiTest extends SecuredApiTest {
         var result = (body == null ? request.exchange() : request.contentType(MediaType.APPLICATION_JSON)
                 .body(body instanceof String text ? text : json.writeValueAsString(body)).exchange())
                 .expectBody(String.class).returnResult();
+        String text = result.getResponseBody();
+        return new Reply(result.getStatus().value(), text == null || text.isBlank() ? null : json.readTree(text));
+    }
+
+    private final Map<UUID, String[]> registers = new HashMap<>();
+
+    /** The register of a business, enrolled on first use; the first value is its id and the second its credential. */
+    private String[] registerOf(UUID business) {
+        return registers.computeIfAbsent(business, id -> {
+            UUID registerId = io.github.mauriciotorrez1.pos.id.Uuid7.next();
+            return new String[] {registerId.toString(), DeviceFixtures.enroll(admin, id, registerId)};
+        });
+    }
+
+    /** Calls the API as a register, with its device credential (ADR 0054). */
+    private Reply callAsRegister(UUID business, HttpMethod method, String path, Object body) {
+        var request = client.method(method).uri(path).header("Authorization", "Device " + registerOf(business)[1]);
+        var result = (body == null ? request.exchange() : request.contentType(MediaType.APPLICATION_JSON)
+                .body(json.writeValueAsString(body)).exchange()).expectBody(String.class).returnResult();
         String text = result.getResponseBody();
         return new Reply(result.getStatus().value(), text == null || text.isBlank() ? null : json.readTree(text));
     }
@@ -257,8 +277,8 @@ class ProductPricingApiTest extends SecuredApiTest {
 
     // -- what the registers pull -------------------------------------------------------------------------------
 
-    private JsonNode pull(Actor actor, long cursor) {
-        Reply reply = call(actor, HttpMethod.GET, "/sync/pull?cursor=" + cursor + "&limit=200", null, null);
+    private JsonNode pull(UUID business, long cursor) {
+        Reply reply = callAsRegister(business, HttpMethod.GET, "/sync/pull?cursor=" + cursor + "&limit=200", null);
         assertThat(reply.status()).isEqualTo(200);
         assertThat(PULL_SCHEMA.validate(reply.body())).as("the page follows the shared contract").isEmpty();
         return reply.body();
@@ -284,7 +304,7 @@ class ProductPricingApiTest extends SecuredApiTest {
                 "taxRateBp", 1600, "codes", List.of(Map.of("code", barcode, "kind", "barcode")));
         UUID id = createdId(call(pullOwner, HttpMethod.POST, "/products", fields, UUID.randomUUID()));
 
-        JsonNode page = pull(pullCashier, 0);
+        JsonNode page = pull(pullTenant, 0);
 
         JsonNode payload = lastChangeOf(page, id).get("payload");
         assertThat(payload.get("name").asString()).isEqualTo("Cable THW 12");
@@ -296,18 +316,18 @@ class ProductPricingApiTest extends SecuredApiTest {
 
         long cursor = page.get("nextCursor").asLong();
         call(pullOwner, HttpMethod.PATCH, "/products/" + id + "/price", Map.of("unitPrice", "25.0000"), null);
-        JsonNode afterPrice = pull(pullCashier, cursor);
+        JsonNode afterPrice = pull(pullTenant, cursor);
         assertThat(lastChangeOf(afterPrice, id).get("payload").get("unitPriceE4").asLong()).isEqualTo(250_000L);
 
         cursor = afterPrice.get("nextCursor").asLong();
         call(pullOwner, HttpMethod.PATCH, "/products/" + id, Map.of("taxFactor", "exempt", "name", "Cable exento"), null);
-        JsonNode afterEdit = pull(pullCashier, cursor);
+        JsonNode afterEdit = pull(pullTenant, cursor);
         assertThat(lastChangeOf(afterEdit, id).get("payload").get("taxFactor").asString()).isEqualTo("exempt");
         assertThat(lastChangeOf(afterEdit, id).get("payload").get("taxRateBp").asInt()).isZero();
 
         cursor = afterEdit.get("nextCursor").asLong();
         call(pullOwner, HttpMethod.DELETE, "/products/" + id, null, null);
-        JsonNode afterDelete = pull(pullCashier, cursor);
+        JsonNode afterDelete = pull(pullTenant, cursor);
         assertThat(lastChangeOf(afterDelete, id).get("deleted").asBoolean()).isTrue();
     }
 
@@ -319,24 +339,25 @@ class ProductPricingApiTest extends SecuredApiTest {
                 Map.of("name", "Temporal", "unit", "piece", "unitPrice", "5.0000"), UUID.randomUUID()));
 
         call(pullOwner, HttpMethod.PATCH, "/products/" + id, Map.of("status", "inactive"), null);
-        assertThat(lastChangeOf(pull(pullOwner, 0), id).get("deleted").asBoolean()).isTrue();
+        assertThat(lastChangeOf(pull(pullTenant, 0), id).get("deleted").asBoolean()).isTrue();
 
         call(pullOwner, HttpMethod.PATCH, "/products/" + id, Map.of("status", "active"), null);
-        JsonNode back = lastChangeOf(pull(pullOwner, 0), id);
+        JsonNode back = lastChangeOf(pull(pullTenant, 0), id);
         assertThat(back.get("deleted").asBoolean()).isFalse();
         assertThat(back.get("payload").get("unitPriceE4").asLong()).isEqualTo(50_000L);
     }
 
     // -- prices that registers charged (E1-40) -----------------------------------------------------------------
 
-    private Reply pushPriceChange(Actor actor, UUID registerId, UUID productId, long previous, long current) {
+    private Reply pushPriceChange(UUID business, Actor actor, UUID productId, long previous, long current) {
         Map<String, Object> payload = Map.of("changeId", io.github.mauriciotorrez1.pos.id.Uuid7.next().toString(),
                 "productId", productId.toString(), "previousUnitPriceE4", previous, "newUnitPriceE4", current,
                 "changedBy", actor.id().toString(), "authorizedBy", owner.id().toString());
         Map<String, Object> operation = Map.of("opId", io.github.mauriciotorrez1.pos.id.Uuid7.next().toString(), "deviceSeq", 1,
                 "type", "product.price_changed", "schemaVersion", 1, "occurredAt", "2026-12-12T15:00:00.000Z",
                 "payload", payload);
-        return call(actor, HttpMethod.POST, "/sync/push", Map.of("registerId", registerId.toString(), "operations", List.of(operation)), null);
+        return callAsRegister(business, HttpMethod.POST, "/sync/push",
+                Map.of("registerId", registerOf(business)[0], "operations", List.of(operation)));
     }
 
     @Test
@@ -346,15 +367,15 @@ class ProductPricingApiTest extends SecuredApiTest {
         Actor priceCashier = seedActor(priceTenant, Role.CASHIER, true);
         UUID id = createdId(call(priceOwner, HttpMethod.POST, "/products",
                 Map.of("name", "Martillo", "unit", "piece", "unitPrice", "100.0000"), UUID.randomUUID()));
-        long cursor = pull(priceCashier, 0).get("nextCursor").asLong();
+        long cursor = pull(priceTenant, 0).get("nextCursor").asLong();
 
-        Reply pushed = pushPriceChange(priceCashier, io.github.mauriciotorrez1.pos.id.Uuid7.next(), id, 1_000_000, 1_200_000);
+        Reply pushed = pushPriceChange(priceTenant, priceCashier, id, 1_000_000, 1_200_000);
 
         assertThat(pushed.status()).isEqualTo(200);
         assertThat(pushed.body().get("results").get(0).get("status").asString()).isEqualTo("accepted");
         assertThat(call(priceOwner, HttpMethod.GET, "/products/" + id, null, null).body().get("unitPrice").asString())
                 .isEqualTo("120.0000");
-        assertThat(lastChangeOf(pull(priceCashier, cursor), id).get("payload").get("unitPriceE4").asLong()).isEqualTo(1_200_000L);
+        assertThat(lastChangeOf(pull(priceTenant, cursor), id).get("payload").get("unitPriceE4").asLong()).isEqualTo(1_200_000L);
         List<Map<String, Object>> history = admin.queryForList(
                 "SELECT new_unit_price_e4, source, changed_by FROM product_price_history WHERE product_id = ? ORDER BY changed_at, id", id);
         assertThat(history).extracting(row -> row.get("source")).containsExactly("created", "register");
@@ -371,7 +392,7 @@ class ProductPricingApiTest extends SecuredApiTest {
         UUID id = createdId(call(priceOwner, HttpMethod.POST, "/products",
                 Map.of("name", "Pala", "unit", "piece", "unitPrice", "100.0000"), UUID.randomUUID()));
 
-        pushPriceChange(priceCashier, io.github.mauriciotorrez1.pos.id.Uuid7.next(), id, 900_000, 950_000);
+        pushPriceChange(priceTenant, priceCashier, id, 900_000, 950_000);
 
         Map<String, Object> row = admin.queryForMap("SELECT discrepancy, server_price_e4 FROM product_price_change WHERE product_id = ?", id);
         assertThat(row).containsEntry("discrepancy", true).containsEntry("server_price_e4", 1_000_000L);
@@ -385,7 +406,7 @@ class ProductPricingApiTest extends SecuredApiTest {
         Actor priceCashier = seedActor(priceTenant, Role.CASHIER, true);
         UUID unknown = io.github.mauriciotorrez1.pos.id.Uuid7.next();
 
-        Reply pushed = pushPriceChange(priceCashier, io.github.mauriciotorrez1.pos.id.Uuid7.next(), unknown, 100, 200);
+        Reply pushed = pushPriceChange(priceTenant, priceCashier, unknown, 100, 200);
 
         assertThat(pushed.body().get("results").get(0).get("status").asString()).isEqualTo("accepted");
         assertThat(admin.queryForObject("SELECT count(*) FROM product_price_change WHERE product_id = ?", Long.class, unknown)).isEqualTo(1L);
