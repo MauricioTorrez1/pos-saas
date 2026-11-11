@@ -12,7 +12,6 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
@@ -37,7 +36,6 @@ public class EnrollmentService {
     // Crockford's base32 without I, L, O and U: nothing to confuse when someone types the code.
     private static final String ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
     private static final int CODE_LENGTH = 16;
-    private static final int TOKEN_BYTES = 32;
     private static final Pattern REGISTER_CODE = Pattern.compile("[A-Z0-9]{1,10}");
     private static final Pattern NORMALIZED_CODE = Pattern.compile("[0-9A-HJKMNP-TV-Z]{16}");
 
@@ -108,10 +106,10 @@ public class EnrollmentService {
         if (!NORMALIZED_CODE.matcher(normalized).matches()) {
             throw new InvalidEnrollmentCodeException();
         }
-        return TenantContext.callAs(tenantId, () -> transaction.execute(status -> redeem(normalized)));
+        return TenantContext.callAs(tenantId, () -> transaction.execute(status -> redeem(tenantId, normalized)));
     }
 
-    private Enrollment redeem(String normalizedCode) {
+    private Enrollment redeem(UUID tenantId, String normalizedCode) {
         List<Pending> spent = jdbc.query("""
                         UPDATE enrollment_code SET redeemed_at = ?
                         WHERE code_hash = ? AND redeemed_at IS NULL AND expires_at > ?
@@ -132,8 +130,8 @@ public class EnrollmentService {
             throw new RegisterCodeTakenException(pending.registerCode());
         }
         jdbc.update("UPDATE enrollment_code SET register_id = ? WHERE id = ?", registerId, pending.id());
-        String token = newToken();
-        jdbc.update("INSERT INTO register_device (register_id, token_hash) VALUES (?, ?)", registerId, sha256(token));
+        String token = DeviceToken.generate(tenantId, random);
+        jdbc.update("INSERT INTO register_device (register_id, token_hash) VALUES (?, ?)", registerId, DeviceToken.hash(token));
         auditLog.record(new AuditEntry(null, "register.enrolled", "register", registerId, null,
                 "{\"branch_id\": \"" + pending.branchId() + "\", \"code\": \"" + pending.registerCode() + "\"}"));
         return new Enrollment(registerId, pending.branchId(), pending.registerCode(), token, usersWithPin());
@@ -171,12 +169,6 @@ public class EnrollmentService {
 
     private static String format(String code) {
         return code.substring(0, 4) + "-" + code.substring(4, 8) + "-" + code.substring(8, 12) + "-" + code.substring(12);
-    }
-
-    private String newToken() {
-        byte[] bytes = new byte[TOKEN_BYTES];
-        random.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     private static String sha256(String value) {

@@ -20,6 +20,8 @@ public record EndpointRule(HttpMethod method, String pattern, Access access, Per
     public enum Access {
         /** Nobody has to sign in; the endpoint checks its own credential (such as an enrollment code). */
         PUBLIC,
+        /** Only an enrolled register with a valid device credential; no person's token opens it. */
+        DEVICE,
         /** Any signed-in user of a business, whatever the role. */
         AUTHENTICATED,
         /** Only the roles that hold {@link EndpointRule#permission()}. */
@@ -57,6 +59,17 @@ public record EndpointRule(HttpMethod method, String pattern, Access access, Per
      */
     public static EndpointRule authenticated(HttpMethod method, String pattern) {
         return new EndpointRule(method, pattern, Access.AUTHENTICATED, null);
+    }
+
+    /**
+     * Creates a rule for an endpoint that only an enrolled register may call, with its device credential.
+     *
+     * @param method  the HTTP method
+     * @param pattern the path pattern
+     * @return the rule
+     */
+    public static EndpointRule device(HttpMethod method, String pattern) {
+        return new EndpointRule(method, pattern, Access.DEVICE, null);
     }
 
     /**

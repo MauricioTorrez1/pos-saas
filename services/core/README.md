@@ -9,7 +9,7 @@ Modular monolith built with Java 21, Spring Boot 4.1, and Spring Modulith. For n
 | `src/main/java/.../money/` | `Money`, `UnitPrice`, `Quantity`, `LineAmount`, and the VAT of `LineTotals` and `SaleTotals`, outside the modules ([ADR 0020](../../docs/adr/0020-casos-compartidos.md), [ADR 0022](../../docs/adr/0022-libreria-de-dinero.md), [ADR 0023](../../docs/adr/0023-iva-incluido-por-linea.md)) |
 | `src/main/java/.../id/` | `Uuid7`, the UUIDv7 generator ([ADR 0034](../../docs/adr/0034-flyway-y-modelo-base.md)) |
 | `src/main/resources/db/migration/` | Flyway migrations: the base model, row-level security, the outbox, the audit log and the records that registers upload |
-| `src/main/java/.../security/` | Resource server, `TenantFromTokenFilter` and `GET /me` ([ADR 0039](../../docs/adr/0039-keycloak-oidc-y-tenant-en-el-token.md)) |
+| `src/main/java/.../security/` | Resource server, `TenantFromTokenFilter`, the endpoint permission table and the device credential filter of the registers ([ADR 0039](../../docs/adr/0039-keycloak-oidc-y-tenant-en-el-token.md), [ADR 0042](../../docs/adr/0042-roles-y-permisos-por-endpoint.md), [ADR 0054](../../docs/adr/0054-credencial-de-dispositivo-en-sync-push.md)) |
 | `src/main/java/.../tenant/` | `TenantContext` and the transaction manager that pins the tenant ([ADR 0035](../../docs/adr/0035-rls-rol-de-aplicacion-y-tenant-por-transaccion.md)) |
 | `src/main/java/.../ingest/` | `OperationRecorder`, the contract that each module implements to store the operations a register uploads ([ADR 0046](../../docs/adr/0046-recepcion-idempotente-en-el-nucleo.md)) |
 | `src/main/java/.../events/` | `BusinessEvent`, the contract of every event sent to Redpanda through the outbox ([ADR 0036](../../docs/adr/0036-outbox-con-modulith-y-redpanda.md)) |
@@ -73,7 +73,7 @@ An event that implements `BusinessEvent` and is annotated `@Externalized("topic:
 `AuditLog.record(AuditEntry)` appends who did what to which entity, with the value before and after, in the transaction of the change ([ADR 0038](../../docs/adr/0038-bitacora-de-auditoria-solo-agregar.md)). It fails without a transaction. The table is append-only: `pos_app` has no `UPDATE`, `DELETE` or `TRUNCATE`, and a trigger rejects them for every role. Store ids and business values only, never PINs, tokens, card data or needless personal data.
 
 ## Receiving register batches
-`POST /sync/push` receives the batch that a register uploads from its local outbox ([ADR 0046](../../docs/adr/0046-recepcion-idempotente-en-el-nucleo.md), RF-021). The business comes from the token, never from the body: a body with an extra field, including a `tenantId`, is a `400`. Each operation is checked against the shared schema `packages/contracts/schemas/sync-push-request.schema.json` and applied **in its own transaction**, so a batch that fails halfway keeps what was confirmed before.
+`POST /sync/push` receives the batch that a register uploads from its local outbox ([ADR 0046](../../docs/adr/0046-recepcion-idempotente-en-el-nucleo.md), RF-021). The register authenticates with its device credential (`Authorization: Device <tenantId>.<secret>`, [ADR 0054](../../docs/adr/0054-credencial-de-dispositivo-en-sync-push.md)); the business and the register come from it, never from the body, and a batch that names another register is a `403`: a body with an extra field, including a `tenantId`, is a `400`. Each operation is checked against the shared schema `packages/contracts/schemas/sync-push-request.schema.json` and applied **in its own transaction**, so a batch that fails halfway keeps what was confirmed before.
 
 Idempotency lives in PostgreSQL: `sync_operation` has `UNIQUE (tenant_id, op_id)` and each operation claims its key with `INSERT ... ON CONFLICT DO NOTHING`. The same batch twice, or at the same time from many threads, stores everything once. `device_seq` is kept for information and never used to reject.
 
@@ -88,7 +88,7 @@ Records go to the module that owns them through `OperationRecorder` (`pos.ingest
 **Price changes** (`product.price_changed`, E1-40, [ADR 0053](../../docs/adr/0053-recepcion-de-cambios-de-precio.md)) go to `catalog`. The change is stored in `product_price_change` (append-only, `tenant_id`, RLS), audited as `product.price_change` (who, when, before, after) and announced as `ProductPriceChanged` through the outbox, all in one transaction. It is idempotent by `op_id` and by `changeId`. The core never rejects a change for what it does not know yet: a product that is not in the core is kept (the catalog applies the latest change of each product when F0-16 creates it), and a previous price that differs from the one the core holds is kept and marked `discrepancy` for the owner to review (RF-022, E1-19).
 
 ```bash
-curl -X POST http://localhost:8080/sync/push   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   --data @batch.json   # same file twice: the second answer has only "duplicate"
+curl -X POST http://localhost:8080/sync/push   -H "Authorization: Device $DEVICE_TOKEN" -H "Content-Type: application/json"   --data @batch.json   # same file twice: the second answer has only "duplicate"
 ```
 
 ## Cash cut reports by e-mail
@@ -138,7 +138,7 @@ Every change is a row of `sync_change`, numbered per business by `seq`. Taking t
 Modules publish changes through `ChangePublisher` (`pos.feed`), inside the same transaction that changes their data: `publish(type, id, state)` or `publishDeletion(type, id)`. Types today: `product` (with its price and barcodes) and `staff_member`. The products module (F0-16) must call it.
 
 ```bash
-curl "http://localhost:8080/sync/pull?cursor=0&limit=100" -H "Authorization: Bearer $TOKEN"
+curl "http://localhost:8080/sync/pull?cursor=0&limit=100" -H "Authorization: Device $DEVICE_TOKEN"
 ## Average cost (inventory)
 The weighted moving average cost of a product is computed only in the core ([ADR 0049](../../docs/adr/0049-costo-promedio-en-el-servidor.md), RF-033). It is never stored: `InventoryValuation` replays the ledger of the product (entries in `stock_receipt`, sales, returns, adjustments and write-offs) in the order the events *happened*, so a late sale or a late entry lands where it belongs and recalculating always gives the same result. Costs are integers in millionths of a peso (`unit_cost_e6`, [ADR 0011](../../docs/adr/0011-precision-monetaria.md)), rounded half up. Sales and adjustments do not move the average, a return comes back at the cost of its sale, and stock at or below zero is worth zero.
 

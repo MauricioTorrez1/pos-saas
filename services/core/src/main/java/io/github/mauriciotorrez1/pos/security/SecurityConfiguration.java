@@ -1,5 +1,6 @@
 package io.github.mauriciotorrez1.pos.security;
 
+import io.github.mauriciotorrez1.pos.core.identity.DeviceCredentialService;
 import io.github.mauriciotorrez1.pos.core.identity.UserDirectory;
 import io.github.mauriciotorrez1.pos.core.reporting.AuditLog;
 import jakarta.servlet.DispatcherType;
@@ -32,12 +33,13 @@ public class SecurityConfiguration {
      *
      * @param http          the Spring Security builder
      * @param directory     where the user of a token is looked up
+     * @param devices       where the device credential of a register is checked
      * @param authorization the manager that applies the endpoint table
      * @return the chain applied to every request
      * @throws Exception if the chain cannot be built
      */
     @Bean
-    SecurityFilterChain apiSecurity(HttpSecurity http, UserDirectory directory,
+    SecurityFilterChain apiSecurity(HttpSecurity http, UserDirectory directory, DeviceCredentialService devices,
                                     EndpointAuthorizationManager authorization) throws Exception {
         return http
                 // No cookies and no sessions: a browser never attaches a bearer token on its own, so CSRF does not apply.
@@ -51,6 +53,7 @@ public class SecurityConfiguration {
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
                 .addFilterAfter(new TenantFromTokenFilter(), BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(new UserRoleFilter(directory), TenantFromTokenFilter.class)
+                .addFilterAfter(new DeviceCredentialFilter(devices), UserRoleFilter.class)
                 .build();
     }
 

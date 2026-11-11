@@ -55,4 +55,5 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0053](0053-recepcion-de-cambios-de-precio.md) | Recepción de cambios de precio en el núcleo, sin rechazar lo que aún no se conoce | Aceptada |
 | [0051](0051-catalogo-de-productos-codigos-y-unidades.md) | Catálogo de productos, códigos únicos por negocio y unidad base fija | Aceptada |
 | [0048](0048-cambios-hacia-la-caja-con-cursor.md) | Cambios hacia la caja con cursor numerado por negocio, tombstones y aplicación atómica | Aceptada |
+| [0054](0054-credencial-de-dispositivo-en-sync-push.md) | Credencial de dispositivo `<tenantId>.<secreto>` en `/sync/push`, con revocación | Aceptada |
 | [0049](0049-costo-promedio-en-el-servidor.md) | Costo promedio ponderado móvil, recalculado en el servidor desde el libro | Aceptada |

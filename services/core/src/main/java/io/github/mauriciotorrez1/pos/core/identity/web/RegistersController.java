@@ -1,5 +1,6 @@
 package io.github.mauriciotorrez1.pos.core.identity.web;
 
+import io.github.mauriciotorrez1.pos.core.identity.DeviceCredentialService;
 import io.github.mauriciotorrez1.pos.core.identity.Enrollment;
 import io.github.mauriciotorrez1.pos.core.identity.EnrollmentService;
 import io.github.mauriciotorrez1.pos.core.identity.InvalidRequestDataException;
@@ -10,9 +11,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Registration of physical registers (F0-15, ADR 0043). */
@@ -22,10 +25,24 @@ class RegistersController {
 
     private final CurrentActor currentActor;
     private final EnrollmentService enrollment;
+    private final DeviceCredentialService devices;
 
-    RegistersController(CurrentActor currentActor, EnrollmentService enrollment) {
+    RegistersController(CurrentActor currentActor, EnrollmentService enrollment, DeviceCredentialService devices) {
         this.currentActor = currentActor;
         this.enrollment = enrollment;
+        this.devices = devices;
+    }
+
+    /**
+     * Revokes the device credential of a register, so it stops sending at once. Revoking twice is fine.
+     *
+     * @param id  the register to stop
+     * @param jwt the token of the owner or manager
+     */
+    @PostMapping("/{id}/revoke")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void revoke(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        devices.revoke(currentActor.of(jwt), id);
     }
 
     /**
