@@ -37,7 +37,9 @@ public enum Permission {
     /** Issue the one-time code that enrolls a register. */
     REGISTER_ENROLLMENT_CODE_ISSUE("register.enrollment.issue", Role.OWNER, Role.MANAGER),
     /** Upload the operations of a register (E1-17). The register acts as the staff member that signed in on it. */
-    SYNC_PUSH("sync.push", Role.OWNER, Role.MANAGER, Role.CASHIER);
+    SYNC_PUSH("sync.push", Role.OWNER, Role.MANAGER, Role.CASHIER),
+    /** Download what changed in the catalog, prices and permissions since the last time (E1-18). */
+    SYNC_PULL("sync.pull", Role.OWNER, Role.MANAGER, Role.CASHIER);
 
     private final String id;
     private final Set<Role> roles;

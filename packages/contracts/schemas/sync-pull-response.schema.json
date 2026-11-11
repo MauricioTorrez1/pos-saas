@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GET /sync/pull response",
+  "description": "A page of changes after a cursor, in ascending seq. The register applies the whole page and its nextCursor in one local transaction, and asks again while hasMore is true. Asking with the same cursor gives the same changes plus whatever came after them, never fewer (ADR 0048). A change carries the whole state of the entity, so applying it twice leaves the same result. A deletion is a change with deleted true and no payload (a tombstone). An unknown entityType is not valid: a register that meets one must stop and not advance its cursor.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["changes", "nextCursor", "hasMore"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "changes": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/change" }
+    },
+    "nextCursor": {
+      "description": "What to send as cursor next. Equal to the cursor that was sent when there was nothing new.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,15})$"
+    },
+    "hasMore": { "type": "boolean" }
+  },
+  "$defs": {
+    "uuid_v7": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "entityType", "entityId", "deleted", "schemaVersion", "changedAt"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "entityType": { "enum": ["product", "staff_member"] },
+        "entityId": { "$ref": "#/$defs/uuid_v7" },
+        "deleted": { "type": "boolean" },
+        "schemaVersion": { "const": 1 },
+        "changedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$" },
+        "payload": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "deleted": { "const": true } }, "required": ["deleted"] },
+          "then": { "not": { "required": ["payload"] } },
+          "else": { "required": ["payload"] }
+        },
+        {
+          "if": { "properties": { "entityType": { "const": "product" }, "deleted": { "const": false } }, "required": ["entityType", "deleted"] },
+          "then": { "properties": { "payload": { "$ref": "#/$defs/product" } } }
+        },
+        {
+          "if": { "properties": { "entityType": { "const": "staff_member" }, "deleted": { "const": false } }, "required": ["entityType", "deleted"] },
+          "then": { "properties": { "payload": { "$ref": "#/$defs/staff_member" } } }
+        }
+      ]
+    },
+    "product": {
+      "description": "A product with its price: a price change is a new state of the product. The id is the entityId.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "baseUnit", "unitPriceE4", "taxFactor", "taxRateBp", "barcodes"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": "\\S" },
+        "baseUnit": { "$ref": "values.schema.json#/$defs/unit" },
+        "unitPriceE4": { "$ref": "values.schema.json#/$defs/unit_price_e4", "minimum": 0 },
+        "taxFactor": { "$ref": "values.schema.json#/$defs/tax_factor" },
+        "taxRateBp": { "$ref": "values.schema.json#/$defs/valid_tax_rate_bp" },
+        "barcodes": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 64 } }
+      },
+      "if": { "properties": { "taxFactor": { "const": "exempt" } }, "required": ["taxFactor"] },
+      "then": { "properties": { "taxRateBp": { "const": 0 } } }
+    },
+    "staff_member": {
+      "description": "A person and what the register lets them do without internet. The id is the entityId. A person who leaves is active false, never a deletion, because their sales keep their name.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["displayName", "role", "permissions", "active"],
+      "properties": {
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "\\S" },
+        "role": { "enum": ["owner", "manager", "cashier"] },
+        "permissions": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z]+(\\.[a-z]+)+$" } },
+        "active": { "type": "boolean" }
+      }
+    }
+  }
+}

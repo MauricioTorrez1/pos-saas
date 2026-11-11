@@ -1,17 +1,24 @@
 import { backoffDelayMs, DEFAULT_BACKOFF, type BackoffPolicy } from './backoff';
-import type { OutboxSynchronizer, PushOutcome } from './outbox-synchronizer';
+import type { PushOutcome } from './outbox-synchronizer';
 
 /** How often the outbox is looked at while everything works. */
 export const DEFAULT_PUSH_INTERVAL_MS = 5_000;
 
+/** How often the register asks the core for changes while everything works. A price change is not urgent to the second. */
+export const DEFAULT_PULL_INTERVAL_MS = 30_000;
+
 /** What `SyncScheduler` needs. */
-export interface SyncSchedulerOptions {
-  readonly synchronizer: Pick<OutboxSynchronizer, 'pushPending'>;
+export interface SyncSchedulerOptions<Outcome extends { readonly failure: Error | null } = PushOutcome> {
+  /**
+   * What to run each time. It is the outbox synchronizer for the push; the pull passes `{ pushPending: () => puller.pullAll() }`,
+   * because the loop only needs something that runs and says whether it failed.
+   */
+  readonly synchronizer: { readonly pushPending: () => Promise<Outcome> };
   /** Time between pushes while they work. */
   readonly intervalMs?: number;
   readonly backoff?: BackoffPolicy;
   /** Called after every run, for logs or a status light. */
-  readonly onRun?: (outcome: PushOutcome) => void;
+  readonly onRun?: (outcome: Outcome) => void;
   /** Replaces `Math.random` for the jitter. Only tests pass it. */
   readonly random?: () => number;
 }
@@ -20,18 +27,18 @@ export interface SyncSchedulerOptions {
  * Runs the synchronizer every few seconds, and after each failure waits longer before trying again. It lives apart from
  * the sales: a sale only writes to the local database, so a dead network slows this loop and nothing else.
  */
-export class SyncScheduler {
-  readonly #synchronizer: Pick<OutboxSynchronizer, 'pushPending'>;
+export class SyncScheduler<Outcome extends { readonly failure: Error | null } = PushOutcome> {
+  readonly #synchronizer: { readonly pushPending: () => Promise<Outcome> };
   readonly #intervalMs: number;
   readonly #backoff: BackoffPolicy;
-  readonly #onRun: ((outcome: PushOutcome) => void) | undefined;
+  readonly #onRun: ((outcome: Outcome) => void) | undefined;
   readonly #random: () => number;
   #timer: ReturnType<typeof setTimeout> | null = null;
   #consecutiveFailures = 0;
   #started = false;
 
   /** @param options the synchronizer to run and how often */
-  constructor({ synchronizer, intervalMs = DEFAULT_PUSH_INTERVAL_MS, backoff = DEFAULT_BACKOFF, onRun, random = Math.random }: SyncSchedulerOptions) {
+  constructor({ synchronizer, intervalMs = DEFAULT_PUSH_INTERVAL_MS, backoff = DEFAULT_BACKOFF, onRun, random = Math.random }: SyncSchedulerOptions<Outcome>) {
     this.#synchronizer = synchronizer;
     this.#intervalMs = intervalMs;
     this.#backoff = backoff;

@@ -5,12 +5,15 @@ import amountSumCases from "../cases/amount-sum.json" with { type: "json" };
 import lineAmountCases from "../cases/line-amount.json" with { type: "json" };
 import lineTaxCases from "../cases/line-tax.json" with { type: "json" };
 import saleTotalsCases from "../cases/sale-totals.json" with { type: "json" };
+import syncPullCases from "../cases/sync-pull.json" with { type: "json" };
 import syncPushCases from "../cases/sync-push.json" with { type: "json" };
 import textInputCases from "../cases/text-input.json" with { type: "json" };
 import amountSumSchema from "../schemas/amount-sum-cases.schema.json" with { type: "json" };
 import lineAmountSchema from "../schemas/line-amount-cases.schema.json" with { type: "json" };
 import lineTaxSchema from "../schemas/line-tax-cases.schema.json" with { type: "json" };
 import saleTotalsSchema from "../schemas/sale-totals-cases.schema.json" with { type: "json" };
+import syncPullQuerySchema from "../schemas/sync-pull-query.schema.json" with { type: "json" };
+import syncPullResponseSchema from "../schemas/sync-pull-response.schema.json" with { type: "json" };
 import syncPushRequestSchema from "../schemas/sync-push-request.schema.json" with { type: "json" };
 import syncPushResponseSchema from "../schemas/sync-push-response.schema.json" with { type: "json" };
 import textInputSchema from "../schemas/text-input-cases.schema.json" with { type: "json" };
@@ -25,6 +28,8 @@ const validateLineTaxCases = ajv.compile(lineTaxSchema);
 const validateSaleTotalsCases = ajv.compile(saleTotalsSchema);
 const validateSyncPushRequest = ajv.compile(syncPushRequestSchema);
 const validateSyncPushResponse = ajv.compile(syncPushResponseSchema);
+const validateSyncPullQuery = ajv.compile(syncPullQuerySchema);
+const validateSyncPullResponse = ajv.compile(syncPullResponseSchema);
 
 describe.each([
   ["text input cases", validateTextInputCases, textInputCases],
@@ -190,5 +195,53 @@ describe("sync push response", () => {
 
   test.each(syncPushCases.response_rejections.map((entry) => [entry.name, entry.response] as const))("rejects %s", (_name, response) => {
     expect(validateSyncPushResponse(response)).toBe(false);
+  });
+});
+
+/** Reads a query string the way the core does, so each parameter has the type the schema expects. */
+function queryObject(query: string): Record<string, string | number> {
+  return Object.fromEntries(
+    [...new URLSearchParams(query)].map(([name, value]) => [name, /^-?\d+$/.test(value) && name === "limit" ? Number(value) : value]),
+  );
+}
+
+describe("sync pull query", () => {
+  test.each(syncPullCases.queries.map((entry) => [entry.name, entry.query] as const))("accepts %s", (_name, query) => {
+    expect(validateSyncPullQuery(queryObject(query))).toBe(true);
+  });
+
+  test.each(syncPullCases.query_rejections.map((entry) => [entry.name, entry.query] as const))("rejects %s", (_name, query) => {
+    expect(validateSyncPullQuery(queryObject(query))).toBe(false);
+  });
+
+  test("names the keyword that rejects each bad query", () => {
+    for (const entry of syncPullCases.query_rejections) {
+      validateSyncPullQuery(queryObject(entry.query));
+      const keywords = (validateSyncPullQuery.errors ?? []).map((error) => error.keyword);
+
+      expect(keywords, entry.name).toContain(entry.reason);
+    }
+  });
+});
+
+describe("sync pull response", () => {
+  test.each(syncPullCases.responses.map((entry) => [entry.name, entry.response] as const))("accepts %s", (_name, response) => {
+    const isValid = validateSyncPullResponse(response);
+
+    expect(validateSyncPullResponse.errors).toBeNull();
+    expect(isValid).toBe(true);
+  });
+
+  test.each(syncPullCases.response_rejections.map((entry) => [entry.name, entry.response] as const))("rejects %s", (_name, response) => {
+    expect(validateSyncPullResponse(response)).toBe(false);
+  });
+
+  test("names the keyword that rejects each bad response", () => {
+    for (const entry of syncPullCases.response_rejections) {
+      validateSyncPullResponse(entry.response);
+      const keywords = (validateSyncPullResponse.errors ?? []).map((error) => error.keyword);
+
+      expect(keywords, entry.name).toContain(entry.reason);
+    }
   });
 });
