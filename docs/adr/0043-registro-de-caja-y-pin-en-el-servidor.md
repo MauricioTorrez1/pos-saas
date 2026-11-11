@@ -36,5 +36,5 @@ Una caja física debe unirse a un negocio una sola vez y en línea, y recibir lo
 - El bloqueo del servidor y el de la caja (ADR 0029) son independientes: una persona puede gastar 5 intentos en cada uno.
 - Un atacante puede bloquear a alguien adivinando mal a propósito; por eso solo dueño y encargado verifican el PIN de otros.
 - No hay límite de intentos contra `POST /registers/enroll` más allá de los 80 bits del código y su caducidad; un límite por IP llegará con la puerta de entrada (Redis).
-- El token de dispositivo todavía no autentica nada: lo usarán `/sync/push` y `/sync/pull` (E1-17). Rotarlo o revocarlo queda para entonces.
+- El token de dispositivo todavía no autentica nada. Pendiente (tarea siguiente de sincronización): que `/sync/push` y `/sync/pull` lo exijan en lugar del permiso `sync.push` por rol, y que `/sync/push` compare el `registerId` del lote con la caja enrolada (hoy solo lo guarda). Como el token no lleva el negocio, deberá llevarlo dentro (`<tenantId>.<secreto>`) para que RLS encuentre la fila. Rotarlo o revocarlo queda para entonces.
 - Un código emitido y nunca canjeado queda en la tabla caducado; una limpieza periódica queda pendiente.

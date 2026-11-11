@@ -48,6 +48,7 @@ abstract class SecuredApiTest {
         private final UUID userId;
         private final KeycloakTestClient keycloak;
         private String token;
+        private long tokenFetchedAt;
 
         Actor(String username, UUID userId, KeycloakTestClient keycloak) {
             this.username = username;
@@ -60,10 +61,12 @@ abstract class SecuredApiTest {
             return userId;
         }
 
-        /** The {@code Authorization} header value of a real access token, requested once. */
+        /** The {@code Authorization} header value of a real access token, requested again when it is two minutes old. */
         protected String bearer() {
-            if (token == null) {
+            // Tokens live 5 minutes and a slow machine can take longer than that to run a class.
+            if (token == null || System.currentTimeMillis() - tokenFetchedAt > 120_000) {
                 token = keycloak.accessToken(username);
+                tokenFetchedAt = System.currentTimeMillis();
             }
             return "Bearer " + token;
         }
