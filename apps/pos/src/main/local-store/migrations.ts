@@ -583,4 +583,23 @@ export const MIGRATIONS: readonly Migration[] = [
       ) STRICT;
     `,
   },
+  {
+    version: 15,
+    name: 'create_operation_review',
+    // What the owner decided about an operation or a price change of this register that the core could not apply as it
+    // arrived (E1-19, ADR 0055). The id is the opId of the operation, or the changeId of the price change. It only informs:
+    // a rejected sale is never removed from the register, because the register keeps its own records.
+    sql: `
+      CREATE TABLE operation_review (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('quarantine', 'discrepancy')),
+        resolution TEXT NOT NULL CHECK (resolution IN ('accepted', 'rejected', 'corrected')),
+        operation_type TEXT NOT NULL CHECK (length(operation_type) > 0),
+        reason TEXT,
+        resolved_at TEXT NOT NULL,
+        CHECK (resolution = 'accepted' OR reason IS NOT NULL)
+      ) STRICT;
+    `,
+  },
 ];

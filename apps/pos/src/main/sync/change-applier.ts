@@ -12,6 +12,8 @@ export interface ApplyOutcome {
   readonly productsRemoved: number;
   /** Staff members created or replaced. */
   readonly staffSaved: number;
+  /** Review decisions saved or replaced. */
+  readonly reviewsSaved: number;
   /** The cursor after the page. */
   readonly cursor: string;
 }
@@ -33,6 +35,8 @@ export class ChangeApplier {
   readonly #saveBarcode: StatementSync;
   readonly #saveStaff: StatementSync;
   readonly #removeStaff: StatementSync;
+  readonly #saveReview: StatementSync;
+  readonly #removeReview: StatementSync;
 
   /**
    * @param store the open local database
@@ -69,6 +73,13 @@ export class ChangeApplier {
       WHERE staff_permission.tenant_id = excluded.tenant_id
     `);
     this.#removeStaff = store.prepare('DELETE FROM staff_permission WHERE tenant_id = ? AND id = ?');
+    this.#saveReview = store.prepare(`
+      INSERT INTO operation_review (id, tenant_id, kind, resolution, operation_type, reason, resolved_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, resolution = excluded.resolution, operation_type = excluded.operation_type,
+        reason = excluded.reason, resolved_at = excluded.resolved_at
+      WHERE operation_review.tenant_id = excluded.tenant_id
+    `);
+    this.#removeReview = store.prepare('DELETE FROM operation_review WHERE tenant_id = ? AND id = ?');
   }
 
   /**
@@ -105,7 +116,7 @@ export class ChangeApplier {
       if (isCursorBehind(page.nextCursor, cursor)) {
         throw new SyncProtocolError(`it would move the cursor back from ${cursor} to ${page.nextCursor}`);
       }
-      const totals = { productsSaved: 0, productsRemoved: 0, staffSaved: 0 };
+      const totals = { productsSaved: 0, productsRemoved: 0, staffSaved: 0, reviewsSaved: 0 };
       for (const change of page.changes) {
         this.#applyChange(change, totals);
       }
@@ -114,7 +125,7 @@ export class ChangeApplier {
     });
   }
 
-  #applyChange(change: PullChange, totals: { productsSaved: number; productsRemoved: number; staffSaved: number }): void {
+  #applyChange(change: PullChange, totals: { productsSaved: number; productsRemoved: number; staffSaved: number; reviewsSaved: number }): void {
     if (change.entityType === 'product') {
       if (change.deleted) {
         // The barcodes go with the product (cascade), and the search index follows through its trigger.
@@ -128,6 +139,16 @@ export class ChangeApplier {
         this.#saveBarcode.run(this.#tenantId, code, change.entityId);
       }
       totals.productsSaved += 1;
+      return;
+    }
+    if (change.entityType === 'review_resolution') {
+      if (change.deleted) {
+        this.#removeReview.run(this.#tenantId, change.entityId);
+        return;
+      }
+      const { kind, resolution, operationType, reason, resolvedAt } = change.payload;
+      this.#saveReview.run(change.entityId, this.#tenantId, kind, resolution, operationType, reason, resolvedAt);
+      totals.reviewsSaved += 1;
       return;
     }
     if (change.deleted) {

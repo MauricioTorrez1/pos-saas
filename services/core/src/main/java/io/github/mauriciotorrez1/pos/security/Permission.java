@@ -20,8 +20,10 @@ public enum Permission {
     PRICE_CHANGE("price.change", Role.OWNER),
     /** Load the catalog from a file. */
     CATALOG_IMPORT("catalog.import", Role.OWNER, Role.MANAGER),
-    /** Review the differences between the registers and the core. */
+    /** Review the differences between the registers and the core, and the operations kept in quarantine. */
     DISCREPANCY_VIEW("discrepancy.view", Role.OWNER, Role.MANAGER),
+    /** Resolve them: apply, correct or reject, for good (E1-19). The cashier whose sale is under review does not decide it. */
+    DISCREPANCY_RESOLVE("discrepancy.resolve", Role.OWNER, Role.MANAGER),
     /** Issue an invoice. */
     INVOICE_ISSUE("invoice.issue", Role.OWNER, Role.MANAGER),
     /** Cancel an invoice before the tax authority. */

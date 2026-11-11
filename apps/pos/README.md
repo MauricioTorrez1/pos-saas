@@ -187,6 +187,8 @@ A second loop downloads what changed in the core: products with their prices and
 - **Strict:** a page that does not follow the contract, or an entity kind this version does not know, is refused whole and the cursor stays. A core that is behind the register (restored from a backup) answers `409` and the register starts over from 0.
 - **Pace:** every 30 seconds, with the same exponential backoff after a failure. Same switch as the push: `POS_SYNC_URL`.
 
+- **Review notices:** when the owner resolves something this register sent that the core could not apply (a quarantined operation or a price discrepancy), the pull brings a `review_resolution` change with the decision and the reason, saved in `operation_review`. The register never deletes its own sale because of it ([ADR 0055](../../docs/adr/0055-revision-de-cuarentena-y-discrepancias.md)).
+
 `FakePullTransport` is a core in memory that can drop the network before it answers or in the middle of the answer.
 
 ## Commands

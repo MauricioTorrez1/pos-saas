@@ -17,6 +17,8 @@ public interface ChangePublisher {
     String PRODUCT = "product";
     /** A staff member with the permissions that the register enforces without internet. */
     String STAFF_MEMBER = "staff_member";
+    /** The outcome of a review the owner did of something the register sent, so the register can show it (E1-19). */
+    String REVIEW_RESOLUTION = "review_resolution";
 
     /**
      * Publishes the new state of an entity, whether it was created or changed.

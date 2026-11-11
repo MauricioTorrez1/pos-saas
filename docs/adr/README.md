@@ -54,3 +54,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0053](0053-recepcion-de-cambios-de-precio.md) | Recepción de cambios de precio en el núcleo, sin rechazar lo que aún no se conoce | Aceptada |
 | [0048](0048-cambios-hacia-la-caja-con-cursor.md) | Cambios hacia la caja con cursor numerado por negocio, tombstones y aplicación atómica | Aceptada |
 | [0049](0049-costo-promedio-en-el-servidor.md) | Costo promedio ponderado móvil, recalculado en el servidor desde el libro | Aceptada |
+| [0055](0055-revision-de-cuarentena-y-discrepancias.md) | Revisión de cuarentena y discrepancias con resoluciones de solo agregar y aviso por el pull | Aceptada |

@@ -175,6 +175,48 @@ describe('when the network fails', () => {
   });
 });
 
+describe('what the owner decided about a quarantined sale or a price discrepancy', () => {
+  const OP_ID = '0193a5c0-0000-7000-8000-000000000010';
+  const CHANGE_ID = '0193a5c0-0000-7000-8000-000000000060';
+
+  function review(id: string): { resolution: string; reason: string | null; kind: string } | undefined {
+    return store.prepare('SELECT resolution, reason, kind FROM operation_review WHERE id = ?').get(id) as never;
+  }
+
+  it('shows the register the rejection of a sale with the reason, and the acceptance of a price without one', async () => {
+    core.publishReview(OP_ID, { kind: 'quarantine', resolution: 'rejected', operationType: 'sale.completed', reason: 'Duplicated ticket', resolvedAt: '2026-12-12T10:00:00.000Z' });
+    core.publishReview(CHANGE_ID, { kind: 'discrepancy', resolution: 'accepted', operationType: 'product.price_changed', reason: null, resolvedAt: '2026-12-12T10:01:00.000Z' });
+
+    const outcome = await puller().pullAll();
+
+    expect(outcome).toMatchObject({ changes: 2, cursor: '2', failure: null });
+    expect(review(OP_ID)).toEqual({ resolution: 'rejected', reason: 'Duplicated ticket', kind: 'quarantine' });
+    expect(review(CHANGE_ID)).toEqual({ resolution: 'accepted', reason: null, kind: 'discrepancy' });
+  });
+
+  it('keeps one row per item when the notice is applied again, and a later decision replaces the earlier one', async () => {
+    const rejected = { kind: 'quarantine', resolution: 'rejected', operationType: 'sale.completed', reason: 'Wrong price', resolvedAt: '2026-12-12T10:00:00.000Z' } as const;
+    core.publishReview(OP_ID, rejected);
+    await puller().pullAll();
+    applier.resetCursor();
+    await puller().pullAll();
+    core.publishReview(OP_ID, { ...rejected, resolution: 'corrected', reason: 'Fixed the price' });
+    await puller().pullAll();
+
+    expect(store.prepare('SELECT count(*) AS total FROM operation_review').get()).toEqual({ total: 1 });
+    expect(review(OP_ID)).toMatchObject({ resolution: 'corrected', reason: 'Fixed the price' });
+  });
+
+  it('does not touch the sales or the outbox of the register', async () => {
+    core.publishReview(OP_ID, { kind: 'quarantine', resolution: 'rejected', operationType: 'sale.completed', reason: 'Duplicated ticket', resolvedAt: '2026-12-12T10:00:00.000Z' });
+
+    await puller().pullAll();
+
+    expect(store.prepare('SELECT count(*) AS total FROM sale').get()).toEqual({ total: 0 });
+    expect(store.prepare('SELECT count(*) AS total FROM sync_outbox').get()).toEqual({ total: 0 });
+  });
+});
+
 describe('without getting in the way of the register', () => {
   it('leaves the sync outbox untouched, so selling and sending do not depend on it', async () => {
     const outbox = new SyncOutbox(store, TENANT);

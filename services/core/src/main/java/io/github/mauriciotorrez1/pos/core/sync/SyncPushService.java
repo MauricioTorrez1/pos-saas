@@ -48,6 +48,7 @@ public class SyncPushService {
     private static final Pattern CONSTRAINT = Pattern.compile("constraint \"([A-Za-z0-9_]+)\"");
     private static final Set<String> ENVELOPE_KEYS = Set.of("$schema", "registerId", "operations");
     private static final int MAX_TYPE_LENGTH = 100;
+    private static final tools.jackson.databind.json.JsonMapper JSON_TEXT = tools.jackson.databind.json.JsonMapper.builder().build();
 
     private final Map<String, OperationRecorder> recorders = new HashMap<>();
     private final SyncOperationStore store;
@@ -157,6 +158,31 @@ public class SyncPushService {
             return quarantine(received, integrityReason(violation));
         } catch (DateTimeParseException invalidDate) {
             return quarantine(received, "A timestamp is not a real date");
+        }
+    }
+
+    /**
+     * Applies again an operation that was kept in quarantine, inside the transaction of the caller (E1-19, ADR 0055). It
+     * goes through the same schema check and the same recorder as a push, so a sale accepted from the quarantine is the
+     * very same rows a clean sale would have written. It does not claim the {@code op_id}: the quarantine row already did.
+     *
+     * @param registerId the register that sent the operation
+     * @param operation  the operation, as received or with a corrected payload
+     * @throws OperationRejectedException  if the operation still breaks the schema or a business rule
+     * @throws DataIntegrityViolationException if the data breaks a constraint of the database
+     * @throws IllegalStateException if no transaction is active
+     */
+    void applyReviewed(UUID registerId, JsonNode operation) {
+        Optional<String> problem = problemWith(JSON_TEXT.valueToTree(registerId.toString()), operation);
+        if (problem.isPresent()) {
+            throw new OperationRejectedException(problem.get());
+        }
+        try {
+            RegisterOperation parsed = new RegisterOperation(UUID.fromString(operation.get("opId").asString()), registerId,
+                    operation.get("type").asString(), Instant.parse(operation.get("occurredAt").asString()), operation.get("payload"));
+            recorders.get(parsed.type()).record(parsed);
+        } catch (DateTimeParseException invalidDate) {
+            throw new OperationRejectedException("A timestamp is not a real date");
         }
     }
 

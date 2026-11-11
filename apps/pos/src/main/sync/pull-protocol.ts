@@ -13,6 +13,7 @@ const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 const UNITS: readonly string[] = ['piece', 'meter', 'kilogram', 'liter'];
 const TAX_FACTORS: readonly string[] = ['rate', 'exempt'];
 const ROLES: readonly string[] = ['owner', 'manager', 'cashier'];
+const RESOLVED_AT = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$/;
 const PERMISSION_ID = /^[a-z]+(\.[a-z]+)+$/;
 
 /** A product with its price, as the core publishes it. Its id is the `entityId` of the change. */
@@ -33,12 +34,25 @@ export interface StaffMemberState {
   readonly active: boolean;
 }
 
+/** What the owner decided about something this register sent that the core could not apply as it arrived (E1-19). Its id is the `entityId`. */
+export interface ReviewResolutionState {
+  /** A quarantined operation (its id is the `opId`) or a price discrepancy (its id is the `changeId`). */
+  readonly kind: 'quarantine' | 'discrepancy';
+  readonly resolution: 'accepted' | 'rejected' | 'corrected';
+  readonly operationType: string;
+  /** The owner's words. Always present when the item was rejected or corrected. */
+  readonly reason: string | null;
+  readonly resolvedAt: string;
+}
+
 /** One change of the feed of the core. A deletion has no state: it is a tombstone. */
 export type PullChange =
   | { readonly seq: number; readonly entityType: 'product'; readonly entityId: string; readonly deleted: false; readonly payload: ProductState }
   | { readonly seq: number; readonly entityType: 'product'; readonly entityId: string; readonly deleted: true }
   | { readonly seq: number; readonly entityType: 'staff_member'; readonly entityId: string; readonly deleted: false; readonly payload: StaffMemberState }
-  | { readonly seq: number; readonly entityType: 'staff_member'; readonly entityId: string; readonly deleted: true };
+  | { readonly seq: number; readonly entityType: 'staff_member'; readonly entityId: string; readonly deleted: true }
+  | { readonly seq: number; readonly entityType: 'review_resolution'; readonly entityId: string; readonly deleted: false; readonly payload: ReviewResolutionState }
+  | { readonly seq: number; readonly entityType: 'review_resolution'; readonly entityId: string; readonly deleted: true };
 
 /** One page of the feed. */
 export interface PullPage {
@@ -123,11 +137,29 @@ function parseStaffMember(value: unknown): StaffMemberState {
   };
 }
 
+function parseReviewResolution(value: unknown): ReviewResolutionState {
+  const body = record(value, 'a review resolution payload');
+  const resolution = oneOf<ReviewResolutionState['resolution']>(body.resolution, ['accepted', 'rejected', 'corrected'], 'resolution');
+  if (resolution !== 'accepted' && body.reason === undefined) {
+    throw new SyncProtocolError('a rejected or corrected item has no reason');
+  }
+  if (typeof body.resolvedAt !== 'string' || !RESOLVED_AT.test(body.resolvedAt)) {
+    throw new SyncProtocolError('resolvedAt is not a UTC timestamp');
+  }
+  return {
+    kind: oneOf<ReviewResolutionState['kind']>(body.kind, ['quarantine', 'discrepancy'], 'kind'),
+    resolution,
+    operationType: text(body.operationType, 'operationType', 100),
+    reason: body.reason === undefined ? null : text(body.reason, 'reason', 500),
+    resolvedAt: body.resolvedAt,
+  };
+}
+
 function parseChange(value: unknown, index: number): PullChange {
   const where = `change ${index}`;
   const body = record(value, where);
   const seq = integer(body.seq, `${where} seq`, 1, Number.MAX_SAFE_INTEGER);
-  const entityType = oneOf<'product' | 'staff_member'>(body.entityType, ['product', 'staff_member'], `${where} entityType`);
+  const entityType = oneOf<'product' | 'staff_member' | 'review_resolution'>(body.entityType, ['product', 'staff_member', 'review_resolution'], `${where} entityType`);
   if (typeof body.entityId !== 'string' || !UUID_V7.test(body.entityId)) {
     throw new SyncProtocolError(`${where} has an entityId that is not a UUIDv7`);
   }
@@ -144,9 +176,12 @@ function parseChange(value: unknown, index: number): PullChange {
     }
     return { seq, entityType, entityId, deleted: true };
   }
-  return entityType === 'product'
-    ? { seq, entityType, entityId, deleted: false, payload: parseProduct(body.payload) }
-    : { seq, entityType, entityId, deleted: false, payload: parseStaffMember(body.payload) };
+  if (entityType === 'product') {
+    return { seq, entityType, entityId, deleted: false, payload: parseProduct(body.payload) };
+  }
+  return entityType === 'staff_member'
+    ? { seq, entityType, entityId, deleted: false, payload: parseStaffMember(body.payload) }
+    : { seq, entityType, entityId, deleted: false, payload: parseReviewResolution(body.payload) };
 }
 
 /**

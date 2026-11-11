@@ -15,7 +15,7 @@ JSON schemas and calculation cases shared by the TypeScript register and the Jav
 | `schemas/sync-push-response.schema.json` | The answer of the core: one result per operation, `accepted`, `duplicate`, or `quarantined` |
 | `cases/sync-push.json` | Batches and answers: `requests` and `responses` must pass the schema, and `request_rejections` and `response_rejections` must fail, each naming the schema keyword that rejects it |
 | `schemas/sync-pull-query.schema.json` | The query of `GET /sync/pull`: an opaque `cursor` and a `limit` from 1 to 500 ([ADR 0048](../../docs/adr/0048-cambios-hacia-la-caja-con-cursor.md)) |
-| `schemas/sync-pull-response.schema.json` | A page of changes to the register: `product` (with its price and barcodes) and `staff_member`, each the whole state of the entity, or a tombstone with no payload when it was deleted |
+| `schemas/sync-pull-response.schema.json` | A page of changes to the register: `product` (with its price and barcodes), `staff_member` and `review_resolution` (the decision of the owner about a quarantined operation or a price discrepancy, E1-19), each the whole state of the entity, or a tombstone with no payload when it was deleted |
 | `cases/sync-pull.json` | Queries and pages: `queries` and `responses` must pass, and `query_rejections` and `response_rejections` must fail, each naming the schema keyword that rejects it. Vitest checks them against the schemas and the register's reader; the core runs the same queries and validates its answers with the same schema |
 | `src/cases.test.ts` | Checks that the cases follow their schema, and that the schema rejects bad ones |
 

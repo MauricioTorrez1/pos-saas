@@ -108,9 +108,55 @@
         "nextCursor": "5",
         "hasMore": false
       }
+    },
+    {
+      "name": "The owner rejected a quarantined sale, and the register learns it with the reason",
+      "response": {
+        "changes": [
+          {
+            "seq": 6,
+            "entityType": "review_resolution",
+            "entityId": "0193a5c0-0000-7000-8000-000000000010",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-12T10:00:00.000Z",
+            "payload": { "kind": "quarantine", "resolution": "rejected", "operationType": "sale.completed", "reason": "Duplicated ticket", "resolvedAt": "2026-12-12T10:00:00.000Z" }
+          },
+          {
+            "seq": 7,
+            "entityType": "review_resolution",
+            "entityId": "0193a5c0-0000-7000-8000-000000000060",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-12T10:01:00.000Z",
+            "payload": { "kind": "discrepancy", "resolution": "accepted", "operationType": "product.price_changed", "resolvedAt": "2026-12-12T10:01:00.000Z" }
+          }
+        ],
+        "nextCursor": "7",
+        "hasMore": false
+      }
     }
   ],
   "response_rejections": [
+    {
+      "name": "A rejection with no reason",
+      "reason": "required",
+      "response": {
+        "changes": [
+          {
+            "seq": 6,
+            "entityType": "review_resolution",
+            "entityId": "0193a5c0-0000-7000-8000-000000000010",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-12T10:00:00.000Z",
+            "payload": { "kind": "quarantine", "resolution": "rejected", "operationType": "sale.completed", "resolvedAt": "2026-12-12T10:00:00.000Z" }
+          }
+        ],
+        "nextCursor": "6",
+        "hasMore": false
+      }
+    },
     {
       "name": "A deletion that still carries a payload",
       "reason": "not",
