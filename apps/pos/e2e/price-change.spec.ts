@@ -111,6 +111,8 @@ test('charges a sale rung up before the price changed with the prices it showed 
   await page.getByRole('textbox', { name: 'Precio nuevo (IVA incluido)' }).fill('139.20');
   await page.keyboard.press('F2');
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  // The keyboard comes back to the lookup box a moment after the dialog closes, and F12 typed before that is lost.
+  await expect(lookupBox(page)).toBeFocused();
 
   await page.keyboard.press('F12');
   await expect(page.getByRole('dialog', { name: 'Cobrar' })).toBeVisible();
