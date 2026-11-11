@@ -22,6 +22,7 @@ public final class EndpointPermissions {
     public static final List<EndpointRule> RULES = List.of(
             authenticated(GET, "/me"),
             requires(POST, "/sync/push", Permission.SYNC_PUSH),
+            requires(GET, "/sync/pull", Permission.SYNC_PULL),
             requires(PUT, "/users/{id}/role", Permission.USER_ROLE_CHANGE),
             requires(PUT, "/users/{id}/pin", Permission.PIN_SET),
             requires(POST, "/users/{id}/pin/verify", Permission.PIN_VERIFY),
