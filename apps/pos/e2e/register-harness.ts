@@ -367,9 +367,10 @@ export const TEST_OWNER = { name: 'Mauricio', pin: '4321' } as const;
  * a sale left pending is covering it.
  *
  * @param register the running app
+ * @param options.hasPendingSales true when a question about a sale left pending holds the keyboard, so the lookup box does not
  * @returns the window, signed in
  */
-export async function signInWindow(register: ElectronApplication): Promise<Page> {
+export async function signInWindow(register: ElectronApplication, options: { readonly hasPendingSales?: boolean } = {}): Promise<Page> {
   const page = await register.firstWindow();
   const welcome = page.getByRole('heading', { name: 'Bienvenido' });
   const whoIsCharging = page.getByRole('heading', { name: '¿Quién cobra?' });
@@ -385,6 +386,10 @@ export async function signInWindow(register: ElectronApplication): Promise<Page>
   }
   await expect(page.getByRole('combobox', { name: 'Buscar producto' })).toBeVisible();
   await openCashIfClosed(page);
+  if (options.hasPendingSales !== true) {
+    // The keyboard reaches the lookup box a moment after it shows, and a scan or a key typed before that would be lost.
+    await expect(page.getByRole('combobox', { name: 'Buscar producto' })).toBeFocused();
+  }
   return page;
 }
 
@@ -397,7 +402,5 @@ async function openCashIfClosed(page: Page): Promise<void> {
     await page.keyboard.press('F2');
     await expect(state).toHaveText('Caja abierta');
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    // The keyboard comes back to the lookup box a moment later, and a scan typed before that would be lost.
-    await expect(page.getByRole('combobox', { name: 'Buscar producto' })).toBeFocused();
   }
 }

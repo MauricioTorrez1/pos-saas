@@ -63,12 +63,10 @@ function total(page: Page): Locator {
   return page.getByRole('status', { name: 'Total', exact: true });
 }
 
-/** The keys of the finished sale start working a moment after it shows, so Enter is retried until the dialog closes. */
+/** Enter on the finished sale starts the next one, and the dialog going away is the proof that it did. */
 async function closeDone(page: Page): Promise<void> {
-  await expect(async () => {
-    await page.keyboard.press('Enter');
-    await expect(payment(page)).toHaveCount(0, { timeout: 1000 });
-  }).toPass();
+  await page.keyboard.press('Enter');
+  await expect(payment(page)).toHaveCount(0);
 }
 
 /** A scanner is a keyboard that types a whole code at once and ends it with Enter. */
@@ -221,7 +219,7 @@ test('asks for the payment method of a sale left pending when the register is ki
   await forceClose(await readMainPid(first.register));
 
   const reopened = await launch();
-  const page = await signInWindow(reopened);
+  const page = await signInWindow(reopened, { hasPendingSales: true });
   const question = page.getByRole('dialog', { name: '¿Se cobró esta venta?' });
   await expect(question).toBeVisible();
   await page.keyboard.press('F2');
@@ -260,11 +258,8 @@ test('numbers the sales and prints the last ticket again with F8 (RF-018)', asyn
     await page.keyboard.press('F2');
     await expect(payment(page)).toContainText(`Folio ${folio}`);
     if (folio === 'T1-000002') {
-      // The keys start working a moment after the dialog shows, so the press is retried until the reprint answers.
-      await expect(async () => {
-        await page.keyboard.press('F8');
-        await expect(payment(page)).toContainText('Ticket T1-000002 reimpreso.', { timeout: 1000 });
-      }).toPass();
+      await page.keyboard.press('F8');
+      await expect(payment(page)).toContainText('Ticket T1-000002 reimpreso.');
     }
     await closeDone(page);
     await expect(lookupBox(page)).toBeFocused();
@@ -307,10 +302,10 @@ test('sells an item that is not in the catalog with a typed price, writes who ap
   await page.keyboard.press('F2');
   await expect(total(page)).toHaveText('$25.00');
 
-  await expect(async () => {
-    await page.keyboard.press('F12');
-    await expect(payment(page)).toBeVisible({ timeout: 1000 });
-  }).toPass();
+  // The keyboard goes back to the lookup box after the dialog of the item closes, and F12 is read there.
+  await expect(lookupBox(page)).toBeFocused();
+  await page.keyboard.press('F12');
+  await expect(payment(page)).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Efectivo recibido' })).toBeFocused();
   await page.keyboard.type('25');
   await page.keyboard.press('F2');

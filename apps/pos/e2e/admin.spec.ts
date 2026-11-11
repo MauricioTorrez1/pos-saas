@@ -61,10 +61,8 @@ test('loads the catalog and the stock of Eleventa, and then sells from it (RF-03
   await expect(result).toContainText('Productos nuevos2');
   await expect(result).toContainText('$1,585.00');
   await expect(page.getByRole('alert')).toContainText('Línea 4: El código está vacío');
-  await expect(async () => {
-    await page.keyboard.press('Enter');
-    await expect(page.getByRole('heading', { name: 'Administración' })).toBeVisible({ timeout: 1000 });
-  }).toPass();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Administración' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: 'Buscar producto' })).toBeFocused();

@@ -1,5 +1,5 @@
 import { formatCents } from '@pos-saas/money';
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 
 import type { CheckoutProblem, PendingSale, PosApi } from '../../shared/pos-api';
 import { describePlan } from './amount-input';
@@ -136,7 +136,7 @@ interface DoneViewProps {
 
 /** Keeps the change on the screen while it is handed over. Enter or Esc starts the next sale, and F2 does not, so a double tap cannot hide the change. */
 function DoneView({ folio, changeCents, problems, reprintMessage, onReprint, onContinue }: DoneViewProps): ReactElement {
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Enter' || event.key === 'Escape') {
         event.preventDefault();

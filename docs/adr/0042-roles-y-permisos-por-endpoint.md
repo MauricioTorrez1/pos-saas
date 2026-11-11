@@ -39,3 +39,4 @@ El núcleo ya sabe quién llama (token de Keycloak) y de qué negocio es (ADR 00
 - `PATCH /products/{id}` exige `product.write`; cuando F0-17 permita cambiar el precio por ahí, el servicio debe exigir además `price.change`. Queda anotado para esa tarea.
 - Las acciones que dependen del dato y no solo del rol (por ejemplo un cajero que solo verifica su propio PIN) las revisa el servicio del módulo, no la tabla.
 - Las preguntas abiertas para la familia están al final de `docs/permisos.md`; sus respuestas pueden cambiar el enum sin tocar nada más.
+- Nota (F0-26): `GET /me` devuelve también `role` (el de `app_user`, o `null` sin usuario activo) para que el panel y la caja muestren y decidan con el mismo rol que usa esta autorización. Sigue siendo una ayuda para la pantalla: el servidor decide.

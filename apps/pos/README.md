@@ -219,5 +219,16 @@ Run the crash drill. The register opens and saves test sales to a temporary data
 pnpm --filter @pos-saas/pos crash-drill
 ```
 
+## Writing interface tests without timing
+A test that passes by luck of timing fails on a slow CI runner. These rules keep the Vitest and Playwright tests deterministic:
+
+- **Wait for what the person would see, never for time.** Use `findBy…`, `waitFor` with a condition, or the web-first assertions of Playwright (`expect(locator).toBeFocused()`). Do not add `setTimeout`, fixed sleeps, or retry loops (`toPass`) that press a key again until it works: a key pressed twice can act twice.
+- **A key is read where the focus is.** The lookup box takes the keyboard back after a dialog closes, a moment after the dialog is gone. Before pressing a key that the sale screen reads (F3, F4, F12 and the like), wait for the lookup box to be focused. `signInWindow` already does it.
+- **Key listeners on the window are layout effects.** `useWindowKeys` and the done screens listen from the moment the screen is in the page. With a passive `useEffect` the listener arrives after the paint, so a key pressed right when the screen shows is lost. `use-window-keys.test.tsx` reproduces it without `act`.
+- **A first answer must not undo what the person did meanwhile.** The first `getCashStatus` used to close the cash dialog that F3 had just opened. An effect that loads data may open something, but it must not close what is already open.
+- **Do not raise a timeout to hide a race.** The default of 1000 ms for `waitFor` and 5000 ms for Playwright is enough when the condition is right. If it fails only under load, find the missing wait.
+
+To look for a flaky test, run the suite many times with the CPU busy: start busy loops (`node -e "while(true){}"`, about as many as half of the cores) and repeat `pnpm --filter @pos-saas/pos exec vitest run --project renderer`. A race that CI shows once in a hundred runs shows up in a few runs this way.
+
 ## Continuous integration
 The `TypeScript` job runs these tests on Linux with a virtual display (`xvfb-run`). It also lifts the Ubuntu 24.04 restriction on user namespaces, so the tests run with the sandbox of Electron on rather than with `--no-sandbox`.

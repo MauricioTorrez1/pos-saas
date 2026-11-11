@@ -128,12 +128,15 @@ function RegisterScreen({ posApi, pricingApi, user, appearance, onAppearanceSave
     posApi.getCashStatus().then(setCash, () => setCash(null));
   }, [posApi]);
 
-  // A closed register cannot sell, so the first thing a cashier sees is how to open it.
+  // A closed register cannot sell, so the first thing a cashier sees is how to open it. An open register leaves the dialog
+  // alone: the cashier may have asked for it (F3) before the first answer came, and that answer must not close it.
   useEffect(() => {
     posApi.getCashStatus().then(
       (status) => {
         setCash(status);
-        setIsEditingCash(status.session === null);
+        if (status.session === null) {
+          setIsEditingCash(true);
+        }
       },
       () => setCash(null),
     );

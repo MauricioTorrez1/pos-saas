@@ -151,4 +151,16 @@ abstract class SecuredApiTest {
                 : request.contentType(MediaType.APPLICATION_JSON).body(body).exchange().expectBody(String.class).returnResult();
         return new Reply(result.getStatus().value(), result.getResponseBody(), result.getResponseHeaders());
     }
+
+    /**
+     * Calls {@code GET} on the API and returns the JSON body.
+     *
+     * @param actor who calls
+     * @param path  the path
+     * @return the response body
+     */
+    protected String bodyOf(Actor actor, String path) {
+        return client.get().uri(path).header("Authorization", actor.bearer())
+                .exchange().expectBody(String.class).returnResult().getResponseBody();
+    }
 }

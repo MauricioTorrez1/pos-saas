@@ -1,5 +1,5 @@
 import { formatCents } from '@pos-saas/money';
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 
 import type { PendingSale } from '../../shared/pos-api';
 import { PaymentForm } from '../checkout/PaymentForm';
@@ -62,7 +62,7 @@ export function PendingSaleDialog({ sales, onAnswer }: PendingSaleDialogProps): 
 
   // On the window, because a click on the backdrop leaves the keyboard outside the dialog. It runs after every render
   // so the keys always answer for the sale on the screen.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (step !== 'ask') {
         return;

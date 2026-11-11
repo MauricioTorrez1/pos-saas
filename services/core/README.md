@@ -89,6 +89,20 @@ Records go to the module that owns them through `OperationRecorder` (`pos.ingest
 curl -X POST http://localhost:8080/sync/push   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   --data @batch.json   # same file twice: the second answer has only "duplicate"
 ```
 
+## Cash cut reports by e-mail
+When a cut is stored, the core publishes `CashCutRecorded` in the same transaction ([ADR 0052](../../docs/adr/0052-reporte-del-corte-por-correo.md), RF-028). An asynchronous listener in `reporting` e-mails the owner a Spanish summary: sales and refunds by payment method, cash taken out or in, expected against counted, and the difference. It holds no customer data. A slow or dead provider never delays `POST /sync/push`.
+
+- **Once per cut.** `cut_report_delivery` has `UNIQUE (tenant_id, cut_id)` and records the state (`pending`, `sending`, `sent`, `failed`, `gave_up`, `rejected`, `skipped`); the call to the provider carries `Idempotency-Key: cut-report-<cutId>`.
+- **Bounded retries.** Up to 5 attempts with a wait that doubles from 1 minute; the outbox offers pending events again every 30 seconds and after a restart.
+- **Provider.** `EmailSender` is implemented with the [Resend](https://resend.com) HTTPS API (free tier). Without a key the core starts, logs a warning, and each report is `skipped`.
+- **Recipient.** `tenant.owner_email`, or `REPORT_DEFAULT_RECIPIENT` until the panel can set it.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `RESEND_API_KEY` | none | API key of the e-mail provider; only from the environment |
+| `RESEND_FROM` | none | Verified sender, such as `Reportes <reportes@your-domain.com>` |
+| `REPORT_DEFAULT_RECIPIENT` | none | Recipient when the business has no `owner_email` |
+
 ## Invoicing (Facturapi)
 Other modules depend on the `FiscalInvoicing` interface (`invoicing` root package) and never on the client, so tests use a fake ([ADR 0041](../../docs/adr/0041-cliente-de-facturapi.md)). It creates receivers, stamps invoices (including the `global` object and credit notes), reads and cancels them, and downloads PDF and XML. Amounts use the scales of ADR 0011.
 

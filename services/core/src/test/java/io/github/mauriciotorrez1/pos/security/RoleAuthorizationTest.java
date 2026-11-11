@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.HttpMethod;
 
@@ -50,6 +51,19 @@ class RoleAuthorizationTest extends SecuredApiTest {
         } else {
             assertThat(status).as("%s %s as %s", rule.method(), rule.pattern(), role).isEqualTo(403);
         }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Role.class)
+    void meReturnsTheRoleStoredForTheUser(Role role) {
+        assertThat(bodyOf(actors.get(role), "/me")).contains("\"role\":\"" + role.value() + "\"");
+    }
+
+    @Test
+    void meReturnsNoRoleWhenTheTokenMatchesNoUserButKeepsTheTenant() {
+        Actor ghost = seedLoginWithoutUser(tenant);
+
+        assertThat(bodyOf(ghost, "/me")).contains("\"tenantId\":\"" + tenant + "\"").contains("\"role\":null");
     }
 
     @Test
