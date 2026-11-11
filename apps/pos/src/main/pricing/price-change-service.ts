@@ -7,6 +7,7 @@ import type { AuditLog } from '../audit/audit-log';
 import type { AuthService } from '../auth/auth-service';
 import type { LocalStore } from '../local-store/local-store';
 import type { ProductCatalog } from '../local-store/product-catalog';
+import { isRefusal, OwnerGate } from '../auth/owner-gate';
 import { SyncOutbox } from '../sync/sync-outbox';
 import { uuidV7 } from '../uuid-v7';
 
@@ -33,6 +34,7 @@ export class PriceChangeService implements PriceHistoryReader {
   readonly #auth: Pick<AuthService, 'currentUser' | 'authorizeWithOwnerPin'>;
   readonly #catalog: ProductCatalog;
   readonly #audit: Pick<AuditLog, 'record'>;
+  readonly #gate: OwnerGate;
   readonly #outbox: SyncOutbox;
   readonly #lastCost: StatementSync;
   readonly #insertChange: StatementSync;
@@ -57,11 +59,14 @@ export class PriceChangeService implements PriceHistoryReader {
     this.#auth = auth;
     this.#catalog = catalog;
     this.#audit = audit;
+    this.#gate = new OwnerGate(auth, audit);
     this.#outbox = new SyncOutbox(store, tenantId);
-    // The same last known cost the report of the day uses for the margin.
+    // The cost the owner typed on the product wins; without one, the last known cost of the ledger, as in the report of the day.
     this.#lastCost = store.prepare(`
-      SELECT unit_cost_e6 AS unitCostE6 FROM stock_movement
-      WHERE tenant_id = ? AND product_id = ? AND unit_cost_e6 IS NOT NULL ORDER BY rowid DESC LIMIT 1
+      SELECT coalesce(
+        (SELECT unit_cost_e6 FROM product WHERE tenant_id = ?1 AND id = ?2),
+        (SELECT unit_cost_e6 FROM stock_movement WHERE tenant_id = ?1 AND product_id = ?2 AND unit_cost_e6 IS NOT NULL ORDER BY rowid DESC LIMIT 1)
+      ) AS unitCostE6
     `);
     this.#insertChange = store.prepare(`
       INSERT INTO product_price_change
@@ -85,8 +90,8 @@ export class PriceChangeService implements PriceHistoryReader {
     if (product === null) {
       return null;
     }
-    const cost = this.#lastCost.get(this.#tenantId, productId) as unknown as { unitCostE6: number } | undefined;
-    return { product, lastCostE6: cost?.unitCostE6 ?? null };
+    const cost = this.#lastCost.get(this.#tenantId, productId) as unknown as { unitCostE6: number | null };
+    return { product, lastCostE6: cost.unitCostE6 };
   }
 
   /** @inheritDoc */
@@ -123,8 +128,15 @@ export class PriceChangeService implements PriceHistoryReader {
       return { status: 'unchanged' };
     }
 
-    const authorization = this.#authorize(user.id, user.role, request, product.name);
-    if ('status' in authorization) {
+    const authorization = this.#gate.authorize({
+      user,
+      ownerPin: request.ownerPin,
+      deniedAction: 'product.price_change_denied',
+      entity: 'product',
+      entityId: productId,
+      deniedDetail: `tried ${product.name} from ${previousUnitPriceE4} to ${newUnitPriceE4} ten-thousandths`,
+    });
+    if (isRefusal(authorization)) {
       return authorization;
     }
 
@@ -148,35 +160,5 @@ export class PriceChangeService implements PriceHistoryReader {
       );
     });
     return { status: 'changed', product: { ...product, unitPriceE4: newUnitPriceE4 }, previousUnitPriceE4 };
-  }
-
-  /** The owner who is signed in approves by being there. A cashier needs the PIN of an owner, and a refusal is written down. */
-  #authorize(
-    userId: string,
-    role: 'owner' | 'cashier',
-    request: ChangePriceRequest,
-    productName: string,
-  ): { ownerId: string } | Extract<ChangePriceResult, { status: 'authorization_required' | 'wrong_pin' | 'locked' }> {
-    if (role === 'owner') {
-      return { ownerId: userId };
-    }
-    const refuse = <Refusal extends Extract<ChangePriceResult, { status: 'authorization_required' | 'wrong_pin' | 'locked' }>>(refusal: Refusal): Refusal => {
-      this.#audit.record({
-        userId,
-        action: 'product.price_change_denied',
-        entity: 'product',
-        entityId: request.productId,
-        detail: `${refusal.status}: tried ${productName} from ${request.previousUnitPriceE4} to ${request.newUnitPriceE4} ten-thousandths`,
-      });
-      return refusal;
-    };
-    if (request.ownerPin === undefined || request.ownerPin === '') {
-      return refuse({ status: 'authorization_required' });
-    }
-    const result = this.#auth.authorizeWithOwnerPin(request.ownerPin);
-    if (result.status === 'ok') {
-      return { ownerId: result.owner.id };
-    }
-    return refuse(result);
   }
 }

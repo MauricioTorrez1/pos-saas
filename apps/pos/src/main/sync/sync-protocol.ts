@@ -7,6 +7,7 @@ export const SYNC_OPERATION_TYPES = [
   'cash_session.closed',
   'stock.adjusted',
   'product.price_changed',
+  'product.created',
 ] as const;
 
 /** One of the kinds of operation. */

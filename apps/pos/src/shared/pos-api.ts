@@ -44,6 +44,7 @@ export const IPC_CHANNELS = {
   searchProducts: 'catalog:search',
   getPriceInfo: 'catalog:get-price-info',
   changePrice: 'catalog:change-price',
+  createProduct: 'catalog:create-product',
   getAppearance: 'appearance:get',
   saveAppearance: 'appearance:save',
   savePendingSale: 'sales:save-pending',
