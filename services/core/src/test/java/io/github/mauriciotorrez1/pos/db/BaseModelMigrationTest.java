@@ -41,7 +41,6 @@ class BaseModelMigrationTest {
         String latestState = jdbc.queryForObject("""
                 SELECT success::text FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1
                 """, String.class);
-<<<<<<< HEAD
         assertThat(tables).containsExactly("app_user", "audit_log", "branch", "cash_cut", "cash_movement", "cash_session", "catalog_change_counter",
                 "cut_report_delivery", "enrollment_code", "event_publication", "product", "product_code", "product_presentation", "product_price_change", "register", "register_device",
                 "sale", "sale_line", "sale_payment", "sale_return", "sale_return_line", "sale_return_refund", "stock_movement", "stock_receipt",
