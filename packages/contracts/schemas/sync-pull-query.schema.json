@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GET /sync/pull query",
+  "description": "The query string of the pull, as an object. cursor is the nextCursor of the last page the register applied, kept as received and never computed with; it is absent the first time and means 0. limit is the page size. The business is never in the query: it comes from the token (ADR 0039). Any other parameter is rejected with 400 (ADR 0048).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "cursor": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,15})$" },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500 }
+  }
+}

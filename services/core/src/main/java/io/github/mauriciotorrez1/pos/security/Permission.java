@@ -31,7 +31,9 @@ public enum Permission {
     /** Change the role of a user. */
     USER_ROLE_CHANGE("user.role.change", Role.OWNER),
     /** Upload the operations of a register (E1-17). The register acts as the staff member that signed in on it. */
-    SYNC_PUSH("sync.push", Role.OWNER, Role.MANAGER, Role.CASHIER);
+    SYNC_PUSH("sync.push", Role.OWNER, Role.MANAGER, Role.CASHIER),
+    /** Download what changed in the catalog, prices and permissions since the last time (E1-18). */
+    SYNC_PULL("sync.pull", Role.OWNER, Role.MANAGER, Role.CASHIER);
 
     private final String id;
     private final Set<Role> roles;

@@ -103,6 +103,23 @@ When a cut is stored, the core publishes `CashCutRecorded` in the same transacti
 | `RESEND_FROM` | none | Verified sender, such as `Reportes <reportes@your-domain.com>` |
 | `REPORT_DEFAULT_RECIPIENT` | none | Recipient when the business has no `owner_email` |
 
+## Changes for the registers
+`GET /sync/pull?cursor=&limit=` gives a register what changed in the catalog, prices and permissions since its cursor ([ADR 0048](../../docs/adr/0048-cambios-hacia-la-caja-con-cursor.md), RF-023). The business comes from the token and row-level security; any parameter other than `cursor` and `limit` is a `400`. It needs the `sync.pull` permission.
+
+Every change is a row of `sync_change`, numbered per business by `seq`. Taking the next number locks the business row in `sync_change_counter` until the transaction ends, so numbers follow the order of the commits and a change still in flight can never end up behind a cursor. A deletion is a tombstone (`deleted: true`, no `payload`); the table is append-only.
+
+| Answer | Meaning |
+| --- | --- |
+| `200` with `changes`, `nextCursor`, `hasMore` | Up to `limit` changes (1 to 500, default 200) after the cursor, in order. `nextCursor` is what to send next; with nothing new it is the same cursor. The same cursor gives the same changes |
+| `400` | A cursor that is not the `nextCursor` of an earlier answer (or `0`), a `limit` out of range, or an unknown parameter |
+| `409` `cursor_ahead` | The cursor is beyond the last change of the business, as after a restore from a backup: start again from `0` |
+
+Modules publish changes through `ChangePublisher` (`pos.feed`), inside the same transaction that changes their data: `publish(type, id, state)` or `publishDeletion(type, id)`. Types today: `product` (with its price and barcodes) and `staff_member`. The products module (F0-16) must call it.
+
+```bash
+curl "http://localhost:8080/sync/pull?cursor=0&limit=100" -H "Authorization: Bearer $TOKEN"
+```
+
 ## Invoicing (Facturapi)
 Other modules depend on the `FiscalInvoicing` interface (`invoicing` root package) and never on the client, so tests use a fake ([ADR 0041](../../docs/adr/0041-cliente-de-facturapi.md)). It creates receivers, stamps invoices (including the `global` object and credit notes), reads and cancels them, and downloads PDF and XML. Amounts use the scales of ADR 0011.
 

@@ -1,0 +1,218 @@
+{
+  "queries": [
+    { "name": "First pull, nothing stored yet", "query": "" },
+    { "name": "Explicit start", "query": "cursor=0" },
+    { "name": "Resume with a cursor and a page size", "query": "cursor=1042&limit=50" },
+    { "name": "Largest page", "query": "limit=500" }
+  ],
+  "query_rejections": [
+    { "name": "A cursor that is not a number", "query": "cursor=abc", "reason": "pattern" },
+    { "name": "A negative cursor", "query": "cursor=-1", "reason": "pattern" },
+    { "name": "A cursor with leading zeros", "query": "cursor=007", "reason": "pattern" },
+    { "name": "A page of zero", "query": "limit=0", "reason": "minimum" },
+    { "name": "A page above the limit", "query": "limit=501", "reason": "maximum" },
+    { "name": "A page size that is not a number", "query": "limit=many", "reason": "type" },
+    { "name": "A parameter that names another business", "query": "tenantId=0193a5c0-0000-7000-8000-0000000000aa", "reason": "additionalProperties" }
+  ],
+  "responses": [
+    {
+      "name": "Nothing new: the cursor stays where it was",
+      "response": { "changes": [], "nextCursor": "1042", "hasMore": false }
+    },
+    {
+      "name": "A new product, a price change and a staff member, with more waiting",
+      "response": {
+        "changes": [
+          {
+            "seq": 1,
+            "entityType": "product",
+            "entityId": "0193a5c0-0000-7000-8000-000000000050",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-10T18:21:04.123Z",
+            "payload": {
+              "name": "Cable THW calibre 12",
+              "baseUnit": "meter",
+              "unitPriceE4": 386667,
+              "taxFactor": "rate",
+              "taxRateBp": 1600,
+              "barcodes": ["CBL-12-NEG"]
+            }
+          },
+          {
+            "seq": 2,
+            "entityType": "product",
+            "entityId": "0193a5c0-0000-7000-8000-000000000050",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-10T18:25:00.000Z",
+            "payload": {
+              "name": "Cable THW calibre 12",
+              "baseUnit": "meter",
+              "unitPriceE4": 400000,
+              "taxFactor": "rate",
+              "taxRateBp": 1600,
+              "barcodes": ["CBL-12-NEG"]
+            }
+          },
+          {
+            "seq": 3,
+            "entityType": "staff_member",
+            "entityId": "0193a5c0-0000-7000-8000-000000000040",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-10T18:30:00.000Z",
+            "payload": {
+              "displayName": "Cajero de la tarde",
+              "role": "cashier",
+              "permissions": ["product.read", "sync.push", "sync.pull"],
+              "active": true
+            }
+          }
+        ],
+        "nextCursor": "3",
+        "hasMore": true
+      }
+    },
+    {
+      "name": "A product that was taken out of the catalog is a tombstone with no payload",
+      "response": {
+        "changes": [
+          {
+            "seq": 4,
+            "entityType": "product",
+            "entityId": "0193a5c0-0000-7000-8000-000000000050",
+            "deleted": true,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-11T09:00:00.000Z"
+          }
+        ],
+        "nextCursor": "4",
+        "hasMore": false
+      }
+    },
+    {
+      "name": "An exempt product with a rate of zero",
+      "response": {
+        "changes": [
+          {
+            "seq": 5,
+            "entityType": "product",
+            "entityId": "0193a5c0-0000-7000-8000-000000000051",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-11T09:05:00Z",
+            "payload": { "name": "Libro de texto", "baseUnit": "piece", "unitPriceE4": 2500000, "taxFactor": "exempt", "taxRateBp": 0, "barcodes": [] }
+          }
+        ],
+        "nextCursor": "5",
+        "hasMore": false
+      }
+    }
+  ],
+  "response_rejections": [
+    {
+      "name": "A deletion that still carries a payload",
+      "reason": "not",
+      "response": {
+        "changes": [
+          {
+            "seq": 4,
+            "entityType": "product",
+            "entityId": "0193a5c0-0000-7000-8000-000000000050",
+            "deleted": true,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-11T09:00:00.000Z",
+            "payload": { "name": "Cable" }
+          }
+        ],
+        "nextCursor": "4",
+        "hasMore": false
+      }
+    },
+    {
+      "name": "An update without a payload",
+      "reason": "required",
+      "response": {
+        "changes": [
+          {
+            "seq": 4,
+            "entityType": "product",
+            "entityId": "0193a5c0-0000-7000-8000-000000000050",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-11T09:00:00.000Z"
+          }
+        ],
+        "nextCursor": "4",
+        "hasMore": false
+      }
+    },
+    {
+      "name": "An entity type the register does not know",
+      "reason": "enum",
+      "response": {
+        "changes": [
+          {
+            "seq": 4,
+            "entityType": "loyalty_card",
+            "entityId": "0193a5c0-0000-7000-8000-000000000050",
+            "deleted": true,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-11T09:00:00.000Z"
+          }
+        ],
+        "nextCursor": "4",
+        "hasMore": false
+      }
+    },
+    {
+      "name": "A product price with decimals",
+      "reason": "type",
+      "response": {
+        "changes": [
+          {
+            "seq": 1,
+            "entityType": "product",
+            "entityId": "0193a5c0-0000-7000-8000-000000000050",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-10T18:21:04.123Z",
+            "payload": { "name": "Cable", "baseUnit": "meter", "unitPriceE4": 38.5, "taxFactor": "rate", "taxRateBp": 1600, "barcodes": [] }
+          }
+        ],
+        "nextCursor": "1",
+        "hasMore": false
+      }
+    },
+    {
+      "name": "An exempt product with a rate",
+      "reason": "const",
+      "response": {
+        "changes": [
+          {
+            "seq": 1,
+            "entityType": "product",
+            "entityId": "0193a5c0-0000-7000-8000-000000000050",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-10T18:21:04.123Z",
+            "payload": { "name": "Libro", "baseUnit": "piece", "unitPriceE4": 100, "taxFactor": "exempt", "taxRateBp": 1600, "barcodes": [] }
+          }
+        ],
+        "nextCursor": "1",
+        "hasMore": false
+      }
+    },
+    {
+      "name": "A cursor that is a number instead of a string",
+      "reason": "type",
+      "response": { "changes": [], "nextCursor": 7, "hasMore": false }
+    },
+    {
+      "name": "A page without hasMore",
+      "reason": "required",
+      "response": { "changes": [], "nextCursor": "7" }
+    }
+  ]
+}

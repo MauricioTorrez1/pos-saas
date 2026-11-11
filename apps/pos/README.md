@@ -9,7 +9,7 @@ Electron 45 runs on Windows 10 and later, which covers the machines of [ADR 0002
 | --- | --- | --- |
 | `src/main/` | Window, navigation limits, answers to the screen, and the local database | Main process, with Node |
 | `src/main/hardware/` | Device interfaces, and their fakes in `fakes/` | Main process, with Node |
-| `src/main/sync/` | Outbox, batch sender with retries, and the transport to the core | Main process, with Node |
+| `src/main/sync/` | Outbox, batch sender with retries, change puller and applier, and the transport to the core | Main process, with Node |
 | `src/main/checkout/` | Checkout, which drives the devices in the order of ADR 0010, and the states of a sale | Main process, with Node |
 | `src/preload/` | The `window.pos` bridge | Sandboxed preload script |
 | `src/renderer/` | React screen | Sandboxed renderer, without Node |
@@ -177,6 +177,17 @@ Every sale, return, cash movement, cut, stock adjustment, and price change is al
 - **Switch:** the loop only runs when `POS_SYNC_URL` points at the core, such as `https://core.example.com`. Without it the register sells the same and keeps its operations in the outbox. Sign-in for the register arrives with its enrollment (F0-15).
 
 The tests use `FakeSyncTransport`, a core in memory that can drop the network before a batch arrives or after it was stored but before the answer comes back.
+
+### Changes from the core
+A second loop downloads what changed in the core: products with their prices and barcodes, and the permissions of each staff member ([ADR 0048](../../docs/adr/0048-cambios-hacia-la-caja-con-cursor.md), RF-023). It never touches a sale or the outbox.
+
+- **Cursor:** the register keeps in `sync_pull_state` the number of the last change it applied, as text, and asks `GET /sync/pull?cursor=...&limit=200` for what came after. The same cursor always gives the same changes.
+- **One transaction per page:** `ChangeApplier` writes the changes of a page and the new cursor together. If anything fails halfway, nothing stays and the cursor does not move, so the next run asks for the same page.
+- **Safe to repeat:** every change is the whole state of its entity, so applying a page twice leaves the same data. A deleted product arrives as a tombstone and is removed with its barcodes.
+- **Strict:** a page that does not follow the contract, or an entity kind this version does not know, is refused whole and the cursor stays. A core that is behind the register (restored from a backup) answers `409` and the register starts over from 0.
+- **Pace:** every 30 seconds, with the same exponential backoff after a failure. Same switch as the push: `POS_SYNC_URL`.
+
+`FakePullTransport` is a core in memory that can drop the network before it answers or in the middle of the answer.
 
 ## Commands
 Run them from the repository root. The first time, Electron downloads its binary, about 150 MiB.
