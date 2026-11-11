@@ -1,6 +1,6 @@
 # Entrega 1: Reemplazar a Eleventa
 
-Duración estimada: 166 horas. Reparto: Claude escribe y explica; tú revisas, pruebas y apruebas.
+Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, pruebas y apruebas.
 
 ## Hito E1-A: Caja base
 
@@ -175,6 +175,16 @@ Duración estimada: 166 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** E1-17, E1-39 · **Estimación:** 3 h
 - **Autoevaluación:** (1) ¿Por qué no se rechaza un cambio de un producto desconocido? (2) ¿Qué marca una discrepancia? (3) ¿Por qué el registro no se actualiza?
 - **Entrevista:** (1) ¿Cómo garantizas idempotencia con dos llaves? (2) ¿Cómo evitas que dos escritores concurrentes se pisen?
+
+### E1-41 · Credencial de dispositivo en `/sync/push`
+- **Objetivo:** solo una caja enrolada puede enviar, y solo sus propios lotes; una caja perdida se da de baja y deja de enviar.
+- **Conceptos:** [Autenticación de dispositivos], [Revocación de credenciales]
+- **Claude / tú:** Claude escribe el filtro, la revocación y las pruebas, y el cambio mínimo de la caja para guardar y enviar la credencial. Tú das de baja una caja de prueba y compruebas que deja de enviar.
+- **Pruebas:** Testcontainers con las pruebas de E1-17 reescritas con la credencial real, y casos de credencial válida, inválida, revocada, de otro negocio, `registerId` que no coincide y aislamiento entre negocios; Vitest del transporte de la caja.
+- **Criterios:** cumple RF-021; ADR 0054. Retira el permiso temporal `sync.push` por rol.
+- **Depende de:** E1-17, F0-15 · **Estimación:** 4 h
+- **Autoevaluación:** (1) ¿Por qué el negocio viaja dentro de la credencial? (2) ¿Por qué un 403 y no un 401 cuando el lote nombra otra caja? (3) ¿Qué pasa con las ventas de una caja dada de baja?
+- **Entrevista:** (1) ¿Cómo autenticas un dispositivo sin usuario? (2) ¿Cómo revocas una credencial sin esperar a que caduque?
 
 ## Hito E1-C: Sincronización
 

@@ -101,6 +101,42 @@ class FacturapiClientTest {
     }
 
     @Test
+    void sendsTheExternalIdWhenTheDraftHasOne() {
+        InvoiceDraft draft = new InvoiceDraft("cus_1", draft().lines(), "01", "G03", InvoiceType.INCOME, null, null,
+                "0199-external");
+
+        client(SECRET_KEY, Duration.ofSeconds(5)).createInvoice(draft);
+
+        assertThat(received.get(0).body()).contains("\"external_id\":\"0199-external\"");
+    }
+
+    @Test
+    void findsAnInvoiceByItsExternalIdAndRetriesTheLookup() {
+        AtomicInteger attempt = new AtomicInteger();
+        responder = exchange -> {
+            if (attempt.incrementAndGet() == 1) {
+                reply(exchange, 503, "{}");
+            } else {
+                reply(exchange, 200, "{\"data\":[" + INVOICE_JSON + "]}");
+            }
+        };
+
+        var found = client(SECRET_KEY, Duration.ofSeconds(5)).findByExternalId("0199 external");
+
+        assertThat(found).hasValueSatisfying(invoice -> assertThat(invoice.id()).isEqualTo("inv_1"));
+        assertThat(received.get(0).method()).isEqualTo("GET");
+        assertThat(received.get(0).uri()).startsWith("/invoices?external_id=0199+external");
+        assertThat(received).hasSize(2);
+    }
+
+    @Test
+    void reportsNoInvoiceWhenTheLookupFindsNothing() {
+        responder = exchange -> reply(exchange, 200, "{\"data\":[]}");
+
+        assertThat(client(SECRET_KEY, Duration.ofSeconds(5)).findByExternalId("missing")).isEmpty();
+    }
+
+    @Test
     void createsACustomerAndReturnsItsId() {
         responder = exchange -> reply(exchange, 200, "{\"id\":\"cus_9\"}");
 

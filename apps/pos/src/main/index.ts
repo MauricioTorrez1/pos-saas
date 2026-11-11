@@ -117,7 +117,7 @@ async function start(): Promise<void> {
   await app.whenReady();
   const store = openLocalStore();
   // Without POS_SYNC_URL the register sells as usual and keeps its operations until a core is configured.
-  const sync = startSyncIfConfigured(store, LOCAL_TENANT_ID, process.env.POS_SYNC_URL);
+  const sync = startSyncIfConfigured(store, LOCAL_TENANT_ID, process.env.POS_SYNC_URL, process.env.POS_DEVICE_TOKEN);
   app.once('will-quit', () => sync?.stop());
   const rendererEntry = resolveRendererEntry();
   const catalog = new ProductCatalog(store, LOCAL_TENANT_ID);

@@ -10,24 +10,33 @@ export interface HttpSyncTransportOptions {
   readonly baseUrl: string;
   /** Longest a push may take before it counts as a failure, so a dead connection never hangs the loop. */
   readonly timeoutMs?: number;
+  /**
+   * The device credential the core gave this register when it enrolled (`<tenantId>.<secret>`, ADR 0054). It goes in
+   * `Authorization: Device <credential>` and nowhere else: it is never logged and never part of an error message.
+   * Without it the core answers 401 and the operations wait in the outbox.
+   */
+  readonly deviceToken?: string;
   /** Replaces `fetch`. Only tests pass it. */
   readonly fetchImpl?: typeof fetch;
 }
 
-/** Sends batches to `POST /sync/push` and reads `GET /sync/pull` over HTTP. Sign-in headers arrive with the enrollment of the register (F0-15). */
+/** Sends batches to `POST /sync/push` and reads `GET /sync/pull` over HTTP. The register signs in with its device credential (E1-41). */
 export class HttpSyncTransport implements SyncTransport, PullTransport {
   readonly #url: string;
   readonly #pullUrl: string;
   readonly #timeoutMs: number;
   readonly #fetch: typeof fetch;
+  readonly #auth: Record<string, string>;
 
-  /** @param options where the core is */
-  constructor({ baseUrl, timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = fetch }: HttpSyncTransportOptions) {
+  /** @param options where the core is and the credential of this register */
+  constructor({ baseUrl, timeoutMs = DEFAULT_TIMEOUT_MS, deviceToken, fetchImpl = fetch }: HttpSyncTransportOptions) {
     const root = baseUrl.replace(/\/+$/, '');
     this.#url = `${root}/sync/push`;
     this.#pullUrl = `${root}/sync/pull`;
     this.#timeoutMs = timeoutMs;
     this.#fetch = fetchImpl;
+    const token = deviceToken?.trim();
+    this.#auth = token === undefined || token === '' ? {} : { Authorization: `Device ${token}` };
   }
 
   /** {@inheritDoc SyncTransport.push} */
@@ -36,7 +45,7 @@ export class HttpSyncTransport implements SyncTransport, PullTransport {
     try {
       response = await this.#fetch(this.#url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...this.#auth },
         body: JSON.stringify(request),
         signal: AbortSignal.timeout(this.#timeoutMs),
       });
@@ -63,7 +72,7 @@ export class HttpSyncTransport implements SyncTransport, PullTransport {
     try {
       response = await this.#fetch(`${this.#pullUrl}?${new URLSearchParams({ cursor, limit: String(limit) })}`, {
         method: 'GET',
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', ...this.#auth },
         signal: AbortSignal.timeout(this.#timeoutMs),
       });
     } catch (cause) {

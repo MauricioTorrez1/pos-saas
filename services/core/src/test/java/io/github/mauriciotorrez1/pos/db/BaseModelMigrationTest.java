@@ -42,9 +42,10 @@ class BaseModelMigrationTest {
                 SELECT success::text FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1
                 """, String.class);
         assertThat(tables).containsExactly("app_user", "audit_log", "branch", "cash_cut", "cash_movement", "cash_session",
-                "cut_report_delivery", "enrollment_code", "event_publication", "product", "product_code", "product_presentation", "product_price_change", "product_price_history", "register", "register_device",
-                "sale", "sale_line", "sale_payment", "sale_return", "sale_return_line", "sale_return_refund", "stock_movement", "stock_receipt",
-                "sync_change", "sync_change_counter", "sync_operation", "tenant", "user_pin");
+                "cut_report_delivery", "enrollment_code", "event_publication", "invoice", "product", "product_code", "product_presentation",
+                "product_price_change", "product_price_history", "register", "register_device", "sale", "sale_line", "sale_payment", "sale_return",
+                "sale_return_line", "sale_return_refund", "stock_movement", "stock_receipt", "sync_change", "sync_change_counter", "sync_operation",
+                "tenant", "user_pin");
         assertThat(latestState).isEqualTo("true");
     }
 
