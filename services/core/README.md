@@ -105,6 +105,7 @@ When a cut is stored, the core publishes `CashCutRecorded` in the same transacti
 | `RESEND_FROM` | none | Verified sender, such as `Reportes <reportes@your-domain.com>` |
 | `REPORT_DEFAULT_RECIPIENT` | none | Recipient when the business has no `owner_email` |
 
+
 ## Changes for the registers
 `GET /sync/pull?cursor=&limit=` gives a register what changed in the catalog, prices and permissions since its cursor ([ADR 0048](../../docs/adr/0048-cambios-hacia-la-caja-con-cursor.md), RF-023). The business comes from the token and row-level security; any parameter other than `cursor` and `limit` is a `400`. It needs the `sync.pull` permission.
 
@@ -120,6 +121,13 @@ Modules publish changes through `ChangePublisher` (`pos.feed`), inside the same 
 
 ```bash
 curl "http://localhost:8080/sync/pull?cursor=0&limit=100" -H "Authorization: Bearer $TOKEN"
+## Average cost (inventory)
+The weighted moving average cost of a product is computed only in the core ([ADR 0049](../../docs/adr/0049-costo-promedio-en-el-servidor.md), RF-033). It is never stored: `InventoryValuation` replays the ledger of the product (entries in `stock_receipt`, sales, returns, adjustments and write-offs) in the order the events *happened*, so a late sale or a late entry lands where it belongs and recalculating always gives the same result. Costs are integers in millionths of a peso (`unit_cost_e6`, [ADR 0011](../../docs/adr/0011-precision-monetaria.md)), rounded half up. Sales and adjustments do not move the average, a return comes back at the cost of its sale, and stock at or below zero is worth zero.
+
+```java
+valuation.recordReceipt(new StockReceipt(opId, productId, Source.PURCHASE, 10_000, 10_000_000, arrivedAt, userId)); // 10 units at $10.00
+ProductCost cost = valuation.costOf(productId);   // quantityMilli, averageCostE6, valueCents()
+InventoryValue all = valuation.inventoryValue();   // total in cents and products without a known cost
 ```
 
 ## Invoicing (Facturapi)
@@ -151,7 +159,7 @@ The core sends traces, metrics and logs over OTLP to the collector of the `obser
 | `sales` | Sales and returns |
 | `payments` | Manually entered card payments and the integrated terminal |
 | `cash` | Register sessions and cash closings |
-| `inventory` | The inventory movement ledger |
+| `inventory` | The inventory movement ledger and the average cost |
 | `invoicing` | CFDI invoices through Facturapi |
 | `sync` | Register batches, cursors, and discrepancies |
 | `reporting` | Reports and the audit log |
