@@ -1,8 +1,9 @@
 import type { PanelConfig } from './config';
+import { parseRole, type AppRole } from './identity';
 
-/** Outcome of asking the core who the token belongs to (`GET /me`, ADR 0039). */
+/** Outcome of asking the core who the token belongs to (`GET /me`, ADR 0039 and 0042). */
 export type MeResult =
-  | { status: 'ok'; subject: string; tenantId: string }
+  | { status: 'ok'; subject: string; tenantId: string; role: AppRole | null }
   | { status: 'unauthorized' }
   | { status: 'forbidden' }
   | { status: 'unavailable' };
@@ -39,11 +40,11 @@ export async function fetchMe(
     if (!response.ok) {
       return { status: 'unavailable' };
     }
-    const body = (await response.json()) as { subject?: unknown; tenantId?: unknown };
+    const body = (await response.json()) as { subject?: unknown; tenantId?: unknown; role?: unknown };
     if (typeof body.subject !== 'string' || typeof body.tenantId !== 'string') {
       return { status: 'unavailable' };
     }
-    return { status: 'ok', subject: body.subject, tenantId: body.tenantId };
+    return { status: 'ok', subject: body.subject, tenantId: body.tenantId, role: parseRole(body.role) };
   } catch {
     return { status: 'unavailable' };
   }

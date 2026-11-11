@@ -10,14 +10,22 @@ function respond(status: number, body?: unknown): typeof fetch {
 
 describe('fetchMe', () => {
   it('sends the access token as a bearer to /me', async () => {
-    const fetcher = respond(200, { subject: 'user-1', tenantId: 'tenant-1' });
+    const fetcher = respond(200, { subject: 'user-1', tenantId: 'tenant-1', role: 'manager' });
 
     const result = await fetchMe(config, 'the-token', fetcher);
 
-    expect(result).toEqual({ status: 'ok', subject: 'user-1', tenantId: 'tenant-1' });
+    expect(result).toEqual({ status: 'ok', subject: 'user-1', tenantId: 'tenant-1', role: 'manager' });
     const [url, init] = vi.mocked(fetcher).mock.calls[0] ?? [];
     expect(String(url)).toBe('http://core.test:8080/me');
     expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer the-token');
+  });
+
+  it('gives no role when the core sends null or an unknown value', async () => {
+    const body = { subject: 's', tenantId: 't' };
+
+    expect(await fetchMe(config, 'x', respond(200, { ...body, role: null }))).toMatchObject({ role: null });
+    expect(await fetchMe(config, 'x', respond(200, { ...body, role: 'admin' }))).toMatchObject({ role: null });
+    expect(await fetchMe(config, 'x', respond(200, body))).toMatchObject({ role: null });
   });
 
   it('maps 401 to unauthorized and 403 to forbidden', async () => {

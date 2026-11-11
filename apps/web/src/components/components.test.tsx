@@ -7,23 +7,29 @@ import { RoleList } from './role-list';
 afterEach(cleanup);
 
 describe('RoleList', () => {
-  it('shows the Spanish name of each role', () => {
-    render(<RoleList roles={['owner', 'manager']} />);
+  it('shows the Spanish name of the role', () => {
+    render(<RoleList role="manager" known />);
 
-    expect(screen.getByText('Dueño')).toBeTruthy();
     expect(screen.getByText('Encargado')).toBeTruthy();
   });
 
   it('explains that no role is assigned', () => {
-    render(<RoleList roles={[]} />);
+    render(<RoleList role={null} known />);
 
     expect(screen.getByText('Sin rol asignado')).toBeTruthy();
+  });
+
+  it('says the role is unknown when the core did not answer', () => {
+    render(<RoleList role={null} known={false} />);
+
+    expect(screen.queryByText('Sin rol asignado')).toBeNull();
+    expect(screen.getByText(/responda/)).toBeTruthy();
   });
 });
 
 describe('CoreStatus', () => {
   it('shows a connected state', () => {
-    render(<CoreStatus result={{ status: 'ok', subject: 's', tenantId: 't' }} />);
+    render(<CoreStatus result={{ status: 'ok', subject: 's', tenantId: 't', role: 'owner' }} />);
 
     expect(screen.getByText('Conectado')).toBeTruthy();
   });

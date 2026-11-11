@@ -9,7 +9,6 @@ const session: Session = {
   idToken: 'id',
   accessExpiresAt: 1_000_000,
   tenantId: '0192f3a4-7b1c-7e2d-8a3f-5c9d1e2b4a60',
-  roles: ['owner'],
 };
 
 describe('seal and unseal', () => {

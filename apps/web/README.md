@@ -1,10 +1,10 @@
 # Owner panel
 
-Web panel of the business, built with Next.js (App Router), React, and TypeScript in strict mode. For now the owner signs in through Keycloak, sees the business and the role of the token, and the panel proves the chain by calling `GET /me` on the core. Catalog screens arrive in F0-21. The decisions are in [ADR 0044](../../docs/adr/0044-panel-next-con-login-oidc.md).
+Web panel of the business, built with Next.js (App Router), React, and TypeScript in strict mode. For now the owner signs in through Keycloak, sees the business of the token and the role the core returns, and the panel proves the chain by calling `GET /me` on the core. Catalog screens arrive in F0-21. The decisions are in [ADR 0044](../../docs/adr/0044-panel-next-con-login-oidc.md).
 
 ## Run it
 1. Start the stack with the realm: `docker compose --profile core up -d` (see [Compose](../../infra/compose/README.md)).
-2. Create a user in the realm `pos` (admin console at <http://localhost:8180>) with a password, and set its attribute `tenant_id` to a UUIDv7. Optionally create the realm roles `owner`, `manager`, or `cashier`, as in ADR 0042 and give one to the user.
+2. Create a user in the realm `pos` (admin console at <http://localhost:8180>) with a password, and set its attribute `tenant_id` to a UUIDv7. The role is not in Keycloak: the core keeps it in `app_user.role` (`owner`, `manager`, or `cashier`, ADR 0042) and returns it in `GET /me`.
 3. Copy [`.env.example`](.env.example) to `.env.local` and fill `PANEL_SESSION_SECRET` (`openssl rand -base64 48`).
 4. Start the core (`services/core`) if you want to see the connected state, then run `pnpm --filter @pos-saas/web dev` and open <http://localhost:3000>.
 
@@ -14,7 +14,7 @@ Web panel of the business, built with Next.js (App Router), React, and TypeScrip
 | 1 | `/auth/login` | Creates a PKCE verifier and a `state`, keeps them in a short-lived sealed cookie, and redirects to Keycloak |
 | 2 | Keycloak | The user signs in. The browser never sees a password of the panel |
 | 3 | `/auth/callback` | Checks `state`, trades the code and the verifier for tokens on the server, validates the id token, and opens the session |
-| 4 | `proxy.ts` | On every protected request: no session goes to the home page, a role the route does not allow sees a no-permission page, and a token about to expire is renewed with the refresh token |
+| 4 | `proxy.ts` | On every protected request: no session goes to the home page, a route with a role rule asks the core for the role (`GET /me`) and shows a no-permission page when the role does not allow it, and a token about to expire is renewed with the refresh token |
 | 5 | `/dashboard` | Server Component that calls `GET /me` with the access token |
 | 6 | `/auth/logout` | `POST` only. Clears the cookies and sends the browser to the Keycloak end-session endpoint |
 

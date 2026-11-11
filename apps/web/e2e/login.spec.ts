@@ -32,7 +32,7 @@ test('the owner signs in with PKCE and sees the business, the role, and the core
   await signIn(page);
 
   await expect(page.getByTestId('tenant')).toHaveText('0192f3a4…4a60');
-  await expect(page.getByText('Dueño')).toBeVisible();
+  await expect(page.getByTestId('role')).toHaveText('Dueño');
   await expect(page.getByText('Conectado')).toBeVisible();
   expect((await stats(page)).pkceChecks).toBe(1);
 });
@@ -108,6 +108,34 @@ test('a role the route does not allow sees the no-permission page', async ({ pag
   await page.goto('/catalog');
 
   await expect(page.getByRole('heading', { name: 'No tienes permiso para ver esto' })).toBeVisible();
+});
+
+test('a user with a business but no role is told so', async ({ page }) => {
+  await control(page, { persona: 'norole' });
+  await signIn(page);
+
+  await expect(page.getByText('Sin rol asignado')).toBeVisible();
+  await expect(page.getByText('Conectado')).toBeVisible();
+});
+
+test('the role comes from the core on every request, so a change applies without signing in again', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/catalog');
+  await expect(page.getByRole('heading', { name: 'No tienes permiso para ver esto' })).toHaveCount(0);
+
+  await control(page, { persona: 'cashier' });
+  await page.goto('/catalog');
+
+  await expect(page.getByRole('heading', { name: 'No tienes permiso para ver esto' })).toBeVisible();
+});
+
+test('the manager is allowed on the catalog route', async ({ page }) => {
+  await control(page, { persona: 'manager' });
+  await signIn(page);
+
+  const response = await page.goto('/catalog');
+
+  expect(response?.status()).toBe(404);
 });
 
 test('the owner is allowed on the catalog route (it does not exist yet, so 404)', async ({ page }) => {

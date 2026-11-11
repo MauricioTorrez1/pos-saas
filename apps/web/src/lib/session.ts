@@ -1,5 +1,4 @@
 import { EncryptJWT, jwtDecrypt } from 'jose';
-import type { AppRole } from './identity';
 
 /** What the panel keeps about a signed-in user. It lives only inside an encrypted, HttpOnly cookie. */
 export interface Session {
@@ -10,7 +9,6 @@ export interface Session {
   /** Moment the access token expires, in seconds since the epoch. */
   accessExpiresAt: number;
   tenantId: string | null;
-  roles: AppRole[];
 }
 
 /** Longest a session cookie lives, whatever Keycloak says. Keycloak's own idle timeout usually ends it first. */

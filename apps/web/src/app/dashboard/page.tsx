@@ -11,8 +11,7 @@ export const metadata: Metadata = { title: 'Inicio' };
 export const dynamic = 'force-dynamic';
 
 /**
- * Protected page. The proxy already checked the session; this page shows the business and the roles
- * of the token, and proves the chain by calling `GET /me` on the core with the access token. That call
+ * Protected page. The proxy already checked the session; this page shows the business of the token and the role that the core returns in `GET /me`, and proves the chain by calling `GET /me` on the core with the access token. That call
  * happens here, on the server, so the token never reaches the browser.
  */
 export default async function DashboardPage() {
@@ -60,7 +59,7 @@ export default async function DashboardPage() {
             <h2 id="role-label" className="panel__label">
               Tu rol
             </h2>
-            <RoleList roles={session.roles} />
+            <RoleList role={me.status === 'ok' ? me.role : null} known={me.status === 'ok' || me.status === 'forbidden'} />
           </section>
           <section className="panel" aria-labelledby="core-label">
             <h2 id="core-label" className="panel__label">

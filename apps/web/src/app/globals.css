@@ -289,13 +289,6 @@ p {
   color: var(--danger);
 }
 
-.roles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
 .stack {
   display: grid;
   gap: 16px;
