@@ -102,7 +102,7 @@ export class OrderExporter {
         return { status: 'cancelled' };
       }
       const businessName = this.#ports.businessName();
-      const content = request.format === 'xlsx' ? await buildOrderWorkbook(order, businessName) : await this.#ports.renderPdf(renderOrderHtml(order, businessName));
+      const content = request.format === 'xlsx' ? buildOrderWorkbook(order, businessName) : await this.#ports.renderPdf(renderOrderHtml(order, businessName));
       await writeFile(path, content);
       this.#savedPaths.add(path);
       this.#audit.record({

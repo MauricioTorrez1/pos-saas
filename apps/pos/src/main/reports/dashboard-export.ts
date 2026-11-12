@@ -15,7 +15,7 @@ import {
   quantityText,
   trendLabel,
 } from '../../shared/dashboard-format';
-import type { Cell, Sheet } from './xlsx-workbook';
+import type { Cell, Sheet } from '../export/xlsx';
 
 const UNIT_NAMES = { piece: 'Pieza', meter: 'Metro', kilogram: 'Kilogramo', liter: 'Litro' } as const;
 const COST_SOURCE_NAMES = { typed: 'Capturado', average: 'Promedio ponderado', none: 'Sin costo' } as const;
