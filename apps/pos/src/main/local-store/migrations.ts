@@ -622,4 +622,106 @@ export const MIGRATIONS: readonly Migration[] = [
       ) STRICT;
     `,
   },
+  {
+    version: 17,
+    name: 'create_purchasing',
+    // What the register needs to order from a supplier (E1-44, ADR 0059). A supplier is given up and never deleted, because
+    // the orders already sent point at it. supplier_code is NOCASE, so a code typed in capitals finds the same one. An order
+    // keeps a copy of the supplier name, and every line a copy of the description, the barcode and the code, so a sent order
+    // reads the same years later; the lines have no foreign key to the product for the same reason as a sale line. A sent
+    // order and its lines never change, like the audit log, and only a draft can be discarded. An order is a document: it
+    // never writes to stock_movement (the reception arrives with F2-13).
+    sql: `
+      CREATE TABLE supplier (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+        contact TEXT,
+        notes TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT;
+
+      CREATE UNIQUE INDEX supplier_unique_name ON supplier (tenant_id, name COLLATE NOCASE);
+
+      CREATE TABLE supplier_product_code (
+        tenant_id TEXT NOT NULL,
+        supplier_id TEXT NOT NULL REFERENCES supplier (id),
+        product_id TEXT NOT NULL REFERENCES product (id) ON DELETE CASCADE,
+        supplier_code TEXT NOT NULL COLLATE NOCASE CHECK (length(trim(supplier_code)) > 0),
+        list_cost_e6 INTEGER CHECK (list_cost_e6 IS NULL OR list_cost_e6 >= 0),
+        purchase_unit TEXT,
+        PRIMARY KEY (tenant_id, supplier_id, product_id, supplier_code)
+      ) STRICT, WITHOUT ROWID;
+
+      CREATE INDEX supplier_product_code_by_code ON supplier_product_code (tenant_id, supplier_id, supplier_code);
+      CREATE INDEX supplier_product_code_by_product ON supplier_product_code (tenant_id, product_id);
+
+      CREATE TABLE product_reorder_level (
+        tenant_id TEXT NOT NULL,
+        product_id TEXT NOT NULL REFERENCES product (id) ON DELETE CASCADE,
+        minimum_milli INTEGER NOT NULL CHECK (minimum_milli > 0),
+        maximum_milli INTEGER CHECK (maximum_milli IS NULL OR maximum_milli > minimum_milli),
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, product_id)
+      ) STRICT, WITHOUT ROWID;
+
+      CREATE TABLE purchase_order (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        folio INTEGER NOT NULL CHECK (folio >= 1),
+        supplier_id TEXT NOT NULL REFERENCES supplier (id),
+        supplier_name TEXT NOT NULL CHECK (length(trim(supplier_name)) > 0),
+        status TEXT NOT NULL CHECK (status IN ('draft', 'sent')),
+        notes TEXT,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        sent_by TEXT,
+        sent_at TEXT,
+        revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+        CHECK ((status = 'sent') = (sent_at IS NOT NULL AND sent_by IS NOT NULL)),
+        UNIQUE (tenant_id, folio)
+      ) STRICT;
+
+      CREATE TABLE purchase_order_line (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        order_id TEXT NOT NULL REFERENCES purchase_order (id) ON DELETE CASCADE,
+        line_number INTEGER NOT NULL CHECK (line_number >= 1),
+        product_id TEXT NOT NULL,
+        description TEXT NOT NULL CHECK (length(trim(description)) > 0),
+        supplier_code TEXT,
+        barcode TEXT,
+        unit TEXT NOT NULL CHECK (unit IN ('piece', 'meter', 'kilogram', 'liter')),
+        quantity_milli INTEGER NOT NULL CHECK (quantity_milli > 0),
+        unit_cost_e6 INTEGER CHECK (unit_cost_e6 IS NULL OR unit_cost_e6 >= 0),
+        line_total_cents INTEGER CHECK (line_total_cents IS NULL OR line_total_cents >= 0),
+        CHECK ((unit_cost_e6 IS NULL) = (line_total_cents IS NULL)),
+        UNIQUE (order_id, line_number)
+      ) STRICT;
+
+      CREATE TRIGGER purchase_order_sent_never_changes BEFORE UPDATE ON purchase_order
+      WHEN OLD.status = 'sent'
+      BEGIN SELECT RAISE(ABORT, 'a sent order never changes'); END;
+
+      CREATE TRIGGER purchase_order_sent_is_never_deleted BEFORE DELETE ON purchase_order
+      WHEN OLD.status = 'sent'
+      BEGIN SELECT RAISE(ABORT, 'a sent order is never deleted'); END;
+
+      CREATE TRIGGER purchase_order_line_of_sent_is_never_added BEFORE INSERT ON purchase_order_line
+      WHEN (SELECT status FROM purchase_order WHERE id = NEW.order_id) = 'sent'
+      BEGIN SELECT RAISE(ABORT, 'the lines of a sent order never change'); END;
+
+      CREATE TRIGGER purchase_order_line_of_sent_never_changes BEFORE UPDATE ON purchase_order_line
+      WHEN (SELECT status FROM purchase_order WHERE id = OLD.order_id) = 'sent'
+      BEGIN SELECT RAISE(ABORT, 'the lines of a sent order never change'); END;
+
+      CREATE TRIGGER purchase_order_line_of_sent_is_never_deleted BEFORE DELETE ON purchase_order_line
+      WHEN (SELECT status FROM purchase_order WHERE id = OLD.order_id) = 'sent'
+      BEGIN SELECT RAISE(ABORT, 'the lines of a sent order never change'); END;
+    `,
+  },
 ];

@@ -1125,3 +1125,92 @@ kbd {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+/* Orders to suppliers (E1-44): a wide dialog with the lines of the order as a table of small boxes. */
+
+.order-dialog {
+  width: min(78rem, calc(100vw - 2rem));
+}
+
+.order-lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1.0625rem;
+}
+
+.order-lines th,
+.order-lines td {
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--rule);
+}
+
+.order-lines th {
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+  background: var(--ground);
+}
+
+.order-lines small {
+  display: block;
+  color: var(--ink-soft);
+}
+
+.order-input {
+  width: 7.5rem;
+  height: 2.5rem;
+  padding: 0 0.5rem;
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--ground);
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+}
+
+.order-input[aria-invalid='true'] {
+  border-color: var(--alert);
+}
+
+.order-input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 0;
+}
+
+.order-amount {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.order-total {
+  margin: 0;
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.order-empty {
+  padding: 0.75rem 1rem;
+  margin: 0;
+  background: var(--ground);
+  border-left: 0.35rem solid var(--accent);
+}
+
+.order-suggestions,
+.order-level {
+  padding: 0.75rem 1rem;
+  background: var(--ground);
+  border-left: 0.35rem solid var(--accent);
+}
+
+.order-code {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--rule);
+}
+
+.order-actions {
+  flex-wrap: wrap;
+}

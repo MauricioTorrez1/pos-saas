@@ -20,6 +20,8 @@ interface InventoryViewProps {
   readonly pricingApi?: PricingApi;
   /** Finding and editing products. Without it, the view of a product offers no panel. */
   readonly productApi?: ProductAdminApi;
+  /** Opens the orders to suppliers (E1-44) from the search of a product. */
+  readonly onOpenSupplierOrder?: () => void;
   readonly onBack: () => void;
 }
 
@@ -30,10 +32,11 @@ interface InventoryViewProps {
  * @param props.posApi bridge to the main process
  * @param props.pricingApi bridge for changing the price of the product, when the register offers it
  * @param props.productApi bridge for the product panel, when the register offers it
+ * @param props.onOpenSupplierOrder opens the orders to suppliers, when the register offers them
  * @param props.onBack called to go back to the administration summary
  * @returns the view
  */
-export function InventoryView({ posApi, pricingApi, productApi, onBack }: InventoryViewProps): ReactElement {
+export function InventoryView({ posApi, pricingApi, productApi, onOpenSupplierOrder, onBack }: InventoryViewProps): ReactElement {
   const [text, setText] = useState('');
   const [found, setFound] = useState<readonly CatalogProduct[]>([]);
   const [kardex, setKardex] = useState<Kardex | null>(null);
@@ -62,7 +65,7 @@ export function InventoryView({ posApi, pricingApi, productApi, onBack }: Invent
       setKardex(await posApi.getKardex(productId));
     });
 
-  useWindowKeys({ Escape: kardex === null ? onBack : () => setKardex(null) }, isBusy || isChangingPrice || isEditing);
+  useWindowKeys({ Escape: kardex === null ? onBack : () => setKardex(null), F11: kardex === null ? onOpenSupplierOrder : undefined }, isBusy || isChangingPrice || isEditing);
 
   if (kardex !== null) {
     return (
@@ -104,9 +107,16 @@ export function InventoryView({ posApi, pricingApi, productApi, onBack }: Invent
           ))}
         </ul>
       )}
-      <button type="button" className="button" tabIndex={-1} onClick={onBack}>
-        Volver <kbd>Esc</kbd>
-      </button>
+      <div className="payment-actions">
+        <button type="button" className="button" tabIndex={-1} onClick={onBack}>
+          Volver <kbd>Esc</kbd>
+        </button>
+        {onOpenSupplierOrder !== undefined && (
+          <button type="button" className="button" tabIndex={-1} onClick={onOpenSupplierOrder}>
+            Pedido al proveedor <kbd>F11</kbd>
+          </button>
+        )}
+      </div>
     </>
   );
 }

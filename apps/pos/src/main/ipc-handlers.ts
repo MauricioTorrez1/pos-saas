@@ -41,6 +41,7 @@ import type { PendingSales } from './checkout/pending-sales';
 import type { SalePayments } from './checkout/sale-payments';
 import type { AppearanceStore } from './local-store/appearance-store';
 import type { ProductCatalog } from './local-store/product-catalog';
+import { registerPurchasingHandlers, type PurchasingServices } from './purchasing/purchasing-ipc';
 import { assertTrustedSender } from './trusted-url';
 
 const SEARCH_RESULT_LIMIT = 20;
@@ -59,6 +60,8 @@ export interface IpcServices {
   readonly appearance: AppearanceStore;
   readonly pendingSales: PendingSales;
   readonly salePayments: SalePayments;
+  /** The suppliers and the purchase orders (E1-44). */
+  readonly purchasing: PurchasingServices;
 }
 
 /** Nobody is signed in, or the person signed in may not do this. The screen should have shown the sign-in first. */
@@ -88,7 +91,7 @@ function requireLookupText(value: unknown): string {
  */
 export function registerIpcHandlers(
   rendererEntry: string,
-  { auth, cash, returns, admin, inventory, reports, catalog, prices, products, appearance, pendingSales, salePayments }: IpcServices,
+  { auth, cash, returns, admin, inventory, reports, catalog, prices, products, appearance, pendingSales, salePayments, purchasing }: IpcServices,
 ): void {
   const answerScreen = <Result>(channel: string, respond: (argument: unknown) => Result): void => {
     ipcMain.handle(channel, (event, argument: unknown) => {
@@ -170,4 +173,5 @@ export function registerIpcHandlers(
   answerSignedIn(IPC_CHANNELS.reprintLastTicket, (): Promise<ReprintResult> => salePayments.reprintLast());
   answerSignedIn(IPC_CHANNELS.confirmPendingSale, (request): CheckoutSaleResult => salePayments.confirm(parsePaymentRequest(request)));
   answerSignedIn(IPC_CHANNELS.cancelPendingSale, (saleId): void => pendingSales.cancel(parseSaleId(saleId)));
+  registerPurchasingHandlers(answerSignedIn, purchasing);
 }

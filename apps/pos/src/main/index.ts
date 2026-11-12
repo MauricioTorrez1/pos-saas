@@ -35,6 +35,10 @@ import { LOCAL_TENANT_ID } from './local-store/local-tenant';
 import { ProductCatalog } from './local-store/product-catalog';
 import { PriceChangeService } from './pricing/price-change-service';
 import { ProductReader } from './products/product-reader';
+import { electronExportPorts } from './purchasing/electron-export-ports';
+import { OrderExporter } from './purchasing/order-exporter';
+import { PurchaseOrderService } from './purchasing/purchase-order-service';
+import { SupplierService } from './purchasing/supplier-service';
 import { ProductService } from './products/product-service';
 import { seedSampleCatalogIfEmpty } from './local-store/sample-catalog';
 import { SaleStore } from './local-store/sale-store';
@@ -152,7 +156,17 @@ async function start(): Promise<void> {
   const prices = new PriceChangeService(store, LOCAL_TENANT_ID, auth, catalog, new AuditLog(store, LOCAL_TENANT_ID));
   const inventory = new InventoryService(store, LOCAL_TENANT_ID, auth, new StockStore(store, LOCAL_TENANT_ID), new AuditLog(store, LOCAL_TENANT_ID), catalog);
   const products = new ProductService(store, LOCAL_TENANT_ID, auth, new AuditLog(store, LOCAL_TENANT_ID), new ProductReader(store, LOCAL_TENANT_ID), catalog, inventory);
+  const productReader = new ProductReader(store, LOCAL_TENANT_ID);
+  const suppliers = new SupplierService(store, LOCAL_TENANT_ID, auth, new AuditLog(store, LOCAL_TENANT_ID));
+  const orders = new PurchaseOrderService(store, LOCAL_TENANT_ID, auth, new AuditLog(store, LOCAL_TENANT_ID), suppliers, productReader, catalog);
+  const exporter = new OrderExporter(
+    auth,
+    new AuditLog(store, LOCAL_TENANT_ID),
+    (orderId) => orders.get(orderId),
+    electronExportPorts(() => appearance.read().businessName || UNNAMED_BUSINESS),
+  );
   registerIpcHandlers(rendererEntry, {
+    purchasing: { suppliers, orders, exporter },
     auth,
     cash,
     prices,

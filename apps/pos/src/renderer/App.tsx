@@ -5,6 +5,7 @@ import type { UserSummary } from '../shared/auth';
 import type { AuthState, PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
+import type { PurchasingApi } from '../shared/supplier-order';
 import { applyAppearance } from './appearance/apply-appearance';
 import { AppearanceDialog } from './appearance/AppearanceDialog';
 import type { CashStatus } from '../shared/cash-api';
@@ -14,6 +15,7 @@ import { CashDialog } from './cash/CashDialog';
 import { ReturnDialog } from './returns/ReturnDialog';
 import { PendingSaleDialog } from './recovery/PendingSaleDialog';
 import { usePendingSales } from './recovery/use-pending-sales';
+import { SupplierOrderDialog } from './purchasing/SupplierOrderDialog';
 import { SaleScreen } from './sale/SaleScreen';
 
 type AppInfoState = { status: 'loading' } | { status: 'ready'; version: string } | { status: 'failed' };
@@ -33,6 +35,7 @@ const SHORTCUTS: readonly { readonly keys: string; readonly action: string }[] =
   { keys: 'F7', action: 'Precio' },
   { keys: 'F5', action: 'Producto nuevo' },
   { keys: 'F10', action: 'Producto' },
+  { keys: 'F11', action: 'Pedido' },
   { keys: 'F8', action: 'Reimprimir' },
   { keys: 'F6', action: 'Salir' },
 ];
@@ -43,6 +46,8 @@ interface AppProps {
   readonly pricingApi?: PricingApi;
   /** Adding products that are not in the catalog (E1-42). Without it, the register offers no product form. */
   readonly productApi?: ProductAdminApi;
+  /** Orders to suppliers (E1-44). Without it, the register offers no purchase order. */
+  readonly purchasingApi?: PurchasingApi;
 }
 
 /**
@@ -52,9 +57,10 @@ interface AppProps {
  * @param props.posApi bridge to the main process
  * @param props.pricingApi bridge for changing prices, when the register offers it
  * @param props.productApi bridge for adding products, when the register offers it
+ * @param props.purchasingApi bridge for the orders to suppliers, when the register offers it
  * @returns the screen
  */
-export function App({ posApi, pricingApi, productApi }: AppProps): ReactElement {
+export function App({ posApi, pricingApi, productApi, purchasingApi }: AppProps): ReactElement {
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [authState, setAuthState] = useState<AuthState | null>(null);
   const [authFailed, setAuthFailed] = useState(false);
@@ -96,6 +102,7 @@ export function App({ posApi, pricingApi, productApi }: AppProps): ReactElement 
       posApi={posApi}
       {...(pricingApi === undefined ? {} : { pricingApi })}
       {...(productApi === undefined ? {} : { productApi })}
+      {...(purchasingApi === undefined ? {} : { purchasingApi })}
       user={authState.current}
       appearance={appearance}
       onAppearanceSaved={setAppearance}
@@ -108,19 +115,22 @@ interface RegisterScreenProps {
   readonly posApi: PosApi;
   readonly pricingApi?: PricingApi;
   readonly productApi?: ProductAdminApi;
+  readonly purchasingApi?: PurchasingApi;
   readonly user: UserSummary;
   readonly appearance: Appearance;
   readonly onAppearanceSaved: (appearance: Appearance) => void;
   readonly onSignOut: () => void;
 }
 
-function RegisterScreen({ posApi, pricingApi, productApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
+function RegisterScreen({ posApi, pricingApi, productApi, purchasingApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
   const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
   const [cash, setCash] = useState<CashStatus | null>(null);
   const [isEditingCash, setIsEditingCash] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
   const [isAdministering, setIsAdministering] = useState(false);
+  // Where the orders to suppliers were opened from, so closing them goes back there.
+  const [ordering, setOrdering] = useState<'sale' | 'admin' | null>(null);
   const pendingSales = usePendingSales(posApi);
   const hasPendingSales = pendingSales.sales.length > 0;
   const isOwner = user.role === 'owner';
@@ -154,6 +164,15 @@ function RegisterScreen({ posApi, pricingApi, productApi, user, appearance, onAp
   const closeCash = useCallback(() => setIsEditingCash(false), []);
   const openAdmin = useCallback(() => setIsAdministering(isOwner), [isOwner]);
   const closeAdmin = useCallback(() => setIsAdministering(false), []);
+  const openOrders = useCallback(() => setOrdering('sale'), []);
+  const openOrdersFromAdmin = useCallback(() => {
+    setIsAdministering(false);
+    setOrdering('admin');
+  }, []);
+  const closeOrders = useCallback(() => {
+    setIsAdministering(ordering === 'admin' && isOwner);
+    setOrdering(null);
+  }, [ordering, isOwner]);
   const openReturns = useCallback(() => setIsReturning(true), []);
   const closeReturns = useCallback(() => setIsReturning(false), []);
 
@@ -207,13 +226,14 @@ function RegisterScreen({ posApi, pricingApi, productApi, user, appearance, onAp
         posApi={posApi}
         {...(pricingApi === undefined ? {} : { pricingApi })}
         {...(productApi === undefined ? {} : { productApi })}
-        isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering}
+        isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering || ordering !== null}
         isOwner={isOwner}
         onOpenAppearance={openAppearance}
         onSignOut={onSignOut}
         onOpenCash={openCash}
         onOpenReturns={openReturns}
         onOpenAdmin={openAdmin}
+        {...(purchasingApi === undefined ? {} : { onOpenSupplierOrder: openOrders })}
         onCashChanged={refreshCash}
       />
       <footer className="register-footer">
@@ -237,8 +257,9 @@ function RegisterScreen({ posApi, pricingApi, productApi, user, appearance, onAp
         )}
       </footer>
       {isAdministering && !hasPendingSales && (
-        <AdminDialog posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} {...(productApi === undefined ? {} : { productApi })} onClose={closeAdmin} />
+        <AdminDialog posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} {...(productApi === undefined ? {} : { productApi })} {...(purchasingApi === undefined ? {} : { onOpenSupplierOrder: openOrdersFromAdmin })} onClose={closeAdmin} />
       )}
+      {ordering !== null && !hasPendingSales && purchasingApi !== undefined && <SupplierOrderDialog api={purchasingApi} isOwner={isOwner} onClose={closeOrders} />}
       {isReturning && !hasPendingSales && <ReturnDialog posApi={posApi} user={user} onReturned={refreshCash} onClose={closeReturns} />}
       {isEditingCash && !hasPendingSales && cash !== null && (
         <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} onClose={closeCash} />

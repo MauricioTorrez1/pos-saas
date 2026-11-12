@@ -46,6 +46,7 @@ The lookup box always holds the keyboard, so a scan lands there even after a cli
 | F7 | Opens the dialog to change the price of a product |
 | F5 | Opens the form to add a product that is not in the catalog |
 | F10 | Opens the panel of a product: edit it, change its price, adjust its stock |
+| F11 | Opens the orders to suppliers: suppliers, drafts, sent orders, and the files to send |
 
 A barcode scanner acts as a keyboard, so the register tells it apart by speed: at least 4 characters with no more than 50 ms between them. Only what happens to an unknown code changes: from the scanner it shows a warning, and from a person it searches by name.
 
@@ -97,6 +98,20 @@ When a customer brings something that is not in the catalog imported from Eleven
 | Concurrency | Every change of a product raises its `revision`. If the product changed after the panel loaded it, nothing is written (`stale`) and the panel shows how it is now |
 | One transaction | The update, the barcodes, the `product.update` audit entry (old and new value of each field), and the `product.updated` operation in `sync_outbox` are written together or not at all |
 | Sales already made | Nothing in `sale`, `sale_line`, a ticket or the ledger is touched |
+
+## Order from a supplier
+**F11** on the sale screen, or on the administration (its summary and the search of the inventory), opens "Pedido al proveedor" ([ADR 0059](../../docs/adr/0059-pedido-al-proveedor-en-la-caja.md)). It lists the orders (drafts first, then the sent ones, with folio, state and estimated total). **F2** starts a new order and **F3** opens the suppliers. Everything works with no internet.
+
+| Rule | How it works |
+| --- | --- |
+| Suppliers | Name (unique ignoring capitals), optional contact and notes. A supplier is given up, never deleted: the orders already sent point at it. For each product, one or several codes or SKUs of the supplier, each with an optional list cost and presentation ("Caja con 12"), apart from the own barcode of the product. A code can belong to several products of one supplier |
+| Lines | Found by name, by barcode (the scanner types straight into the box, and a second scan adds one more unit) or by code of the supplier. Quantity with up to 3 decimals and its unit, and an estimated cost from the supplier's list or the product. The amount is whole cents, rounded half up like a sale line, and the total adds the lines that have a cost. Never a decimal number |
+| Suggestions | **F7** lists the products at or below their minimum, with what to order to reach the maximum (or twice the minimum), and only the ones the supplier sells once it has codes. It never forces a quantity. The minimum is set from the line (**Mínimo**) and stays in the register until F2-16 |
+| Draft and sent | **F2** saves a draft, which can be reopened, edited or discarded (**F8**). **F4** asks to confirm and marks it as sent: from then on neither the order nor its lines change, even with SQL by hand. The sent orders are the history |
+| Files | **F5** saves an Excel file (`exceljs`, with the codes as text and the amounts worked out by the register) and **F6** a PDF (the engine of Electron prints an escaped HTML page, so no PDF library is needed). Windows asks where to save, and **F9** opens the folder. Both have the name of the business, the supplier, the date, the folio, the lines and the total |
+| Stock | An order is a document: it never writes to `stock_movement`. What arrives is posted by the reception of F2-13 |
+| Who | The owner. A cashier sees everything and types the PIN of an owner to save, send, discard, export or set a minimum. Every refusal is written in the audit log |
+| One transaction | Each change, its audit entry and, when it travels, its operation in `sync_outbox` (`supplier.upserted`, `supplier_product.upserted`, `purchase_order.sent`) are written together or not at all. Drafts and minimums do not travel. The core receives them in F2-11 and F2-12 |
 
 ## Sale states and recovery
 A sale is saved as `pending_payment` before anything is charged, so a power cut can never leave money without a record ([ADR 0010](../../docs/adr/0010-guardar-antes-de-cobrar.md)). From there it can only become `completed` or `cancelled`, and each change is one transaction. `src/main/checkout/sale-state-machine.ts` gives a clear error, and triggers in the database refuse the same changes if the code ever gets it wrong ([ADR 0025](../../docs/adr/0025-maquina-de-estados-de-la-venta.md)).

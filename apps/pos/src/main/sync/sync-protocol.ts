@@ -9,6 +9,9 @@ export const SYNC_OPERATION_TYPES = [
   'product.price_changed',
   'product.created',
   'product.updated',
+  'supplier.upserted',
+  'supplier_product.upserted',
+  'purchase_order.sent',
 ] as const;
 
 /** One of the kinds of operation. */

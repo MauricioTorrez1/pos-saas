@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS, type PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
+import { PURCHASING_CHANNELS, type PurchasingApi } from '../shared/supplier-order';
 
 const posApi: PosApi & PricingApi & ProductAdminApi = {
   getAppInfo: () => ipcRenderer.invoke(IPC_CHANNELS.getAppInfo),
@@ -45,4 +46,23 @@ const posApi: PosApi & PricingApi & ProductAdminApi = {
   cancelPendingSale: (saleId) => ipcRenderer.invoke(IPC_CHANNELS.cancelPendingSale, saleId),
 };
 
+/** The suppliers and the purchase orders (E1-44). They are a bridge of their own, so the register bridge above stays as it was. */
+const purchasingApi: PurchasingApi = {
+  listSuppliers: (includeInactive) => ipcRenderer.invoke(PURCHASING_CHANNELS.listSuppliers, includeInactive),
+  saveSupplier: (request) => ipcRenderer.invoke(PURCHASING_CHANNELS.saveSupplier, request),
+  getSupplierLinks: (productId) => ipcRenderer.invoke(PURCHASING_CHANNELS.getSupplierLinks, productId),
+  setSupplierCodes: (request) => ipcRenderer.invoke(PURCHASING_CHANNELS.setSupplierCodes, request),
+  searchOrderProducts: (request) => ipcRenderer.invoke(PURCHASING_CHANNELS.searchOrderProducts, request),
+  suggestOrderProducts: (supplierId) => ipcRenderer.invoke(PURCHASING_CHANNELS.suggestOrderProducts, supplierId),
+  setReorderLevel: (request) => ipcRenderer.invoke(PURCHASING_CHANNELS.setReorderLevel, request),
+  listOrders: () => ipcRenderer.invoke(PURCHASING_CHANNELS.listOrders),
+  getOrder: (orderId) => ipcRenderer.invoke(PURCHASING_CHANNELS.getOrder, orderId),
+  saveOrder: (request) => ipcRenderer.invoke(PURCHASING_CHANNELS.saveOrder, request),
+  markOrderSent: (request) => ipcRenderer.invoke(PURCHASING_CHANNELS.markOrderSent, request),
+  discardOrder: (request) => ipcRenderer.invoke(PURCHASING_CHANNELS.discardOrder, request),
+  exportOrder: (request) => ipcRenderer.invoke(PURCHASING_CHANNELS.exportOrder, request),
+  revealFile: (path) => ipcRenderer.invoke(PURCHASING_CHANNELS.revealFile, path),
+};
+
 contextBridge.exposeInMainWorld('pos', posApi);
+contextBridge.exposeInMainWorld('purchasing', purchasingApi);
