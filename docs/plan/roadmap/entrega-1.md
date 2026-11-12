@@ -206,6 +206,16 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Autoevaluación:** (1) ¿Por qué la unidad no se puede cambiar cuando hay movimientos? (2) ¿Cómo sabe el panel que el producto cambió mientras lo editabas? (3) ¿Por qué se da de baja en lugar de borrar?
 - **Entrevista:** (1) ¿Qué es el control de concurrencia optimista y cuándo lo prefieres? (2) ¿Cómo modelas un borrado lógico sin romper la historia?
 
+### E1-45 · Tablero de indicadores y más vendidos
+- **Objetivo:** el dueño ve en la caja, sin internet, cómo va el negocio en un día, una semana, un mes, un año o un rango, contra el periodo anterior, con los más vendidos y lo que no se mueve, y se lo lleva a Excel o PDF.
+- **Conceptos:** [Agregación en SQL], [Huso horario y cambio de horario], [Costo promedio ponderado], [Accesibilidad de gráficas]
+- **Claude / tú:** Claude escribe las consultas, el cálculo del costo, el componente de gráficas, la pantalla (F11), el escritor de Excel, el PDF y los permisos (dueño completo; cajero solo su turno o con el PIN del dueño). Tú comparas los totales con el corte de Eleventa del mismo día y decides qué indicador sobra.
+- **Pruebas:** cada indicador verificado a mano con datos sembrados (devolución, pago mixto, venta a medianoche en el límite de día, semana, mes y año, cambio de horario), venta cancelada o abierta que no cuenta, orden y empates de más vendidos, unidades medidas, producto sin costo, permisos y PIN, menos de 300 ms para un año con miles de ventas, Excel leído de vuelta, HTML del PDF y un flujo de pantalla de punta a punta con un PDF real.
+- **Criterios:** cumple RF-049 y ADR 0060; dinero en centavos enteros y costos en `e6`, sin `float`; la fuente de verdad son las ventas cerradas, las devoluciones y el libro local; solo el dueño ve costos, utilidad y márgenes; sin dependencias nuevas.
+- **Depende de:** E1-27, E1-28, E1-39 · **Estimación:** 6 h
+- **Autoevaluación:** (1) ¿Por qué el día se mide con `America/Mexico_City` y no con el reloj de la computadora? (2) ¿Por qué una venta sin costo no entra a la utilidad en lugar de contarse con costo cero? (3) ¿Por qué el cajero ni siquiera recibe los costos en lugar de que la pantalla los esconda?
+- **Entrevista:** (1) ¿Cómo agrupas ventas por día local cuando guardas UTC y hay cambio de horario? (2) ¿Cuándo calculas un indicador al leer y cuándo lo precalculas?
+
 ## Hito E1-C: Sincronización
 
 ### E1-16 · Envío desde la caja

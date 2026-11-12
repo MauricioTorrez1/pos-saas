@@ -27,6 +27,8 @@ interface AdminDialogProps {
   readonly pricingApi?: PricingApi;
   /** Finding and editing products. Without it, the inventory offers no product panel. */
   readonly productApi?: ProductAdminApi;
+  /** Opens the summary of the business, which closes this dialog. Without it, the menu does not offer the summary. */
+  readonly onOpenDashboard?: () => void;
   readonly onClose: () => void;
 }
 
@@ -37,10 +39,11 @@ interface AdminDialogProps {
  * @param props.posApi bridge to the main process
  * @param props.pricingApi bridge for changing prices, when the register offers it
  * @param props.productApi bridge for the product panel, when the register offers it
+ * @param props.onOpenDashboard called to open the summary of the business, when the register offers it
  * @param props.onClose called when the dialog is done
  * @returns the dialog
  */
-export function AdminDialog({ posApi, pricingApi, productApi, onClose }: AdminDialogProps): ReactElement {
+export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, onClose }: AdminDialogProps): ReactElement {
   const [view, setView] = useState<View>({ kind: 'summary' });
   const [backup, setBackup] = useState<BackupStatus | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -104,6 +107,7 @@ export function AdminDialog({ posApi, pricingApi, productApi, onClose }: AdminDi
           F6: () => setView({ kind: 'passphrase', purpose: 'configure' }),
           F7: backupNow,
           F8: () => setView({ kind: 'passphrase', purpose: 'restore' }),
+          F9: onOpenDashboard,
           Escape: onClose,
         }
       : view.kind === 'imported'
@@ -154,6 +158,11 @@ export function AdminDialog({ posApi, pricingApi, productApi, onClose }: AdminDi
             <li>
               <kbd>F4</kbd> Reporte del día: ventas, ticket promedio, ganancia, agotados
             </li>
+            {onOpenDashboard !== undefined && (
+              <li>
+                <kbd>F9</kbd> Resumen del negocio: indicadores, gráficas, más vendidos y existencias (también con F11 en la venta)
+              </li>
+            )}
             <li>
               <kbd>F5</kbd> Cargar el catálogo y las existencias de Eleventa
             </li>

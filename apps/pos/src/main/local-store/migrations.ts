@@ -622,4 +622,16 @@ export const MIGRATIONS: readonly Migration[] = [
       ) STRICT;
     `,
   },
+  {
+    version: 17,
+    name: 'index_the_dashboard_queries',
+    // The dashboard reads a year of sales by the moment they were resolved (E1-45, ADR 0060). Indexes only: nothing is
+    // stored twice, so there is nothing to keep in step. The partial one lists the entries that carry a cost, which are few
+    // next to the sales that fill the ledger.
+    sql: `
+      CREATE INDEX sale_by_status_and_time ON sale (tenant_id, status, resolved_at);
+      CREATE INDEX sale_return_by_time ON sale_return (tenant_id, occurred_at);
+      CREATE INDEX stock_movement_with_cost ON stock_movement (tenant_id, product_id) WHERE unit_cost_e6 IS NOT NULL;
+    `,
+  },
 ];

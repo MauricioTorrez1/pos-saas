@@ -8,6 +8,7 @@ import { AdminActions, type PassphraseVault } from './admin/admin-actions';
 import { applyPendingRestore } from './backup/backup-service';
 import { CatalogImporter } from './import/catalog-importer';
 import { AuditLog } from './audit/audit-log';
+import { OwnerGate } from './auth/owner-gate';
 import { InventoryService } from './inventory/inventory-service';
 import { StockStore } from './inventory/stock-store';
 
@@ -16,6 +17,9 @@ import { CashService } from './cash/cash-service';
 import { CashSessionStore } from './cash/cash-session-store';
 import { UserStore } from './auth/user-store';
 import { PendingSales } from './checkout/pending-sales';
+import { DashboardExporter } from './reports/dashboard-exporter';
+import { DashboardService } from './reports/dashboard-service';
+import { printHtmlToPdf } from './reports/pdf-printer';
 import { ReportService } from './reports/report-service';
 import { ReturnService } from './returns/return-service';
 import { ReturnStore } from './returns/return-store';
@@ -115,6 +119,15 @@ async function pickPath(properties: ('openFile' | 'openDirectory')[], title: str
   return canceled ? null : (filePaths[0] ?? null);
 }
 
+async function pickSavePath(title: string, defaultName: string, filterName: string, extension: string): Promise<string | null> {
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    title,
+    defaultPath: join(app.getPath('documents'), defaultName),
+    filters: [{ name: filterName, extensions: [extension] }],
+  });
+  return canceled || filePath === undefined ? null : filePath;
+}
+
 async function start(): Promise<void> {
   await app.whenReady();
   const store = openLocalStore();
@@ -152,8 +165,15 @@ async function start(): Promise<void> {
   const prices = new PriceChangeService(store, LOCAL_TENANT_ID, auth, catalog, new AuditLog(store, LOCAL_TENANT_ID));
   const inventory = new InventoryService(store, LOCAL_TENANT_ID, auth, new StockStore(store, LOCAL_TENANT_ID), new AuditLog(store, LOCAL_TENANT_ID), catalog);
   const products = new ProductService(store, LOCAL_TENANT_ID, auth, new AuditLog(store, LOCAL_TENANT_ID), new ProductReader(store, LOCAL_TENANT_ID), catalog, inventory);
+  const dashboard = new DashboardService(store, LOCAL_TENANT_ID, new OwnerGate(auth, new AuditLog(store, LOCAL_TENANT_ID)));
   registerIpcHandlers(rendererEntry, {
     auth,
+    dashboard,
+    dashboardExporter: new DashboardExporter(dashboard, {
+      pickSavePath,
+      renderPdf: printHtmlToPdf,
+      businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
+    }),
     cash,
     prices,
     products,

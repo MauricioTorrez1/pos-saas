@@ -46,6 +46,7 @@ The lookup box always holds the keyboard, so a scan lands there even after a cli
 | F7 | Opens the dialog to change the price of a product |
 | F5 | Opens the form to add a product that is not in the catalog |
 | F10 | Opens the panel of a product: edit it, change its price, adjust its stock |
+| F11 | Opens the summary of the business |
 
 A barcode scanner acts as a keyboard, so the register tells it apart by speed: at least 4 characters with no more than 50 ms between them. Only what happens to an unknown code changes: from the scanner it shows a warning, and from a person it searches by name.
 
@@ -97,6 +98,19 @@ When a customer brings something that is not in the catalog imported from Eleven
 | Concurrency | Every change of a product raises its `revision`. If the product changed after the panel loaded it, nothing is written (`stale`) and the panel shows how it is now |
 | One transaction | The update, the barcodes, the `product.update` audit entry (old and new value of each field), and the `product.updated` operation in `sync_outbox` are written together or not at all |
 | Sales already made | Nothing in `sale`, `sale_line`, a ticket or the ledger is touched |
+
+## Summary of the business
+**F11** on the sale screen (or **F9** inside the administration) opens "Resumen del negocio" ([ADR 0060](../../docs/adr/0060-tablero-de-indicadores-y-mas-vendidos.md)). It works with no internet, because every number comes from the register's own database: the completed sales, the returns and the stock ledger. A cancelled or still open sale never counts.
+
+- **Period:** day, week (Monday to Sunday), month, year or a custom range, counted in the `America/Mexico_City` time zone, including the days the clocks changed. The arrows move to the previous or next period, and every number is compared with the period right before it.
+- **Resumen:** sales with and without VAT, tickets, average ticket, lines per ticket, returns, net sales, cost of goods sold, gross profit and margin, cancellations, sales by way of payment (a sale paid two ways is "mixto"), by hour, by weekday, by day or month and by cashier, and the value of the stock at cost. The charts are drawn as SVG by `BarChart`, with a text for screen readers and the same numbers as a table under "Ver como tabla".
+- **Más vendidos:** top 10, 20 or 50 by quantity, amount or profit. Pieces show whole and kilos, liters and meters show three decimals. Ties always come out in the same order.
+- **Inventario:** what ran out, what is about to (it sold in the period as much as what is left), what has stock and did not sell, and what has no cost.
+- **Costs:** the cost the owner typed, or else the weighted average of the entries with a cost in the ledger ([ADR 0049](../../docs/adr/0049-costo-promedio-en-el-servidor.md)). A product with neither is marked "sin costo" and is left out of the profit instead of being guessed.
+- **Who sees what:** the owner sees everything. A cashier sees only the sales of their own shift and never receives costs, profit, margins or the stock value; with the PIN of an owner they see the whole summary, the same way as in the price change.
+- **Export:** **F3** saves an Excel file (`.xlsx`, written without a library) and **F4** a PDF (printed by Electron's `webContents.printToPDF`). The window to choose where to save is the one of Windows, and a file never has more than the screen had.
+
+Money is kept in whole cents and costs in millionths of a peso, with no floating point; the rounding of each figure is written in the ADR. The queries are aggregates in SQLite over three indexes added by migration 17: with 5,000 sales and 15,000 lines in a year, the year answers in about 100 ms.
 
 ## Sale states and recovery
 A sale is saved as `pending_payment` before anything is charged, so a power cut can never leave money without a record ([ADR 0010](../../docs/adr/0010-guardar-antes-de-cobrar.md)). From there it can only become `completed` or `cancelled`, and each change is one transaction. `src/main/checkout/sale-state-machine.ts` gives a clear error, and triggers in the database refuse the same changes if the code ever gets it wrong ([ADR 0025](../../docs/adr/0025-maquina-de-estados-de-la-venta.md)).

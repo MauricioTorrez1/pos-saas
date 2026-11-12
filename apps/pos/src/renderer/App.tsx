@@ -8,6 +8,8 @@ import type { ProductAdminApi } from '../shared/product-admin';
 import { applyAppearance } from './appearance/apply-appearance';
 import { AppearanceDialog } from './appearance/AppearanceDialog';
 import type { CashStatus } from '../shared/cash-api';
+import type { DashboardApi } from '../shared/dashboard-api';
+import { DashboardDialog } from './dashboard/DashboardDialog';
 import { AdminDialog } from './admin/AdminDialog';
 import { LoginScreen } from './auth/LoginScreen';
 import { CashDialog } from './cash/CashDialog';
@@ -33,6 +35,7 @@ const SHORTCUTS: readonly { readonly keys: string; readonly action: string }[] =
   { keys: 'F7', action: 'Precio' },
   { keys: 'F5', action: 'Producto nuevo' },
   { keys: 'F10', action: 'Producto' },
+  { keys: 'F11', action: 'Resumen' },
   { keys: 'F8', action: 'Reimprimir' },
   { keys: 'F6', action: 'Salir' },
 ];
@@ -43,6 +46,8 @@ interface AppProps {
   readonly pricingApi?: PricingApi;
   /** Adding products that are not in the catalog (E1-42). Without it, the register offers no product form. */
   readonly productApi?: ProductAdminApi;
+  /** The summary of the business (E1-45). Without it, the register offers no summary. */
+  readonly dashboardApi?: DashboardApi;
 }
 
 /**
@@ -52,9 +57,10 @@ interface AppProps {
  * @param props.posApi bridge to the main process
  * @param props.pricingApi bridge for changing prices, when the register offers it
  * @param props.productApi bridge for adding products, when the register offers it
+ * @param props.dashboardApi bridge for the summary of the business, when the register offers it
  * @returns the screen
  */
-export function App({ posApi, pricingApi, productApi }: AppProps): ReactElement {
+export function App({ posApi, pricingApi, productApi, dashboardApi }: AppProps): ReactElement {
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [authState, setAuthState] = useState<AuthState | null>(null);
   const [authFailed, setAuthFailed] = useState(false);
@@ -96,6 +102,7 @@ export function App({ posApi, pricingApi, productApi }: AppProps): ReactElement 
       posApi={posApi}
       {...(pricingApi === undefined ? {} : { pricingApi })}
       {...(productApi === undefined ? {} : { productApi })}
+      {...(dashboardApi === undefined ? {} : { dashboardApi })}
       user={authState.current}
       appearance={appearance}
       onAppearanceSaved={setAppearance}
@@ -108,19 +115,21 @@ interface RegisterScreenProps {
   readonly posApi: PosApi;
   readonly pricingApi?: PricingApi;
   readonly productApi?: ProductAdminApi;
+  readonly dashboardApi?: DashboardApi;
   readonly user: UserSummary;
   readonly appearance: Appearance;
   readonly onAppearanceSaved: (appearance: Appearance) => void;
   readonly onSignOut: () => void;
 }
 
-function RegisterScreen({ posApi, pricingApi, productApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
+function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
   const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
   const [cash, setCash] = useState<CashStatus | null>(null);
   const [isEditingCash, setIsEditingCash] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
   const [isAdministering, setIsAdministering] = useState(false);
+  const [isViewingDashboard, setIsViewingDashboard] = useState(false);
   const pendingSales = usePendingSales(posApi);
   const hasPendingSales = pendingSales.sales.length > 0;
   const isOwner = user.role === 'owner';
@@ -154,6 +163,13 @@ function RegisterScreen({ posApi, pricingApi, productApi, user, appearance, onAp
   const closeCash = useCallback(() => setIsEditingCash(false), []);
   const openAdmin = useCallback(() => setIsAdministering(isOwner), [isOwner]);
   const closeAdmin = useCallback(() => setIsAdministering(false), []);
+  const openDashboard = useCallback(() => setIsViewingDashboard(dashboardApi !== undefined), [dashboardApi]);
+  const closeDashboard = useCallback(() => setIsViewingDashboard(false), []);
+  // The administration closes when it hands over to the summary, so only one dialog has the keyboard.
+  const openDashboardFromAdmin = useCallback(() => {
+    setIsAdministering(false);
+    openDashboard();
+  }, [openDashboard]);
   const openReturns = useCallback(() => setIsReturning(true), []);
   const closeReturns = useCallback(() => setIsReturning(false), []);
 
@@ -188,6 +204,11 @@ function RegisterScreen({ posApi, pricingApi, productApi, user, appearance, onAp
             Apariencia <kbd>F9</kbd>
           </button>
         )}
+        {dashboardApi !== undefined && (
+          <button type="button" className="header-button" tabIndex={-1} onClick={openDashboard}>
+            Resumen <kbd>F11</kbd>
+          </button>
+        )}
         <button type="button" className="header-button" tabIndex={-1} onClick={openReturns}>
           Devolución <kbd>F4</kbd>
         </button>
@@ -207,13 +228,14 @@ function RegisterScreen({ posApi, pricingApi, productApi, user, appearance, onAp
         posApi={posApi}
         {...(pricingApi === undefined ? {} : { pricingApi })}
         {...(productApi === undefined ? {} : { productApi })}
-        isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering}
+        isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering || isViewingDashboard}
         isOwner={isOwner}
         onOpenAppearance={openAppearance}
         onSignOut={onSignOut}
         onOpenCash={openCash}
         onOpenReturns={openReturns}
         onOpenAdmin={openAdmin}
+        {...(dashboardApi === undefined ? {} : { onOpenDashboard: openDashboard })}
         onCashChanged={refreshCash}
       />
       <footer className="register-footer">
@@ -237,8 +259,9 @@ function RegisterScreen({ posApi, pricingApi, productApi, user, appearance, onAp
         )}
       </footer>
       {isAdministering && !hasPendingSales && (
-        <AdminDialog posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} {...(productApi === undefined ? {} : { productApi })} onClose={closeAdmin} />
+        <AdminDialog posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} {...(productApi === undefined ? {} : { productApi })} {...(dashboardApi === undefined ? {} : { onOpenDashboard: openDashboardFromAdmin })} onClose={closeAdmin} />
       )}
+      {isViewingDashboard && !hasPendingSales && dashboardApi !== undefined && <DashboardDialog api={dashboardApi} user={user} onClose={closeDashboard} />}
       {isReturning && !hasPendingSales && <ReturnDialog posApi={posApi} user={user} onReturned={refreshCash} onClose={closeReturns} />}
       {isEditingCash && !hasPendingSales && cash !== null && (
         <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} onClose={closeCash} />
