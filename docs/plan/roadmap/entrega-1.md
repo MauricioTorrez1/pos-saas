@@ -226,6 +226,16 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Autoevaluación:** (1) ¿Por qué un pedido no es un movimiento del libro? (2) ¿Por qué el renglón copia el nombre y el código en lugar de apuntar al producto? (3) ¿Por qué un pedido enviado ya no se puede editar, ni siquiera con SQL?
 - **Entrevista:** (1) ¿Cómo generas un PDF sin una librería de PDF y cómo lo pruebas? (2) ¿Cómo modelas un documento que primero es borrador y luego historial?
 
+### E1-47 · Un solo escritor de Excel
+- **Objetivo:** el pedido al proveedor y el resumen del negocio salen del mismo módulo de Excel, con los mismos archivos de antes, y la caja deja de tener dos formas de escribir un `.xlsx`.
+- **Conceptos:** [Refactor], [Decimales exactos], [Inyección de fórmulas]
+- **Claude / tú:** Claude compara los dos exportadores, elige el escritor que garantiza decimales exactos, migra el otro, borra el código sobrante y lo justifica en una nota del ADR 0060. Tú abres los dos archivos en Excel y confirmas que se ven como antes.
+- **Pruebas:** las de los dos exportadores siguen igual (lectura de vuelta, columnas, totales y números exactos) y se agrega la del módulo compartido: hojas, formatos, números grandes y con 4 decimales, caracteres especiales y textos como `=1+1` que salen como texto y nunca como fórmula; los flujos de punta a punta que generan el Excel y el PDF reales.
+- **Criterios:** ADR 0060 (nota de E1-47); sin dependencias nuevas; una dependencia que sale del paquete de la caja; el dinero nunca pasa por `float`.
+- **Depende de:** E1-44, E1-45 · **Estimación:** 2 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Cómo evitas que un texto que escribió una persona se ejecute como fórmula en una hoja de cálculo? (2) ¿Cuándo conviene escribir un formato de archivo a mano y cuándo usar una librería?
+
 ## Hito E1-C: Sincronización
 
 ### E1-16 · Envío desde la caja

@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 40 de 45 tareas hechas · ⚠️ 5 faltan (21 h)
+✅ 41 de 46 tareas hechas · ⚠️ 5 faltan (21 h)
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -85,6 +85,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-43 · Panel de modificación de productos** (5 h) _(En revisión)_: el dueño busca un producto y modifica su nombre, códigos, unidad, impuesto, costo y estado, cambia su precio y ajusta su inventario desde una sola pantalla, sin perder el historial.
 - ✅ **E1-45 · Tablero de indicadores y más vendidos** (6 h) _(En revisión)_: el dueño ve en la caja, sin internet, cómo va el negocio en un día, una semana, un mes, un año o un rango, contra el periodo anterior, con los más vendidos y lo que no se mueve, y se lo lleva a Excel o PDF.
 - ✅ **E1-44 · Pedido al proveedor** (6 h) _(En revisión)_: en la caja el dueño arma un pedido a un proveedor, lo guarda como borrador o lo marca como enviado, y saca un archivo de Excel o de PDF para mandarlo por correo o por WhatsApp, sin internet y sin mover el inventario.
+- ✅ **E1-47 · Un solo escritor de Excel** (2 h) _(En revisión)_: el pedido al proveedor y el resumen del negocio salen del mismo módulo de Excel, que escribe los números como decimales exactos y los textos nunca como fórmulas, sin cambiar lo que el dueño ve en los archivos.
 
 ## Entrega 2 · Terminal de tarjeta integrada
 
@@ -203,4 +204,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 60 de 161 tareas hechas (250 h de 712 h) · ⚠️ 101 faltan (462 h).
+✅ 61 de 162 tareas hechas (252 h de 714 h) · ⚠️ 101 faltan (462 h).
