@@ -9,10 +9,14 @@ export interface FieldProps {
   readonly autoFocus?: boolean;
   readonly hint?: string;
   readonly maxLength?: number;
+  /** What Enter does in this box. Without it, Enter moves to the next box. A scanner ends every code with Enter. */
+  readonly onEnter?: () => void;
+  /** Shown in place of the hint when something about this box is wrong. */
+  readonly problem?: string | undefined;
 }
 
 /** A labeled box. Enter moves to the next box of the form, and never submits it. */
-export function Field({ label, value, onChange, type = 'text', autoFocus = false, hint, maxLength }: FieldProps): ReactElement {
+export function Field({ label, value, onChange, type = 'text', autoFocus = false, hint, maxLength, onEnter, problem }: FieldProps): ReactElement {
   const ref = useRef<HTMLInputElement>(null);
   return (
     <label className="payment-field">
@@ -28,11 +32,19 @@ export function Field({ label, value, onChange, type = 'text', autoFocus = false
         maxLength={maxLength}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        onKeyDown={moveOnEnter}
+        aria-invalid={problem === undefined ? undefined : true}
+        onKeyDown={onEnter === undefined ? moveOnEnter : (event) => runOnEnter(event, onEnter)}
       />
-      {hint !== undefined && <small>{hint}</small>}
+      {problem !== undefined ? <small className="payment-field-problem">{problem}</small> : hint !== undefined && <small>{hint}</small>}
     </label>
   );
+}
+
+function runOnEnter(event: KeyboardEvent<HTMLInputElement>, action: () => void): void {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    action();
+  }
 }
 
 function moveOnEnter(event: KeyboardEvent<HTMLInputElement>): void {
@@ -40,8 +52,61 @@ function moveOnEnter(event: KeyboardEvent<HTMLInputElement>): void {
     return;
   }
   event.preventDefault();
-  const inputs = [...(event.currentTarget.closest('dialog')?.querySelectorAll<HTMLInputElement>('input') ?? [])];
-  inputs[inputs.indexOf(event.currentTarget) + 1]?.focus();
+  moveToNextBox(event.currentTarget);
+}
+
+export interface SelectFieldProps<Value extends string> {
+  readonly label: string;
+  readonly value: Value;
+  readonly onChange: (value: Value) => void;
+  readonly options: readonly { readonly value: Value; readonly label: string }[];
+  readonly disabled?: boolean;
+  readonly hint?: string;
+}
+
+/** A labeled list of choices. Arrow keys change the choice, and Enter moves to the next box of the form. */
+export function SelectField<Value extends string>({ label, value, onChange, options, disabled = false, hint }: SelectFieldProps<Value>): ReactElement {
+  return (
+    <label className="payment-field">
+      <span>{label}</span>
+      <select
+        aria-label={label}
+        className="payment-select"
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value as Value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            moveToNextBox(event.currentTarget);
+          }
+        }}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {hint !== undefined && <small>{hint}</small>}
+    </label>
+  );
+}
+
+/** A box to tick, such as "A la venta". */
+export function CheckField({ label, checked, onChange }: { readonly label: string; readonly checked: boolean; readonly onChange: (checked: boolean) => void }): ReactElement {
+  return (
+    <label className="payment-check">
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <span>{label}</span>
+    </label>
+  );
+}
+
+/** Moves the keyboard to the next box or list of the dialog the element is in. */
+function moveToNextBox(element: HTMLElement): void {
+  const boxes = [...(element.closest('dialog')?.querySelectorAll<HTMLElement>('input:not([type="checkbox"]), select') ?? [])];
+  boxes[boxes.indexOf(element) + 1]?.focus();
 }
 
 export function Message({ text }: { readonly text: string | null }): ReactElement | null {

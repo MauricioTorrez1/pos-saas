@@ -2,8 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import { IPC_CHANNELS, type PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
+import type { ProductAdminApi } from '../shared/product-admin';
 
-const posApi: PosApi & PricingApi = {
+const posApi: PosApi & PricingApi & ProductAdminApi = {
   getAppInfo: () => ipcRenderer.invoke(IPC_CHANNELS.getAppInfo),
   getAuthState: () => ipcRenderer.invoke(IPC_CHANNELS.getAuthState),
   setupOwner: (request) => ipcRenderer.invoke(IPC_CHANNELS.setupOwner, request),
@@ -30,6 +31,7 @@ const posApi: PosApi & PricingApi = {
   searchProducts: (text) => ipcRenderer.invoke(IPC_CHANNELS.searchProducts, text),
   getPriceInfo: (productId) => ipcRenderer.invoke(IPC_CHANNELS.getPriceInfo, productId),
   changePrice: (request) => ipcRenderer.invoke(IPC_CHANNELS.changePrice, request),
+  createProduct: (request) => ipcRenderer.invoke(IPC_CHANNELS.createProduct, request),
   getAppearance: () => ipcRenderer.invoke(IPC_CHANNELS.getAppearance),
   saveAppearance: (appearance) => ipcRenderer.invoke(IPC_CHANNELS.saveAppearance, appearance),
   savePendingSale: (request) => ipcRenderer.invoke(IPC_CHANNELS.savePendingSale, request),

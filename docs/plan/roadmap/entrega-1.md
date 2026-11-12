@@ -186,6 +186,26 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Autoevaluación:** (1) ¿Por qué el negocio viaja dentro de la credencial? (2) ¿Por qué un 403 y no un 401 cuando el lote nombra otra caja? (3) ¿Qué pasa con las ventas de una caja dada de baja?
 - **Entrevista:** (1) ¿Cómo autenticas un dispositivo sin usuario? (2) ¿Cómo revocas una credencial sin esperar a que caduque?
 
+### E1-42 · Alta de nuevos productos en la caja
+- **Objetivo:** el dueño da de alta, desde la venta y sin internet, un producto que no está en el catálogo, con su unidad, precio, impuesto, costo, códigos de barras y existencia inicial.
+- **Conceptos:** [Libro de movimientos], [Autorización en la caja], [Transacciones en SQLite]
+- **Claude / tú:** Claude escribe el formulario (F5, y «Dar de alta» cuando la búsqueda no encuentra nada), la regla de permisos, el movimiento de saldo inicial y el contrato `product.created`. Tú pruebas con productos reales y con el lector de códigos.
+- **Pruebas:** validaciones, permisos por rol y PIN, código repetido (también de un producto dado de baja), existencia inicial como movimiento del libro, bitácora, outbox en la misma transacción con reversa, ventas cerradas intactas, venta nueva con el producto recién creado, y un flujo de pantalla de punta a punta.
+- **Criterios:** cumple RF-040 y ADR 0057; escalas del ADR 0011; unidad explícita; el servidor lo recibe en una tarea posterior.
+- **Depende de:** E1-29, E1-39 · **Estimación:** 4 h
+- **Autoevaluación:** (1) ¿Por qué la existencia inicial es un movimiento y no una columna? (2) ¿Por qué el producto nace con su UUIDv7 en la caja? (3) ¿Por qué se revisa el código repetido antes de pedir el PIN?
+- **Entrevista:** (1) ¿Cómo creas una entidad offline sin que dos dispositivos choquen? (2) ¿Cómo mantienes atómico un cambio que toca cuatro tablas?
+
+### E1-43 · Panel de modificación de productos
+- **Objetivo:** el dueño busca un producto y modifica su nombre, códigos, unidad, impuesto, costo y estado, cambia su precio y ajusta su inventario desde una sola pantalla, sin perder el historial.
+- **Conceptos:** [Control de concurrencia optimista], [Borrado lógico], [Autorización en la caja]
+- **Claude / tú:** Claude escribe el panel (F10 en la venta y desde el inventario), las reglas de cada campo y el contrato `product.updated`; el precio y el inventario reutilizan los servicios de E1-39 y E1-26. Tú decides qué ve un cajero y pruebas con productos reales.
+- **Pruebas:** validaciones, permisos por rol y PIN, código repetido, unidad bloqueada con movimientos, bitácora con valor anterior y nuevo, outbox en la misma transacción con reversa, producto que cambió mientras se editaba, borrado lógico, ventas cerradas intactas y un flujo de pantalla de punta a punta.
+- **Criterios:** cumple RF-008, RF-040 y ADR 0058; nunca se borra un producto ni se edita la existencia; el precio sigue usando `product.price_changed`.
+- **Depende de:** E1-26, E1-39, E1-42 · **Estimación:** 5 h
+- **Autoevaluación:** (1) ¿Por qué la unidad no se puede cambiar cuando hay movimientos? (2) ¿Cómo sabe el panel que el producto cambió mientras lo editabas? (3) ¿Por qué se da de baja en lugar de borrar?
+- **Entrevista:** (1) ¿Qué es el control de concurrencia optimista y cuándo lo prefieres? (2) ¿Cómo modelas un borrado lógico sin romper la historia?
+
 ## Hito E1-C: Sincronización
 
 ### E1-16 · Envío desde la caja

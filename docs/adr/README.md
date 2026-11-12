@@ -58,3 +58,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0054](0054-credencial-de-dispositivo-en-sync-push.md) | Credencial de dispositivo `<tenantId>.<secreto>` en `/sync/push`, con revocación | Aceptada |
 | [0049](0049-costo-promedio-en-el-servidor.md) | Costo promedio ponderado móvil, recalculado en el servidor desde el libro | Aceptada |
 | [0055](0055-revision-de-cuarentena-y-discrepancias.md) | Revisión de cuarentena y discrepancias con resoluciones de solo agregar y aviso por el pull | Aceptada |
+| [0057](0057-alta-de-productos-en-la-caja.md) | Alta de productos en la caja, con PIN del dueño, existencia como movimiento y outbox en una transacción | Aceptada |

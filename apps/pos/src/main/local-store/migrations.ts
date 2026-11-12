@@ -585,6 +585,26 @@ export const MIGRATIONS: readonly Migration[] = [
   },
   {
     version: 15,
+    name: 'add_product_administration',
+    // What the register needs to add and edit products itself (E1-42, E1-43, ADR 0057 and ADR 0058). is_active is the logical
+    // delete: a product that was given up is hidden from the sale and kept for the history, because sale lines, the ledger
+    // and the audit log point at it. unit_cost_e6 is the cost the owner typed, in millionths of a peso, and the margin prefers
+    // it over the last cost of the ledger. revision goes up on every change of a product, so a screen can tell that the product
+    // changed while it was being edited; a trigger does it, so no path that updates a product can forget.
+    sql: `
+      ALTER TABLE product ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1));
+      ALTER TABLE product ADD COLUMN unit_cost_e6 INTEGER CHECK (unit_cost_e6 IS NULL OR unit_cost_e6 >= 0);
+      ALTER TABLE product ADD COLUMN revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1);
+
+      CREATE TRIGGER product_bumps_its_revision
+      AFTER UPDATE OF name, base_unit, unit_price_e4, tax_factor, tax_rate_bp, unit_cost_e6, is_active ON product
+      BEGIN
+        UPDATE product SET revision = revision + 1 WHERE local_rowid = NEW.local_rowid;
+      END;
+    `,
+  },
+  {
+    version: 16,
     name: 'create_operation_review',
     // What the owner decided about an operation or a price change of this register that the core could not apply as it
     // arrived (E1-19, ADR 0055). The id is the opId of the operation, or the changeId of the price change. It only informs:

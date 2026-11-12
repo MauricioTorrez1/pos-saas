@@ -4,8 +4,11 @@ import { useCallback, useEffect, useReducer, useRef, useState, type KeyboardEven
 import { isMiscLineId, MISC_LINE_ID_PREFIX, MISC_TAX_RATE_BP } from '../../shared/miscellaneous';
 import { MAX_LOOKUP_TEXT_LENGTH, type CatalogProduct, type PendingSale, type PosApi, type SavePendingSaleResult } from '../../shared/pos-api';
 import type { PricingApi } from '../../shared/pricing';
+import type { ProductAdminApi, ProductDetail } from '../../shared/product-admin';
 import { CheckoutDialog } from '../checkout/CheckoutDialog';
 import { PriceChangeDialog } from '../pricing/PriceChangeDialog';
+import { NewProductDialog } from '../products/NewProductDialog';
+import { newProductFormFor, type ProductFormValues } from '../products/product-form';
 import { describeReprint, REPRINT_FAILED } from '../checkout/reprint-message';
 import { MiscItemDialog, type MiscItem } from './MiscItemDialog';
 import { QuantityDialog } from './QuantityDialog';
@@ -48,6 +51,8 @@ interface SaleScreenProps {
   readonly posApi: PosApi;
   /** The prices of the catalog. Without it, F7 does nothing and the sale is saved with the catalog prices only. */
   readonly pricingApi?: PricingApi;
+  /** Adding products that are not in the catalog (E1-42). Without it, F5 does nothing and a missing product only says so. */
+  readonly productApi?: ProductAdminApi;
   /** While true, another part of the screen has the keyboard, and the lookup box waits. */
   readonly isKeyboardElsewhere: boolean;
   /** Whether the owner is signed in. A cashier who sells a miscellaneous item needs the PIN of the owner. */
@@ -71,6 +76,7 @@ interface SaleScreenProps {
  *
  * @param props.posApi bridge to the main process
  * @param props.pricingApi bridge for changing the price of a product, when the register offers it
+ * @param props.productApi bridge for adding a product that is not in the catalog, when the register offers it
  * @param props.isKeyboardElsewhere whether a dialog is using the keyboard
  * @param props.onOpenAppearance called when the cashier asks for the appearance dialog
  * @param props.onSignOut called when the cashier asks to sign out
@@ -80,7 +86,7 @@ interface SaleScreenProps {
  * @param props.onCashChanged called after a sale was collected
  * @returns the screen
  */
-export function SaleScreen({ posApi, pricingApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onCashChanged }: SaleScreenProps): ReactElement {
+export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onCashChanged }: SaleScreenProps): ReactElement {
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
@@ -90,6 +96,10 @@ export function SaleScreen({ posApi, pricingApi, isKeyboardElsewhere, isOwner = 
   const [isAddingMisc, setIsAddingMisc] = useState(false);
   /** The price dialog, with the product it starts from. Null while it is closed. */
   const [priceChange, setPriceChange] = useState<{ readonly product: CatalogProduct | null } | null>(null);
+  /** What was looked for and not found, so the cashier can add it as a new product (E1-42). */
+  const [missing, setMissing] = useState<{ readonly text: string; readonly fromScanner: boolean } | null>(null);
+  /** The form of a new product, with what is loaded in it. Null while it is closed. */
+  const [newProduct, setNewProduct] = useState<{ readonly initial: ProductFormValues; readonly lookedFor: string | null } | null>(null);
   const isSaving = useRef(false);
   /** The PIN the owner typed for the miscellaneous items of this sale. It lives only until the sale is saved or cleared. */
   const ownerPin = useRef<string | undefined>(undefined);
@@ -99,10 +109,10 @@ export function SaleScreen({ posApi, pricingApi, isKeyboardElsewhere, isOwner = 
   const search = useProductSearch(posApi, showCatalogFailure);
 
   useEffect(() => {
-    if (!isKeyboardElsewhere && savedSale === null && measuring === null && !isAddingMisc && priceChange === null) {
+    if (!isKeyboardElsewhere && savedSale === null && measuring === null && !isAddingMisc && priceChange === null && newProduct === null) {
       inputRef.current?.focus();
     }
-  }, [isKeyboardElsewhere, savedSale, measuring, isAddingMisc, priceChange]);
+  }, [isKeyboardElsewhere, savedSale, measuring, isAddingMisc, priceChange, newProduct]);
 
   const addMiscItem = ({ name, unitPriceE4, quantityMilli, ownerPin: pin }: MiscItem): void => {
     const product: CatalogProduct = {
@@ -133,7 +143,7 @@ export function SaleScreen({ posApi, pricingApi, isKeyboardElsewhere, isOwner = 
       setNotice(EMPTY_SALE_MESSAGE);
       return;
     }
-    if (isSaving.current || isKeyboardElsewhere || measuring !== null || isAddingMisc || priceChange !== null) {
+    if (isSaving.current || isKeyboardElsewhere || measuring !== null || isAddingMisc || priceChange !== null || newProduct !== null) {
       return;
     }
     isSaving.current = true;
@@ -196,6 +206,28 @@ export function SaleScreen({ posApi, pricingApi, isKeyboardElsewhere, isOwner = 
     );
   };
 
+  const openNewProduct = (): void => {
+    if (productApi === undefined || isSaving.current) {
+      return;
+    }
+    setNewProduct({ initial: newProductFormFor(missing?.text ?? '', missing?.fromScanner ?? false), lookedFor: missing?.text ?? null });
+  };
+
+  const finishNewProduct = (product: ProductDetail): void => {
+    const lookedFor = newProduct?.lookedFor ?? null;
+    setNewProduct(null);
+    setMissing(null);
+    setNotice(null);
+    clearLookup();
+    if (lookedFor !== null && product.isActive) {
+      // The product the customer brought is the one being rung up, so it goes straight onto the sale.
+      addProduct({ id: product.id, name: product.name, unit: product.unit, unitPriceE4: product.unitPriceE4, taxRate: product.taxRate }, lookedFor);
+      setInfo(`Producto nuevo: ${product.name}. Ya está en la venta y en el catálogo.`);
+    } else {
+      setInfo(`Producto nuevo: ${product.name}. Quedó guardado con tu nombre.`);
+    }
+  };
+
   const reprintLast = async (): Promise<void> => {
     try {
       setInfo(describeReprint(await posApi.reprintLastTicket()));
@@ -245,6 +277,7 @@ export function SaleScreen({ posApi, pricingApi, isKeyboardElsewhere, isOwner = 
         addProduct(product, text);
       } else if (fromScanner) {
         setNotice(notFoundMessage(text));
+        setMissing({ text, fromScanner });
       } else {
         await addHighlightedOrShowResults(text);
       }
@@ -262,6 +295,7 @@ export function SaleScreen({ posApi, pricingApi, isKeyboardElsewhere, isOwner = 
     const results = await search.searchNow(text);
     if (results.length === 0) {
       setNotice(notFoundMessage(text));
+      setMissing({ text, fromScanner: false });
     }
   };
 
@@ -318,6 +352,7 @@ export function SaleScreen({ posApi, pricingApi, isKeyboardElsewhere, isOwner = 
         event.preventDefault();
         clearLookup();
         setNotice(null);
+        setMissing(null);
         return;
       case 'ArrowDown':
         event.preventDefault();
@@ -347,6 +382,10 @@ export function SaleScreen({ posApi, pricingApi, isKeyboardElsewhere, isOwner = 
         event.preventDefault();
         openPriceChange();
         return;
+      case 'F5':
+        event.preventDefault();
+        openNewProduct();
+        return;
       case 'F6':
         event.preventDefault();
         onSignOut();
@@ -374,6 +413,7 @@ export function SaleScreen({ posApi, pricingApi, isKeyboardElsewhere, isOwner = 
 
   const handleInput = (): void => {
     setNotice(null);
+    setMissing(null);
     setInfo(null);
     const text = inputRef.current?.value.trim() ?? '';
     if (text === '') {
@@ -436,6 +476,13 @@ export function SaleScreen({ posApi, pricingApi, isKeyboardElsewhere, isOwner = 
             {message}
           </p>
         )}
+        {missing !== null && productApi !== undefined && (
+          <p>
+            <button type="button" className="button" tabIndex={-1} onClick={openNewProduct}>
+              Dar de alta «{missing.text}» <kbd>F5</kbd>
+            </button>
+          </p>
+        )}
         {info !== null && (
           <p className="notice notice-info" role="status">
             {info}
@@ -453,6 +500,16 @@ export function SaleScreen({ posApi, pricingApi, isKeyboardElsewhere, isOwner = 
           initialProduct={priceChange.product}
           onChanged={finishPriceChange}
           onCancel={() => setPriceChange(null)}
+        />
+      )}
+      {newProduct !== null && productApi !== undefined && (
+        <NewProductDialog
+          posApi={posApi}
+          productApi={productApi}
+          isOwner={isOwner}
+          initialValues={newProduct.initial}
+          onCreated={finishNewProduct}
+          onCancel={() => setNewProduct(null)}
         />
       )}
       {measuring !== null && <QuantityDialog product={measuring} onConfirm={confirmQuantity} onCancel={() => setMeasuring(null)} />}
