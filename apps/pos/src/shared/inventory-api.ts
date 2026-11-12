@@ -33,6 +33,8 @@ export interface AdjustStockRequest {
   readonly quantityMilli: number;
   /** Why. It stays in the audit log. */
   readonly reason: string;
+  /** The PIN of an owner, when a cashier asks (E1-43). The owner who is signed in needs none. */
+  readonly ownerPin?: string;
 }
 
 /** How an adjustment ended. */
@@ -40,7 +42,11 @@ export type AdjustStockResult =
   | { readonly status: 'recorded'; readonly kardex: Kardex }
   | { readonly status: 'not_found' }
   /** A waste has to take stock out. */
-  | { readonly status: 'waste_must_be_negative' };
+  | { readonly status: 'waste_must_be_negative' }
+  /** A cashier asked without the PIN of an owner. */
+  | { readonly status: 'authorization_required' }
+  | { readonly status: 'wrong_pin'; readonly attemptsLeft: number }
+  | { readonly status: 'locked'; readonly until: string };
 
 /** Something in the ledger that does not agree with the sales. */
 export interface LedgerProblem {

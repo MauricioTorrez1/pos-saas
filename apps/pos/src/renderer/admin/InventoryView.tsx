@@ -1,37 +1,25 @@
 import { formatUnitPriceE4, MoneyError, parseQuantity } from '@pos-saas/money';
 import { useState, type ReactElement } from 'react';
 
-import type { AdjustmentType, Kardex } from '../../shared/inventory-api';
+import type { Kardex } from '../../shared/inventory-api';
 import type { CatalogProduct, PosApi } from '../../shared/pos-api';
 import type { PricingApi } from '../../shared/pricing';
+import type { ProductAdminApi } from '../../shared/product-admin';
 import { PriceChangeDialog } from '../pricing/PriceChangeDialog';
+import { ProductPanelDialog } from '../products/ProductPanelDialog';
 import { formatQuantity } from '../sale/format';
 import { Field, Message, useAction } from '../ui/form-parts';
 import { useWindowKeys } from '../ui/use-window-keys';
+import { MOVEMENT_LABELS, STOCK_KINDS, type StockKind } from './stock-kinds';
 
 const MOMENT = new Intl.DateTimeFormat('es-MX', { dateStyle: 'short', timeStyle: 'short' });
-
-/** What the owner can say happened, in the words of the shop. */
-type Kind = 'waste' | 'surplus' | 'shortage';
-
-const KINDS: Readonly<Record<Kind, { readonly label: string; readonly type: AdjustmentType; readonly sign: 1 | -1 }>> = {
-  waste: { label: 'Merma (se perdió o se dañó)', type: 'waste', sign: -1 },
-  surplus: { label: 'Sobrante (hay más de lo que dice la caja)', type: 'adjustment', sign: 1 },
-  shortage: { label: 'Faltante (hay menos de lo que dice la caja)', type: 'adjustment', sign: -1 },
-};
-
-const TYPE_LABELS: Readonly<Record<string, string>> = {
-  opening_balance: 'Existencia inicial',
-  sale: 'Venta',
-  return: 'Devolución',
-  adjustment: 'Ajuste',
-  waste: 'Merma',
-};
 
 interface InventoryViewProps {
   readonly posApi: PosApi;
   /** The prices of the catalog. Without it, the product view offers no price change. */
   readonly pricingApi?: PricingApi;
+  /** Finding and editing products. Without it, the view of a product offers no panel. */
+  readonly productApi?: ProductAdminApi;
   readonly onBack: () => void;
 }
 
@@ -41,14 +29,16 @@ interface InventoryViewProps {
  *
  * @param props.posApi bridge to the main process
  * @param props.pricingApi bridge for changing the price of the product, when the register offers it
+ * @param props.productApi bridge for the product panel, when the register offers it
  * @param props.onBack called to go back to the administration summary
  * @returns the view
  */
-export function InventoryView({ posApi, pricingApi, onBack }: InventoryViewProps): ReactElement {
+export function InventoryView({ posApi, pricingApi, productApi, onBack }: InventoryViewProps): ReactElement {
   const [text, setText] = useState('');
   const [found, setFound] = useState<readonly CatalogProduct[]>([]);
   const [kardex, setKardex] = useState<Kardex | null>(null);
   const [isChangingPrice, setIsChangingPrice] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const { isBusy, message, setMessage, run } = useAction();
 
   const search = (): void => {
@@ -72,10 +62,23 @@ export function InventoryView({ posApi, pricingApi, onBack }: InventoryViewProps
       setKardex(await posApi.getKardex(productId));
     });
 
-  useWindowKeys({ Escape: kardex === null ? onBack : () => setKardex(null) }, isBusy || isChangingPrice);
+  useWindowKeys({ Escape: kardex === null ? onBack : () => setKardex(null) }, isBusy || isChangingPrice || isEditing);
 
   if (kardex !== null) {
-    return <KardexView posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} isChangingPrice={isChangingPrice} setIsChangingPrice={setIsChangingPrice} kardex={kardex} onChange={setKardex} onBack={() => setKardex(null)} />;
+    return (
+      <KardexView
+        posApi={posApi}
+        {...(pricingApi === undefined ? {} : { pricingApi })}
+        {...(productApi === undefined ? {} : { productApi })}
+        isChangingPrice={isChangingPrice}
+        setIsChangingPrice={setIsChangingPrice}
+        isEditing={isEditing}
+        setIsEditing={setIsEditing}
+        kardex={kardex}
+        onChange={setKardex}
+        onBack={() => setKardex(null)}
+      />
+    );
   }
   return (
     <>
@@ -87,7 +90,7 @@ export function InventoryView({ posApi, pricingApi, onBack }: InventoryViewProps
           search();
         }}
       >
-        <Field label="Producto" value={text} onChange={setText} autoFocus maxLength={100} />
+        <Field label="Producto" value={text} onChange={setText} autoFocus maxLength={100} onEnter={search} />
       </form>
       <Message text={message} />
       {found.length > 1 && (
@@ -111,16 +114,20 @@ export function InventoryView({ posApi, pricingApi, onBack }: InventoryViewProps
 interface KardexViewProps {
   readonly posApi: PosApi;
   readonly pricingApi?: PricingApi;
+  readonly productApi?: ProductAdminApi;
   /** Lives in the parent, because the key that goes back to the search must also wait while the price dialog is open. */
   readonly isChangingPrice: boolean;
   readonly setIsChangingPrice: (isChangingPrice: boolean) => void;
+  /** Lives in the parent for the same reason: the key that goes back must also wait while the product panel is open. */
+  readonly isEditing: boolean;
+  readonly setIsEditing: (isEditing: boolean) => void;
   readonly kardex: Kardex;
   readonly onChange: (kardex: Kardex) => void;
   readonly onBack: () => void;
 }
 
-function KardexView({ posApi, pricingApi, isChangingPrice, setIsChangingPrice, kardex, onChange, onBack }: KardexViewProps): ReactElement {
-  const [kind, setKind] = useState<Kind>('waste');
+function KardexView({ posApi, pricingApi, productApi, isChangingPrice, setIsChangingPrice, isEditing, setIsEditing, kardex, onChange, onBack }: KardexViewProps): ReactElement {
+  const [kind, setKind] = useState<StockKind>('waste');
   const [quantity, setQuantity] = useState('');
   const [reason, setReason] = useState('');
   const [note, setNote] = useState<string | null>(null);
@@ -142,7 +149,7 @@ function KardexView({ posApi, pricingApi, isChangingPrice, setIsChangingPrice, k
       setMessage('Escribe el motivo: se queda guardado en la bitácora.');
       return;
     }
-    const { type, sign } = KINDS[kind];
+    const { type, sign } = STOCK_KINDS[kind];
     run(async () => {
       const result = await posApi.adjustStock({ productId: kardex.productId, type, quantityMilli: sign * milli, reason });
       if (result.status === 'recorded') {
@@ -157,9 +164,10 @@ function KardexView({ posApi, pricingApi, isChangingPrice, setIsChangingPrice, k
   };
 
   const openPriceChange = pricingApi === undefined ? undefined : (): void => setIsChangingPrice(true);
+  const openProductPanel = productApi === undefined ? undefined : (): void => setIsEditing(true);
 
   // While the price dialog is open it has the keyboard, so these keys wait.
-  useWindowKeys({ F2: save, F5: () => setKind('waste'), F6: () => setKind('surplus'), F7: () => setKind('shortage'), F8: openPriceChange }, isBusy || isChangingPrice);
+  useWindowKeys({ F2: save, F5: () => setKind('waste'), F6: () => setKind('surplus'), F7: () => setKind('shortage'), F8: openPriceChange, F9: openProductPanel }, isBusy || isChangingPrice || isEditing);
 
   return (
     <>
@@ -180,7 +188,7 @@ function KardexView({ posApi, pricingApi, isChangingPrice, setIsChangingPrice, k
           {kardex.rows.map((row, index) => (
             <tr key={`${row.occurredAt}-${index}`}>
               <td>{MOMENT.format(new Date(row.occurredAt))}</td>
-              <td>{TYPE_LABELS[row.type] ?? row.type}</td>
+              <td>{MOVEMENT_LABELS[row.type] ?? row.type}</td>
               <td>{signed(row.quantityMilli, kardex.unit)}</td>
               <td>{signed(row.balanceMilli, kardex.unit)}</td>
             </tr>
@@ -191,7 +199,7 @@ function KardexView({ posApi, pricingApi, isChangingPrice, setIsChangingPrice, k
       <fieldset>
         <legend>Qué pasó</legend>
         <p>
-          <strong>{KINDS[kind].label}</strong>
+          <strong>{STOCK_KINDS[kind].label}</strong>
         </p>
         <p>
           <kbd>F5</kbd> Merma · <kbd>F6</kbd> Sobrante · <kbd>F7</kbd> Faltante
@@ -218,6 +226,20 @@ function KardexView({ posApi, pricingApi, isChangingPrice, setIsChangingPrice, k
           onCancel={() => setIsChangingPrice(false)}
         />
       )}
+      {isEditing && productApi !== undefined && (
+        <ProductPanelDialog
+          posApi={posApi}
+          productApi={productApi}
+          {...(pricingApi === undefined ? {} : { pricingApi })}
+          isOwner
+          initialProduct={{ id: kardex.productId }}
+          onClose={() => {
+            setIsEditing(false);
+            // The panel may have changed the product, its price or its stock, so the history is read again.
+            posApi.getKardex(kardex.productId).then((fresh) => (fresh === null ? onBack() : onChange(fresh)), () => setMessage('No se pudo actualizar el inventario.'));
+          }}
+        />
+      )}
       <div className="payment-actions">
         <button type="button" className="button" tabIndex={-1} onClick={onBack}>
           Otro producto <kbd>Esc</kbd>
@@ -225,6 +247,11 @@ function KardexView({ posApi, pricingApi, isChangingPrice, setIsChangingPrice, k
         {openPriceChange !== undefined && (
           <button type="button" className="button" tabIndex={-1} onClick={openPriceChange}>
             Cambiar precio <kbd>F8</kbd>
+          </button>
+        )}
+        {openProductPanel !== undefined && (
+          <button type="button" className="button" tabIndex={-1} onClick={openProductPanel}>
+            Modificar producto <kbd>F9</kbd>
           </button>
         )}
         <button type="button" className="button button-primary" tabIndex={-1} disabled={isBusy} onClick={save}>

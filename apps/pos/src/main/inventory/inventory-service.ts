@@ -4,6 +4,7 @@ import type { AdjustStockRequest, AdjustStockResult, Kardex, KardexRow, LedgerCh
 import { MISC_PRODUCT_ID } from '../../shared/miscellaneous';
 import type { AuditLog } from '../audit/audit-log';
 import type { AuthService } from '../auth/auth-service';
+import { isRefusal, OwnerGate } from '../auth/owner-gate';
 import type { LocalStore } from '../local-store/local-store';
 import type { ProductCatalog } from '../local-store/product-catalog';
 import { uuidV7 } from '../uuid-v7';
@@ -42,6 +43,7 @@ export class InventoryService {
   readonly #auth: AuthService;
   readonly #stock: StockStore;
   readonly #audit: AuditLog;
+  readonly #gate: OwnerGate;
   readonly #catalog: ProductCatalog;
   readonly #kardexRows: StatementSync;
   readonly #movementCount: StatementSync;
@@ -61,6 +63,7 @@ export class InventoryService {
     this.#auth = auth;
     this.#stock = stock;
     this.#audit = audit;
+    this.#gate = new OwnerGate(auth, audit);
     this.#catalog = catalog;
     this.#outbox = new SyncOutbox(store, tenantId);
     // The balance is summed over the whole history and only then cut, so the rows shown always add up to the stock.
@@ -81,14 +84,15 @@ export class InventoryService {
    * Corrects a count or writes off a loss.
    *
    * @param request the product, what happened, how much and why
-   * @returns the new kardex, or why nothing was recorded
-   * @throws Error if the person signed in is not the owner
+   * @returns the new kardex, or why nothing was recorded. A cashier needs the PIN of an owner, and a missing PIN, a wrong one
+   *   and a lock are answers that are written in the audit log as `stock.adjust_denied`.
+   * @throws Error if nobody is signed in
    * @throws RangeError if the quantity is zero or not a whole number of thousandths, or the reason is empty
    */
   adjust(request: AdjustStockRequest): AdjustStockResult {
     const user = this.#auth.currentUser();
-    if (user?.role !== 'owner') {
-      throw new Error('Only the owner can adjust the stock');
+    if (user === null) {
+      throw new Error('Only a person who is signed in can adjust the stock');
     }
     if (!Number.isSafeInteger(request.quantityMilli) || request.quantityMilli === 0) {
       throw new RangeError('The quantity must be a whole number of thousandths other than zero');
@@ -100,8 +104,20 @@ export class InventoryService {
     if (request.type === 'waste' && request.quantityMilli > 0) {
       return { status: 'waste_must_be_negative' };
     }
-    if (this.#catalog.findById(request.productId) === null) {
+    // A product that was given up still has stock to correct, so it is found too.
+    if (this.#catalog.findById(request.productId, { includeInactive: true }) === null) {
       return { status: 'not_found' };
+    }
+    const approval = this.#gate.authorize({
+      user,
+      ownerPin: request.ownerPin,
+      deniedAction: 'stock.adjust_denied',
+      entity: 'product',
+      entityId: request.productId,
+      deniedDetail: `tried ${request.type} of ${request.quantityMilli} thousandths: ${reason}`,
+    });
+    if (isRefusal(approval)) {
+      return approval;
     }
 
     this.#store.transaction(() => {
@@ -114,7 +130,7 @@ export class InventoryService {
         action: `stock.${request.type}`,
         entity: 'product',
         entityId: request.productId,
-        detail: `${request.quantityMilli} thousandths: ${reason}`,
+        detail: `${request.quantityMilli} thousandths: ${reason}${approval.ownerId === user.id ? '' : `; approved by ${approval.ownerId}`}`,
       });
       this.#outbox.enqueue('stock.adjusted', {
         movementId,
@@ -123,6 +139,7 @@ export class InventoryService {
         quantityMilli: request.quantityMilli,
         reason,
         userId: user.id,
+        ...(approval.ownerId === user.id ? {} : { authorizedBy: approval.ownerId }),
       });
     });
     return { status: 'recorded', kardex: this.kardex(request.productId)! };
@@ -135,7 +152,7 @@ export class InventoryService {
    * @returns the newest movements with the balance after each, or null if the product does not exist
    */
   kardex(productId: string): Kardex | null {
-    const product = this.#catalog.findById(productId);
+    const product = this.#catalog.findById(productId, { includeInactive: true });
     if (product === null) {
       return null;
     }

@@ -150,7 +150,8 @@ async function start(): Promise<void> {
       renderTicket(toTicketData(appearance.read().businessName || UNNAMED_BUSINESS, sale, { ...receipt, isReprint: false })),
   });
   const prices = new PriceChangeService(store, LOCAL_TENANT_ID, auth, catalog, new AuditLog(store, LOCAL_TENANT_ID));
-  const products = new ProductService(store, LOCAL_TENANT_ID, auth, new AuditLog(store, LOCAL_TENANT_ID), new ProductReader(store, LOCAL_TENANT_ID));
+  const inventory = new InventoryService(store, LOCAL_TENANT_ID, auth, new StockStore(store, LOCAL_TENANT_ID), new AuditLog(store, LOCAL_TENANT_ID), catalog);
+  const products = new ProductService(store, LOCAL_TENANT_ID, auth, new AuditLog(store, LOCAL_TENANT_ID), new ProductReader(store, LOCAL_TENANT_ID), catalog, inventory);
   registerIpcHandlers(rendererEntry, {
     auth,
     cash,
@@ -158,7 +159,7 @@ async function start(): Promise<void> {
     products,
     returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, cash),
     admin,
-    inventory: new InventoryService(store, LOCAL_TENANT_ID, auth, new StockStore(store, LOCAL_TENANT_ID), new AuditLog(store, LOCAL_TENANT_ID), catalog),
+    inventory,
     reports: new ReportService(store, LOCAL_TENANT_ID, auth),
     catalog,
     appearance,

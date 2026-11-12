@@ -59,3 +59,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0049](0049-costo-promedio-en-el-servidor.md) | Costo promedio ponderado móvil, recalculado en el servidor desde el libro | Aceptada |
 | [0056](0056-precio-impuesto-y-claves-sat-del-producto.md) | Precio con IVA incluido, impuesto y claves SAT del producto, publicados a las cajas | Aceptada |
 | [0057](0057-alta-de-productos-en-la-caja.md) | Alta de productos en la caja, con PIN del dueño, existencia como movimiento y outbox en una transacción | Aceptada |
+| [0058](0058-panel-de-modificacion-de-productos.md) | Panel de modificación de productos: borrado lógico, revisión optimista, unidad bloqueada con movimientos y precio e inventario por sus servicios | Aceptada |

@@ -76,7 +76,8 @@ function posApiWith(user: UserSummary, overrides: Partial<PosApi> = {}): PosApi 
 }
 
 function productApiWith(createProduct: ProductAdminApi['createProduct']): ProductAdminApi {
-  return { createProduct };
+  // The new product dialog only needs this one; the product panel has its own tests.
+  return { createProduct } as ProductAdminApi;
 }
 
 async function renderApp(posApi: PosApi, productApi: ProductAdminApi): Promise<void> {

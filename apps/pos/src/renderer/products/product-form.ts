@@ -6,7 +6,10 @@ import {
   problemWithBarcodes,
   problemWithName,
   readUnitCost,
+  unitCostText,
   type NewProductRequest,
+  type ProductDetail,
+  type UpdateProductRequest,
 } from '../../shared/product-admin';
 import { readNewPrice } from '../pricing/price-input';
 
@@ -195,6 +198,73 @@ export function readNewProductForm(values: ProductFormValues): NewProductReading
       barcodes: values.barcodes.map((code) => code.trim()),
       initialStockMilli,
       isActive: values.isActive,
+    },
+  };
+}
+
+/**
+ * Fills the boxes of the panel with a product as it is now. The price and the stock have no box in the panel, so they stay
+ * empty: they change with their own dialogs.
+ *
+ * @param product the product loaded from the main process
+ * @returns the values the boxes start with, which are also what the panel compares against to tell if anything changed
+ */
+export function formValuesOf(product: ProductDetail): ProductFormValues {
+  return {
+    name: product.name,
+    unit: product.unit,
+    price: '',
+    taxKey: taxKeyOf(product.taxRate),
+    cost: product.unitCostE6 === null ? '' : unitCostText(product.unitCostE6),
+    barcodes: product.barcodes,
+    stock: '',
+    isActive: product.isActive,
+  };
+}
+
+/** What reading the form of the panel gave: what to send, or what to fix. */
+export type ProductEditReading =
+  | { readonly ok: true; readonly changes: Omit<UpdateProductRequest, 'productId' | 'expectedRevision' | 'ownerPin'> }
+  | { readonly ok: false; readonly problems: ProductFormProblems };
+
+/**
+ * Reads the boxes of the panel, with the same rules the main process checks again. The price and the stock are not read:
+ * the panel does not write them.
+ *
+ * @param values what the boxes hold
+ * @returns the new state of the edited fields, or every problem found
+ */
+export function readEditForm(values: ProductFormValues): ProductEditReading {
+  const problems: { -readonly [Key in keyof ProductFormProblems]: ProductFormProblems[Key] } = {};
+  const nameProblem = problemWithName(values.name);
+  if (nameProblem !== null) {
+    problems.name = nameProblem;
+  }
+  let unitCostE6: number | null = null;
+  if (values.cost.trim() !== '') {
+    const cost = readUnitCost(values.cost);
+    if (cost.ok) {
+      unitCostE6 = cost.unitCostE6;
+    } else {
+      problems.cost = cost.message;
+    }
+  }
+  const barcodesProblem = problemWithBarcodes(values.barcodes);
+  if (barcodesProblem !== null) {
+    problems.barcodes = barcodesProblem;
+  }
+  if (Object.keys(problems).length > 0) {
+    return { ok: false, problems };
+  }
+  return {
+    ok: true,
+    changes: {
+      name: values.name.trim(),
+      unit: values.unit,
+      taxRate: taxRateOfKey(values.taxKey),
+      unitCostE6,
+      isActive: values.isActive,
+      barcodes: values.barcodes.map((code) => code.trim()),
     },
   };
 }

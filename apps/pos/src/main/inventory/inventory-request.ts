@@ -1,4 +1,5 @@
 import type { AdjustStockRequest } from '../../shared/inventory-api';
+import { parseOwnerPin } from '../products/product-request';
 
 const UUID_V7_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const MAX_REASON_LENGTH = 200;
@@ -38,5 +39,12 @@ export function parseAdjustStockRequest(value: unknown): AdjustStockRequest {
   if (typeof request.reason !== 'string' || request.reason.length > MAX_REASON_LENGTH) {
     throw new TypeError(`Expected a reason of at most ${MAX_REASON_LENGTH} characters`);
   }
-  return { productId: parseProductId(request.productId), type: request.type, quantityMilli: request.quantityMilli, reason: request.reason };
+  const ownerPin = parseOwnerPin(request.ownerPin);
+  return {
+    productId: parseProductId(request.productId),
+    type: request.type,
+    quantityMilli: request.quantityMilli,
+    reason: request.reason,
+    ...(ownerPin === undefined ? {} : { ownerPin }),
+  };
 }

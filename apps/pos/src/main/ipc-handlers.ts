@@ -5,7 +5,7 @@ import type { LoginResult, UserSummary } from '../shared/auth';
 import type { BackupOutcome, BackupStatus, ImportOutcome, RestoreOutcome } from '../shared/admin-api';
 import type { AdjustStockResult, Kardex, LedgerCheck } from '../shared/inventory-api';
 import type { ChangePriceResult, PriceInfo } from '../shared/pricing';
-import type { CreateProductResult } from '../shared/product-admin';
+import type { CreateProductResult, ProductPanelDetail, ProductSummary, UpdateProductResult } from '../shared/product-admin';
 import type { DailyReport } from '../shared/report-api';
 import type { FindReturnableResult, ReturnResult } from '../shared/returns-api';
 import type { CashMovementResult, CashStatus, CloseCashResult, OpenCashResult } from '../shared/cash-api';
@@ -29,7 +29,7 @@ import type { CashService } from './cash/cash-service';
 import { parseAdjustStockRequest, parseProductId } from './inventory/inventory-request';
 import type { InventoryService } from './inventory/inventory-service';
 import { parseChangePriceRequest } from './pricing/price-request';
-import { parseNewProductRequest } from './products/product-request';
+import { parseNewProductRequest, parseUpdateProductRequest } from './products/product-request';
 import type { ProductService } from './products/product-service';
 import type { PriceChangeService } from './pricing/price-change-service';
 import { requireDayText } from './reports/report-request';
@@ -146,7 +146,7 @@ export function registerIpcHandlers(
   answerOwner(IPC_CHANNELS.setWithdrawalLimit, (request): CashStatus => cash.setWithdrawalLimit(parseLimitRequest(request)));
 
   answerOwner(IPC_CHANNELS.getKardex, (productId): Kardex | null => inventory.kardex(parseProductId(productId)));
-  answerOwner(IPC_CHANNELS.adjustStock, (request): AdjustStockResult => inventory.adjust(parseAdjustStockRequest(request)));
+  answerSignedIn(IPC_CHANNELS.adjustStock, (request): AdjustStockResult => inventory.adjust(parseAdjustStockRequest(request)));
   answerOwner(IPC_CHANNELS.checkLedger, (): LedgerCheck => inventory.verifyLedger());
   answerOwner(IPC_CHANNELS.getDailyReport, (date): DailyReport => reports.daily(requireDayText(date)));
 
@@ -161,6 +161,9 @@ export function registerIpcHandlers(
   answerSignedIn(IPC_CHANNELS.getPriceInfo, (productId): PriceInfo | null => prices.info(parseProductId(productId)));
   answerSignedIn(IPC_CHANNELS.changePrice, (request): ChangePriceResult => prices.change(parseChangePriceRequest(request)));
   answerSignedIn(IPC_CHANNELS.createProduct, (request): CreateProductResult => products.create(parseNewProductRequest(request)));
+  answerSignedIn(IPC_CHANNELS.findProducts, (text): ProductSummary[] => products.find(requireLookupText(text)));
+  answerSignedIn(IPC_CHANNELS.getProductDetail, (productId): ProductPanelDetail | null => products.panelDetail(parseProductId(productId)));
+  answerSignedIn(IPC_CHANNELS.updateProduct, (request): UpdateProductResult => products.update(parseUpdateProductRequest(request)));
   answerSignedIn(IPC_CHANNELS.savePendingSale, (request): SavePendingSaleResult => pendingSales.save(parsePendingSaleRequest(request)));
   answerSignedIn(IPC_CHANNELS.listPendingSales, (): PendingSale[] => pendingSales.list());
   answerSignedIn(IPC_CHANNELS.checkoutSale, (request): Promise<CheckoutSaleResult> => salePayments.checkout(parsePaymentRequest(request)));
