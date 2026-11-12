@@ -104,8 +104,9 @@ When a cut is stored, the core publishes `CashCutRecorded` in the same transacti
 | `RESEND_API_KEY` | none | API key of the e-mail provider; only from the environment |
 | `RESEND_FROM` | none | Verified sender, such as `Reportes <reportes@your-domain.com>` |
 | `REPORT_DEFAULT_RECIPIENT` | none | Recipient when the business has no `owner_email` |
+
 ## Catalog: products, codes and units
-`/products` is the catalog of the business ([ADR 0051](../../docs/adr/0051-catalogo-de-productos-codigos-y-unidades.md), RF-001, RF-002). A product has a name, a status (`active` or `inactive`), a **base unit that never changes** (`piece`, `meter`, `kilogram`, `liter`, each of a kind: count, weight, length, volume), any number of codes (barcode or alternate) and optional bulk presentations such as a roll of `"100.000"` m. Quantities are text with 3 decimals. A code points at **one product per business** (`UNIQUE (tenant_id, code)`, `409` otherwise), even after the product is deleted. There are no prices or taxes yet (F0-17).
+`/products` is the catalog of the business ([ADR 0051](../../docs/adr/0051-catalogo-de-productos-codigos-y-unidades.md), RF-001, RF-002). A product has a name, a status (`active` or `inactive`), a **base unit that never changes** (`piece`, `meter`, `kilogram`, `liter`, each of a kind: count, weight, length, volume), any number of codes (barcode or alternate) and optional bulk presentations such as a roll of `"100.000"` m. Quantities are text with 3 decimals. A code points at **one product per business** (`UNIQUE (tenant_id, code)`, `409` otherwise), even after the product is deleted. Its **price** is per base unit, VAT included, in ten-thousandths of a peso (text with 4 decimals), with a tax rate of 16%, 8%, 0% or exempt, and the two SAT keys ([ADR 0056](../../docs/adr/0056-precio-impuesto-y-claves-sat-del-producto.md)).
 
 | Endpoint | Who | What |
 | --- | --- | --- |
@@ -114,13 +115,17 @@ When a cut is stored, the core publishes `CashCutRecorded` in the same transacti
 | `GET /products/{id}` | all roles | Read one |
 | `PATCH /products/{id}` | owner, manager | Edit what is sent; a list of codes or presentations replaces the old one |
 | `DELETE /products/{id}` | owner, manager | Logical delete (`204`, also if repeated) |
+| `PATCH /products/{id}/price` | owner | Change the price (audited, kept in the append-only `product_price_history`) |
+| `GET /reports/fiscal-pending` | owner, manager | Products that cannot be invoiced yet because a SAT key is missing (RF-004) |
 
-Every change writes its audit entry, takes the next number of the change feed of the business (`product.change_seq`, handed out by `catalog_change_counter`; the pull of E1-18 will read "everything after my cursor") and publishes `ProductCreated` or `ProductUpdated` through the outbox, all in the same transaction.
+Setting a price needs `price.change`: a manager creates products without one and the owner sets it. Every change writes its audit entry, publishes the **whole product** (name, base unit, price, tax, barcodes) to the change feed that registers pull ([ADR 0048](../../docs/adr/0048-cambios-hacia-la-caja-con-cursor.md); an inactive or deleted product is a tombstone), and emits `ProductCreated` or `ProductUpdated` through the outbox, all in the same transaction. A price that a register charged (E1-40) is applied to the product and republished.
+
+**SAT keys.** `satProductKey` (`c_ClaveProdServ`, 8 digits) and `satUnitKey` (`c_ClaveUnidad`) are checked for format and against the reviewable files `src/main/resources/sat/c_ClaveProdServ.csv` and `c_ClaveUnidad.csv`. Copy rows from the `catCFDI` file published by the SAT (never from memory) and rebuild, or point `pos.sat.catalog-dir` at a folder with both files to extend them without a rebuild. Only `01010101` ships for products, so the accountant's keys must be added before products become invoiceable.
 
 ```bash
 curl -X POST http://localhost:8080/products -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -H "Idempotency-Key: $(uuidgen)" \
-  --data '{"name":"Cable THW 12","unit":"meter","codes":[{"code":"7501234567890","kind":"barcode"}],"presentations":[{"name":"roll","baseQuantity":"100.000"}]}'
+  --data '{"name":"Cable THW 12","unit":"meter","unitPrice":"23.2000","taxRateBp":1600,"satUnitKey":"MTR","codes":[{"code":"7501234567890","kind":"barcode"}],"presentations":[{"name":"roll","baseQuantity":"100.000"}]}'
 ```
 
 

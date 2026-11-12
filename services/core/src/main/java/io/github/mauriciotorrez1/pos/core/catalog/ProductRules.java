@@ -2,6 +2,7 @@ package io.github.mauriciotorrez1.pos.core.catalog;
 
 import io.github.mauriciotorrez1.pos.money.MoneyException;
 import io.github.mauriciotorrez1.pos.money.Quantity;
+import io.github.mauriciotorrez1.pos.money.TaxRate;
 import io.github.mauriciotorrez1.pos.money.Unit;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -12,6 +13,11 @@ import java.util.regex.Pattern;
 
 /** The rules a product must meet before it is saved. Pure functions, so they are tested without a database. */
 final class ProductRules {
+
+    /** The general VAT rate, 16%, in basis points. */
+    static final int STANDARD_RATE_BP = 1600;
+    /** The VAT rates the catalog offers: 0%, 8% (border zone) and 16%. Exempt is a factor, not a rate. */
+    private static final java.util.Set<Integer> OFFERED_RATES_BP = java.util.Set.of(0, 800, STANDARD_RATE_BP);
 
     static final int MAX_NAME_LENGTH = 200;
     static final int MAX_CODES = 20;
@@ -39,6 +45,20 @@ final class ProductRules {
             throw new InvalidProductException("name must have at most " + MAX_NAME_LENGTH + " characters");
         }
         return name;
+    }
+
+    /**
+     * Checks that the catalog offers a tax rate.
+     *
+     * @param tax the rate: 16%, 8%, 0% or exempt
+     * @return the same rate
+     * @throws InvalidProductException if the rate is not one the catalog offers
+     */
+    static TaxRate tax(TaxRate tax) {
+        if (!OFFERED_RATES_BP.contains(tax.bp())) {
+            throw new InvalidProductException("tax rate must be 16%, 8%, 0% or exempt");
+        }
+        return tax;
     }
 
     /**

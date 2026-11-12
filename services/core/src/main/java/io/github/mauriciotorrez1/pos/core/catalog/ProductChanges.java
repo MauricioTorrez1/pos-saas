@@ -1,5 +1,6 @@
 package io.github.mauriciotorrez1.pos.core.catalog;
 
+import io.github.mauriciotorrez1.pos.money.TaxRate;
 import io.github.mauriciotorrez1.pos.money.Unit;
 import java.util.List;
 
@@ -12,7 +13,11 @@ import java.util.List;
  *                      base unit never changes
  * @param codes         the complete new list of codes, or {@code null}
  * @param presentations the complete new list of presentations, or {@code null}
+ * @param tax           the new VAT rate, or {@code null}
+ * @param satProductKey the new SAT product key, {@code ""} to clear it, or {@code null} to leave it
+ * @param satUnitKey    the new SAT unit key, {@code ""} to clear it, or {@code null} to leave it
  */
 public record ProductChanges(String name, ProductStatus status, Unit unit, List<ProductCode> codes,
-                             List<PresentationDraft> presentations) {
+                             List<PresentationDraft> presentations, TaxRate tax, String satProductKey,
+                             String satUnitKey) {
 }

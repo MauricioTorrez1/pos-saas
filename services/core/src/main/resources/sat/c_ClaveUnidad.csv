@@ -1,0 +1,16 @@
+# SAT catalog c_ClaveUnidad (CFDI 4.0), limited to the units this business uses.
+# Source: the official "catCFDI" file published by the SAT (c_ClaveUnidad sheet). Copy rows from there; never type a key from memory.
+# Format: key,name  (the key is 2 or 3 uppercase letters or digits). Lines that start with # are comments.
+H87,Pieza
+MTR,Metro
+KGM,Kilogramo
+LTR,Litro
+GRM,Gramo
+MTK,Metro cuadrado
+XBX,Caja
+XPK,Paquete
+KT,Kit
+SET,Conjunto
+PR,Par
+E48,Unidad de servicio
+ACT,Actividad

@@ -37,13 +37,15 @@ public final class EndpointPermissions {
             requires(GET, "/products/{id}", Permission.PRODUCT_READ),
             requires(PATCH, "/products/{id}", Permission.PRODUCT_WRITE),
             requires(DELETE, "/products/{id}", Permission.PRODUCT_WRITE),
+            requires(PATCH, "/products/{id}/price", Permission.PRICE_CHANGE),
             requires(POST, "/imports/catalog", Permission.CATALOG_IMPORT),
             requires(POST, "/price-changes", Permission.PRICE_CHANGE),
             requires(GET, "/discrepancies", Permission.DISCREPANCY_VIEW),
             requires(POST, "/invoices", Permission.INVOICE_ISSUE),
             requires(POST, "/invoices/global", Permission.INVOICE_ISSUE),
             requires(POST, "/invoices/{id}/cancel", Permission.INVOICE_CANCEL),
-            requires(GET, "/reports/sales", Permission.REPORT_VIEW));
+            requires(GET, "/reports/sales", Permission.REPORT_VIEW),
+            requires(GET, "/reports/fiscal-pending", Permission.REPORT_VIEW));
 
     private EndpointPermissions() {
     }
