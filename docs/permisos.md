@@ -37,6 +37,11 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 | `POST /imports/catalog` | `catalog.import` | Sí | Sí | — |
 | `POST /price-changes` | `price.change` | Sí | — | — |
 | `GET /discrepancies` | `discrepancy.view` | Sí | Sí | — |
+| `GET /discrepancies/{id}` | `discrepancy.view` | Sí | Sí | — |
+| `POST /discrepancies/{id}/resolution` | `discrepancy.resolve` | Sí | Sí | — |
+| `GET /quarantine` | `discrepancy.view` | Sí | Sí | — |
+| `GET /quarantine/{id}` | `discrepancy.view` | Sí | Sí | — |
+| `POST /quarantine/{id}/resolution` | `discrepancy.resolve` | Sí | Sí | — |
 | `POST /invoices` | `invoice.issue` | Sí | Sí | — |
 | `POST /invoices/global` | `invoice.issue` | Sí | Sí | — |
 | `POST /invoices/{id}/cancel` | `invoice.cancel` | Sí | — | — |
@@ -52,7 +57,8 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 | `product.write` | Dar de alta, editar y borrar (de forma lógica, sin perder el historial) productos, con sus códigos y presentaciones (no su precio: eso es `price.change`) |
 | `catalog.import` | Cargar el catálogo desde un archivo, por ejemplo el de Eleventa |
 | `price.change` | Cambiar un precio, uno por uno o en bloque; también poner precio al dar de alta un producto |
-| `discrepancy.view` | Ver las diferencias entre lo que dice la caja y lo que dice el servidor |
+| `discrepancy.view` | Ver las diferencias entre lo que dice la caja y lo que dice el servidor, y las operaciones que el servidor apartó en cuarentena |
+| `discrepancy.resolve` | Resolver una diferencia o una cuarentena: aplicarla, corregirla o rechazarla con un motivo. Es definitivo y queda en la bitácora con quién y cuándo |
 | `invoice.issue` | Emitir una factura |
 | `invoice.cancel` | Cancelar una factura ante el SAT |
 | `report.view` | Ver los reportes de ventas y el de productos que aún no se pueden facturar |

@@ -1,4 +1,4 @@
-import { parsePullResponse, type PullPage, type ProductState, type StaffMemberState } from '../pull-protocol';
+import { parsePullResponse, type PullPage, type ProductState, type ReviewResolutionState, type StaffMemberState } from '../pull-protocol';
 import { SyncTransportError, type PullTransport } from '../sync-transport';
 
 /** Where the fake loses the network. */
@@ -55,6 +55,18 @@ export class FakePullTransport implements PullTransport {
    */
   publishStaff(id: string, state: StaffMemberState): void {
     this.#append('staff_member', id, state);
+  }
+
+  /**
+   * Publishes what the owner decided about a quarantined operation or a price discrepancy.
+   *
+   * @param id the opId or the changeId
+   * @param state the decision
+   */
+  publishReview(id: string, state: ReviewResolutionState): void {
+    // The core leaves the reason out when there is none, instead of sending null.
+    const { reason, ...rest } = state;
+    this.#append('review_resolution', id, reason === null ? rest : state);
   }
 
   /**

@@ -129,6 +129,18 @@ curl -X POST http://localhost:8080/products -H "Authorization: Bearer $TOKEN" -H
 ```
 
 
+## Review of quarantine and discrepancies
+What the core could not apply as it arrived waits for the owner or the manager ([ADR 0055](../../docs/adr/0055-revision-de-cuarentena-y-discrepancias.md), RF-022): `sync_operation` rows kept in quarantine, and price changes whose previous price is not the one of the core.
+
+| Endpoint | What it does |
+| --- | --- |
+| `GET /quarantine`, `GET /discrepancies` | Lists, oldest first, with `status=open` (default), `resolved` or `all`, `limit` (1 to 100) and the `cursor` of the previous page |
+| `GET /quarantine/{opId}`, `GET /discrepancies/{id}` | One item; a quarantined operation comes exactly as it arrived |
+| `POST /quarantine/{opId}/resolution` | `{"action": "accept"}` applies it again with the same recorder as a push; `{"action": "correct", "reason", "correctedPayload"}` applies another payload under the same `opId`; `{"action": "reject", "reason"}` keeps it out |
+| `POST /discrepancies/{id}/resolution` | `accept` or `reject` (with a reason) |
+
+A resolution is final and idempotent: the first answers `201`, the same one again `200`, another one `409`, and an operation that still cannot be applied `422` with nothing changed. Two people resolving at once take one advisory lock per item and the `UNIQUE (tenant_id, kind, subject_id)` of the append-only `review_resolution`, so only one wins and a sale is written once. Each resolution writes, in one transaction, the audit entry (`review.resolved`, who and when, never the reason) and a `review_resolution` change that the register receives with the pull. Reading needs `discrepancy.view` and resolving `discrepancy.resolve`: owner and manager, never the cashier.
+
 ## Changes for the registers
 `GET /sync/pull?cursor=&limit=` gives a register what changed in the catalog, prices and permissions since its cursor ([ADR 0048](../../docs/adr/0048-cambios-hacia-la-caja-con-cursor.md), RF-023). The business comes from the token and row-level security; any parameter other than `cursor` and `limit` is a `400`. It needs the `sync.pull` permission.
 
