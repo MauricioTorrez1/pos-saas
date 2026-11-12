@@ -34,6 +34,8 @@ import { LocalStore } from './local-store/local-store';
 import { LOCAL_TENANT_ID } from './local-store/local-tenant';
 import { ProductCatalog } from './local-store/product-catalog';
 import { PriceChangeService } from './pricing/price-change-service';
+import { ProductReader } from './products/product-reader';
+import { ProductService } from './products/product-service';
 import { seedSampleCatalogIfEmpty } from './local-store/sample-catalog';
 import { SaleStore } from './local-store/sale-store';
 import { openMainWindow } from './main-window';
@@ -148,10 +150,12 @@ async function start(): Promise<void> {
       renderTicket(toTicketData(appearance.read().businessName || UNNAMED_BUSINESS, sale, { ...receipt, isReprint: false })),
   });
   const prices = new PriceChangeService(store, LOCAL_TENANT_ID, auth, catalog, new AuditLog(store, LOCAL_TENANT_ID));
+  const products = new ProductService(store, LOCAL_TENANT_ID, auth, new AuditLog(store, LOCAL_TENANT_ID), new ProductReader(store, LOCAL_TENANT_ID));
   registerIpcHandlers(rendererEntry, {
     auth,
     cash,
     prices,
+    products,
     returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, cash),
     admin,
     inventory: new InventoryService(store, LOCAL_TENANT_ID, auth, new StockStore(store, LOCAL_TENANT_ID), new AuditLog(store, LOCAL_TENANT_ID), catalog),

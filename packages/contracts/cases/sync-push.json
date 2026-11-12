@@ -225,6 +225,70 @@
           }
         ]
       }
+    },
+    {
+      "name": "The owner adds a product with two barcodes, a cost and its first stock",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000110",
+            "deviceSeq": 4001,
+            "type": "product.created",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-13T09:00:00.000Z",
+            "payload": {
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "name": "Cinta métrica 5 m",
+              "unit": "piece",
+              "unitPriceE4": 895000,
+              "taxFactor": "rate",
+              "taxRateBp": 1600,
+              "unitCostE6": 52250000,
+              "barcodes": [
+                "7501234567890",
+                "CINTA-5M"
+              ],
+              "isActive": true,
+              "initialStock": {
+                "quantityMilli": 12000,
+                "unitCostE6": 52250000
+              },
+              "createdBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A cashier adds a product with the PIN of an owner: no cost, no barcode, no stock, not yet for sale",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000111",
+            "deviceSeq": 4002,
+            "type": "product.created",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-13T09:00:00.000Z",
+            "payload": {
+              "productId": "0193a5c0-0000-7000-8000-000000000061",
+              "name": "Cable por metro",
+              "unit": "meter",
+              "unitPriceE4": 125000,
+              "taxFactor": "exempt",
+              "taxRateBp": 0,
+              "unitCostE6": null,
+              "barcodes": [],
+              "isActive": false,
+              "initialStock": null,
+              "createdBy": "0193a5c0-0000-7000-8000-000000000040",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
     }
   ],
   "request_rejections": [
@@ -540,6 +604,364 @@
               "previousUnitPriceE4": 125000,
               "newUnitPriceE4": 135000,
               "changedBy": "0193a5c0-0000-7000-8000-000000000040"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A new product with a price of zero",
+      "reason": "minimum",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000112",
+            "deviceSeq": 1,
+            "type": "product.created",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-13T09:00:00.000Z",
+            "payload": {
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "name": "Cinta métrica 5 m",
+              "unit": "piece",
+              "unitPriceE4": 0,
+              "taxFactor": "rate",
+              "taxRateBp": 1600,
+              "unitCostE6": 52250000,
+              "barcodes": [
+                "7501234567890",
+                "CINTA-5M"
+              ],
+              "isActive": true,
+              "initialStock": {
+                "quantityMilli": 12000,
+                "unitCostE6": 52250000
+              },
+              "createdBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A new product with a price of a million pesos and one cent",
+      "reason": "maximum",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000112",
+            "deviceSeq": 1,
+            "type": "product.created",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-13T09:00:00.000Z",
+            "payload": {
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "name": "Cinta métrica 5 m",
+              "unit": "piece",
+              "unitPriceE4": 10000000100,
+              "taxFactor": "rate",
+              "taxRateBp": 1600,
+              "unitCostE6": 52250000,
+              "barcodes": [
+                "7501234567890",
+                "CINTA-5M"
+              ],
+              "isActive": true,
+              "initialStock": {
+                "quantityMilli": 12000,
+                "unitCostE6": 52250000
+              },
+              "createdBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A new product with an empty name",
+      "reason": "minLength",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000112",
+            "deviceSeq": 1,
+            "type": "product.created",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-13T09:00:00.000Z",
+            "payload": {
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "name": "",
+              "unit": "piece",
+              "unitPriceE4": 895000,
+              "taxFactor": "rate",
+              "taxRateBp": 1600,
+              "unitCostE6": 52250000,
+              "barcodes": [
+                "7501234567890",
+                "CINTA-5M"
+              ],
+              "isActive": true,
+              "initialStock": {
+                "quantityMilli": 12000,
+                "unitCostE6": 52250000
+              },
+              "createdBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A new product with a unit the core does not know",
+      "reason": "enum",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000112",
+            "deviceSeq": 1,
+            "type": "product.created",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-13T09:00:00.000Z",
+            "payload": {
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "name": "Cinta métrica 5 m",
+              "unit": "box",
+              "unitPriceE4": 895000,
+              "taxFactor": "rate",
+              "taxRateBp": 1600,
+              "unitCostE6": 52250000,
+              "barcodes": [
+                "7501234567890",
+                "CINTA-5M"
+              ],
+              "isActive": true,
+              "initialStock": {
+                "quantityMilli": 12000,
+                "unitCostE6": 52250000
+              },
+              "createdBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A new product with a barcode that has a space",
+      "reason": "pattern",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000112",
+            "deviceSeq": 1,
+            "type": "product.created",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-13T09:00:00.000Z",
+            "payload": {
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "name": "Cinta métrica 5 m",
+              "unit": "piece",
+              "unitPriceE4": 895000,
+              "taxFactor": "rate",
+              "taxRateBp": 1600,
+              "unitCostE6": 52250000,
+              "barcodes": [
+                "7501 234"
+              ],
+              "isActive": true,
+              "initialStock": {
+                "quantityMilli": 12000,
+                "unitCostE6": 52250000
+              },
+              "createdBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A new product with the same barcode twice",
+      "reason": "uniqueItems",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000112",
+            "deviceSeq": 1,
+            "type": "product.created",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-13T09:00:00.000Z",
+            "payload": {
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "name": "Cinta métrica 5 m",
+              "unit": "piece",
+              "unitPriceE4": 895000,
+              "taxFactor": "rate",
+              "taxRateBp": 1600,
+              "unitCostE6": 52250000,
+              "barcodes": [
+                "7501234567890",
+                "7501234567890"
+              ],
+              "isActive": true,
+              "initialStock": {
+                "quantityMilli": 12000,
+                "unitCostE6": 52250000
+              },
+              "createdBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A new product with an initial stock of zero",
+      "reason": "minimum",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000112",
+            "deviceSeq": 1,
+            "type": "product.created",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-13T09:00:00.000Z",
+            "payload": {
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "name": "Cinta métrica 5 m",
+              "unit": "piece",
+              "unitPriceE4": 895000,
+              "taxFactor": "rate",
+              "taxRateBp": 1600,
+              "unitCostE6": 52250000,
+              "barcodes": [
+                "7501234567890",
+                "CINTA-5M"
+              ],
+              "isActive": true,
+              "initialStock": {
+                "quantityMilli": 0,
+                "unitCostE6": null
+              },
+              "createdBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A new product with a cost that has decimals",
+      "reason": "type",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000112",
+            "deviceSeq": 1,
+            "type": "product.created",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-13T09:00:00.000Z",
+            "payload": {
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "name": "Cinta métrica 5 m",
+              "unit": "piece",
+              "unitPriceE4": 895000,
+              "taxFactor": "rate",
+              "taxRateBp": 1600,
+              "unitCostE6": 52.25,
+              "barcodes": [
+                "7501234567890",
+                "CINTA-5M"
+              ],
+              "isActive": true,
+              "initialStock": {
+                "quantityMilli": 12000,
+                "unitCostE6": 52250000
+              },
+              "createdBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A new product that is exempt but has a rate",
+      "reason": "const",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000112",
+            "deviceSeq": 1,
+            "type": "product.created",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-13T09:00:00.000Z",
+            "payload": {
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "name": "Cinta métrica 5 m",
+              "unit": "piece",
+              "unitPriceE4": 895000,
+              "taxFactor": "exempt",
+              "taxRateBp": 1600,
+              "unitCostE6": 52250000,
+              "barcodes": [
+                "7501234567890",
+                "CINTA-5M"
+              ],
+              "isActive": true,
+              "initialStock": {
+                "quantityMilli": 12000,
+                "unitCostE6": 52250000
+              },
+              "createdBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A new product that nobody approved",
+      "reason": "required",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000112",
+            "deviceSeq": 1,
+            "type": "product.created",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-13T09:00:00.000Z",
+            "payload": {
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "name": "Cinta métrica 5 m",
+              "unit": "piece",
+              "unitPriceE4": 895000,
+              "taxFactor": "rate",
+              "taxRateBp": 1600,
+              "unitCostE6": 52250000,
+              "barcodes": [
+                "7501234567890",
+                "CINTA-5M"
+              ],
+              "isActive": true,
+              "initialStock": {
+                "quantityMilli": 12000,
+                "unitCostE6": 52250000
+              },
+              "createdBy": "0193a5c0-0000-7000-8000-000000000041"
             }
           }
         ]

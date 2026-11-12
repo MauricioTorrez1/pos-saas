@@ -16,6 +16,8 @@ Electron 45 runs on Windows 10 and later, which covers the machines of [ADR 0002
 | `src/renderer/sale/` | Sale screen: lookup box, lines, totals, and scanner detection | Sandboxed renderer, without Node |
 | `src/main/pricing/` | Price changes: who may, one transaction, and the history of prices | Main process, with Node |
 | `src/renderer/pricing/` | Dialog to change the price of a product, with the margin | Sandboxed renderer, without Node |
+| `src/main/products/` | Adding products: who may, validation, barcodes, first stock, and one transaction | Main process, with Node |
+| `src/renderer/products/` | The product form shared by the new product dialog and the product panel | Sandboxed renderer, without Node |
 | `src/renderer/appearance/` | Dialog where the owner changes how the register looks | Sandboxed renderer, without Node |
 | `src/renderer/checkout/` | Payment screen: cash received, transfer with its reference, and the change | Sandboxed renderer, without Node |
 | `src/renderer/recovery/` | Dialog that asks about the sales left pending | Sandboxed renderer, without Node |
@@ -42,6 +44,7 @@ The lookup box always holds the keyboard, so a scan lands there even after a cli
 | Esc | Clears the box and the matches |
 | F9 | Opens the appearance dialog |
 | F7 | Opens the dialog to change the price of a product |
+| F5 | Opens the form to add a product that is not in the catalog |
 
 A barcode scanner acts as a keyboard, so the register tells it apart by speed: at least 4 characters with no more than 50 ms between them. Only what happens to an unknown code changes: from the scanner it shows a warning, and from a person it searches by name.
 
@@ -64,6 +67,19 @@ The owner can change the price of a product that is already in the catalog ([ADR
 | Offline | Nothing needs the core. The operation waits in the outbox and travels in order; its shape is in [`packages/contracts`](../../packages/contracts/README.md) |
 
 Only a person at the register changes a price here. The panel will have its own editor (F0-21), and the core processes `product.price_changed` in E1-17.
+
+## Add a new product
+When a customer brings something that is not in the catalog imported from Eleventa, the owner adds it without leaving the sale ([ADR 0057](../../docs/adr/0057-alta-de-productos-en-la-caja.md)). When a search or a scan finds nothing, the warning offers **Dar de alta «what was typed»**, and **F5** opens "Producto nuevo" with that text already loaded: a scanned text goes to the barcode list and the rest goes to the name. **F2** saves and **Esc** cancels. A new product that came from a search is added to the sale in progress.
+
+| Rule | How it works |
+| --- | --- |
+| Who | The owner signed in. A cashier types the PIN of an owner, with the usual tries and lock. A refusal is written in the audit log as `product.create_denied` |
+| What it asks | Name, unit (piece, meter, kilogram or liter), price with VAT included (up to 4 decimals, never zero), VAT rate, an optional cost (up to 6 decimals), barcodes, an optional initial stock (a `Quantity`: 3 decimals, whole pieces), and whether it is active. Every problem shows at once, in Spanish, box by box |
+| Barcodes | The scanner types the code and Enter, which adds it to the list. A code that another product already has is refused, naming that product, even if that product was given up |
+| Initial stock | It is a `opening_balance` movement of the ledger (`source = 'product_creation'`), never a number written on the product |
+| One transaction | The product with its UUIDv7 (made in the register), its codes, the movement, the `product.create` audit entry (who, when, values), and the `product.created` operation in `sync_outbox` are written together or not at all |
+| Sales already made | Nothing in `sale`, `sale_line`, or a ticket is touched |
+| Offline | Nothing needs the core. The core receives `product.created` in a later task; until then it keeps it for review |
 
 ## Sale states and recovery
 A sale is saved as `pending_payment` before anything is charged, so a power cut can never leave money without a record ([ADR 0010](../../docs/adr/0010-guardar-antes-de-cobrar.md)). From there it can only become `completed` or `cancelled`, and each change is one transaction. `src/main/checkout/sale-state-machine.ts` gives a clear error, and triggers in the database refuse the same changes if the code ever gets it wrong ([ADR 0025](../../docs/adr/0025-maquina-de-estados-de-la-venta.md)).

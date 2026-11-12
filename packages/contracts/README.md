@@ -11,7 +11,7 @@ JSON schemas and calculation cases shared by the TypeScript register and the Jav
 | `cases/amount-sum.json` | Totals of a sale: `sums` must add up, and `rejections` must fail |
 | `cases/line-tax.json` | Lines with VAT included at 16%, 8%, 0%, and exempt: `lines` must split into base and VAT, and `rejections` must fail |
 | `cases/sale-totals.json` | Sales with their VAT grouped by rate: `sales` must add up, and `rejections` must fail |
-| `schemas/sync-push-request.schema.json` | The batch the register uploads to `POST /sync/push` and the shape of each of its seven kinds of operation, the last one being `product.price_changed` ([ADR 0040](../../docs/adr/0040-envio-desde-la-caja-con-outbox.md), [ADR 0047](../../docs/adr/0047-editar-precio-de-un-producto-en-la-caja.md)) |
+| `schemas/sync-push-request.schema.json` | The batch the register uploads to `POST /sync/push` and the shape of each of its eight kinds of operation, the last two being `product.price_changed` and `product.created` ([ADR 0040](../../docs/adr/0040-envio-desde-la-caja-con-outbox.md), [ADR 0047](../../docs/adr/0047-editar-precio-de-un-producto-en-la-caja.md), [ADR 0057](../../docs/adr/0057-alta-de-productos-en-la-caja.md)) |
 | `schemas/sync-push-response.schema.json` | The answer of the core: one result per operation, `accepted`, `duplicate`, or `quarantined` |
 | `cases/sync-push.json` | Batches and answers: `requests` and `responses` must pass the schema, and `request_rejections` and `response_rejections` must fail, each naming the schema keyword that rejects it |
 | `schemas/sync-pull-query.schema.json` | The query of `GET /sync/pull`: an opaque `cursor` and a `limit` from 1 to 500 ([ADR 0048](../../docs/adr/0048-cambios-hacia-la-caja-con-cursor.md)) |
