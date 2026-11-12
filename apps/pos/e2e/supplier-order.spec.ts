@@ -109,6 +109,9 @@ test('orders from a supplier: finds the product by the code of the supplier, sav
   await page.keyboard.press('Escape');
   await expect(page.getByRole('heading', { name: 'Pedido al proveedor' })).toBeVisible();
 
+  // The list is read again on the way back, and the keys wait until it is there.
+  await expect(page.getByRole('button', { name: /Pedido nuevo/ })).toBeEnabled();
+  await expect(dialog).toContainText('Todavía no has hecho ningún pedido.');
   // A new order: the supplier is already chosen, and the code of the supplier finds the product.
   await page.keyboard.press('F2');
   await expect(page.getByRole('heading', { name: 'Pedido nuevo' })).toBeVisible();
