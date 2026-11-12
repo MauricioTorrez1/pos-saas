@@ -33,6 +33,10 @@
     "positive_cents": { "$ref": "values.schema.json#/$defs/amount_cents", "minimum": 1 },
     "positive_int": { "$ref": "values.schema.json#/$defs/safe_integer", "minimum": 1 },
     "reference": { "type": ["string", "null"], "maxLength": 100 },
+    "product_name": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": "\\S" },
+    "barcode": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\\s\\u0000-\\u001f\\u007f]+$" },
+    "barcodes": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/barcode" } },
+    "unit_cost_e6": { "$ref": "values.schema.json#/$defs/safe_integer", "description": "Cost per unit in millionths of a peso: $58.25 is 58250000.", "minimum": 0, "maximum": 1000000000000 },
 
     "operation": {
       "type": "object",
@@ -42,7 +46,7 @@
         "opId": { "$ref": "#/$defs/uuid_v7" },
         "deviceSeq": { "$ref": "#/$defs/positive_int" },
         "type": {
-          "enum": ["sale.completed", "return.registered", "cash_session.opened", "cash_movement.recorded", "cash_session.closed", "stock.adjusted", "product.price_changed"]
+          "enum": ["sale.completed", "return.registered", "cash_session.opened", "cash_movement.recorded", "cash_session.closed", "stock.adjusted", "product.price_changed", "product.created"]
         },
         "schemaVersion": { "const": 1 },
         "occurredAt": { "$ref": "#/$defs/timestamp" },
@@ -55,7 +59,8 @@
         { "if": { "properties": { "type": { "const": "cash_movement.recorded" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/cash_movement_recorded" } } } },
         { "if": { "properties": { "type": { "const": "cash_session.closed" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/cash_session_closed" } } } },
         { "if": { "properties": { "type": { "const": "stock.adjusted" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/stock_adjusted" } } } },
-        { "if": { "properties": { "type": { "const": "product.price_changed" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/product_price_changed" } } } }
+        { "if": { "properties": { "type": { "const": "product.price_changed" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/product_price_changed" } } } },
+        { "if": { "properties": { "type": { "const": "product.created" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/product_created" } } } }
       ]
     },
 
@@ -235,6 +240,41 @@
         "changedBy": { "$ref": "#/$defs/uuid_v7" },
         "authorizedBy": { "$ref": "#/$defs/uuid_v7" }
       }
+    },
+
+    "product_created": {
+      "description": "The register added a product that was not in the catalog (E1-42, ADR 0057). The owner, or a cashier with the PIN of an owner, did it. The product already has its UUIDv7, so it can be sold offline before the core knows it. Prices include VAT and use the scales of values.schema.json; the cost is optional and in millionths of a peso. initialStock is the opening balance the register posted to its own ledger in the same transaction: the core posts one opening_balance movement for it, with the productId as its source, and never a second one. opId already makes the push idempotent, and productId identifies the product, so the core stores it once.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["productId", "name", "unit", "unitPriceE4", "taxFactor", "taxRateBp", "unitCostE6", "barcodes", "isActive", "initialStock", "createdBy", "authorizedBy"],
+      "properties": {
+        "productId": { "$ref": "#/$defs/uuid_v7" },
+        "name": { "$ref": "#/$defs/product_name" },
+        "unit": { "$ref": "values.schema.json#/$defs/unit" },
+        "unitPriceE4": { "$ref": "values.schema.json#/$defs/unit_price_e4", "minimum": 1, "maximum": 10000000000 },
+        "taxFactor": { "$ref": "values.schema.json#/$defs/tax_factor" },
+        "taxRateBp": { "$ref": "values.schema.json#/$defs/valid_tax_rate_bp" },
+        "unitCostE6": { "oneOf": [{ "$ref": "#/$defs/unit_cost_e6" }, { "type": "null" }] },
+        "barcodes": { "$ref": "#/$defs/barcodes" },
+        "isActive": { "type": "boolean" },
+        "initialStock": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["quantityMilli", "unitCostE6"],
+              "properties": {
+                "quantityMilli": { "$ref": "values.schema.json#/$defs/quantity_milli", "minimum": 1 },
+                "unitCostE6": { "oneOf": [{ "$ref": "#/$defs/unit_cost_e6" }, { "type": "null" }] }
+              }
+            }
+          ]
+        },
+        "createdBy": { "$ref": "#/$defs/uuid_v7" },
+        "authorizedBy": { "$ref": "#/$defs/uuid_v7" }
+      },
+      "allOf": [{ "if": { "properties": { "taxFactor": { "const": "exempt" } }, "required": ["taxFactor"] }, "then": { "properties": { "taxRateBp": { "const": 0 } } } }]
     }
   }
 }

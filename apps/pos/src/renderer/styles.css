@@ -1016,3 +1016,89 @@ kbd {
   gap: 0.5rem;
   align-items: center;
 }
+/* Product form (E1-42, E1-43): the same boxes as the payment dialogs, in two columns where they are short. */
+
+.product-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.product-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.payment-select {
+  height: 3.25rem;
+  padding: 0 0.9rem;
+  font-size: 1.25rem;
+  color: var(--ink);
+  background: var(--ground);
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+}
+
+.payment-select:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 0;
+}
+
+.payment-select:disabled {
+  color: var(--ink-soft);
+  cursor: not-allowed;
+}
+
+.payment-field input[aria-invalid='true'] {
+  border-color: var(--alert);
+}
+
+.payment-field-problem {
+  color: var(--alert);
+  font-weight: 600;
+}
+
+.payment-check {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.25rem;
+}
+
+.payment-check input {
+  width: 1.5rem;
+  height: 1.5rem;
+  accent-color: var(--accent);
+}
+
+.product-codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.product-codes li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.25rem 0.25rem 0.75rem;
+  background: var(--ground);
+  border: 1px solid var(--rule);
+}
+
+.product-codes code {
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.product-code-remove {
+  padding: 0.25rem 0.6rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--ink-soft);
+  cursor: pointer;
+}

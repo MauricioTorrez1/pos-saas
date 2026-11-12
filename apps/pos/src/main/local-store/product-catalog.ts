@@ -19,6 +19,12 @@ interface ProductRow {
   readonly tax_rate_bp: number;
 }
 
+/** How a lookup treats the products that were given up. */
+export interface LookupOptions {
+  /** Also finds the products with `is_active = 0`. The sale never asks for them. */
+  readonly includeInactive?: boolean;
+}
+
 /**
  * Looks up the products of one business in the local database. Both lookups run on prepared statements, because
  * they run in the main process and a slow one would freeze the window (ADR 0021).
@@ -28,6 +34,9 @@ export class ProductCatalog {
   readonly #findById: StatementSync;
   readonly #findByCode: StatementSync;
   readonly #searchByName: StatementSync;
+  readonly #findByIdAny: StatementSync;
+  readonly #findByCodeAny: StatementSync;
+  readonly #searchByNameAny: StatementSync;
   readonly #updatePrice: StatementSync;
 
   /**
@@ -36,21 +45,27 @@ export class ProductCatalog {
    */
   constructor(store: LocalStore, tenantId: string) {
     this.#tenantId = tenantId;
-    this.#findById = store.prepare(`SELECT ${PRODUCT_COLUMNS} FROM product WHERE product.tenant_id = ? AND product.id = ?`);
-    this.#findByCode = store.prepare(`
+    // A product that was given up (is_active = 0) is not sold or found by the sale screen, but the product screens still see it.
+    const byId = `SELECT ${PRODUCT_COLUMNS} FROM product WHERE product.tenant_id = ? AND product.id = ?`;
+    const byCode = `
       SELECT ${PRODUCT_COLUMNS}
       FROM product_barcode
       JOIN product ON product.id = product_barcode.product_id AND product.tenant_id = product_barcode.tenant_id
       WHERE product_barcode.tenant_id = ? AND product_barcode.code = ?
-    `);
-    this.#searchByName = store.prepare(`
+    `;
+    const byName = `
       SELECT ${PRODUCT_COLUMNS}
       FROM product_search
       JOIN product ON product.local_rowid = product_search.rowid
       WHERE product_search MATCH ? AND product.tenant_id = ?
-      ORDER BY product_search.rank, product.name
-      LIMIT ?
-    `);
+    `;
+    const nameOrder = 'ORDER BY product_search.rank, product.name LIMIT ?';
+    this.#findById = store.prepare(`${byId} AND product.is_active = 1`);
+    this.#findByIdAny = store.prepare(byId);
+    this.#findByCode = store.prepare(`${byCode} AND product.is_active = 1`);
+    this.#findByCodeAny = store.prepare(byCode);
+    this.#searchByName = store.prepare(`${byName} AND product.is_active = 1 ${nameOrder}`);
+    this.#searchByNameAny = store.prepare(`${byName} ${nameOrder}`);
     this.#updatePrice = store.prepare('UPDATE product SET unit_price_e4 = ? WHERE tenant_id = ? AND id = ? AND unit_price_e4 = ?');
   }
 
@@ -72,10 +87,12 @@ export class ProductCatalog {
    * Finds a product by its id, to price a sale with the catalog instead of with what the screen says.
    *
    * @param id the UUIDv7 of the product
-   * @returns the product, or null if this business has no product with that id
+   * @param options `includeInactive` also finds a product that was given up, for the product screens
+   * @returns the product, or null if this business has no product with that id, or it was given up and the options do not ask for it
    */
-  findById(id: string): CatalogProduct | null {
-    const row = this.#findById.get(this.#tenantId, id) as unknown as ProductRow | undefined;
+  findById(id: string, options: LookupOptions = {}): CatalogProduct | null {
+    const statement = options.includeInactive === true ? this.#findByIdAny : this.#findById;
+    const row = statement.get(this.#tenantId, id) as unknown as ProductRow | undefined;
     return row === undefined ? null : toCatalogProduct(row);
   }
 
@@ -83,10 +100,12 @@ export class ProductCatalog {
    * Finds the product that has exactly this barcode.
    *
    * @param code the barcode. Spaces around it are ignored.
+   * @param options `includeInactive` also finds a product that was given up, for the product screens
    * @returns the product, or null if no product of this business has that code
    */
-  findByCode(code: string): CatalogProduct | null {
-    const row = this.#findByCode.get(this.#tenantId, code.trim()) as unknown as ProductRow | undefined;
+  findByCode(code: string, options: LookupOptions = {}): CatalogProduct | null {
+    const statement = options.includeInactive === true ? this.#findByCodeAny : this.#findByCode;
+    const row = statement.get(this.#tenantId, code.trim()) as unknown as ProductRow | undefined;
     return row === undefined ? null : toCatalogProduct(row);
   }
 
@@ -95,14 +114,16 @@ export class ProductCatalog {
    *
    * @param text what the cashier typed
    * @param limit the most products to return
+   * @param options `includeInactive` also lists the products that were given up, for the product screens
    * @returns the best matches first, or an empty list if the text has nothing to search for
    */
-  search(text: string, limit: number): CatalogProduct[] {
+  search(text: string, limit: number, options: LookupOptions = {}): CatalogProduct[] {
     const query = toPrefixQuery(text);
     if (query === null) {
       return [];
     }
-    const rows = this.#searchByName.all(query, this.#tenantId, limit) as unknown as ProductRow[];
+    const statement = options.includeInactive === true ? this.#searchByNameAny : this.#searchByName;
+    const rows = statement.all(query, this.#tenantId, limit) as unknown as ProductRow[];
     return rows.map(toCatalogProduct);
   }
 }

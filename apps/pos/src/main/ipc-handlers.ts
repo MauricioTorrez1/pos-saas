@@ -5,6 +5,7 @@ import type { LoginResult, UserSummary } from '../shared/auth';
 import type { BackupOutcome, BackupStatus, ImportOutcome, RestoreOutcome } from '../shared/admin-api';
 import type { AdjustStockResult, Kardex, LedgerCheck } from '../shared/inventory-api';
 import type { ChangePriceResult, PriceInfo } from '../shared/pricing';
+import type { CreateProductResult } from '../shared/product-admin';
 import type { DailyReport } from '../shared/report-api';
 import type { FindReturnableResult, ReturnResult } from '../shared/returns-api';
 import type { CashMovementResult, CashStatus, CloseCashResult, OpenCashResult } from '../shared/cash-api';
@@ -28,6 +29,8 @@ import type { CashService } from './cash/cash-service';
 import { parseAdjustStockRequest, parseProductId } from './inventory/inventory-request';
 import type { InventoryService } from './inventory/inventory-service';
 import { parseChangePriceRequest } from './pricing/price-request';
+import { parseNewProductRequest } from './products/product-request';
+import type { ProductService } from './products/product-service';
 import type { PriceChangeService } from './pricing/price-change-service';
 import { requireDayText } from './reports/report-request';
 import type { ReportService } from './reports/report-service';
@@ -52,6 +55,7 @@ export interface IpcServices {
   readonly reports: ReportService;
   readonly catalog: ProductCatalog;
   readonly prices: PriceChangeService;
+  readonly products: ProductService;
   readonly appearance: AppearanceStore;
   readonly pendingSales: PendingSales;
   readonly salePayments: SalePayments;
@@ -84,7 +88,7 @@ function requireLookupText(value: unknown): string {
  */
 export function registerIpcHandlers(
   rendererEntry: string,
-  { auth, cash, returns, admin, inventory, reports, catalog, prices, appearance, pendingSales, salePayments }: IpcServices,
+  { auth, cash, returns, admin, inventory, reports, catalog, prices, products, appearance, pendingSales, salePayments }: IpcServices,
 ): void {
   const answerScreen = <Result>(channel: string, respond: (argument: unknown) => Result): void => {
     ipcMain.handle(channel, (event, argument: unknown) => {
@@ -156,6 +160,7 @@ export function registerIpcHandlers(
   answerSignedIn(IPC_CHANNELS.searchProducts, (text): CatalogProduct[] => catalog.search(requireLookupText(text), SEARCH_RESULT_LIMIT));
   answerSignedIn(IPC_CHANNELS.getPriceInfo, (productId): PriceInfo | null => prices.info(parseProductId(productId)));
   answerSignedIn(IPC_CHANNELS.changePrice, (request): ChangePriceResult => prices.change(parseChangePriceRequest(request)));
+  answerSignedIn(IPC_CHANNELS.createProduct, (request): CreateProductResult => products.create(parseNewProductRequest(request)));
   answerSignedIn(IPC_CHANNELS.savePendingSale, (request): SavePendingSaleResult => pendingSales.save(parsePendingSaleRequest(request)));
   answerSignedIn(IPC_CHANNELS.listPendingSales, (): PendingSale[] => pendingSales.list());
   answerSignedIn(IPC_CHANNELS.checkoutSale, (request): Promise<CheckoutSaleResult> => salePayments.checkout(parsePaymentRequest(request)));

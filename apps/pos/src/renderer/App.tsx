@@ -4,6 +4,7 @@ import { DEFAULT_APPEARANCE, type Appearance } from '../shared/appearance';
 import type { UserSummary } from '../shared/auth';
 import type { AuthState, PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
+import type { ProductAdminApi } from '../shared/product-admin';
 import { applyAppearance } from './appearance/apply-appearance';
 import { AppearanceDialog } from './appearance/AppearanceDialog';
 import type { CashStatus } from '../shared/cash-api';
@@ -30,6 +31,7 @@ const SHORTCUTS: readonly { readonly keys: string; readonly action: string }[] =
   { keys: 'F3', action: 'Caja' },
   { keys: 'F4', action: 'Devolución' },
   { keys: 'F7', action: 'Precio' },
+  { keys: 'F5', action: 'Producto nuevo' },
   { keys: 'F8', action: 'Reimprimir' },
   { keys: 'F6', action: 'Salir' },
 ];
@@ -38,6 +40,8 @@ interface AppProps {
   readonly posApi: PosApi;
   /** Changing the price of a product (E1-39). Without it, the register offers no price change. */
   readonly pricingApi?: PricingApi;
+  /** Adding products that are not in the catalog (E1-42). Without it, the register offers no product form. */
+  readonly productApi?: ProductAdminApi;
 }
 
 /**
@@ -46,9 +50,10 @@ interface AppProps {
  *
  * @param props.posApi bridge to the main process
  * @param props.pricingApi bridge for changing prices, when the register offers it
+ * @param props.productApi bridge for adding products, when the register offers it
  * @returns the screen
  */
-export function App({ posApi, pricingApi }: AppProps): ReactElement {
+export function App({ posApi, pricingApi, productApi }: AppProps): ReactElement {
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [authState, setAuthState] = useState<AuthState | null>(null);
   const [authFailed, setAuthFailed] = useState(false);
@@ -89,6 +94,7 @@ export function App({ posApi, pricingApi }: AppProps): ReactElement {
     <RegisterScreen
       posApi={posApi}
       {...(pricingApi === undefined ? {} : { pricingApi })}
+      {...(productApi === undefined ? {} : { productApi })}
       user={authState.current}
       appearance={appearance}
       onAppearanceSaved={setAppearance}
@@ -100,13 +106,14 @@ export function App({ posApi, pricingApi }: AppProps): ReactElement {
 interface RegisterScreenProps {
   readonly posApi: PosApi;
   readonly pricingApi?: PricingApi;
+  readonly productApi?: ProductAdminApi;
   readonly user: UserSummary;
   readonly appearance: Appearance;
   readonly onAppearanceSaved: (appearance: Appearance) => void;
   readonly onSignOut: () => void;
 }
 
-function RegisterScreen({ posApi, pricingApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
+function RegisterScreen({ posApi, pricingApi, productApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
   const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
   const [cash, setCash] = useState<CashStatus | null>(null);
@@ -198,6 +205,7 @@ function RegisterScreen({ posApi, pricingApi, user, appearance, onAppearanceSave
       <SaleScreen
         posApi={posApi}
         {...(pricingApi === undefined ? {} : { pricingApi })}
+        {...(productApi === undefined ? {} : { productApi })}
         isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering}
         isOwner={isOwner}
         onOpenAppearance={openAppearance}
