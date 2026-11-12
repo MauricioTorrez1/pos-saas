@@ -4,7 +4,7 @@ import type { UserSummary } from '../../shared/auth';
 import type { DashboardRequest, ExportFormat, ExportResult } from '../../shared/dashboard-api';
 import { exportFileName, summaryHtml, summarySheets } from './dashboard-export';
 import type { DashboardService } from './dashboard-service';
-import { buildWorkbook } from './xlsx-workbook';
+import { buildWorkbook } from '../export/xlsx';
 
 /** What the exporter needs from the outside: the window to choose where to save, the printer of PDFs, and the name. */
 export interface ExporterDependencies {

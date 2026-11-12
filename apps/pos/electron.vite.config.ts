@@ -5,8 +5,8 @@ export default defineConfig({
   main: {
     build: {
       // The money package exports TypeScript source, which plain Node cannot run, so the build bundles it. The installer
-      // carries no node_modules (electron-builder.yml), so exceljs, which writes the purchase order sheet, is bundled too.
-      externalizeDeps: { exclude: ['@pos-saas/money', 'exceljs'] },
+      // carries no node_modules (electron-builder.yml). The Excel files are written by our own module (src/main/export/xlsx.ts), with no library.
+      externalizeDeps: { exclude: ['@pos-saas/money'] },
     },
   },
   preload: {

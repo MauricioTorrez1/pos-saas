@@ -16,7 +16,7 @@ import { DashboardFixture } from './dashboard-fixtures';
 import { exportFileName, summaryHtml, summarySheets } from './dashboard-export';
 import { DashboardExporter } from './dashboard-exporter';
 import { DashboardService } from './dashboard-service';
-import { buildWorkbook } from './xlsx-workbook';
+import { buildWorkbook } from '../export/xlsx';
 
 const TENANT = 'tenant-a';
 

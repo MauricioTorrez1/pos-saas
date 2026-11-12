@@ -1,8 +1,9 @@
 import { formatCents, type Unit } from '@pos-saas/money';
-import ExcelJS from 'exceljs';
 
+import { costNumberText, pesosText } from '../../shared/dashboard-format';
 import { formatUnitCost } from '../../shared/product-admin';
 import { formatFolio, type OrderLine, type PurchaseOrder } from '../../shared/supplier-order';
+import { buildWorkbook, type Cell, type CellStyle, type Sheet } from '../export/xlsx';
 
 /** The titles of the columns of the order, in the order they are printed and written. */
 export const ORDER_COLUMNS = ['Código del proveedor', 'Descripción', 'Código de barras', 'Cantidad', 'Unidad', 'Costo estimado', 'Importe'] as const;
@@ -128,79 +129,76 @@ ${notes}
 }
 
 const HEADER_ROW = 6;
+const ORDER_WIDTHS = [22, 46, 18, 12, 9, 16, 16] as const;
+const HEADER_STYLE: CellStyle = { bold: true, fill: 'EEEEEE', bottomBorder: true };
+/** A code is text even when it is only digits, or a leading zero would be lost. */
+const CODE_STYLE: CellStyle = { numFormat: '@' };
+const MONEY_FORMAT = { code: '"$"#,##0.00' } as const;
+const COST_FORMAT = { code: '"$"#,##0.00####' } as const;
+
+function codeCell(code: string | null): Cell {
+  return code === null ? null : { text: code, style: CODE_STYLE };
+}
+
+function lineCells(line: OrderLine): Cell[] {
+  return [
+    codeCell(line.supplierCode),
+    line.description,
+    codeCell(line.barcode),
+    { decimal: formatOrderQuantity(line.quantityMilli, line.unit), format: { code: line.unit === 'piece' ? '#,##0' : '#,##0.000' } },
+    orderUnitName(line.unit),
+    line.unitCostE6 === null ? null : { decimal: costNumberText(line.unitCostE6), format: COST_FORMAT },
+    line.lineTotalCents === null ? null : { decimal: pesosText(line.lineTotalCents), format: MONEY_FORMAT },
+  ];
+}
 
 /**
- * Builds the spreadsheet of the order: the same header, table and total as the PDF, with the codes as text (so a leading
- * zero is kept), the quantity and the money as numbers, and the amounts worked out by the register in whole cents, never by
- * the sheet.
+ * Lays the order out as the sheet of an Excel workbook: the same header, table and total as the PDF, with the codes as text
+ * (so a leading zero is kept), the quantity and the money as numbers written as the exact decimals of the integers the
+ * register keeps, and the amounts worked out by the register in whole cents, never by the sheet.
  *
  * @param order the order to write, draft or sent
  * @param businessName the name of the business for the header
- * @returns the bytes of the .xlsx file
+ * @returns the sheet, to be written by `buildWorkbook`
  */
-export async function buildOrderWorkbook(order: PurchaseOrder, businessName: string): Promise<Buffer> {
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = businessName;
-  workbook.created = new Date(order.createdAt);
-  const sheet = workbook.addWorksheet('Pedido', { pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-  sheet.columns = [{ width: 22 }, { width: 46 }, { width: 18 }, { width: 12 }, { width: 9 }, { width: 16 }, { width: 16 }];
-
-  sheet.getCell('A1').value = businessName;
-  sheet.getCell('A1').font = { bold: true, size: 14 };
-  sheet.getCell('A2').value = 'Pedido al proveedor';
-  sheet.getCell('A2').font = { bold: true, size: 12 };
-  const facts: readonly (readonly [string, string])[] = [
-    ['Proveedor', order.supplierName],
-    ['Fecha', orderDate(order)],
-    ['Folio', formatFolio(order.folio)],
+export function orderSheet(order: PurchaseOrder, businessName: string): Sheet {
+  const rows: Cell[][] = [
+    [{ text: businessName, style: { bold: true, size: 14 } }],
+    [{ text: 'Pedido al proveedor', style: { bold: true, size: 12 } }],
+    [{ heading: 'Proveedor' }, order.supplierName],
+    [{ heading: 'Fecha' }, orderDate(order)],
+    [{ heading: 'Folio' }, formatFolio(order.folio)],
+    ORDER_COLUMNS.map((title): Cell => ({ text: title, style: HEADER_STYLE })),
+    ...order.lines.map(lineCells),
+    [
+      null,
+      null,
+      null,
+      null,
+      null,
+      { text: TOTAL_LABEL, style: { bold: true, alignRight: true } },
+      { decimal: pesosText(order.totalCents), format: MONEY_FORMAT, style: { bold: true } },
+    ],
   ];
-  facts.forEach(([label, value], index) => {
-    sheet.getCell(3 + index, 1).value = label;
-    sheet.getCell(3 + index, 1).font = { bold: true };
-    sheet.getCell(3 + index, 2).value = value;
-  });
-
-  const header = sheet.getRow(HEADER_ROW);
-  header.values = [...ORDER_COLUMNS];
-  header.font = { bold: true };
-  header.eachCell((cell) => {
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
-    cell.border = { bottom: { style: 'thin' } };
-  });
-
-  order.lines.forEach((line, index) => {
-    const row = sheet.getRow(HEADER_ROW + 1 + index);
-    row.getCell(1).value = line.supplierCode ?? '';
-    row.getCell(2).value = line.description;
-    row.getCell(3).value = line.barcode ?? '';
-    row.getCell(4).value = line.quantityMilli / MILLI_PER_UNIT;
-    row.getCell(5).value = orderUnitName(line.unit);
-    row.getCell(6).value = line.unitCostE6 === null ? null : line.unitCostE6 / 1_000_000;
-    row.getCell(7).value = line.lineTotalCents === null ? null : line.lineTotalCents / 100;
-    // A code is text even when it is only digits, or a leading zero would be lost.
-    row.getCell(1).numFmt = '@';
-    row.getCell(3).numFmt = '@';
-    row.getCell(4).numFmt = line.unit === 'piece' ? '#,##0' : '#,##0.000';
-    row.getCell(6).numFmt = '"$"#,##0.00####';
-    row.getCell(7).numFmt = '"$"#,##0.00';
-  });
-
-  const totalRow = sheet.getRow(HEADER_ROW + 1 + order.lines.length);
-  totalRow.getCell(6).value = TOTAL_LABEL;
-  totalRow.getCell(7).value = order.totalCents / 100;
-  totalRow.getCell(7).numFmt = '"$"#,##0.00';
-  totalRow.font = { bold: true };
-  totalRow.getCell(6).alignment = { horizontal: 'right' };
-
-  let next = HEADER_ROW + 3 + order.lines.length;
+  if (order.linesWithoutCost > 0 || order.notes !== null) {
+    rows.push([]);
+  }
   if (order.linesWithoutCost > 0) {
-    sheet.getCell(next, 1).value = `${order.linesWithoutCost} renglón(es) sin costo no están en el total.`;
-    next += 1;
+    rows.push([`${order.linesWithoutCost} renglón(es) sin costo no están en el total.`]);
   }
   if (order.notes !== null) {
-    sheet.getCell(next, 1).value = `Notas: ${order.notes}`;
+    rows.push([`Notas: ${order.notes}`]);
   }
-  sheet.views = [{ state: 'frozen', ySplit: HEADER_ROW }];
+  return { name: 'Pedido', rows, widths: ORDER_WIDTHS, frozenRows: HEADER_ROW, fitToPageWidth: true };
+}
 
-  return Buffer.from(await workbook.xlsx.writeBuffer());
+/**
+ * Builds the spreadsheet of the order with the shared Excel writer.
+ *
+ * @param order the order to write, draft or sent
+ * @param businessName the name of the business for the header and the author of the file
+ * @returns the bytes of the .xlsx file
+ */
+export function buildOrderWorkbook(order: PurchaseOrder, businessName: string): Buffer {
+  return buildWorkbook([orderSheet(order, businessName)], { creator: businessName, created: new Date(order.createdAt) });
 }
