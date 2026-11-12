@@ -1,6 +1,6 @@
 import { isUnit } from '@pos-saas/money';
 
-import { MAX_BARCODES_PER_PRODUCT, type NewProductRequest } from '../../shared/product-admin';
+import { MAX_BARCODES_PER_PRODUCT, type NewProductRequest, type UpdateProductRequest } from '../../shared/product-admin';
 
 const MAX_PIN_LENGTH = 8;
 /** A text longer than this is not a name or a barcode, so it is refused before anything looks at it. */
@@ -56,6 +56,45 @@ export function parseBarcodeList(value: unknown): string[] {
     throw new TypeError('Expected a list of barcodes');
   }
   return value.map((code) => requireText(code, 'a barcode'));
+}
+
+const UUID_V7_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+/**
+ * Checks the changes of a product that came over the bridge. The service checks the rules of the business, such as who may
+ * approve and whether the unit can change; this checks the shape.
+ *
+ * @param value what the screen sent
+ * @returns the request, with only the fields it knows
+ * @throws TypeError if something is missing or has the wrong type
+ */
+export function parseUpdateProductRequest(value: unknown): UpdateProductRequest {
+  const request = asRecord(value, 'the changes of a product');
+  const taxRate = asRecord(request.taxRate, 'the VAT rate');
+  if (typeof request.productId !== 'string' || !UUID_V7_TEXT.test(request.productId)) {
+    throw new TypeError('Expected the UUIDv7 of a product');
+  }
+  if (taxRate.factor !== 'rate' && taxRate.factor !== 'exempt') {
+    throw new TypeError('Expected the VAT factor to be rate or exempt');
+  }
+  if (!isUnit(request.unit)) {
+    throw new TypeError('Expected the unit to be piece, meter, kilogram or liter');
+  }
+  if (typeof request.isActive !== 'boolean') {
+    throw new TypeError('Expected whether the product is active');
+  }
+  const ownerPin = parseOwnerPin(request.ownerPin);
+  return {
+    productId: request.productId,
+    expectedRevision: requireInteger(request.expectedRevision, 'the revision'),
+    name: requireText(request.name, 'the name'),
+    unit: request.unit,
+    taxRate: { factor: taxRate.factor, rateBp: requireInteger(taxRate.rateBp, 'the VAT rate') },
+    unitCostE6: request.unitCostE6 === null ? null : requireInteger(request.unitCostE6, 'the cost'),
+    isActive: request.isActive,
+    barcodes: parseBarcodeList(request.barcodes),
+    ...(ownerPin === undefined ? {} : { ownerPin }),
+  };
 }
 
 /**

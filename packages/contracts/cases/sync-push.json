@@ -289,6 +289,127 @@
           }
         ]
       }
+    },
+    {
+      "name": "The owner renames a product, changes its VAT and cost, and swaps a barcode",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000210",
+            "deviceSeq": 5001,
+            "type": "product.updated",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000b0",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "changedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "changes": {
+                "name": {
+                  "previous": "Cinta métrica 5 m",
+                  "new": "Cinta métrica 8 m"
+                },
+                "tax": {
+                  "previous": {
+                    "taxFactor": "rate",
+                    "taxRateBp": 1600
+                  },
+                  "new": {
+                    "taxFactor": "exempt",
+                    "taxRateBp": 0
+                  }
+                },
+                "unitCostE6": {
+                  "previous": 52250000,
+                  "new": null
+                },
+                "barcodesAdded": [
+                  "CINTA-8M"
+                ],
+                "barcodesRemoved": [
+                  "7501234567890"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A cashier gives a product up with the PIN of an owner, and the unit of a product without movements changes",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000211",
+            "deviceSeq": 5002,
+            "type": "product.updated",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000b1",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "changedBy": "0193a5c0-0000-7000-8000-000000000040",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "changes": {
+                "isActive": {
+                  "previous": true,
+                  "new": false
+                }
+              }
+            }
+          },
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000212",
+            "deviceSeq": 5003,
+            "type": "product.updated",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000b2",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "changedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "changes": {
+                "unit": {
+                  "previous": "piece",
+                  "new": "meter"
+                },
+                "unitCostE6": {
+                  "previous": null,
+                  "new": 1500000
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A cashier writes off stock with the PIN of an owner, who approved it",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000213",
+            "deviceSeq": 5004,
+            "type": "stock.adjusted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "movementId": "0193a5c0-0000-7000-8000-0000000000c0",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "movementType": "waste",
+              "quantityMilli": -2000,
+              "reason": "Broken in the warehouse",
+              "userId": "0193a5c0-0000-7000-8000-000000000040",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
     }
   ],
   "request_rejections": [
@@ -962,6 +1083,301 @@
                 "unitCostE6": 52250000
               },
               "createdBy": "0193a5c0-0000-7000-8000-000000000041"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A product update with nothing changed",
+      "reason": "minProperties",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000220",
+            "deviceSeq": 1,
+            "type": "product.updated",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000b0",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "changedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "changes": {}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A product update that tries to carry the price",
+      "reason": "additionalProperties",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000220",
+            "deviceSeq": 1,
+            "type": "product.updated",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000b0",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "changedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "changes": {
+                "unitPriceE4": {
+                  "previous": 1,
+                  "new": 2
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A product update that carries the stock",
+      "reason": "additionalProperties",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000220",
+            "deviceSeq": 1,
+            "type": "product.updated",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000b0",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "changedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "changes": {
+                "stockMilli": {
+                  "previous": 1,
+                  "new": 2
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A product update with an empty new name",
+      "reason": "minLength",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000220",
+            "deviceSeq": 1,
+            "type": "product.updated",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000b0",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "changedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "changes": {
+                "name": {
+                  "previous": "Cinta",
+                  "new": ""
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A product update with a unit the core does not know",
+      "reason": "enum",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000220",
+            "deviceSeq": 1,
+            "type": "product.updated",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000b0",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "changedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "changes": {
+                "unit": {
+                  "previous": "piece",
+                  "new": "box"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A product update to exempt that keeps a rate",
+      "reason": "const",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000220",
+            "deviceSeq": 1,
+            "type": "product.updated",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000b0",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "changedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "changes": {
+                "tax": {
+                  "previous": {
+                    "taxFactor": "rate",
+                    "taxRateBp": 1600
+                  },
+                  "new": {
+                    "taxFactor": "exempt",
+                    "taxRateBp": 1600
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A product update with a change that lacks its previous value",
+      "reason": "required",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000220",
+            "deviceSeq": 1,
+            "type": "product.updated",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000b0",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "changedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "changes": {
+                "isActive": {
+                  "new": false
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A product update with a barcode that has a space",
+      "reason": "pattern",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000220",
+            "deviceSeq": 1,
+            "type": "product.updated",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000b0",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "changedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "changes": {
+                "barcodesAdded": [
+                  "7501 234"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A product update with an empty list of barcodes added",
+      "reason": "minItems",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000220",
+            "deviceSeq": 1,
+            "type": "product.updated",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000b0",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "changedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "changes": {
+                "barcodesAdded": []
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A product update that nobody approved",
+      "reason": "required",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000220",
+            "deviceSeq": 1,
+            "type": "product.updated",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "changeId": "0193a5c0-0000-7000-8000-0000000000b0",
+              "productId": "0193a5c0-0000-7000-8000-000000000060",
+              "changedBy": "0193a5c0-0000-7000-8000-000000000041",
+              "changes": {
+                "name": {
+                  "previous": "Cinta métrica 5 m",
+                  "new": "Cinta métrica 8 m"
+                },
+                "tax": {
+                  "previous": {
+                    "taxFactor": "rate",
+                    "taxRateBp": 1600
+                  },
+                  "new": {
+                    "taxFactor": "exempt",
+                    "taxRateBp": 0
+                  }
+                },
+                "unitCostE6": {
+                  "previous": 52250000,
+                  "new": null
+                },
+                "barcodesAdded": [
+                  "CINTA-8M"
+                ],
+                "barcodesRemoved": [
+                  "7501234567890"
+                ]
+              }
             }
           }
         ]

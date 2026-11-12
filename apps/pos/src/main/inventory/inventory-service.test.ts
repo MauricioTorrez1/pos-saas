@@ -106,12 +106,38 @@ describe('adjusting the stock (RF-030)', () => {
     expect(inventory.adjust({ productId: uuidV7(), type: 'adjustment', quantityMilli: 1000, reason: 'x' })).toEqual({ status: 'not_found' });
   });
 
-  it('is only for the owner', () => {
+  it('needs the owner: a cashier without the PIN of an owner changes nothing and the denial is written down', () => {
     const cashier = auth.createUser('Ana', 'cashier', '5555');
     auth.logout();
     auth.login(cashier.id, '5555');
 
-    expect(() => inventory.adjust({ productId, type: 'waste', quantityMilli: -1, reason: 'x' })).toThrow(/owner/);
+    expect(inventory.adjust({ productId, type: 'waste', quantityMilli: -1, reason: 'x' })).toEqual({ status: 'authorization_required' });
+
+    expect(stock.levelOf(productId)).toBe(100_000);
+    expect(store.prepare("SELECT action FROM audit_log WHERE action LIKE 'stock.%'").all()).toEqual([{ action: 'stock.adjust_denied' }]);
+  });
+
+  it('lets a cashier adjust with the PIN of an owner, and writes who approved', () => {
+    const cashier = auth.createUser('Ana', 'cashier', '5555');
+    auth.logout();
+    auth.login(cashier.id, '5555');
+
+    const result = inventory.adjust({ productId, type: 'waste', quantityMilli: -1000, reason: 'Broken', ownerPin: '4321' });
+
+    expect(result.status).toBe('recorded');
+    expect(stock.levelOf(productId)).toBe(99_000);
+    const entry = store.prepare("SELECT user_id, detail FROM audit_log WHERE action = 'stock.waste'").get() as unknown as { user_id: string; detail: string };
+    expect(entry).toMatchObject({ user_id: cashier.id });
+    expect(entry.detail).toContain(`approved by ${owner.id}`);
+  });
+
+  it('refuses a wrong PIN with the tries left', () => {
+    const cashier = auth.createUser('Ana', 'cashier', '5555');
+    auth.logout();
+    auth.login(cashier.id, '5555');
+
+    expect(inventory.adjust({ productId, type: 'waste', quantityMilli: -1000, reason: 'Broken', ownerPin: '0000' })).toEqual({ status: 'wrong_pin', attemptsLeft: 4 });
+    expect(stock.levelOf(productId)).toBe(100_000);
   });
 
   it('does not touch the stock when the audit entry cannot be written, so a change never lacks its entry', () => {

@@ -8,6 +8,7 @@ import type { ProductAdminApi, ProductDetail } from '../../shared/product-admin'
 import { CheckoutDialog } from '../checkout/CheckoutDialog';
 import { PriceChangeDialog } from '../pricing/PriceChangeDialog';
 import { NewProductDialog } from '../products/NewProductDialog';
+import { ProductPanelDialog } from '../products/ProductPanelDialog';
 import { newProductFormFor, type ProductFormValues } from '../products/product-form';
 import { describeReprint, REPRINT_FAILED } from '../checkout/reprint-message';
 import { MiscItemDialog, type MiscItem } from './MiscItemDialog';
@@ -98,6 +99,8 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
   const [priceChange, setPriceChange] = useState<{ readonly product: CatalogProduct | null } | null>(null);
   /** What was looked for and not found, so the cashier can add it as a new product (E1-42). */
   const [missing, setMissing] = useState<{ readonly text: string; readonly fromScanner: boolean } | null>(null);
+  /** The panel of a product (E1-43), with the product it starts from. Null while it is closed. */
+  const [productPanel, setProductPanel] = useState<{ readonly product: CatalogProduct | null } | null>(null);
   /** The form of a new product, with what is loaded in it. Null while it is closed. */
   const [newProduct, setNewProduct] = useState<{ readonly initial: ProductFormValues; readonly lookedFor: string | null } | null>(null);
   const isSaving = useRef(false);
@@ -109,10 +112,10 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
   const search = useProductSearch(posApi, showCatalogFailure);
 
   useEffect(() => {
-    if (!isKeyboardElsewhere && savedSale === null && measuring === null && !isAddingMisc && priceChange === null && newProduct === null) {
+    if (!isKeyboardElsewhere && savedSale === null && measuring === null && !isAddingMisc && priceChange === null && newProduct === null && productPanel === null) {
       inputRef.current?.focus();
     }
-  }, [isKeyboardElsewhere, savedSale, measuring, isAddingMisc, priceChange, newProduct]);
+  }, [isKeyboardElsewhere, savedSale, measuring, isAddingMisc, priceChange, newProduct, productPanel]);
 
   const addMiscItem = ({ name, unitPriceE4, quantityMilli, ownerPin: pin }: MiscItem): void => {
     const product: CatalogProduct = {
@@ -143,7 +146,7 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
       setNotice(EMPTY_SALE_MESSAGE);
       return;
     }
-    if (isSaving.current || isKeyboardElsewhere || measuring !== null || isAddingMisc || priceChange !== null || newProduct !== null) {
+    if (isSaving.current || isKeyboardElsewhere || measuring !== null || isAddingMisc || priceChange !== null || newProduct !== null || productPanel !== null) {
       return;
     }
     isSaving.current = true;
@@ -204,6 +207,16 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
     setInfo(
       `Precio de ${product.name}: ${formatUnitPriceE4(previousUnitPriceE4)} → ${formatUnitPriceE4(product.unitPriceE4)}. La venta que armaste conserva los precios de sus productos.`,
     );
+  };
+
+  // The product to start from is the one the cashier is pointing at, as with the price.
+  const openProductPanel = (): void => {
+    if (productApi === undefined || isSaving.current) {
+      return;
+    }
+    const highlighted = search.results[search.highlightedIndex];
+    const selectedLine = sale.lines.find((line) => line.product.id === sale.selectedProductId);
+    setProductPanel({ product: highlighted ?? (selectedLine !== undefined && !isMiscLineId(selectedLine.product.id) ? selectedLine.product : null) });
   };
 
   const openNewProduct = (): void => {
@@ -386,6 +399,10 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
         event.preventDefault();
         openNewProduct();
         return;
+      case 'F10':
+        event.preventDefault();
+        openProductPanel();
+        return;
       case 'F6':
         event.preventDefault();
         onSignOut();
@@ -510,6 +527,20 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
           initialValues={newProduct.initial}
           onCreated={finishNewProduct}
           onCancel={() => setNewProduct(null)}
+        />
+      )}
+      {productPanel !== null && productApi !== undefined && (
+        <ProductPanelDialog
+          posApi={posApi}
+          productApi={productApi}
+          {...(pricingApi === undefined ? {} : { pricingApi })}
+          isOwner={isOwner}
+          initialProduct={productPanel.product}
+          onClose={() => {
+            setProductPanel(null);
+            // What the lookup box listed may now be out of date: a name, a code or a state changed.
+            clearLookup();
+          }}
         />
       )}
       {measuring !== null && <QuantityDialog product={measuring} onConfirm={confirmQuantity} onCancel={() => setMeasuring(null)} />}

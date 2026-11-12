@@ -23,7 +23,7 @@ Generado el 2026-11-10 desde `docs/plan/progreso.md` y los roadmaps. Se excluyen
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-19 tareas · 82 h
+18 tareas · 78 h
 
 - **E1-09 · Artículo varios y listas de precio** (3 h) _(En revisión (artículo varios; las listas de precio quedan pendientes))_: se vende algo sin alta y se aplica precio de mayoreo con permiso.
 - **E1-16 · Envío desde la caja** (5 h): la caja sube lotes en orden y reintenta sola.
@@ -40,8 +40,7 @@ Generado el 2026-11-10 desde `docs/plan/progreso.md` y los roadmaps. Se excluyen
 - **E1-32 · Factura global** (5 h): las ventas no facturadas de un periodo van a una global.
 - **E1-33 · Cancelación y nota de crédito** (4 h): se cancela una factura o se emite egreso por una devolución.
 - **E1-34 · Reportes básicos** (5 h) _(En revisión)_: el dueño ve ventas, ticket promedio, margen, agotados y productos sin venta.
-- **E1-42 · Alta de nuevos productos en la caja** (4 h) _(En revisión)_: el dueño da de alta, desde la venta y sin internet, un producto que no está en el catálogo.
-- **E1-43 · Panel de modificación de productos** (5 h): el dueño modifica nombre, códigos, unidad, impuesto, costo, estado, precio e inventario de un producto sin perder el historial.
+- **E1-43 · Panel de modificación de productos** (5 h) _(En revisión)_: el dueño modifica nombre, códigos, unidad, impuesto, costo, estado, precio e inventario de un producto sin perder el historial.
 - **E1-37 · Piloto paralelo** (4 h): 1 a 2 semanas registrando en ambos sistemas.
 - **E1-38 · Salida de Eleventa** (4 h): la tienda opera solo con este sistema y tiene plan de regreso.
 

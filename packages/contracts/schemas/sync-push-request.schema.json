@@ -46,7 +46,7 @@
         "opId": { "$ref": "#/$defs/uuid_v7" },
         "deviceSeq": { "$ref": "#/$defs/positive_int" },
         "type": {
-          "enum": ["sale.completed", "return.registered", "cash_session.opened", "cash_movement.recorded", "cash_session.closed", "stock.adjusted", "product.price_changed", "product.created"]
+          "enum": ["sale.completed", "return.registered", "cash_session.opened", "cash_movement.recorded", "cash_session.closed", "stock.adjusted", "product.price_changed", "product.created", "product.updated"]
         },
         "schemaVersion": { "const": 1 },
         "occurredAt": { "$ref": "#/$defs/timestamp" },
@@ -60,7 +60,8 @@
         { "if": { "properties": { "type": { "const": "cash_session.closed" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/cash_session_closed" } } } },
         { "if": { "properties": { "type": { "const": "stock.adjusted" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/stock_adjusted" } } } },
         { "if": { "properties": { "type": { "const": "product.price_changed" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/product_price_changed" } } } },
-        { "if": { "properties": { "type": { "const": "product.created" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/product_created" } } } }
+        { "if": { "properties": { "type": { "const": "product.created" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/product_created" } } } },
+        { "if": { "properties": { "type": { "const": "product.updated" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/product_updated" } } } }
       ]
     },
 
@@ -223,7 +224,8 @@
         "movementType": { "enum": ["adjustment", "waste"] },
         "quantityMilli": { "$ref": "values.schema.json#/$defs/quantity_milli", "not": { "const": 0 } },
         "reason": { "$ref": "#/$defs/text" },
-        "userId": { "$ref": "#/$defs/uuid_v7" }
+        "userId": { "$ref": "#/$defs/uuid_v7" },
+        "authorizedBy": { "$ref": "#/$defs/uuid_v7", "description": "The owner whose PIN approved it, when a cashier asked (E1-43). Absent when the owner did it themselves." }
       }
     },
 
@@ -273,6 +275,53 @@
         },
         "createdBy": { "$ref": "#/$defs/uuid_v7" },
         "authorizedBy": { "$ref": "#/$defs/uuid_v7" }
+      },
+      "allOf": [{ "if": { "properties": { "taxFactor": { "const": "exempt" } }, "required": ["taxFactor"] }, "then": { "properties": { "taxRateBp": { "const": 0 } } } }]
+    },
+
+    "change_of": {
+      "description": "A field that changed: the value it had and the value it has now, which differ.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["previous", "new"],
+      "properties": { "previous": {}, "new": {} }
+    },
+    "product_updated": {
+      "description": "The register changed a product that already existed (E1-43, ADR 0058): the owner, or a cashier with the PIN of an owner, edited it in the product panel. changes holds at least one field with its previous and new value, and lists of the barcodes added and removed. The price is not here: a price change is product.price_changed, and the stock is not here either, because it only moves with stock.adjusted. isActive false gives the product up: the core hides it and never deletes it. changeId identifies the change and the core stores it once; opId already makes the push idempotent.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["changeId", "productId", "changes", "changedBy", "authorizedBy"],
+      "properties": {
+        "changeId": { "$ref": "#/$defs/uuid_v7" },
+        "productId": { "$ref": "#/$defs/uuid_v7" },
+        "changes": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "name": { "$ref": "#/$defs/change_of", "properties": { "previous": { "$ref": "#/$defs/product_name" }, "new": { "$ref": "#/$defs/product_name" } } },
+            "unit": { "$ref": "#/$defs/change_of", "properties": { "previous": { "$ref": "values.schema.json#/$defs/unit" }, "new": { "$ref": "values.schema.json#/$defs/unit" } } },
+            "tax": { "$ref": "#/$defs/change_of", "properties": { "previous": { "$ref": "#/$defs/tax" }, "new": { "$ref": "#/$defs/tax" } } },
+            "unitCostE6": {
+              "$ref": "#/$defs/change_of",
+              "properties": { "previous": { "oneOf": [{ "$ref": "#/$defs/unit_cost_e6" }, { "type": "null" }] }, "new": { "oneOf": [{ "$ref": "#/$defs/unit_cost_e6" }, { "type": "null" }] } }
+            },
+            "isActive": { "$ref": "#/$defs/change_of", "properties": { "previous": { "type": "boolean" }, "new": { "type": "boolean" } } },
+            "barcodesAdded": { "$ref": "#/$defs/barcodes", "minItems": 1 },
+            "barcodesRemoved": { "$ref": "#/$defs/barcodes", "minItems": 1 }
+          }
+        },
+        "changedBy": { "$ref": "#/$defs/uuid_v7" },
+        "authorizedBy": { "$ref": "#/$defs/uuid_v7" }
+      }
+    },
+    "tax": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["taxFactor", "taxRateBp"],
+      "properties": {
+        "taxFactor": { "$ref": "values.schema.json#/$defs/tax_factor" },
+        "taxRateBp": { "$ref": "values.schema.json#/$defs/valid_tax_rate_bp" }
       },
       "allOf": [{ "if": { "properties": { "taxFactor": { "const": "exempt" } }, "required": ["taxFactor"] }, "then": { "properties": { "taxRateBp": { "const": 0 } } } }]
     }

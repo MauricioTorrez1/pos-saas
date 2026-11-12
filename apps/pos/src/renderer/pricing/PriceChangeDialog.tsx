@@ -158,7 +158,7 @@ export function PriceChangeDialog({ posApi, pricingApi, isOwner, initialProduct,
               search();
             }}
           >
-            <Field label="Producto" value={text} onChange={setText} autoFocus maxLength={100} />
+            <Field label="Producto" value={text} onChange={setText} autoFocus maxLength={100} onEnter={search} />
           </form>
           {choices.length > 0 && (
             <ul className="cash-actions" aria-label="Productos encontrados">

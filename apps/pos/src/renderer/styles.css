@@ -1102,3 +1102,26 @@ kbd {
   border: 1px solid var(--ink-soft);
   cursor: pointer;
 }
+
+/* Product panel (E1-43): the figures of a product as a short list of label and value. */
+
+.product-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
+  margin: 0;
+  background: var(--ground);
+  border-left: 0.35rem solid var(--accent);
+}
+
+.product-summary dt {
+  color: var(--ink-soft);
+}
+
+.product-summary dd {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
