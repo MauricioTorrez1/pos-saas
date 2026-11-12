@@ -1125,3 +1125,280 @@ kbd {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+/* Summary of the business (E1-45): indicators, charts and tables. The colors are the ones of the appearance, so both themes work. */
+
+.dashboard {
+  width: min(72rem, calc(100vw - 2rem));
+  height: calc(100vh - 2rem);
+  overflow: hidden;
+}
+
+.dashboard h2 {
+  margin: 0;
+}
+
+.dashboard-period {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 1.125rem;
+}
+
+.dashboard-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.segmented {
+  display: inline-flex;
+}
+
+.segment {
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  margin-left: -2px;
+  color: var(--ink);
+  cursor: pointer;
+  background: none;
+  border: 2px solid var(--ink);
+}
+
+.segment:first-child {
+  margin-left: 0;
+}
+
+.segment[aria-pressed='true'] {
+  color: var(--surface);
+  background: var(--ink);
+}
+
+.segment:focus-visible,
+.tab:focus-visible,
+.link-button:focus-visible,
+.date-field input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.date-field {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.date-field span {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.date-field input {
+  height: 2.75rem;
+  padding: 0 0.6rem;
+  font-size: 1rem;
+  color: var(--ink);
+  background: var(--ground);
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 2px solid var(--ink);
+}
+
+.tab {
+  min-height: 2.75rem;
+  padding: 0 1.25rem;
+  font-size: 1.125rem;
+  color: var(--ink);
+  cursor: pointer;
+  background: none;
+  border: 2px solid transparent;
+  border-bottom: 0;
+}
+
+.tab[aria-selected='true'] {
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--ink);
+}
+
+.dashboard-panel {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 8rem;
+  padding-right: 0.5rem;
+  overflow-y: auto;
+}
+
+.dashboard-panel > * {
+  flex-shrink: 0;
+}
+
+.dashboard-panel[aria-busy='true'] {
+  opacity: 0.6;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  background: var(--ground);
+  border-left: 0.35rem solid var(--accent);
+}
+
+.kpi dt {
+  color: var(--ink-soft);
+}
+
+.kpi dd {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  font-stretch: condensed;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-detail,
+.kpi-compare {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.chart {
+  margin: 0;
+}
+
+.chart figcaption {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.chart-svg {
+  display: block;
+  width: 100%;
+  max-height: 14rem;
+}
+
+.chart-axis {
+  stroke: var(--ink-soft);
+  stroke-width: 1;
+}
+
+.chart-bar {
+  fill: var(--accent);
+  stroke: var(--ink);
+  stroke-width: 1;
+}
+
+.chart-label {
+  font-size: 10px;
+  fill: var(--ink-soft);
+}
+
+.chart-summary {
+  margin: 0.25rem 0;
+  color: var(--ink-soft);
+}
+
+.chart-table summary {
+  cursor: pointer;
+}
+
+.dashboard-table,
+.chart-table table {
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+  border-collapse: collapse;
+}
+
+.dashboard-table caption {
+  padding: 0.25rem 0;
+  font-weight: 700;
+  text-align: left;
+}
+
+.dashboard-table th,
+.dashboard-table td,
+.chart-table th,
+.chart-table td {
+  padding: 0.35rem 0.6rem;
+  text-align: right;
+  border-bottom: 1px solid var(--rule);
+}
+
+.dashboard-table th[scope='row'],
+.chart-table th[scope='row'],
+.dashboard-table th:first-child,
+.chart-table th:first-child {
+  font-weight: 400;
+  text-align: left;
+}
+
+.dashboard-table thead th {
+  font-weight: 700;
+}
+
+.dashboard-table th.left,
+.dashboard-table td.left {
+  text-align: left;
+}
+
+.badge-warning {
+  padding: 0.1rem 0.45rem;
+  font-size: 0.875rem;
+  color: var(--alert);
+  background: var(--alert-surface);
+  border: 1px solid var(--alert);
+}
+
+.dashboard-section h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.dashboard-section .count,
+.dashboard-section .hint,
+.cost-note {
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+.dashboard-section .hint,
+.dashboard-section .empty {
+  margin: 0.15rem 0 0.4rem;
+}
+
+.link-button {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dashboard-panel {
+    transition: opacity 120ms;
+  }
+}

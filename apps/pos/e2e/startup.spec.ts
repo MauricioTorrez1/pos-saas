@@ -102,6 +102,8 @@ test('exposes only the agreed functions through the bridge', async ({ appWindow 
     'findProducts',
     'getProductDetail',
     'updateProduct',
+    'getDashboard',
+    'exportDashboard',
     'getAppearance',
     'saveAppearance',
     'savePendingSale',

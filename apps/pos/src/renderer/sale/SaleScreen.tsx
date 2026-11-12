@@ -67,6 +67,8 @@ interface SaleScreenProps {
   readonly onOpenReturns: () => void;
   /** Called when the owner asks for the administration: the catalog of Eleventa and the backups. */
   readonly onOpenAdmin: () => void;
+  /** Called when the person asks for the summary of the business (E1-45). Without it, F11 does nothing. */
+  readonly onOpenDashboard?: () => void;
   /** Called after a sale was collected, so the cash of the register is read again. */
   readonly onCashChanged: () => void;
 }
@@ -84,10 +86,11 @@ interface SaleScreenProps {
  * @param props.onOpenCash called when the cashier asks for the cash of the register
  * @param props.onOpenReturns called when the cashier asks to take back a sale
  * @param props.onOpenAdmin called when the owner asks for the administration
+ * @param props.onOpenDashboard called when the person asks for the summary of the business
  * @param props.onCashChanged called after a sale was collected
  * @returns the screen
  */
-export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onCashChanged }: SaleScreenProps): ReactElement {
+export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onOpenDashboard, onCashChanged }: SaleScreenProps): ReactElement {
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
@@ -414,6 +417,10 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
       case 'F4':
         event.preventDefault();
         onOpenReturns();
+        return;
+      case 'F11':
+        event.preventDefault();
+        onOpenDashboard?.();
         return;
       case 'F1':
         event.preventDefault();
