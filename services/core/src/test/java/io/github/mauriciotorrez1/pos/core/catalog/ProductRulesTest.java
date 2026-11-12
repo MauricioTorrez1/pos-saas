@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.mauriciotorrez1.pos.money.Quantity;
+import io.github.mauriciotorrez1.pos.money.TaxRate;
 import io.github.mauriciotorrez1.pos.money.Unit;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -78,5 +79,27 @@ class ProductRulesTest {
     void presentationNamesAreUniqueIgnoringCase() {
         assertThatThrownBy(() -> ProductRules.presentations(List.of(new PresentationDraft("Roll", "100"),
                 new PresentationDraft("roll", "50")), Unit.METER)).hasMessageContaining("repeated");
+    }
+
+    @Test
+    void theCatalogOffersSixteenEightAndZeroPercentAndExempt() {
+        assertThat(ProductRules.tax(TaxRate.of(1600)).bp()).isEqualTo(1600);
+        assertThat(ProductRules.tax(TaxRate.of(800)).bp()).isEqualTo(800);
+        assertThat(ProductRules.tax(TaxRate.of(0)).bp()).isZero();
+        assertThat(ProductRules.tax(TaxRate.EXEMPT)).isEqualTo(TaxRate.EXEMPT);
+        assertThatThrownBy(() -> ProductRules.tax(TaxRate.of(1200))).isInstanceOf(InvalidProductException.class);
+    }
+
+    @Test
+    void theSatFilesLoadAndRejectWhatIsNotInThem() {
+        SatCatalog sat = new SatCatalog("");
+
+        assertThat(sat.requireUnitKey("MTR")).isEqualTo("MTR");
+        assertThat(sat.requireProductKey("01010101")).isEqualTo("01010101");
+        assertThatThrownBy(() -> sat.requireUnitKey("mtr")).hasMessageContaining("invalid format");
+        assertThatThrownBy(() -> sat.requireUnitKey("ZZZ")).hasMessageContaining("not in the reviewed catalog");
+        assertThatThrownBy(() -> sat.requireProductKey("1234567")).hasMessageContaining("invalid format");
+        assertThatThrownBy(() -> sat.requireProductKey("12345678")).hasMessageContaining("not in the reviewed catalog");
+        assertThatThrownBy(() -> sat.requireProductKey(null)).isInstanceOf(InvalidProductException.class);
     }
 }

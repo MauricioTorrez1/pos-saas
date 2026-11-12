@@ -138,7 +138,7 @@ class ProductCatalogApiTest extends SecuredApiTest {
     void aCodeCannotPointAtTwoProductsOfTheSameBusiness() {
         String shared = unique("DUP");
         UUID first = createdId(create(owner, product(unique("Primero "), "piece", List.of(code(shared, "barcode")), List.of())));
-        long seqBefore = admin.queryForObject("SELECT last_seq FROM catalog_change_counter WHERE tenant_id = ?", Long.class, tenant);
+        long seqBefore = admin.queryForObject("SELECT last_seq FROM sync_change_counter WHERE tenant_id = ?", Long.class, tenant);
 
         Reply second = create(owner, product(unique("Segundo "), "piece", List.of(code(unique("OTRO"), "barcode"), code(shared, "alternate")), List.of()));
 
@@ -147,7 +147,7 @@ class ProductCatalogApiTest extends SecuredApiTest {
         assertThat(second.body().get("code").asString()).isEqualTo(shared);
         // The failed creation leaves nothing behind: no product, no other code, no hole in the change feed.
         assertThat(admin.queryForObject("SELECT count(*) FROM product_code WHERE tenant_id = ? AND code = ?", Long.class, tenant, shared)).isEqualTo(1L);
-        assertThat(admin.queryForObject("SELECT last_seq FROM catalog_change_counter WHERE tenant_id = ?", Long.class, tenant)).isEqualTo(seqBefore);
+        assertThat(admin.queryForObject("SELECT last_seq FROM sync_change_counter WHERE tenant_id = ?", Long.class, tenant)).isEqualTo(seqBefore);
     }
 
     @Test
@@ -226,15 +226,15 @@ class ProductCatalogApiTest extends SecuredApiTest {
     @Test
     void anEditChangesOnlyWhatItSendsAndAnEmptyEditWritesNothing() {
         UUID id = createdId(create(owner, product(unique("Lija "), "piece", List.of(code(unique("LIJ"), "barcode")), List.of())));
-        long seq = call(owner, HttpMethod.GET, "/products/" + id, null, null).body().get("changeSeq").asLong();
+        long seq = feedHead(tenant);
 
         Reply unchanged = call(owner, HttpMethod.PATCH, "/products/" + id, Map.of(), null);
-        assertThat(unchanged.body().get("changeSeq").asLong()).isEqualTo(seq);
+        assertThat(feedHead(tenant)).isEqualTo(seq);
 
         Reply renamed = call(owner, HttpMethod.PATCH, "/products/" + id, Map.of("status", "inactive"), null);
         assertThat(renamed.body().get("status").asString()).isEqualTo("inactive");
         assertThat(renamed.body().get("codes")).hasSize(1);
-        assertThat(renamed.body().get("changeSeq").asLong()).isGreaterThan(seq);
+        assertThat(feedHead(tenant)).isGreaterThan(seq);
         assertThat(admin.queryForObject("SELECT count(*) FROM audit_log WHERE entity_id = ? AND action = 'product.updated'", Long.class, id)).isEqualTo(1L);
     }
 
@@ -338,7 +338,7 @@ class ProductCatalogApiTest extends SecuredApiTest {
     }
 
     @Test
-    void theChangeFeedGrowsByOneForEachChangeInsideTheBusiness() {
+    void everyProductChangeIsPublishedToTheRegisterFeedInOrder() {
         UUID feedTenant = seedTenant();
         Actor feedOwner = seedActor(feedTenant, Role.OWNER, true);
 
@@ -347,10 +347,11 @@ class ProductCatalogApiTest extends SecuredApiTest {
         call(feedOwner, HttpMethod.PATCH, "/products/" + first, Map.of("name", "Uno editado"), null);
         call(feedOwner, HttpMethod.DELETE, "/products/" + second, null, null);
 
-        List<Long> positions = admin.queryForList(
-                "SELECT change_seq FROM product WHERE tenant_id = ? ORDER BY change_seq", Long.class, feedTenant);
-        assertThat(positions).containsExactly(3L, 4L);
-        assertThat(admin.queryForObject("SELECT last_seq FROM catalog_change_counter WHERE tenant_id = ?", Long.class, feedTenant)).isEqualTo(4L);
+        List<Map<String, Object>> changes = admin.queryForList(
+                "SELECT seq, entity_id, deleted FROM sync_change WHERE tenant_id = ? ORDER BY seq", feedTenant);
+        assertThat(changes).extracting(row -> row.get("seq")).containsExactly(1L, 2L, 3L, 4L);
+        assertThat(changes).extracting(row -> row.get("entity_id")).containsExactly(first, second, first, second);
+        assertThat(changes).extracting(row -> row.get("deleted")).containsExactly(false, false, false, true);
     }
 
     @Test
@@ -366,7 +367,7 @@ class ProductCatalogApiTest extends SecuredApiTest {
         List<String> updates = eventsOf(id, "ProductUpdated");
         assertThat(updates).as("the repeated edit changed nothing, so it emitted nothing").hasSize(2);
         assertThat(updates).anySatisfy(event -> assertThat(event).contains("\"deleted\":true"));
-        assertThat(eventsOf(id, "ProductCreated").get(0)).contains(tenant.toString(), "\"schemaVersion\":1", "\"unit\":\"meter\"");
+        assertThat(eventsOf(id, "ProductCreated").get(0)).contains(tenant.toString(), "\"schemaVersion\":2", "\"unit\":\"meter\"");
     }
 
     @Test
@@ -378,6 +379,11 @@ class ProductCatalogApiTest extends SecuredApiTest {
         assertThat(create(owner, product(name, "piece", List.of(code(code, "barcode")), List.of())).status()).isEqualTo(409);
 
         assertThat(admin.queryForObject("SELECT count(*) FROM event_publication WHERE serialized_event LIKE ?", Long.class, "%" + name + "%")).isZero();
+    }
+
+    private long feedHead(UUID business) {
+        Long head = admin.queryForObject("SELECT coalesce(max(last_seq), 0) FROM sync_change_counter WHERE tenant_id = ?", Long.class, business);
+        return head == null ? 0 : head;
     }
 
     private List<String> eventsOf(UUID productId, String type) {

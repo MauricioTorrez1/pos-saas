@@ -1,0 +1,6 @@
+# SAT catalog c_ClaveProdServ (CFDI 4.0), limited to the keys this business uses.
+# Source: the official "catCFDI" file published by the SAT (c_ClaveProdServ sheet), confirmed with the accountant.
+# Format: key,name  (the key is 8 digits). Lines that start with # are comments.
+# Only the generic key is shipped. Add the keys of the products of the store here (see services/core/README.md);
+# a product cannot be saved with a key that is not in this file, so an unreviewed key never reaches an invoice.
+01010101,No existe en el catalogo

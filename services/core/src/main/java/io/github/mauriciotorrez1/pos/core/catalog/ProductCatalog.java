@@ -2,9 +2,13 @@ package io.github.mauriciotorrez1.pos.core.catalog;
 
 import io.github.mauriciotorrez1.pos.core.reporting.AuditEntry;
 import io.github.mauriciotorrez1.pos.core.reporting.AuditLog;
+import io.github.mauriciotorrez1.pos.feed.ChangePublisher;
 import io.github.mauriciotorrez1.pos.id.Uuid7;
 import io.github.mauriciotorrez1.pos.money.Quantity;
+import io.github.mauriciotorrez1.pos.money.TaxFactor;
+import io.github.mauriciotorrez1.pos.money.TaxRate;
 import io.github.mauriciotorrez1.pos.money.Unit;
+import io.github.mauriciotorrez1.pos.money.UnitPrice;
 import io.github.mauriciotorrez1.pos.tenant.TenantContext;
 import java.sql.Array;
 import java.sql.Timestamp;
@@ -23,32 +27,40 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Creates, edits, deletes and searches the products of the current business (RF-001, RF-002). Every method runs in
  * a transaction pinned to the business (ADR 0035). Each change leaves, in that same transaction, its audit entry
- * (ADR 0038), a new position in the change feed of the business, and a domain event for the outbox (ADR 0036).
+ * (ADR 0038), the new state of the product in the change feed that registers download (ADR 0048), and a domain event
+ * for the outbox (ADR 0036). A product has a price with VAT included, a tax rate and the two SAT keys (ADR 0056).
  */
 @Service
 public class ProductCatalog {
 
     static final int MAX_PAGE_SIZE = 100;
-    private static final int EVENT_SCHEMA_VERSION = 1;
+    private static final int EVENT_SCHEMA_VERSION = 2;
 
     private static final String PRODUCT_COLUMNS = """
-            p.id, p.name, p.status, p.unit, p.deleted_at, p.change_seq, p.created_at, p.updated_at
+            p.id, p.name, p.status, p.unit, p.deleted_at, p.unit_price_e4, p.tax_factor, p.tax_rate_bp,
+            p.sat_product_key, p.sat_unit_key, p.created_at, p.updated_at
             """;
 
     private final JdbcTemplate jdbc;
     private final AuditLog auditLog;
     private final ApplicationEventPublisher events;
     private final JsonMapper json;
+    private final ChangePublisher feed;
+    private final SatCatalog sat;
 
-    ProductCatalog(JdbcTemplate jdbc, AuditLog auditLog, ApplicationEventPublisher events, JsonMapper json) {
+    ProductCatalog(JdbcTemplate jdbc, AuditLog auditLog, ApplicationEventPublisher events, JsonMapper json,
+                   ChangePublisher feed, SatCatalog sat) {
         this.jdbc = jdbc;
         this.auditLog = auditLog;
         this.events = events;
         this.json = json;
+        this.feed = feed;
+        this.sat = sat;
     }
 
     /** The result of {@link #create}: the product, and whether this call made it or only found it again. */
@@ -71,21 +83,25 @@ public class ProductCatalog {
         List<ProductCode> codes = ProductRules.codes(request.codes());
         List<Presentation> presentations = ProductRules.presentations(request.presentations(), request.unit());
         ProductStatus status = request.status() == null ? ProductStatus.ACTIVE : request.status();
+        TaxRate tax = ProductRules.tax(request.tax() == null ? TaxRate.of(ProductRules.STANDARD_RATE_BP) : request.tax());
+        String satProductKey = request.satProductKey() == null ? null : sat.requireProductKey(request.satProductKey());
+        String satUnitKey = request.satUnitKey() == null ? null : sat.requireUnitKey(request.satUnitKey());
+        long price = request.unitPrice() == null ? 0 : request.unitPrice().e4();
 
         Optional<Product> earlier = findByIdempotencyKey(request.idempotencyKey());
         if (earlier.isPresent()) {
             return new Created(earlier.get(), true);
         }
         UUID id = Uuid7.next();
-        long seq = nextChangeSeq();
         int inserted = jdbc.update("""
-                INSERT INTO product (id, name, status, unit, idempotency_key, change_seq)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO product (id, name, status, unit, idempotency_key, unit_price_e4, tax_factor, tax_rate_bp,
+                                     sat_product_key, sat_unit_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (tenant_id, idempotency_key) DO NOTHING
-                """, id, name, status.code(), request.unit().code(), request.idempotencyKey(), seq);
+                """, id, name, status.code(), request.unit().code(), request.idempotencyKey(), price,
+                tax.factor().code(), tax.bp(), satProductKey, satUnitKey);
         if (inserted == 0) {
-            // A concurrent call with the same key won the race. Nothing of ours is kept: the rollback also
-            // returns the change number taken above, so the feed has no gap.
+            // A concurrent call with the same key won the race. Nothing of ours is kept: the rollback undoes it.
             Product winner = findByIdempotencyKey(request.idempotencyKey())
                     .orElseThrow(() -> new IllegalStateException("Idempotency key conflict without a product"));
             markRollbackOnly();
@@ -93,11 +109,16 @@ public class ProductCatalog {
         }
         codes.forEach(code -> insertCode(id, code));
         presentations.forEach(presentation -> insertPresentation(id, presentation));
+        if (request.unitPrice() != null) {
+            insertPriceHistory(id, null, price, actorId, "created");
+        }
 
         Product product = require(id);
         auditLog.record(new AuditEntry(actorId, "product.created", "product", id, null, snapshot(product)));
         events.publishEvent(new ProductCreated(Uuid7.next(), tenant(), EVENT_SCHEMA_VERSION, id, product.name(),
-                product.status().code(), product.unit().code(), codeTexts(product), seq, Instant.now()));
+                product.status().code(), product.unit().code(), codeTexts(product), product.unitPrice().e4(),
+                product.tax().factor().code(), product.tax().bp(), Instant.now()));
+        publishToFeed(product);
         return new Created(product, false);
     }
 
@@ -124,6 +145,9 @@ public class ProductCatalog {
         List<ProductCode> codes = changes.codes() == null ? null : ProductRules.codes(changes.codes());
         List<Presentation> presentations = changes.presentations() == null ? null
                 : ProductRules.presentations(changes.presentations(), before.unit());
+        TaxRate tax = changes.tax() == null ? before.tax() : ProductRules.tax(changes.tax());
+        String satProductKey = keyChange(changes.satProductKey(), before.satProductKey(), sat::requireProductKey);
+        String satUnitKey = keyChange(changes.satUnitKey(), before.satUnitKey(), sat::requireUnitKey);
 
         if (codes != null) {
             replaceCodes(id, codes);
@@ -133,18 +157,21 @@ public class ProductCatalog {
             presentations.forEach(presentation -> insertPresentation(id, presentation));
         }
         Product listsApplied = require(id);
-        boolean changed = !name.equals(before.name()) || status != before.status()
+        boolean changed = !name.equals(before.name()) || status != before.status() || !tax.equals(before.tax())
+                || !java.util.Objects.equals(satProductKey, before.satProductKey())
+                || !java.util.Objects.equals(satUnitKey, before.satUnitKey())
                 || !Set.copyOf(listsApplied.codes()).equals(Set.copyOf(before.codes()))
                 || !Set.copyOf(listsApplied.presentations()).equals(Set.copyOf(before.presentations()));
         if (!changed) {
-            // An edit that changes nothing leaves no new position in the feed, no audit entry and no event.
+            // An edit that changes nothing leaves no feed entry, no audit entry and no event.
             return before;
         }
-        long seq = touch(id, name, status, false);
+        touch(id, name, status, tax, satProductKey, satUnitKey, false);
 
         Product after = require(id);
         auditLog.record(new AuditEntry(actorId, "product.updated", "product", id, snapshot(before), snapshot(after)));
-        publishUpdated(after, seq);
+        publishUpdated(after);
+        publishToFeed(after);
         return after;
     }
 
@@ -166,10 +193,70 @@ public class ProductCatalog {
         if (before.deleted()) {
             return;
         }
-        long seq = touch(id, before.name(), before.status(), true);
+        touch(id, before.name(), before.status(), before.tax(), before.satProductKey(), before.satUnitKey(), true);
         Product after = require(id);
         auditLog.record(new AuditEntry(actorId, "product.deleted", "product", id, snapshot(before), snapshot(after)));
-        publishUpdated(after, seq);
+        publishUpdated(after);
+        publishToFeed(after);
+    }
+
+    /**
+     * Changes the price of a product (RF-006, RF-008, RF-040). The old and the new price go to the audit log and to
+     * the append-only price history, and registers receive the product with its new price. A price equal to the
+     * current one changes nothing.
+     *
+     * @param actorId the user who changes it
+     * @param id      the product
+     * @param price   the new price per base unit, VAT included
+     * @return the product after the change
+     * @throws ProductNotFoundException if it does not exist or was deleted
+     */
+    @Transactional
+    public Product changePrice(UUID actorId, UUID id, UnitPrice price) {
+        Product before = lockLive(id);
+        if (before.unitPrice().e4() == price.e4()) {
+            return before;
+        }
+        setPrice(id, before.unitPrice().e4(), price.e4(), actorId, "panel");
+        Product after = require(id);
+        auditLog.record(new AuditEntry(actorId, "product.price_change", "product", id,
+                priceValue(before.unitPrice().e4()), priceValue(price.e4())));
+        publishUpdated(after);
+        publishToFeed(after);
+        return after;
+    }
+
+    /**
+     * Gives the price the catalog holds for a live product, so a price change from a register is compared with it
+     * (RF-022, ADR 0053). Runs in the transaction of the caller.
+     *
+     * @param id the product
+     * @return the price in ten-thousandths of a peso, or empty if the product does not exist or was deleted
+     */
+    Optional<Long> livePrice(UUID id) {
+        return jdbc.query("SELECT unit_price_e4 FROM product WHERE id = ? AND deleted_at IS NULL",
+                (rs, n) -> rs.getLong(1), id).stream().findFirst();
+    }
+
+    /**
+     * Applies to the catalog a price that a register charged (E1-40) and republishes the product, so the other
+     * registers learn it. The audit entry is written by the recorder of the operation. Does nothing when the product
+     * is not in the catalog or was deleted: the change stays in its own log.
+     *
+     * @param id        the product
+     * @param price     the price the register set
+     * @param changedBy the user of the register who changed it
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    void applyRegisterPrice(UUID id, long price, UUID changedBy) {
+        Optional<Product> locked = lock(id);
+        if (locked.isEmpty() || locked.get().deleted() || locked.get().unitPrice().e4() == price) {
+            return;
+        }
+        setPrice(id, locked.get().unitPrice().e4(), price, changedBy, "register");
+        Product after = require(id);
+        publishUpdated(after);
+        publishToFeed(after);
     }
 
     /**
@@ -214,6 +301,27 @@ public class ProductCatalog {
             filters.add(escapeLike(term));
             filters.add(term);
         }
+        return pageOf(where, filters, page, size);
+    }
+
+    /**
+     * Lists the live products that cannot be invoiced yet because a SAT key is missing (RF-004), ordered by name.
+     *
+     * @param page the page number, starting at 0
+     * @param size products per page, from 1 to 100
+     * @return the page and the total of products pending
+     * @throws InvalidProductException if the page or the size are out of range
+     */
+    @Transactional(readOnly = true)
+    public ProductPage fiscalPending(int page, int size) {
+        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
+            throw new InvalidProductException("page must be 0 or more and size from 1 to " + MAX_PAGE_SIZE);
+        }
+        return pageOf("p.tenant_id = current_tenant_id() AND p.deleted_at IS NULL"
+                + " AND (p.sat_product_key IS NULL OR p.sat_unit_key IS NULL)", List.of(), page, size);
+    }
+
+    private ProductPage pageOf(String where, List<Object> filters, int page, int size) {
         Long total = jdbc.queryForObject("SELECT count(*) FROM product p WHERE " + where, Long.class, filters.toArray());
         List<Object> pageArguments = new ArrayList<>(filters);
         pageArguments.add(size);
@@ -240,26 +348,34 @@ public class ProductCatalog {
 
     // -- writes ------------------------------------------------------------------------------------------------
 
-    private long nextChangeSeq() {
-        Long seq = jdbc.queryForObject("""
-                INSERT INTO catalog_change_counter (last_seq) VALUES (1)
-                ON CONFLICT (tenant_id) DO UPDATE SET last_seq = catalog_change_counter.last_seq + 1
-                RETURNING last_seq
-                """, Long.class);
-        if (seq == null) {
-            throw new IllegalStateException("The change counter returned nothing");
-        }
-        return seq;
-    }
-
-    private long touch(UUID id, String name, ProductStatus status, boolean delete) {
-        long seq = nextChangeSeq();
+    private void touch(UUID id, String name, ProductStatus status, TaxRate tax, String satProductKey,
+                       String satUnitKey, boolean delete) {
         jdbc.update("""
-                UPDATE product SET name = ?, status = ?, change_seq = ?, updated_at = now(),
+                UPDATE product SET name = ?, status = ?, tax_factor = ?, tax_rate_bp = ?, sat_product_key = ?,
+                                   sat_unit_key = ?, updated_at = now(),
                                    deleted_at = CASE WHEN ? THEN now() ELSE deleted_at END
                 WHERE id = ?
-                """, name, status.code(), seq, delete, id);
-        return seq;
+                """, name, status.code(), tax.factor().code(), tax.bp(), satProductKey, satUnitKey, delete, id);
+    }
+
+    private void setPrice(UUID id, long previous, long current, UUID actorId, String source) {
+        jdbc.update("UPDATE product SET unit_price_e4 = ?, updated_at = now() WHERE id = ?", current, id);
+        insertPriceHistory(id, previous, current, actorId, source);
+    }
+
+    private void insertPriceHistory(UUID id, Long previous, long current, UUID actorId, String source) {
+        jdbc.update("""
+                INSERT INTO product_price_history (id, product_id, previous_unit_price_e4, new_unit_price_e4, changed_by, source)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, Uuid7.next(), id, previous, current, actorId, source);
+    }
+
+    /** A key left as it is ({@code null}), cleared ({@code ""}), or checked against the reviewed SAT file. */
+    private static String keyChange(String requested, String current, java.util.function.UnaryOperator<String> check) {
+        if (requested == null) {
+            return current;
+        }
+        return requested.isEmpty() ? null : check.apply(requested);
     }
 
     private void insertCode(UUID productId, ProductCode code) {
@@ -296,15 +412,37 @@ public class ProductCatalog {
         org.springframework.transaction.interceptor.TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
     }
 
-    private void publishUpdated(Product product, long seq) {
+    private void publishUpdated(Product product) {
         events.publishEvent(new ProductUpdated(Uuid7.next(), tenant(), EVENT_SCHEMA_VERSION, product.id(), product.name(),
-                product.status().code(), product.unit().code(), codeTexts(product), product.deleted(), seq, Instant.now()));
+                product.status().code(), product.unit().code(), codeTexts(product), product.deleted(),
+                product.unitPrice().e4(), product.tax().factor().code(), product.tax().bp(), Instant.now()));
+    }
+
+    /**
+     * Announces the product to the registers in the transaction that changed it (ADR 0048). A deleted or inactive
+     * product leaves the register as a tombstone, because the contract has no status: the register sells what it has.
+     */
+    private void publishToFeed(Product product) {
+        if (product.deleted() || product.status() == ProductStatus.INACTIVE) {
+            feed.publishDeletion(ChangePublisher.PRODUCT, product.id());
+            return;
+        }
+        ObjectNode payload = json.createObjectNode();
+        payload.put("name", product.name());
+        payload.put("baseUnit", product.unit().code());
+        payload.put("unitPriceE4", product.unitPrice().e4());
+        payload.put("taxFactor", product.tax().factor().code());
+        payload.put("taxRateBp", product.tax().bp());
+        var barcodes = payload.putArray("barcodes");
+        product.codes().forEach(code -> barcodes.add(code.code()));
+        feed.publish(ChangePublisher.PRODUCT, product.id(), payload);
     }
 
     // -- reads -------------------------------------------------------------------------------------------------
 
     /** A product row before its codes and presentations are attached. */
-    private record ProductRow(UUID id, String name, ProductStatus status, Unit unit, Instant deletedAt, long changeSeq,
+    private record ProductRow(UUID id, String name, ProductStatus status, Unit unit, Instant deletedAt,
+                              UnitPrice unitPrice, TaxRate tax, String satProductKey, String satUnitKey,
                               Instant createdAt, Instant updatedAt) {
     }
 
@@ -312,7 +450,9 @@ public class ProductCatalog {
         Timestamp deleted = rs.getTimestamp("deleted_at");
         return new ProductRow(rs.getObject("id", UUID.class), rs.getString("name"),
                 ProductStatus.fromCode(rs.getString("status")).orElseThrow(), Unit.fromCode(rs.getString("unit")),
-                deleted == null ? null : deleted.toInstant(), rs.getLong("change_seq"),
+                deleted == null ? null : deleted.toInstant(), new UnitPrice(rs.getLong("unit_price_e4")),
+                new TaxRate(TaxFactor.fromCode(rs.getString("tax_factor")), rs.getInt("tax_rate_bp")),
+                rs.getString("sat_product_key"), rs.getString("sat_unit_key"),
                 rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant());
     }
 
@@ -375,7 +515,8 @@ public class ProductCatalog {
         });
         return rows.stream().map(row -> new Product(row.id(), row.name(), row.status(), row.unit(),
                 codes.getOrDefault(row.id(), List.of()), presentations.getOrDefault(row.id(), List.of()),
-                row.deletedAt(), row.changeSeq(), row.createdAt(), row.updatedAt())).toList();
+                row.deletedAt(), row.unitPrice(), row.tax(), row.satProductKey(), row.satUnitKey(),
+                row.createdAt(), row.updatedAt())).toList();
     }
 
     private static Array uuidArray(java.sql.Connection connection, UUID[] ids) throws java.sql.SQLException {
@@ -399,10 +540,20 @@ public class ProductCatalog {
         value.put("status", product.status().code());
         value.put("unit", product.unit().code());
         value.put("deleted", product.deleted());
+        value.put("unitPriceE4", product.unitPrice().e4());
+        value.put("taxFactor", product.tax().factor().code());
+        value.put("taxRateBp", product.tax().bp());
+        value.put("satProductKey", product.satProductKey());
+        value.put("satUnitKey", product.satUnitKey());
         value.put("codes", product.codes().stream().map(code -> code.kind().code() + ":" + code.code()).toList());
         value.put("presentations", product.presentations().stream()
                 .collect(Collectors.toMap(Presentation::name, p -> p.baseQuantity().milli(), (a, b) -> a, LinkedHashMap::new)));
         return json.writeValueAsString(value);
+    }
+
+    /** Ids and prices only, as the audit log asks. */
+    private String priceValue(long unitPriceE4) {
+        return json.writeValueAsString(Map.of("unitPriceE4", unitPriceE4));
     }
 
     private static String escapeLike(String term) {

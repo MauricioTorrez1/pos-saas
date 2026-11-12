@@ -20,6 +20,87 @@
       "response": { "changes": [], "nextCursor": "1042", "hasMore": false }
     },
     {
+      "name": "Products as the core publishes them from the catalog: 16%, 8% border rate, 0%, exempt, and an inactive one as a tombstone",
+      "response": {
+        "changes": [
+          {
+            "seq": 10,
+            "entityType": "product",
+            "entityId": "0193a5c0-0000-7000-8000-000000000061",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-11T10:00:00.000Z",
+            "payload": {
+              "name": "Cable THW calibre 12",
+              "baseUnit": "meter",
+              "unitPriceE4": 232000,
+              "taxFactor": "rate",
+              "taxRateBp": 1600,
+              "barcodes": ["7501234567890", "CBL-12"]
+            }
+          },
+          {
+            "seq": 11,
+            "entityType": "product",
+            "entityId": "0193a5c0-0000-7000-8000-000000000062",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-11T10:00:01.000Z",
+            "payload": {
+              "name": "Clavo de 2 pulgadas",
+              "baseUnit": "kilogram",
+              "unitPriceE4": 450000,
+              "taxFactor": "rate",
+              "taxRateBp": 800,
+              "barcodes": []
+            }
+          },
+          {
+            "seq": 12,
+            "entityType": "product",
+            "entityId": "0193a5c0-0000-7000-8000-000000000063",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-11T10:00:02.000Z",
+            "payload": {
+              "name": "Producto nuevo sin precio",
+              "baseUnit": "piece",
+              "unitPriceE4": 0,
+              "taxFactor": "rate",
+              "taxRateBp": 0,
+              "barcodes": []
+            }
+          },
+          {
+            "seq": 13,
+            "entityType": "product",
+            "entityId": "0193a5c0-0000-7000-8000-000000000064",
+            "deleted": false,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-11T10:00:03.000Z",
+            "payload": {
+              "name": "Libro de texto",
+              "baseUnit": "piece",
+              "unitPriceE4": 1500000,
+              "taxFactor": "exempt",
+              "taxRateBp": 0,
+              "barcodes": ["9786071234567"]
+            }
+          },
+          {
+            "seq": 14,
+            "entityType": "product",
+            "entityId": "0193a5c0-0000-7000-8000-000000000065",
+            "deleted": true,
+            "schemaVersion": 1,
+            "changedAt": "2026-12-11T10:00:04.000Z"
+          }
+        ],
+        "nextCursor": "14",
+        "hasMore": false
+      }
+    },
+    {
       "name": "A new product, a price change and a staff member, with more waiting",
       "response": {
         "changes": [
