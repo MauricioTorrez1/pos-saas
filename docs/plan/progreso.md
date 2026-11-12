@@ -3,8 +3,8 @@
 Actualizado: 2026-11-09. Estados: Pendiente, En curso, En revisión, Terminada, Bloqueada.
 
 ## Estado actual
-- **Tarea en curso:** F0-12 en revisión (bitácora de auditoría, ADR 0038). F0-11 quedó terminada (PR 33).
-- **Siguiente:** probar con datos reales (catálogo de Eleventa, PC de la tienda, impresora y cajón). Las listas de precio necesitan clientes y quedan pendientes. La facturación (E1-30 a E1-33) y la sincronización necesitan el servidor.
+- **Tarea en curso:** ninguna. Se fusionaron en `main` F0-12 a F0-17, F0-20, F0-26 y E1-16 a E1-19, E1-24, E1-28, E1-30, E1-31, E1-39 a E1-43; la lista de lo que falta está en `docs/plan/pendiente.md`.
+- **Siguiente:** el lote que apruebe Mauricio (factura global, cancelación, importación y cambio masivo de precios, prueba de punta a punta). Para usar el servidor hace falta F0-24 y F0-25, que necesitan proveedor y dominio. Pruebas con datos reales de la tienda siguen en la lista de pendientes de Mauricio.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** precio del servidor por resolver (F0-24); exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
 
@@ -91,11 +91,8 @@ No detienen el tramo de caja, pero deben estar resueltos antes de vender en para
 | F0-11 | Observabilidad del núcleo | 4 | Terminada |
 | F0-12 | Bitácora de auditoría | 3 | En revisión |
 | F0-13 | Keycloak y login con OIDC | 5 | En revisión |
-| F0-14 | Roles y autorización | 4 | Terminada |
-| F0-15 | Registro de caja y PIN en el servidor | 5 | En revisión |
-| F0-16 | Productos, códigos y unidades | 6 | Pendiente |
 | F0-14 | Roles y autorización | 4 | En revisión |
-| F0-15 | Registro de caja y PIN en el servidor | 5 | Pendiente |
+| F0-15 | Registro de caja y PIN en el servidor | 5 | En revisión |
 | F0-16 | Productos, códigos y unidades | 6 | En revisión |
 | F0-17 | Precios, impuestos y claves SAT | 5 | En revisión |
 | F0-18 | Importación de catálogo | 6 | Pendiente |
