@@ -410,6 +410,235 @@
           }
         ]
       }
+    },
+    {
+      "name": "The owner adds a supplier",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000560",
+            "deviceSeq": 6001,
+            "type": "supplier.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "name": "Ferretera del Centro",
+              "contact": "Pedidos: 55 1234 5678",
+              "notes": null,
+              "isActive": true,
+              "revision": 1,
+              "savedBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A cashier gives a supplier up with the PIN of an owner, with no contact and no notes",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000561",
+            "deviceSeq": 6002,
+            "type": "supplier.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "name": "Ferretera del Centro",
+              "contact": null,
+              "notes": null,
+              "isActive": false,
+              "revision": 3,
+              "savedBy": "0193a5c0-0000-7000-8000-000000000064",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "The codes a supplier gives to a product: one with a list cost and a presentation, one with nothing else",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000562",
+            "deviceSeq": 6003,
+            "type": "supplier_product.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "productId": "0193a5c0-0000-7000-8000-000000000096",
+              "savedBy": "0193a5c0-0000-7000-8000-000000000064",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065",
+              "codes": [
+                {
+                  "supplierCode": "CM-5",
+                  "listCostE6": 50500000,
+                  "purchaseUnit": "Caja con 12"
+                },
+                {
+                  "supplierCode": "000123",
+                  "listCostE6": null,
+                  "purchaseUnit": null
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A supplier no longer has codes for a product",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000563",
+            "deviceSeq": 6004,
+            "type": "supplier_product.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "productId": "0193a5c0-0000-7000-8000-000000000096",
+              "savedBy": "0193a5c0-0000-7000-8000-000000000064",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065",
+              "codes": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "An order is sent with a line that has no cost yet",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000564",
+            "deviceSeq": 6005,
+            "type": "purchase_order.sent",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "orderId": "0193a5c0-0000-7000-8000-000000001024",
+              "folio": 7,
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "supplierName": "Ferretera del Centro",
+              "notes": "Entregar en la bodega",
+              "lines": [
+                {
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000096",
+                  "description": "Cinta métrica 5 m",
+                  "supplierCode": "CM-5",
+                  "barcode": "7501234567890",
+                  "unit": "piece",
+                  "quantityMilli": 12000,
+                  "unitCostE6": 52250000,
+                  "lineTotalCents": 62700
+                },
+                {
+                  "lineNumber": 2,
+                  "productId": "0193a5c0-0000-7000-8000-000000000097",
+                  "description": "Cable THW calibre 12",
+                  "supplierCode": null,
+                  "barcode": null,
+                  "unit": "meter",
+                  "quantityMilli": 2500,
+                  "unitCostE6": null,
+                  "lineTotalCents": null
+                }
+              ],
+              "totalCents": 62700,
+              "sentBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A batch with a supplier, its codes and an order, in the order they happened",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000565",
+            "deviceSeq": 6006,
+            "type": "supplier.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "name": "Ferretera del Centro",
+              "contact": "Pedidos: 55 1234 5678",
+              "notes": null,
+              "isActive": true,
+              "revision": 1,
+              "savedBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          },
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000566",
+            "deviceSeq": 6007,
+            "type": "supplier_product.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "productId": "0193a5c0-0000-7000-8000-000000000096",
+              "savedBy": "0193a5c0-0000-7000-8000-000000000064",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065",
+              "codes": [
+                {
+                  "supplierCode": "CM-5",
+                  "listCostE6": 50500000,
+                  "purchaseUnit": null
+                }
+              ]
+            }
+          },
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000567",
+            "deviceSeq": 6008,
+            "type": "purchase_order.sent",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "orderId": "0193a5c0-0000-7000-8000-000000001024",
+              "folio": 7,
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "supplierName": "Ferretera del Centro",
+              "notes": null,
+              "lines": [
+                {
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000096",
+                  "description": "Cinta métrica 5 m",
+                  "supplierCode": "CM-5",
+                  "barcode": "7501234567890",
+                  "unit": "piece",
+                  "quantityMilli": 12000,
+                  "unitCostE6": 52250000,
+                  "lineTotalCents": 62700
+                }
+              ],
+              "totalCents": 62700,
+              "sentBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
     }
   ],
   "request_rejections": [
@@ -1378,6 +1607,651 @@
                   "7501234567890"
                 ]
               }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A supplier with no one who approved it",
+      "reason": "required",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "supplier.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "name": "Ferretera del Centro",
+              "contact": "Pedidos: 55 1234 5678",
+              "notes": null,
+              "isActive": true,
+              "revision": 1,
+              "savedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A supplier with a blank name",
+      "reason": "pattern",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "supplier.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "name": "   ",
+              "contact": "Pedidos: 55 1234 5678",
+              "notes": null,
+              "isActive": true,
+              "revision": 1,
+              "savedBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A supplier whose revision is zero",
+      "reason": "minimum",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "supplier.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "name": "Ferretera del Centro",
+              "contact": "Pedidos: 55 1234 5678",
+              "notes": null,
+              "isActive": true,
+              "revision": 0,
+              "savedBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A supplier with a field the contract does not know",
+      "reason": "additionalProperties",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "supplier.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "name": "Ferretera del Centro",
+              "contact": "Pedidos: 55 1234 5678",
+              "notes": null,
+              "isActive": true,
+              "revision": 1,
+              "savedBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065",
+              "rating": 5
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A supplier code that starts with a space",
+      "reason": "pattern",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "supplier_product.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "productId": "0193a5c0-0000-7000-8000-000000000096",
+              "savedBy": "0193a5c0-0000-7000-8000-000000000064",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065",
+              "codes": [
+                {
+                  "supplierCode": " CM-5",
+                  "listCostE6": null,
+                  "purchaseUnit": null
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A list cost with decimals",
+      "reason": "type",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "supplier_product.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "productId": "0193a5c0-0000-7000-8000-000000000096",
+              "savedBy": "0193a5c0-0000-7000-8000-000000000064",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065",
+              "codes": [
+                {
+                  "supplierCode": "CM-5",
+                  "listCostE6": 50.5,
+                  "purchaseUnit": null
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A product with more than ten codes of one supplier",
+      "reason": "maxItems",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "supplier_product.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "productId": "0193a5c0-0000-7000-8000-000000000096",
+              "savedBy": "0193a5c0-0000-7000-8000-000000000064",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065",
+              "codes": [
+                {
+                  "supplierCode": "CM-0",
+                  "listCostE6": null,
+                  "purchaseUnit": null
+                },
+                {
+                  "supplierCode": "CM-1",
+                  "listCostE6": null,
+                  "purchaseUnit": null
+                },
+                {
+                  "supplierCode": "CM-2",
+                  "listCostE6": null,
+                  "purchaseUnit": null
+                },
+                {
+                  "supplierCode": "CM-3",
+                  "listCostE6": null,
+                  "purchaseUnit": null
+                },
+                {
+                  "supplierCode": "CM-4",
+                  "listCostE6": null,
+                  "purchaseUnit": null
+                },
+                {
+                  "supplierCode": "CM-5",
+                  "listCostE6": null,
+                  "purchaseUnit": null
+                },
+                {
+                  "supplierCode": "CM-6",
+                  "listCostE6": null,
+                  "purchaseUnit": null
+                },
+                {
+                  "supplierCode": "CM-7",
+                  "listCostE6": null,
+                  "purchaseUnit": null
+                },
+                {
+                  "supplierCode": "CM-8",
+                  "listCostE6": null,
+                  "purchaseUnit": null
+                },
+                {
+                  "supplierCode": "CM-9",
+                  "listCostE6": null,
+                  "purchaseUnit": null
+                },
+                {
+                  "supplierCode": "CM-10",
+                  "listCostE6": null,
+                  "purchaseUnit": null
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A list of codes without the codes",
+      "reason": "required",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "supplier_product.upserted",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "productId": "0193a5c0-0000-7000-8000-000000000096",
+              "savedBy": "0193a5c0-0000-7000-8000-000000000064",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "An order with no lines",
+      "reason": "minItems",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "purchase_order.sent",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "orderId": "0193a5c0-0000-7000-8000-000000001024",
+              "folio": 7,
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "supplierName": "Ferretera del Centro",
+              "notes": "Entregar en la bodega",
+              "lines": [],
+              "totalCents": 0,
+              "sentBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "An order with a folio of zero",
+      "reason": "minimum",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "purchase_order.sent",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "orderId": "0193a5c0-0000-7000-8000-000000001024",
+              "folio": 0,
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "supplierName": "Ferretera del Centro",
+              "notes": "Entregar en la bodega",
+              "lines": [
+                {
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000096",
+                  "description": "Cinta métrica 5 m",
+                  "supplierCode": "CM-5",
+                  "barcode": "7501234567890",
+                  "unit": "piece",
+                  "quantityMilli": 12000,
+                  "unitCostE6": 52250000,
+                  "lineTotalCents": 62700
+                },
+                {
+                  "lineNumber": 2,
+                  "productId": "0193a5c0-0000-7000-8000-000000000097",
+                  "description": "Cable THW calibre 12",
+                  "supplierCode": null,
+                  "barcode": null,
+                  "unit": "meter",
+                  "quantityMilli": 2500,
+                  "unitCostE6": null,
+                  "lineTotalCents": null
+                }
+              ],
+              "totalCents": 62700,
+              "sentBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "An order line with a quantity of zero",
+      "reason": "minimum",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "purchase_order.sent",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "orderId": "0193a5c0-0000-7000-8000-000000001024",
+              "folio": 7,
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "supplierName": "Ferretera del Centro",
+              "notes": "Entregar en la bodega",
+              "lines": [
+                {
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000096",
+                  "description": "Cinta métrica 5 m",
+                  "supplierCode": "CM-5",
+                  "barcode": "7501234567890",
+                  "unit": "piece",
+                  "quantityMilli": 0,
+                  "unitCostE6": 52250000,
+                  "lineTotalCents": 62700
+                }
+              ],
+              "totalCents": 62700,
+              "sentBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "An order line with a unit that is not a base unit",
+      "reason": "enum",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "purchase_order.sent",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "orderId": "0193a5c0-0000-7000-8000-000000001024",
+              "folio": 7,
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "supplierName": "Ferretera del Centro",
+              "notes": "Entregar en la bodega",
+              "lines": [
+                {
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000096",
+                  "description": "Cinta métrica 5 m",
+                  "supplierCode": "CM-5",
+                  "barcode": "7501234567890",
+                  "unit": "box",
+                  "quantityMilli": 12000,
+                  "unitCostE6": 52250000,
+                  "lineTotalCents": 62700
+                }
+              ],
+              "totalCents": 62700,
+              "sentBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "An order line with a cost but no amount",
+      "reason": "type",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "purchase_order.sent",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "orderId": "0193a5c0-0000-7000-8000-000000001024",
+              "folio": 7,
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "supplierName": "Ferretera del Centro",
+              "notes": "Entregar en la bodega",
+              "lines": [
+                {
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000096",
+                  "description": "Cinta métrica 5 m",
+                  "supplierCode": "CM-5",
+                  "barcode": "7501234567890",
+                  "unit": "piece",
+                  "quantityMilli": 12000,
+                  "unitCostE6": 52250000,
+                  "lineTotalCents": null
+                }
+              ],
+              "totalCents": 62700,
+              "sentBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "An order line with an amount but no cost",
+      "reason": "type",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "purchase_order.sent",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "orderId": "0193a5c0-0000-7000-8000-000000001024",
+              "folio": 7,
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "supplierName": "Ferretera del Centro",
+              "notes": "Entregar en la bodega",
+              "lines": [
+                {
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000096",
+                  "description": "Cinta métrica 5 m",
+                  "supplierCode": "CM-5",
+                  "barcode": "7501234567890",
+                  "unit": "piece",
+                  "quantityMilli": 12000,
+                  "unitCostE6": null,
+                  "lineTotalCents": 62700
+                }
+              ],
+              "totalCents": 62700,
+              "sentBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "An order that nobody approved",
+      "reason": "required",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "purchase_order.sent",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "orderId": "0193a5c0-0000-7000-8000-000000001024",
+              "folio": 7,
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "supplierName": "Ferretera del Centro",
+              "notes": "Entregar en la bodega",
+              "lines": [
+                {
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000096",
+                  "description": "Cinta métrica 5 m",
+                  "supplierCode": "CM-5",
+                  "barcode": "7501234567890",
+                  "unit": "piece",
+                  "quantityMilli": 12000,
+                  "unitCostE6": 52250000,
+                  "lineTotalCents": 62700
+                },
+                {
+                  "lineNumber": 2,
+                  "productId": "0193a5c0-0000-7000-8000-000000000097",
+                  "description": "Cable THW calibre 12",
+                  "supplierCode": null,
+                  "barcode": null,
+                  "unit": "meter",
+                  "quantityMilli": 2500,
+                  "unitCostE6": null,
+                  "lineTotalCents": null
+                }
+              ],
+              "totalCents": 62700,
+              "sentBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "An order whose supplier is not a UUIDv7",
+      "reason": "pattern",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "purchase_order.sent",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "orderId": "0193a5c0-0000-7000-8000-000000001024",
+              "folio": 7,
+              "supplierId": "0193a5c0-0000-4000-8000-000000000300",
+              "supplierName": "Ferretera del Centro",
+              "notes": "Entregar en la bodega",
+              "lines": [
+                {
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000096",
+                  "description": "Cinta métrica 5 m",
+                  "supplierCode": "CM-5",
+                  "barcode": "7501234567890",
+                  "unit": "piece",
+                  "quantityMilli": 12000,
+                  "unitCostE6": 52250000,
+                  "lineTotalCents": 62700
+                },
+                {
+                  "lineNumber": 2,
+                  "productId": "0193a5c0-0000-7000-8000-000000000097",
+                  "description": "Cable THW calibre 12",
+                  "supplierCode": null,
+                  "barcode": null,
+                  "unit": "meter",
+                  "quantityMilli": 2500,
+                  "unitCostE6": null,
+                  "lineTotalCents": null
+                }
+              ],
+              "totalCents": 62700,
+              "sentBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "An order with a field the contract does not know",
+      "reason": "additionalProperties",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000576",
+            "deviceSeq": 1,
+            "type": "purchase_order.sent",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-14T10:00:00.000Z",
+            "payload": {
+              "orderId": "0193a5c0-0000-7000-8000-000000001024",
+              "folio": 7,
+              "supplierId": "0193a5c0-0000-7000-8000-000000000768",
+              "supplierName": "Ferretera del Centro",
+              "notes": "Entregar en la bodega",
+              "lines": [
+                {
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000096",
+                  "description": "Cinta métrica 5 m",
+                  "supplierCode": "CM-5",
+                  "barcode": "7501234567890",
+                  "unit": "piece",
+                  "quantityMilli": 12000,
+                  "unitCostE6": 52250000,
+                  "lineTotalCents": 62700
+                },
+                {
+                  "lineNumber": 2,
+                  "productId": "0193a5c0-0000-7000-8000-000000000097",
+                  "description": "Cable THW calibre 12",
+                  "supplierCode": null,
+                  "barcode": null,
+                  "unit": "meter",
+                  "quantityMilli": 2500,
+                  "unitCostE6": null,
+                  "lineTotalCents": null
+                }
+              ],
+              "totalCents": 62700,
+              "sentBy": "0193a5c0-0000-7000-8000-000000000065",
+              "authorizedBy": "0193a5c0-0000-7000-8000-000000000065",
+              "discount": 10
             }
           }
         ]

@@ -46,7 +46,7 @@
         "opId": { "$ref": "#/$defs/uuid_v7" },
         "deviceSeq": { "$ref": "#/$defs/positive_int" },
         "type": {
-          "enum": ["sale.completed", "return.registered", "cash_session.opened", "cash_movement.recorded", "cash_session.closed", "stock.adjusted", "product.price_changed", "product.created", "product.updated"]
+          "enum": ["sale.completed", "return.registered", "cash_session.opened", "cash_movement.recorded", "cash_session.closed", "stock.adjusted", "product.price_changed", "product.created", "product.updated", "supplier.upserted", "supplier_product.upserted", "purchase_order.sent"]
         },
         "schemaVersion": { "const": 1 },
         "occurredAt": { "$ref": "#/$defs/timestamp" },
@@ -61,7 +61,10 @@
         { "if": { "properties": { "type": { "const": "stock.adjusted" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/stock_adjusted" } } } },
         { "if": { "properties": { "type": { "const": "product.price_changed" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/product_price_changed" } } } },
         { "if": { "properties": { "type": { "const": "product.created" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/product_created" } } } },
-        { "if": { "properties": { "type": { "const": "product.updated" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/product_updated" } } } }
+        { "if": { "properties": { "type": { "const": "product.updated" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/product_updated" } } } },
+        { "if": { "properties": { "type": { "const": "supplier.upserted" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/supplier_upserted" } } } },
+        { "if": { "properties": { "type": { "const": "supplier_product.upserted" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/supplier_product_upserted" } } } },
+        { "if": { "properties": { "type": { "const": "purchase_order.sent" } } }, "then": { "properties": { "payload": { "$ref": "#/$defs/purchase_order_sent" } } } }
       ]
     },
 
@@ -324,6 +327,101 @@
         "taxRateBp": { "$ref": "values.schema.json#/$defs/valid_tax_rate_bp" }
       },
       "allOf": [{ "if": { "properties": { "taxFactor": { "const": "exempt" } }, "required": ["taxFactor"] }, "then": { "properties": { "taxRateBp": { "const": 0 } } } }]
+    },
+
+    "supplier_name": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "\\S" },
+    "supplier_code": {
+      "description": "The code or SKU a supplier gives to a product: it does not start or end with a space and has no control characters.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[^\\u0000-\\u001f\\u007f\\s]([^\\u0000-\\u001f\\u007f]*[^\\u0000-\\u001f\\u007f\\s])?$"
+    },
+    "nullable_supplier_code": { "oneOf": [{ "$ref": "#/$defs/supplier_code" }, { "type": "null" }] },
+    "nullable_barcode": { "oneOf": [{ "$ref": "#/$defs/barcode" }, { "type": "null" }] },
+    "nullable_text": { "oneOf": [{ "$ref": "#/$defs/text" }, { "type": "null" }] },
+    "nullable_unit_cost_e6": { "oneOf": [{ "$ref": "#/$defs/unit_cost_e6" }, { "type": "null" }] },
+
+    "supplier_upserted": {
+      "description": "The register added or changed a supplier (E1-44, ADR 0059), or gave it up with isActive false: the core hides it from new orders and never deletes it, because sent orders point at it. It is the whole state of the supplier, so the core stores the one with the highest revision. The name is unique per business ignoring capitals. savedBy is who asked and authorizedBy the owner who approved (the same person when the owner did it).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supplierId", "name", "contact", "notes", "isActive", "revision", "savedBy", "authorizedBy"],
+      "properties": {
+        "supplierId": { "$ref": "#/$defs/uuid_v7" },
+        "name": { "$ref": "#/$defs/supplier_name" },
+        "contact": { "$ref": "#/$defs/nullable_text" },
+        "notes": { "$ref": "#/$defs/nullable_text" },
+        "isActive": { "type": "boolean" },
+        "revision": { "$ref": "#/$defs/positive_int" },
+        "savedBy": { "$ref": "#/$defs/uuid_v7" },
+        "authorizedBy": { "$ref": "#/$defs/uuid_v7" }
+      }
+    },
+    "supplier_code_entry": {
+      "description": "What a supplier calls a product. listCostE6 is the cost of its list per unit of the product, and purchaseUnit says how it sells it (such as a box of 12), which is informative.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supplierCode", "listCostE6", "purchaseUnit"],
+      "properties": {
+        "supplierCode": { "$ref": "#/$defs/supplier_code" },
+        "listCostE6": { "$ref": "#/$defs/nullable_unit_cost_e6" },
+        "purchaseUnit": { "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 60 }, { "type": "null" }] }
+      }
+    },
+    "supplier_product_upserted": {
+      "description": "The register set all the codes one supplier gives to one product (E1-44, ADR 0059). codes is the whole list, so an empty list says the supplier no longer has codes for it. The codes of one list do not repeat ignoring capitals, and several products may share a code of the same supplier.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supplierId", "productId", "codes", "savedBy", "authorizedBy"],
+      "properties": {
+        "supplierId": { "$ref": "#/$defs/uuid_v7" },
+        "productId": { "$ref": "#/$defs/uuid_v7" },
+        "codes": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/supplier_code_entry" } },
+        "savedBy": { "$ref": "#/$defs/uuid_v7" },
+        "authorizedBy": { "$ref": "#/$defs/uuid_v7" }
+      }
+    },
+    "purchase_order_line": {
+      "description": "A line of an order as it was sent: the description, the barcode and the code are copies, so the order reads the same later. A line with no estimated cost has no amount either.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lineNumber", "productId", "description", "supplierCode", "barcode", "unit", "quantityMilli", "unitCostE6", "lineTotalCents"],
+      "properties": {
+        "lineNumber": { "$ref": "#/$defs/positive_int" },
+        "productId": { "$ref": "#/$defs/uuid_v7" },
+        "description": { "$ref": "#/$defs/product_name" },
+        "supplierCode": { "$ref": "#/$defs/nullable_supplier_code" },
+        "barcode": { "$ref": "#/$defs/nullable_barcode" },
+        "unit": { "$ref": "values.schema.json#/$defs/unit" },
+        "quantityMilli": { "$ref": "values.schema.json#/$defs/quantity_milli", "type": "integer", "minimum": 1, "maximum": 100000000 },
+        "unitCostE6": { "$ref": "#/$defs/nullable_unit_cost_e6" },
+        "lineTotalCents": { "oneOf": [{ "$ref": "#/$defs/cents" }, { "type": "null" }] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "unitCostE6": { "type": "null" } }, "required": ["unitCostE6"] },
+          "then": { "properties": { "lineTotalCents": { "type": "null" } } },
+          "else": { "properties": { "lineTotalCents": { "type": "integer" } } }
+        }
+      ]
+    },
+    "purchase_order_sent": {
+      "description": "The owner marked an order to a supplier as sent (E1-44, ADR 0059): from then on the register never changes it. It is a document, so it moves no stock: what arrives is posted by the reception (F2-13). folio counts from 1 per business. totalCents is the sum of the lines that have an amount, which the core may check. Sent orders are the history: the core stores each orderId once.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["orderId", "folio", "supplierId", "supplierName", "notes", "lines", "totalCents", "sentBy", "authorizedBy"],
+      "properties": {
+        "orderId": { "$ref": "#/$defs/uuid_v7" },
+        "folio": { "$ref": "#/$defs/positive_int" },
+        "supplierId": { "$ref": "#/$defs/uuid_v7" },
+        "supplierName": { "$ref": "#/$defs/supplier_name" },
+        "notes": { "$ref": "#/$defs/nullable_text" },
+        "lines": { "type": "array", "minItems": 1, "maxItems": 200, "items": { "$ref": "#/$defs/purchase_order_line" } },
+        "totalCents": { "$ref": "#/$defs/cents" },
+        "sentBy": { "$ref": "#/$defs/uuid_v7" },
+        "authorizedBy": { "$ref": "#/$defs/uuid_v7" }
+      }
     }
   }
 }

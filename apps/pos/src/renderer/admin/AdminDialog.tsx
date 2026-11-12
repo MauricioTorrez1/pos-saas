@@ -29,6 +29,8 @@ interface AdminDialogProps {
   readonly productApi?: ProductAdminApi;
   /** Opens the summary of the business, which closes this dialog. Without it, the menu does not offer the summary. */
   readonly onOpenDashboard?: () => void;
+  /** Opens the orders to suppliers (E1-44). Without it, the administration offers none. */
+  readonly onOpenSupplierOrder?: () => void;
   readonly onClose: () => void;
 }
 
@@ -40,10 +42,11 @@ interface AdminDialogProps {
  * @param props.pricingApi bridge for changing prices, when the register offers it
  * @param props.productApi bridge for the product panel, when the register offers it
  * @param props.onOpenDashboard called to open the summary of the business, when the register offers it
+ * @param props.onOpenSupplierOrder opens the orders to suppliers, when the register offers them
  * @param props.onClose called when the dialog is done
  * @returns the dialog
  */
-export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, onClose }: AdminDialogProps): ReactElement {
+export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, onOpenSupplierOrder, onClose }: AdminDialogProps): ReactElement {
   const [view, setView] = useState<View>({ kind: 'summary' });
   const [backup, setBackup] = useState<BackupStatus | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -108,6 +111,7 @@ export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, o
           F7: backupNow,
           F8: () => setView({ kind: 'passphrase', purpose: 'restore' }),
           F9: onOpenDashboard,
+          F11: onOpenSupplierOrder,
           Escape: onClose,
         }
       : view.kind === 'imported'
@@ -119,7 +123,7 @@ export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, o
   return (
     <ModalDialog titleId="admin-title" className="cash">
       {view.kind === 'inventory' ? (
-        <InventoryView posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} {...(productApi === undefined ? {} : { productApi })} onBack={() => setView({ kind: 'summary' })} />
+        <InventoryView posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} {...(productApi === undefined ? {} : { productApi })} {...(onOpenSupplierOrder === undefined ? {} : { onOpenSupplierOrder })} onBack={() => setView({ kind: 'summary' })} />
       ) : view.kind === 'report' ? (
         <ReportView posApi={posApi} onBack={() => setView({ kind: 'summary' })} />
       ) : view.kind === 'passphrase' ? (
@@ -175,6 +179,11 @@ export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, o
             <li>
               <kbd>F8</kbd> Restaurar un respaldo
             </li>
+            {onOpenSupplierOrder !== undefined && (
+              <li>
+                <kbd>F11</kbd> Pedido al proveedor: armarlo, guardarlo y sacarlo en Excel o PDF
+              </li>
+            )}
             <li>
               <kbd>Esc</kbd> Volver a la venta
             </li>

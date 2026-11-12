@@ -5,7 +5,7 @@ La ficha de cada tarea está en un archivo por fase, porque un solo documento se
 | Etapa | Resultado | Tareas | Horas | Archivo |
 | --- | --- | --- | --- | --- |
 | Fase 0 | Base técnica, stack completo, catálogo y panel | 26 | 108 | [fase-0.md](roadmap/fase-0.md) |
-| Entrega 1 | Reemplaza a Eleventa | 44 | 185 | [entrega-1.md](roadmap/entrega-1.md) |
+| Entrega 1 | Reemplaza a Eleventa | 45 | 191 | [entrega-1.md](roadmap/entrega-1.md) |
 | Entrega 2 | Terminal integrada | 9 | 34 | [entrega-2.md](roadmap/entrega-2.md) |
 | Fase 2 | Operación completa | 24 | 104 | [fase-2.md](roadmap/fase-2.md) |
 | Fase 3 | Venta en línea y promociones | 19 | 93 | [fase-3.md](roadmap/fase-3.md) |

@@ -216,6 +216,16 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Autoevaluación:** (1) ¿Por qué el día se mide con `America/Mexico_City` y no con el reloj de la computadora? (2) ¿Por qué una venta sin costo no entra a la utilidad en lugar de contarse con costo cero? (3) ¿Por qué el cajero ni siquiera recibe los costos en lugar de que la pantalla los esconda?
 - **Entrevista:** (1) ¿Cómo agrupas ventas por día local cuando guardas UTC y hay cambio de horario? (2) ¿Cuándo calculas un indicador al leer y cuándo lo precalculas?
 
+### E1-44 · Pedido al proveedor
+- **Objetivo:** en la caja el dueño arma un pedido a un proveedor, lo guarda como borrador o lo marca como enviado, y saca un archivo de Excel o de PDF para mandarlo por correo o por WhatsApp, sin internet y sin mover el inventario.
+- **Conceptos:** [Documento local sin movimiento], [Registro inmutable], [Autorización en la caja], [Generación de archivos]
+- **Claude / tú:** Claude escribe los proveedores mínimos con sus códigos por producto, la pantalla (Mayús+F11 en la venta y F11 en la administración), los mínimos con su sugerencia, los archivos (Excel con `exceljs`, PDF con la impresión de Electron) y los contratos `supplier.upserted`, `supplier_product.upserted` y `purchase_order.sent`. Tú pruebas con un proveedor y un pedido reales, abres los archivos en Excel y en el visor de PDF de la tienda, y los mandas por WhatsApp.
+- **Pruebas:** búsqueda por nombre, por código de barras y por código del proveedor, códigos repetidos, totales sin decimales, borrador, reabrir y enviado inmutable (también con SQL a mano), que no se mueva la existencia, permisos por rol y PIN, bitácora y outbox en la misma transacción con reversa, el contrato con casos válidos y rechazos, el Excel leído de vuelta con la misma librería, el HTML que se imprime a PDF y un flujo de pantalla de punta a punta que genera los dos archivos.
+- **Criterios:** cumple ADR 0059; escalas del ADR 0011; unidad explícita; un pedido nunca mueve existencia (la recepción es F2-13); el servidor los recibe en F2-11 y F2-12, y el ADR dice cómo se transforma en ellas.
+- **Depende de:** E1-26, E1-42, E1-43 · **Estimación:** 6 h
+- **Autoevaluación:** (1) ¿Por qué un pedido no es un movimiento del libro? (2) ¿Por qué el renglón copia el nombre y el código en lugar de apuntar al producto? (3) ¿Por qué un pedido enviado ya no se puede editar, ni siquiera con SQL?
+- **Entrevista:** (1) ¿Cómo generas un PDF sin una librería de PDF y cómo lo pruebas? (2) ¿Cómo modelas un documento que primero es borrador y luego historial?
+
 ## Hito E1-C: Sincronización
 
 ### E1-16 · Envío desde la caja
