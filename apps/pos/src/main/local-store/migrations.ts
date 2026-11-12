@@ -624,6 +624,18 @@ export const MIGRATIONS: readonly Migration[] = [
   },
   {
     version: 17,
+    name: 'index_the_dashboard_queries',
+    // The dashboard reads a year of sales by the moment they were resolved (E1-45, ADR 0060). Indexes only: nothing is
+    // stored twice, so there is nothing to keep in step. The partial one lists the entries that carry a cost, which are few
+    // next to the sales that fill the ledger.
+    sql: `
+      CREATE INDEX sale_by_status_and_time ON sale (tenant_id, status, resolved_at);
+      CREATE INDEX sale_return_by_time ON sale_return (tenant_id, occurred_at);
+      CREATE INDEX stock_movement_with_cost ON stock_movement (tenant_id, product_id) WHERE unit_cost_e6 IS NOT NULL;
+    `,
+  },
+  {
+    version: 18,
     name: 'create_purchasing',
     // What the register needs to order from a supplier (E1-44, ADR 0059). A supplier is given up and never deleted, because
     // the orders already sent point at it. supplier_code is NOCASE, so a code typed in capitals finds the same one. An order

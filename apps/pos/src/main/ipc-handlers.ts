@@ -6,6 +6,7 @@ import type { BackupOutcome, BackupStatus, ImportOutcome, RestoreOutcome } from 
 import type { AdjustStockResult, Kardex, LedgerCheck } from '../shared/inventory-api';
 import type { ChangePriceResult, PriceInfo } from '../shared/pricing';
 import type { CreateProductResult, ProductPanelDetail, ProductSummary, UpdateProductResult } from '../shared/product-admin';
+import { DASHBOARD_CHANNELS, type DashboardResult, type ExportResult } from '../shared/dashboard-api';
 import type { DailyReport } from '../shared/report-api';
 import type { FindReturnableResult, ReturnResult } from '../shared/returns-api';
 import type { CashMovementResult, CashStatus, CloseCashResult, OpenCashResult } from '../shared/cash-api';
@@ -32,6 +33,9 @@ import { parseChangePriceRequest } from './pricing/price-request';
 import { parseNewProductRequest, parseUpdateProductRequest } from './products/product-request';
 import type { ProductService } from './products/product-service';
 import type { PriceChangeService } from './pricing/price-change-service';
+import { parseDashboardRequest, parseExportFormat } from './reports/dashboard-request';
+import type { DashboardExporter } from './reports/dashboard-exporter';
+import type { DashboardService } from './reports/dashboard-service';
 import { requireDayText } from './reports/report-request';
 import type { ReportService } from './reports/report-service';
 import { parseFolioText, parseReturnRequest } from './returns/return-request';
@@ -54,6 +58,8 @@ export interface IpcServices {
   readonly admin: AdminActions;
   readonly inventory: InventoryService;
   readonly reports: ReportService;
+  readonly dashboard: DashboardService;
+  readonly dashboardExporter: DashboardExporter;
   readonly catalog: ProductCatalog;
   readonly prices: PriceChangeService;
   readonly products: ProductService;
@@ -91,7 +97,7 @@ function requireLookupText(value: unknown): string {
  */
 export function registerIpcHandlers(
   rendererEntry: string,
-  { auth, cash, returns, admin, inventory, reports, catalog, prices, products, appearance, pendingSales, salePayments, purchasing }: IpcServices,
+  { auth, cash, returns, admin, inventory, reports, dashboard, dashboardExporter, catalog, prices, products, appearance, pendingSales, salePayments, purchasing }: IpcServices,
 ): void {
   const answerScreen = <Result>(channel: string, respond: (argument: unknown) => Result): void => {
     ipcMain.handle(channel, (event, argument: unknown) => {
@@ -152,6 +158,13 @@ export function registerIpcHandlers(
   answerSignedIn(IPC_CHANNELS.adjustStock, (request): AdjustStockResult => inventory.adjust(parseAdjustStockRequest(request)));
   answerOwner(IPC_CHANNELS.checkLedger, (): LedgerCheck => inventory.verifyLedger());
   answerOwner(IPC_CHANNELS.getDailyReport, (date): DailyReport => reports.daily(requireDayText(date)));
+
+  // A cashier may ask too: the service gives them only their shift, or the whole summary with the PIN of an owner.
+  answerSignedIn(DASHBOARD_CHANNELS.getDashboard, (request, user): DashboardResult => dashboard.summary(parseDashboardRequest(request), user));
+  answerSignedIn(DASHBOARD_CHANNELS.exportDashboard, (request, user): Promise<ExportResult> => {
+    const format = parseExportFormat((request as { format?: unknown } | null)?.format);
+    return dashboardExporter.export(parseDashboardRequest((request as { request?: unknown } | null)?.request), format, user);
+  });
 
   answerOwner(IPC_CHANNELS.importCatalog, (): Promise<ImportOutcome> => admin.importCatalog());
   answerOwner(IPC_CHANNELS.getBackupStatus, (): BackupStatus => admin.backupStatus());

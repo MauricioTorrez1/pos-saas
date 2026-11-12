@@ -76,8 +76,8 @@ test('orders from a supplier: finds the product by the code of the supplier, sav
     electronDialog.showSaveDialog = (() => Promise.resolve({ canceled: false, filePath: answers.shift() ?? '' })) as typeof electronDialog.showSaveDialog;
   }, [xlsxPath, pdfPath]);
 
-  // F11 on the sale screen opens the orders.
-  await page.keyboard.press('F11');
+  // Shift+F11 on the sale screen opens the orders (plain F11 is the summary of the business).
+  await page.keyboard.press('Shift+F11');
   await expect(page.getByRole('heading', { name: 'Pedido al proveedor' })).toBeVisible();
   await expect(dialog).toContainText('Todavía no has hecho ningún pedido.');
 

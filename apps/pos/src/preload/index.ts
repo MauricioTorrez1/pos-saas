@@ -1,11 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+import { DASHBOARD_CHANNELS, type DashboardApi } from '../shared/dashboard-api';
 import { IPC_CHANNELS, type PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
 import { PURCHASING_CHANNELS, type PurchasingApi } from '../shared/supplier-order';
 
-const posApi: PosApi & PricingApi & ProductAdminApi = {
+const posApi: PosApi & PricingApi & ProductAdminApi & DashboardApi = {
   getAppInfo: () => ipcRenderer.invoke(IPC_CHANNELS.getAppInfo),
   getAuthState: () => ipcRenderer.invoke(IPC_CHANNELS.getAuthState),
   setupOwner: (request) => ipcRenderer.invoke(IPC_CHANNELS.setupOwner, request),
@@ -36,6 +37,8 @@ const posApi: PosApi & PricingApi & ProductAdminApi = {
   findProducts: (text) => ipcRenderer.invoke(IPC_CHANNELS.findProducts, text),
   getProductDetail: (productId) => ipcRenderer.invoke(IPC_CHANNELS.getProductDetail, productId),
   updateProduct: (request) => ipcRenderer.invoke(IPC_CHANNELS.updateProduct, request),
+  getDashboard: (request) => ipcRenderer.invoke(DASHBOARD_CHANNELS.getDashboard, request),
+  exportDashboard: (request, format) => ipcRenderer.invoke(DASHBOARD_CHANNELS.exportDashboard, { request, format }),
   getAppearance: () => ipcRenderer.invoke(IPC_CHANNELS.getAppearance),
   saveAppearance: (appearance) => ipcRenderer.invoke(IPC_CHANNELS.saveAppearance, appearance),
   savePendingSale: (request) => ipcRenderer.invoke(IPC_CHANNELS.savePendingSale, request),

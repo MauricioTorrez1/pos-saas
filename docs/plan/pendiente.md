@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 39 de 44 tareas hechas · ⚠️ 5 faltan (21 h)
+✅ 40 de 45 tareas hechas · ⚠️ 5 faltan (21 h)
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -83,6 +83,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-41 · Credencial de dispositivo en `/sync/push`** (4 h) _(En revisión)_: solo una caja enrolada puede enviar, y solo sus propios lotes; una caja perdida se da de baja y deja de enviar.
 - ✅ **E1-42 · Alta de nuevos productos en la caja** (4 h): el dueño da de alta, desde la venta y sin internet, un producto que no está en el catálogo, con su unidad, precio, impuesto, costo, códigos de barras y existencia inicial.
 - ✅ **E1-43 · Panel de modificación de productos** (5 h) _(En revisión)_: el dueño busca un producto y modifica su nombre, códigos, unidad, impuesto, costo y estado, cambia su precio y ajusta su inventario desde una sola pantalla, sin perder el historial.
+- ✅ **E1-45 · Tablero de indicadores y más vendidos** (6 h) _(En revisión)_: el dueño ve en la caja, sin internet, cómo va el negocio por día, semana, mes, año o rango contra el periodo anterior, con los más vendidos, lo que no se mueve y el valor del inventario, y lo exporta a Excel y PDF.
 - ✅ **E1-44 · Pedido al proveedor** (6 h) _(En revisión)_: el dueño arma en la caja un pedido a un proveedor, lo guarda como borrador o lo marca como enviado, y saca un archivo de Excel o de PDF para mandarlo por correo o por WhatsApp, sin internet y sin mover el inventario.
 
 ## Entrega 2 · Terminal de tarjeta integrada
@@ -202,4 +203,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 59 de 160 tareas hechas (244 h de 706 h) · ⚠️ 101 faltan (462 h).
+✅ 60 de 161 tareas hechas (250 h de 712 h) · ⚠️ 101 faltan (462 h).

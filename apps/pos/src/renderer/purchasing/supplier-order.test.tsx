@@ -458,22 +458,22 @@ describe('opening the orders (E1-44)', () => {
     return api as PosApi;
   }
 
-  it('opens from the sale screen with F11, and Esc goes back to the sale', async () => {
+  it('opens from the sale screen with Shift+F11, and Esc goes back to the sale', async () => {
     render(<App posApi={posApiWith(OWNER)} purchasingApi={apiWith()} />);
     const lookup = await screen.findByRole('combobox', { name: 'Buscar producto' });
 
-    fireEvent.keyDown(lookup, { key: 'F11' });
+    fireEvent.keyDown(lookup, { key: 'F11', shiftKey: true });
 
     expect(await screen.findByRole('heading', { name: 'Pedido al proveedor', hidden: true })).toBeTruthy();
     press('Escape');
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Pedido al proveedor', hidden: true })).toBeNull());
   });
 
-  it('does nothing on F11 when the register offers no orders', async () => {
+  it('does nothing on Shift+F11 when the register offers no orders', async () => {
     render(<App posApi={posApiWith(OWNER)} />);
     const lookup = await screen.findByRole('combobox', { name: 'Buscar producto' });
 
-    fireEvent.keyDown(lookup, { key: 'F11' });
+    fireEvent.keyDown(lookup, { key: 'F11', shiftKey: true });
 
     expect(screen.queryByRole('heading', { name: 'Pedido al proveedor', hidden: true })).toBeNull();
   });

@@ -67,7 +67,9 @@ interface SaleScreenProps {
   readonly onOpenReturns: () => void;
   /** Called when the owner asks for the administration: the catalog of Eleventa and the backups. */
   readonly onOpenAdmin: () => void;
-  /** Opens the orders to suppliers (E1-44). Without it, F11 does nothing. */
+  /** Called when the person asks for the summary of the business (E1-45). Without it, F11 does nothing. */
+  readonly onOpenDashboard?: () => void;
+  /** Opens the orders to suppliers (E1-44) with Shift+F11. Without it, Shift+F11 does nothing. */
   readonly onOpenSupplierOrder?: () => void;
   /** Called after a sale was collected, so the cash of the register is read again. */
   readonly onCashChanged: () => void;
@@ -86,11 +88,12 @@ interface SaleScreenProps {
  * @param props.onOpenCash called when the cashier asks for the cash of the register
  * @param props.onOpenReturns called when the cashier asks to take back a sale
  * @param props.onOpenAdmin called when the owner asks for the administration
- * @param props.onOpenSupplierOrder called when the person asks for the orders to suppliers
+ * @param props.onOpenDashboard called when the person asks for the summary of the business
+ * @param props.onOpenSupplierOrder called when the person asks for the orders to suppliers (Shift+F11)
  * @param props.onCashChanged called after a sale was collected
  * @returns the screen
  */
-export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onOpenSupplierOrder, onCashChanged }: SaleScreenProps): ReactElement {
+export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onOpenDashboard, onOpenSupplierOrder, onCashChanged }: SaleScreenProps): ReactElement {
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
@@ -406,10 +409,6 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
         event.preventDefault();
         openProductPanel();
         return;
-      case 'F11':
-        event.preventDefault();
-        onOpenSupplierOrder?.();
-        return;
       case 'F6':
         event.preventDefault();
         onSignOut();
@@ -421,6 +420,11 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
       case 'F4':
         event.preventDefault();
         onOpenReturns();
+        return;
+      case 'F11':
+        event.preventDefault();
+        // Plain F11 is the summary of the business (E1-45), and Shift+F11 the orders to suppliers (E1-44).
+        (event.shiftKey ? onOpenSupplierOrder : onOpenDashboard)?.();
         return;
       case 'F1':
         event.preventDefault();
