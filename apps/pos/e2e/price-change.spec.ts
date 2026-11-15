@@ -108,8 +108,9 @@ test('changes the price of the catalog from the panel of the product, and the sa
   await expect(total(page)).toHaveText('$116.00');
 
   await page.keyboard.press('F10');
-  await expect(panel).toBeVisible();
-  await page.keyboard.press('F8');
+  // The keys of the panel wait until the product is loaded, so the test waits for its price and uses the button.
+  await expect(panel).toContainText('Precio (IVA incluido)$116.00');
+  await panel.getByRole('button', { name: /Cambiar precio/ }).click();
   await expect(page.getByRole('heading', { name: 'Cambiar precio' })).toBeVisible();
   await page.getByRole('textbox', { name: 'Precio nuevo (IVA incluido)' }).fill('0');
   await page.keyboard.press('F2');
