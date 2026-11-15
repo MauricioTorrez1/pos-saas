@@ -69,6 +69,12 @@ The core is an OAuth2 resource server of the Keycloak realm `pos` ([ADR 0039](..
 ## Events and the outbox
 An event that implements `BusinessEvent` and is annotated `@Externalized("topic::#{tenantId()}")` is saved in `event_publication` inside the transaction that publishes it, and sent to Redpanda after the commit ([ADR 0036](../../docs/adr/0036-outbox-con-modulith-y-redpanda.md)). A rollback publishes nothing; if the broker is down, the row waits and `IncompleteEventPublications` resubmits it. Delivery is at least once, so consumers must be idempotent by `eventId`. Externalized types must live in the root package or in a module. The Kafka client uses `spring.kafka.bootstrap-servers` (`localhost:19092` with the compose `core` profile).
 
+## Catalog import and bulk price change
+Two endpoints touch many products at once ([ADR 0062](../../docs/adr/0062-importacion-de-catalogo-y-cambio-masivo-de-precios.md)):
+
+- `POST /imports/catalog` takes a CSV as `text/csv`. Each row is checked and saved on its own, so bad rows come back with their line and reason while the rest load. A product is known by its code, so loading a file again creates nothing. `dryRun=true` only checks, and `report=csv` returns the failed rows as a file.
+- `POST /price-changes` raises or lowers prices by a percentage for the products whose name contains `search`. Send `"preview": true` first; to apply, send the `expectedCount` the preview gave. It is all or nothing, and each product keeps its price history, its audit entry and its notice to the registers.
+
 ## Audit log
 `AuditLog.record(AuditEntry)` appends who did what to which entity, with the value before and after, in the transaction of the change ([ADR 0038](../../docs/adr/0038-bitacora-de-auditoria-solo-agregar.md)). It fails without a transaction. The table is append-only: `pos_app` has no `UPDATE`, `DELETE` or `TRUNCATE`, and a trigger rejects them for every role. Store ids and business values only, never PINs, tokens, card data or needless personal data.
 
