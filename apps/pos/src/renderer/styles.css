@@ -1,40 +1,55 @@
 /*
- * The look of a hardware store counter: galvanized sheet behind, a painted sign on top, and the total as a hanging
- * price tag. Every color and size comes from these tokens, which the owner changes from the Appearance dialog
- * (ADR 0024). Bahnschrift ships with Windows 10 and 11, so the register needs no font files.
+ * The look of the register (ADR 0061): calm surfaces, soft corners, and one accent color that marks what matters right
+ * now: the total, the selected line, the main button. Every color and size comes from these tokens, which the owner
+ * changes from the Appearance dialog (ADR 0024). The fonts ship with Windows 10 and 11, so the register needs no font
+ * files and works without internet.
  */
 :root {
   color-scheme: light;
 
-  --paint-yellow: #ffc400;
-  --paint-yellow-on: #1b2328;
-  --paint-orange: #f76707;
-  --paint-orange-on: #1b2328;
-  --paint-red: #c92a2a;
+  --paint-yellow: #f5b400;
+  --paint-yellow-on: #1c1917;
+  --paint-orange: #f97316;
+  --paint-orange-on: #1c1917;
+  --paint-red: #dc2626;
   --paint-red-on: #ffffff;
-  --paint-blue: #1864ab;
+  --paint-blue: #2563eb;
   --paint-blue-on: #ffffff;
-  --paint-green: #237a36;
+  --paint-green: #15803d;
   --paint-green-on: #ffffff;
-  --paint-purple: #6741d9;
+  --paint-purple: #7c3aed;
   --paint-purple-on: #ffffff;
 
   --accent: var(--paint-yellow);
   --on-accent: var(--paint-yellow-on);
 
-  --ground: #dde1e4;
-  --surface: #f6f7f8;
-  --ink: #1b2328;
-  --ink-soft: #55626b;
-  --rule: #bfc7cd;
-  --sign: #1b2328;
-  --on-sign: #f6f7f8;
-  --alert: #b3261e;
-  --alert-surface: #fbe9e7;
+  --ground: #f3f4f6;
+  --surface: #ffffff;
+  --ink: #111827;
+  --ink-soft: #4b5563;
+  --rule: #e5e7eb;
+  --sign: #111827;
+  --on-sign: #f9fafb;
+  --alert: #b91c1c;
+  --alert-surface: #fef2f2;
+  --danger: #dc2626;
+  --on-danger: #ffffff;
+  --good: #15803d;
+  --good-surface: #ecfdf3;
+  --warn: #92400e;
+  --warn-surface: #fffbeb;
 
-  font-family: Bahnschrift, 'Segoe UI', system-ui, sans-serif;
+  --field: #f9fafb;
+  --hover: rgb(17 24 39 / 6%);
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  --shadow-sm: 0 1px 2px rgb(17 24 39 / 6%), 0 1px 3px rgb(17 24 39 / 8%);
+  --shadow-lg: 0 24px 60px rgb(17 24 39 / 22%), 0 4px 14px rgb(17 24 39 / 10%);
+  --radius: 14px;
+  --radius-sm: 10px;
+
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', Inter, system-ui, sans-serif;
   font-size: 16px;
-  line-height: 1.35;
+  line-height: 1.4;
   color: var(--ink);
   background: var(--ground);
 }
@@ -42,15 +57,24 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --ground: #14191d;
-  --surface: #1e262b;
-  --ink: #eef2f4;
-  --ink-soft: #a5b1b9;
-  --rule: #36424a;
-  --sign: #0c1013;
-  --on-sign: #eef2f4;
-  --alert: #ffb4ab;
-  --alert-surface: #3b1d1a;
+  --ground: #0f1115;
+  --surface: #181b21;
+  --ink: #f3f4f6;
+  --ink-soft: #a1a8b3;
+  --rule: #2a2f38;
+  --sign: #0a0c0f;
+  --on-sign: #f3f4f6;
+  --alert: #fca5a5;
+  --alert-surface: #3f1d1d;
+  --good: #86efac;
+  --good-surface: #12301f;
+  --warn: #fcd34d;
+  --warn-surface: #3a2c0b;
+
+  --field: #11141a;
+  --hover: rgb(255 255 255 / 7%);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-lg: 0 24px 60px rgb(0 0 0 / 60%);
 }
 
 :root[data-accent='orange'] {
@@ -99,29 +123,36 @@ body {
 
 h1,
 h2,
+h3,
 p,
 dl,
-dd {
+dd,
+figure {
   margin: 0;
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
 
 kbd {
   display: inline-block;
-  min-width: 1.75em;
+  min-width: 1.7em;
   padding: 0.05em 0.45em;
-  font: inherit;
+  font-family: inherit;
+  font-size: 0.8em;
+  font-weight: 600;
+  line-height: 1.5;
   text-align: center;
-  color: var(--ink);
-  background: var(--surface);
+  color: var(--ink-soft);
+  background: var(--field);
   border: 1px solid var(--rule);
-  border-bottom-width: 3px;
-  border-radius: 3px;
+  border-bottom-width: 2px;
+  border-radius: 6px;
 }
 
 .visually-hidden {
@@ -131,6 +162,79 @@ kbd {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/*
+ * Scroll bars. Every list that can be longer than its box shows a bar that is easy to see and to grab with the mouse,
+ * in both themes, so a cashier never wonders whether there is more below.
+ */
+* {
+  scrollbar-color: color-mix(in srgb, var(--ink-soft) 55%, transparent) transparent;
+  scrollbar-width: auto;
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ink-soft) 45%, transparent);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ink-soft) 75%, transparent);
+  background-clip: padding-box;
+}
+
+.scroll-area {
+  min-height: 0;
+  max-height: 52vh;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+}
+
+.scroll-area table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.scroll-area th,
+.scroll-area td {
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid var(--rule);
+}
+
+.scroll-area thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--surface);
+}
+
+.scroll-area tbody tr:hover {
+  background: var(--hover);
+}
+
+.scroll-area .line-number {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Page */
@@ -143,35 +247,74 @@ kbd {
 
 .register-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.5rem 1rem;
+  gap: 0.35rem 0.5rem;
+  padding: 0.6rem 1.25rem;
   color: var(--on-sign);
   background: var(--sign);
 }
 
-.register-user {
-  flex: 1;
-  color: var(--on-sign);
-  opacity: 0.8;
-}
-
 .register-header h1 {
   overflow: hidden;
-  font-size: 1.75rem;
+  font-size: 1.35rem;
   font-weight: 700;
-  font-stretch: condensed;
+  letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.register-user {
+  flex: 1;
+  padding-left: 0.5rem;
+  color: var(--on-sign);
+  opacity: 0.7;
+}
+
+.register-cash {
+  padding: 0.2rem 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--on-sign);
+  background: rgb(255 255 255 / 10%);
+  border-radius: 999px;
+}
+
+.register-cash[data-open='true'] {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+.register-cash:empty {
+  display: none;
+}
+
 .header-button {
+  display: inline-flex;
   flex: none;
-  padding: 0.25rem 0.5rem;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.92rem;
   cursor: pointer;
-  background: none;
+  background: rgb(255 255 255 / 8%);
   border: 0;
+  border-radius: 999px;
+  transition: background 120ms ease;
+}
+
+.header-button:hover {
+  background: rgb(255 255 255 / 18%);
+}
+
+.header-button kbd {
+  color: var(--on-sign);
+  background: rgb(255 255 255 / 12%);
+  border-color: transparent;
+}
+
+.register-banner {
+  margin: 0.75rem 1.25rem 0;
 }
 
 .register-footer {
@@ -179,15 +322,18 @@ kbd {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem 1.5rem;
-  padding: 0.5rem 1rem;
+  gap: 0.4rem 1.5rem;
+  padding: 0.55rem 1.25rem;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  background: var(--surface);
   border-top: 1px solid var(--rule);
 }
 
 .shortcuts {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1.5rem;
+  gap: 0.3rem 1.1rem;
   padding: 0;
   margin: 0;
   list-style: none;
@@ -207,9 +353,9 @@ kbd {
   display: grid;
   /* Whole pixels on purpose: a table column at a fractional position shows a seam through the highlighted row. */
   grid-template-columns: minmax(0, 1fr) 24rem;
-  gap: 1rem;
+  gap: 1.25rem;
   min-height: 0;
-  padding: 1rem;
+  padding: 1.25rem;
 }
 
 .sale-ticket {
@@ -227,27 +373,35 @@ kbd {
 .lookup-glyph {
   position: absolute;
   top: 50%;
-  left: 1rem;
-  width: 1.75rem;
-  fill: var(--ink);
+  left: 1.1rem;
+  width: 1.6rem;
+  fill: var(--ink-soft);
   transform: translateY(-50%);
 }
 
 .lookup-input {
   width: 100%;
-  height: 3.5rem;
-  padding: 0 1rem 0 3.5rem;
-  font-size: 1.375rem;
+  height: 3.6rem;
+  padding: 0 1rem 0 3.6rem;
+  font-size: 1.3rem;
   background: var(--surface);
-  border: 2px solid var(--ink);
-  border-radius: 2px;
-  outline: 3px solid var(--accent);
-  outline-offset: 0;
+  border: 2px solid var(--rule);
+  border-radius: var(--radius);
+  outline: none;
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.lookup-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 .lookup-input::placeholder {
   color: var(--ink-soft);
-  opacity: 1;
+  opacity: 0.8;
 }
 
 .lookup-results {
@@ -257,12 +411,14 @@ kbd {
   left: 0;
   z-index: 2;
   max-height: 60vh;
-  padding: 0;
-  margin: 3px 0 0;
+  padding: 0.35rem;
+  margin: 0.4rem 0 0;
   overflow-y: auto;
   list-style: none;
   background: var(--surface);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
 }
 
 .lookup-result {
@@ -270,14 +426,14 @@ kbd {
   align-items: baseline;
   justify-content: space-between;
   gap: 1.5rem;
-  padding: 0.6rem 1rem;
-  font-size: 1.125rem;
+  padding: 0.65rem 0.9rem;
+  font-size: 1.1rem;
   cursor: pointer;
-  border-bottom: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
 }
 
-.lookup-result:last-child {
-  border-bottom: 0;
+.lookup-result:hover {
+  background: var(--hover);
 }
 
 .lookup-result[aria-selected='true'] {
@@ -287,32 +443,42 @@ kbd {
 
 .lookup-result-price {
   flex: none;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .notice {
-  padding: 0.6rem 0.9rem;
+  padding: 0.7rem 1rem;
   color: var(--alert);
   background: var(--alert-surface);
-  border-left: 0.35rem solid var(--alert);
+  border-radius: var(--radius-sm);
+}
+
+.notice-info {
+  color: var(--ink);
+  background: var(--accent-soft);
 }
 
 .sale-empty {
   display: flex;
   flex: 1;
   flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
   justify-content: center;
   padding: 2rem;
   color: var(--ink-soft);
+  text-align: center;
   background: var(--surface);
-  border: 1px solid var(--rule);
+  border: 2px dashed var(--rule);
+  border-radius: var(--radius);
 }
 
 .sale-empty-title {
-  font-size: 2.25rem;
+  font-size: 1.6rem;
   font-weight: 700;
-  font-stretch: condensed;
-  line-height: 1.1;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
   color: var(--ink);
 }
 
@@ -320,8 +486,11 @@ kbd {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   background: var(--surface);
   border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
 }
 
 .sale-lines table {
@@ -331,27 +500,30 @@ kbd {
 }
 
 .sale-lines th.line-number {
-  width: 7rem;
+  width: 8rem;
 }
 
 .sale-lines th:last-child {
-  width: 8rem;
+  width: 8.5rem;
 }
 
 .sale-lines th {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 0.5rem 0.9rem;
-  font-weight: 400;
+  padding: 0.7rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
   color: var(--ink-soft);
   text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   background: var(--surface);
-  box-shadow: inset 0 -2px 0 var(--ink);
+  box-shadow: inset 0 -1px 0 var(--rule);
 }
 
 .sale-lines td {
-  padding: 0.7rem 0.9rem;
+  padding: 0.8rem 1rem;
   border-bottom: 1px solid var(--rule);
 }
 
@@ -359,28 +531,44 @@ kbd {
   cursor: pointer;
 }
 
-.sale-lines tr[aria-current='true'] {
+.sale-lines tbody tr:hover {
+  background: var(--hover);
+}
+
+.sale-lines tr[aria-current='true'],
+.sale-lines tr[aria-current='true']:hover {
   color: var(--on-accent);
   background: var(--accent);
 }
 
 .line-name {
-  font-size: 1.125rem;
+  font-size: 1.1rem;
+  font-weight: 500;
 }
 
-.sale-lines .line-number {
+.sale-lines .line-number,
+.line-number {
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
 }
 
 .line-amount {
-  font-size: 1.125rem;
+  font-size: 1.1rem;
   font-weight: 700;
 }
 
-/* The price tag is the one loud thing on the screen: it has to read from across the counter. */
+/* Marks a line charged at another price for this sale only. */
+.line-override {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+}
 
+/* The total is the one loud thing on the screen: it has to read from across the counter. */
 .sale-summary {
   display: flex;
   flex-direction: column;
@@ -390,50 +578,52 @@ kbd {
 }
 
 .price-tag {
-  position: relative;
   display: flex;
   flex-direction: column;
-  padding: 1rem 1rem 1.25rem 3.25rem;
+  gap: 0.35rem;
+  padding: 1.4rem 1.5rem 1.6rem;
   color: var(--on-accent);
   background: var(--accent);
-  clip-path: polygon(1.75rem 0, 100% 0, 100% 100%, 1.75rem 100%, 0 calc(100% - 1.75rem), 0 1.75rem);
-}
-
-.price-tag::before {
-  position: absolute;
-  top: 50%;
-  left: 1rem;
-  width: 1rem;
-  height: 1rem;
-  content: '';
-  background: var(--ground);
-  border-radius: 50%;
-  transform: translateY(-50%);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
 }
 
 .price-tag-label {
-  font-size: 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
 }
 
 .price-tag-amount {
-  font-size: min(5rem, 19cqi);
-  font-weight: 700;
-  font-stretch: condensed;
+  font-size: min(4.6rem, 18cqi);
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  letter-spacing: -0.03em;
   white-space: nowrap;
 }
 
 .summary-rows {
-  font-size: 1.125rem;
+  padding: 0.5rem 1.1rem;
+  font-size: 1.05rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
 }
 
 .summary-rows > div {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.5rem 0.25rem;
+  padding: 0.6rem 0;
   border-bottom: 1px solid var(--rule);
+}
+
+.summary-rows > div:last-child {
+  border-bottom: 0;
 }
 
 .summary-rows dt {
@@ -441,24 +631,366 @@ kbd {
 }
 
 .summary-rows dd {
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* Buttons */
+
+.button {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0 1.15rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  transition:
+    background 120ms ease,
+    transform 80ms ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--field);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button-primary {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: transparent;
+}
+
+.button-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 88%, var(--ink));
+}
+
+.button-primary kbd,
+.button-danger kbd {
+  color: inherit;
+  background: rgb(255 255 255 / 22%);
+  border-color: transparent;
+}
+
+/* Red is kept for what takes something away: dropping a sale, cancelling one, taking a product off sale. */
+.button-danger {
+  color: var(--on-danger);
+  background: var(--danger);
+  border-color: transparent;
+}
+
+.button-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 86%, #000000);
+}
+
+.button-small {
+  min-height: 2.1rem;
+  padding: 0 0.75rem;
+  font-size: 0.88rem;
+}
+
+.button:focus-visible,
+.header-button:focus-visible,
+.segment:focus-visible,
+.tab:focus-visible,
+.link-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 70%, var(--ink));
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.link-button {
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+/* Dialogs. Every dialog is a card over a dimmed counter; a long one scrolls inside itself. */
+
+.payment,
+.appearance,
+.recovery {
+  width: min(40rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  padding: 1.75rem;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  color: var(--ink);
+  background: var(--surface);
+  border: 0;
+  border-radius: calc(var(--radius) + 6px);
+  box-shadow: var(--shadow-lg);
+}
+
+.payment::backdrop,
+.appearance::backdrop,
+.recovery::backdrop {
+  background: rgb(10 12 15 / 55%);
+  backdrop-filter: blur(3px);
+}
+
+.payment[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.payment h2,
+.appearance h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+
+.payment h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.payment-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.2rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--on-accent);
+  background: var(--accent);
+  border-radius: var(--radius);
+}
+
+.payment-total output {
+  font-size: 2.8rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.payment-form,
+.recovery-payment {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.recovery-payment h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.payment-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.3rem 0.75rem;
+  align-items: center;
+}
+
+.payment-field > span {
+  grid-column: 1 / -1;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.payment-field > small,
+.payment-field > textarea,
+.payment-field > input,
+.payment-field > select,
+.payment-field > output {
+  grid-column: 1 / -1;
+}
+
+.payment-field input,
+.payment-field textarea,
+.payment-select,
+.text-field input,
+.date-field input,
+.order-input,
+.return-quantity {
+  width: 100%;
+  height: 3rem;
+  padding: 0 0.9rem;
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--field);
+  border: 1.5px solid var(--rule);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.payment-field textarea {
+  height: auto;
+  padding: 0.6rem 0.9rem;
+  font-size: 1rem;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.payment-field input:focus-visible,
+.payment-field textarea:focus-visible,
+.payment-select:focus-visible,
+.text-field input:focus-visible,
+.date-field input:focus-visible,
+.order-input:focus-visible,
+.return-quantity:focus-visible {
+  background: var(--surface);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+.payment-field input:disabled,
+.payment-select:disabled {
+  color: var(--ink-soft);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.payment-field small {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.payment-field input[aria-invalid='true'] {
+  border-color: var(--alert);
+}
+
+.payment-field-problem {
+  font-weight: 600;
+  color: var(--alert) !important;
+}
+
+/* A value the register works out, shown where a box would be so the form keeps its shape. */
+.computed-value {
+  display: flex;
+  align-items: center;
+  height: 3rem;
+  padding: 0 0.9rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--ground);
+  border: 1.5px dashed var(--rule);
+  border-radius: var(--radius-sm);
+}
+
+.payment-status,
+.payment-change {
+  display: flex;
+  align-items: center;
+  min-height: 3.4rem;
+  padding: 0.6rem 1rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: var(--ground);
+  border-radius: var(--radius-sm);
+}
+
+.payment-status[data-tone='ready'],
+.payment-change {
+  color: var(--good);
+  background: var(--good-surface);
+}
+
+.payment-status[data-tone='problem'] {
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--alert);
+  background: var(--alert-surface);
+}
+
+.payment-change {
+  font-size: 2.2rem;
+}
+
+.quantity-price,
+.payment-folio,
+.dashboard-period {
+  font-size: 1.1rem;
+  color: var(--ink-soft);
+}
+
+.payment-actions,
+.payment-done,
+.appearance-actions,
+.recovery-actions,
+.settings-actions,
+.order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.payment-done {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.payment-actions .button,
+.payment-done .button,
+.recovery-actions .button {
+  min-height: 3rem;
+  font-size: 1.02rem;
+}
+
+/* The buttons stay in sight while a long dialog scrolls. */
+.payment > .payment-actions {
+  position: sticky;
+  bottom: -1.75rem;
+  padding: 0.9rem 0 1.75rem;
+  margin-bottom: -1.75rem;
+  background: linear-gradient(to bottom, transparent, var(--surface) 0.8rem);
+}
+
+.payment-select {
+  cursor: pointer;
+}
+
+.payment-check {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+
+.payment-check input {
+  width: 1.35rem;
+  height: 1.35rem;
+  accent-color: var(--accent);
+}
+
+.confirm-body {
+  font-size: 1.1rem;
+  color: var(--ink-soft);
 }
 
 /* Appearance dialog */
 
 .appearance {
   width: min(42rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
-  padding: 1.5rem;
-  color: var(--ink);
-  background: var(--surface);
-  border: 0;
-  border-top: 0.5rem solid var(--accent);
-  border-radius: 2px;
-}
-
-.appearance::backdrop {
-  background: rgb(12 16 19 / 60%);
 }
 
 .appearance form {
@@ -467,29 +999,10 @@ kbd {
   gap: 1.25rem;
 }
 
-.appearance h2 {
-  font-size: 1.75rem;
-  font-weight: 700;
-  font-stretch: condensed;
-}
-
 .text-field {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-}
-
-.text-field input {
-  height: 2.75rem;
-  padding: 0 0.75rem;
-  background: var(--ground);
-  border: 1px solid var(--ink);
-  border-radius: 2px;
-}
-
-.text-field input:focus-visible {
-  outline: 3px solid var(--ink);
-  outline-offset: 1px;
+  gap: 0.3rem;
 }
 
 .choices {
@@ -501,7 +1014,10 @@ kbd {
 
 .choices legend {
   padding: 0;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink-soft);
 }
 
 .choices-options {
@@ -515,38 +1031,45 @@ kbd {
   cursor: pointer;
 }
 
+.choice input {
+  position: absolute;
+  opacity: 0;
+}
+
 .choice-face {
   display: block;
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--ink);
-  border-radius: 2px;
+  padding: 0.55rem 1.1rem;
+  font-weight: 600;
+  background: var(--field);
+  border: 1.5px solid var(--rule);
+  border-radius: var(--radius-sm);
 }
 
 .choice input:checked + .choice-face {
   color: var(--surface);
   background: var(--ink);
+  border-color: var(--ink);
 }
 
 .choice input:focus-visible + .choice-face {
-  outline: 3px solid var(--ink);
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* The colors read like the sample cards at the paint counter: the paint above, its name on white below. */
-
+/* The colors read like sample cards: the paint above, its name below. */
 .choices-swatch .choice {
   flex: 1 1 5rem;
 }
 
 .choices-swatch .choice-face {
-  padding: 2.5rem 0.5rem 0.4rem;
+  padding: 2.6rem 0.5rem 0.45rem;
   text-align: center;
-  background: linear-gradient(var(--paint) 2.1rem, var(--surface) 2.1rem);
+  background: linear-gradient(var(--paint) 2.2rem, var(--surface) 2.2rem);
 }
 
 .choices-swatch .choice input:checked + .choice-face {
   color: var(--ink);
-  background: linear-gradient(var(--paint) 2.1rem, var(--surface) 2.1rem);
+  background: linear-gradient(var(--paint) 2.2rem, var(--surface) 2.2rem);
   outline: 3px solid var(--ink);
   outline-offset: 1px;
 }
@@ -575,27 +1098,10 @@ kbd {
   --paint: var(--paint-purple);
 }
 
-.appearance-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-}
-
-/* A sale left pending reads like a ticket torn off the printer: it interrupts the counter until someone answers for it. */
+/* A sale left pending interrupts the counter until someone answers for it. */
 
 .recovery {
   width: min(44rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
-  padding: 1.5rem;
-  color: var(--ink);
-  background: var(--surface);
-  border: 0;
-  border-top: 0.5rem solid var(--accent);
-  border-radius: 2px;
-}
-
-.recovery::backdrop {
-  background: rgb(12 16 19 / 72%);
 }
 
 .recovery-content {
@@ -606,21 +1112,19 @@ kbd {
 }
 
 .recovery h2 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  font-stretch: condensed;
-  line-height: 1.05;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .recovery-ticket {
-  --tooth: 0.5rem;
-
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 1rem 1.25rem calc(1rem + var(--tooth));
+  padding: 1rem 1.25rem;
   background: var(--ground);
-  mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / calc(2 * var(--tooth)) 100%;
+  border-radius: var(--radius);
 }
 
 .recovery-moment,
@@ -639,269 +1143,67 @@ kbd {
 }
 
 .recovery-lines td {
-  padding: 0.3rem 0;
+  padding: 0.35rem 0;
   border-bottom: 1px dashed var(--rule);
 }
 
 .recovery-lines .line-number {
   padding-left: 1.5rem;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
 }
 
 .recovery-total {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  font-size: 1.25rem;
+  font-size: 1.2rem;
 }
 
 .recovery-total output {
-  font-size: 2.5rem;
-  font-weight: 700;
-  font-stretch: condensed;
+  font-size: 2.4rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
-.recovery-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.75rem;
-}
-
-.recovery-actions .button {
-  min-height: 3.25rem;
-  font-size: 1.125rem;
-}
-
-.button {
-  min-height: 2.75rem;
-  padding: 0 1.25rem;
-  cursor: pointer;
-  background: none;
-  border: 2px solid var(--ink);
-  border-radius: 2px;
-}
-
-.button-primary {
-  color: var(--surface);
-  background: var(--ink);
-}
-
-.button:focus-visible {
-  outline: 3px solid var(--ink);
-  outline-offset: 2px;
-}
-
-/* Payment: the total stays as the loud price tag, and the one thing that changes while typing is the line under the boxes. */
-
-.payment {
-  width: min(40rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
-  padding: 1.5rem;
-  color: var(--ink);
-  background: var(--surface);
-  border: 0;
-  border-top: 0.5rem solid var(--accent);
-  border-radius: 2px;
-}
-
-.payment::backdrop {
-  background: rgb(12 16 19 / 72%);
-}
-
-.payment[open] {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.payment h2 {
-  font-size: 2.25rem;
-  font-weight: 700;
-  font-stretch: condensed;
-  line-height: 1.05;
-}
-
-.payment-total {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 0.5rem 1rem;
-  font-size: 1.25rem;
-  color: var(--on-accent);
-  background: var(--accent);
-}
-
-.payment-total output {
-  font-size: 3.5rem;
-  font-weight: 700;
-  font-stretch: condensed;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-
-.payment-form,
-.recovery-payment {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.recovery-payment h3 {
-  margin: 0;
-  font-size: 1.375rem;
-}
-
-.payment-field {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 0.25rem 0.75rem;
-  align-items: center;
-}
-
-.payment-field > span {
-  grid-column: 1 / -1;
-}
-
-.payment-field input {
-  height: 3.25rem;
-  padding: 0 0.9rem;
-  font-size: 1.5rem;
-  font-variant-numeric: tabular-nums;
-  background: var(--ground);
-  border: 2px solid var(--ink);
-  border-radius: 2px;
-}
-
-.payment-field input:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 0;
-}
-
-.payment-field small {
-  color: var(--ink-soft);
-}
-
-.payment-status,
-.payment-change {
-  min-height: 3.5rem;
-  padding: 0.6rem 0.9rem;
-  font-size: 1.75rem;
-  font-weight: 700;
-  font-stretch: condensed;
-  background: var(--ground);
-  border-left: 0.35rem solid var(--ink-soft);
-}
-
-.payment-status[data-tone='ready'],
-.payment-change {
-  border-left-color: var(--accent);
-}
-
-.payment-status[data-tone='problem'] {
-  font-size: 1.125rem;
-  font-weight: 400;
-  color: var(--alert);
-  background: var(--alert-surface);
-  border-left-color: var(--alert);
-}
-
-.payment-change {
-  font-size: 2.5rem;
-}
-
-.quantity-price {
-  color: var(--ink-soft);
-  font-size: 1.25rem;
-}
-
-.payment-folio {
-  font-size: 1.25rem;
-  color: var(--ink-soft);
-}
-
-.notice-info {
-  color: var(--ink);
-  background: var(--ground);
-  border-left-color: var(--accent);
-}
-
-.payment-actions,
-.payment-done {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.75rem;
-}
-
-.payment-done {
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.payment-actions .button,
-.payment-done .button {
-  min-height: 3.25rem;
-  font-size: 1.125rem;
-}
-
-.button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-@media (max-width: 1100px) {
-  .sale {
-    grid-template-columns: minmax(0, 1fr) 19rem;
-  }
-}
-
-@media (max-width: 760px) {
-  .sale {
-    grid-template-rows: minmax(0, 1fr) auto;
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-
-/* Sign-in: a single card on the galvanized background, so the first thing a new cashier sees is who is asking. */
+/* Sign-in: one card in the middle, so the first thing a new cashier sees is who is asking. */
 
 .login {
   display: grid;
   place-items: center;
   min-height: 100vh;
   padding: 1rem;
+  background:
+    radial-gradient(60rem 40rem at 15% -10%, color-mix(in srgb, var(--accent) 22%, transparent), transparent),
+    radial-gradient(50rem 36rem at 110% 110%, color-mix(in srgb, var(--accent) 14%, transparent), transparent), var(--ground);
 }
 
 .login-card {
   width: min(30rem, 100%);
-  padding: 1.5rem;
+  padding: 2rem;
   background: var(--surface);
-  border-top: 0.5rem solid var(--accent);
-  border-radius: 2px;
+  border-radius: calc(var(--radius) + 8px);
+  box-shadow: var(--shadow-lg);
 }
 
 .login-card form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.1rem;
 }
 
 .login-card h1 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  font-stretch: condensed;
-  line-height: 1.05;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .login-users {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  max-height: 40vh;
+  overflow-y: auto;
 }
 
 .login-user {
@@ -909,27 +1211,36 @@ kbd {
   align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.75rem 1rem;
-  font-size: 1.25rem;
+  padding: 0.8rem 1rem;
+  font-size: 1.15rem;
+  font-weight: 600;
   cursor: pointer;
-  border: 2px solid var(--rule);
-  border-radius: 2px;
+  background: var(--field);
+  border: 1.5px solid var(--rule);
+  border-radius: var(--radius-sm);
+  transition: border-color 120ms ease;
+}
+
+.login-user:hover {
+  border-color: var(--ink-soft);
 }
 
 .login-user[data-selected='true'] {
   color: var(--on-accent);
   background: var(--accent);
-  border-color: var(--ink);
+  border-color: transparent;
 }
 
 .login-user-role,
 .login-hint {
-  font-size: 1rem;
+  font-size: 0.95rem;
+  font-weight: 400;
   color: var(--ink-soft);
 }
 
 .login-user[data-selected='true'] .login-user-role {
   color: inherit;
+  opacity: 0.85;
 }
 
 .login .text-field input {
@@ -937,36 +1248,31 @@ kbd {
   font-size: 1.5rem;
   letter-spacing: 0.3em;
 }
-/* Cash dialog */
 
-.register-cash {
-  padding: 0.1rem 0.6rem;
-  font-size: 0.95rem;
-  color: var(--on-sign);
-  border: 1px solid currentColor;
-  border-radius: 999px;
-}
-
-.register-cash[data-open='true'] {
-  color: var(--accent);
-}
-
-.register-banner {
-  margin: 0.5rem 1rem 0;
-}
+/* Cash, administration and the wide dialogs */
 
 .cash {
-  width: min(46rem, calc(100vw - 2rem));
-  overflow-y: auto;
+  width: min(48rem, calc(100vw - 2rem));
 }
 
 .cash-actions {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.45rem;
   padding: 0;
   margin: 0;
-  font-size: 1.125rem;
+  font-size: 1.05rem;
   list-style: none;
+}
+
+.cash-actions li {
+  padding: 0.7rem 0.9rem;
+  background: var(--field);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+}
+
+.cash-actions kbd {
+  margin-right: 0.5rem;
 }
 
 .cash-counts {
@@ -977,17 +1283,20 @@ kbd {
 
 .cash-counts .payment-field input {
   height: 2.5rem;
-  font-size: 1.125rem;
+  font-size: 1.05rem;
 }
 
-.cash-differences {
+.cash-differences,
+.dashboard-table,
+.order-lines,
+.keys-table {
   width: 100%;
   border-collapse: collapse;
 }
 
 .cash-differences th,
 .cash-differences td {
-  padding: 0.4rem 0.6rem;
+  padding: 0.5rem 0.6rem;
   text-align: right;
   border-bottom: 1px solid var(--rule);
 }
@@ -1000,15 +1309,12 @@ kbd {
   font-weight: 700;
   color: var(--alert);
 }
+
 .return-quantity {
-  width: 6rem;
-  height: 2.25rem;
-  padding: 0 0.5rem;
-  font-size: 1.125rem;
+  width: 6.5rem;
+  height: 2.4rem;
+  font-size: 1.05rem;
   text-align: right;
-  background: var(--ground);
-  border: 1px solid var(--ink);
-  border-radius: 2px;
 }
 
 .return-override {
@@ -1016,60 +1322,43 @@ kbd {
   gap: 0.5rem;
   align-items: center;
 }
-/* Product form (E1-42, E1-43): the same boxes as the payment dialogs, in two columns where they are short. */
 
-.product-form {
+/* Product form and panel */
+
+.product-form,
+.cost-margin {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.85rem;
 }
 
 .product-form-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem 1rem;
+  gap: 0.85rem 1rem;
 }
 
-.payment-select {
-  height: 3.25rem;
-  padding: 0 0.9rem;
-  font-size: 1.25rem;
-  color: var(--ink);
-  background: var(--ground);
-  border: 2px solid var(--ink);
-  border-radius: 2px;
-}
-
-.payment-select:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 0;
-}
-
-.payment-select:disabled {
-  color: var(--ink-soft);
-  cursor: not-allowed;
-}
-
-.payment-field input[aria-invalid='true'] {
-  border-color: var(--alert);
-}
-
-.payment-field-problem {
-  color: var(--alert);
-  font-weight: 600;
-}
-
-.payment-check {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 1.25rem;
-}
-
-.payment-check input {
-  width: 1.5rem;
-  height: 1.5rem;
+.margin-slider {
+  height: 1.6rem !important;
+  padding: 0 !important;
+  cursor: pointer;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
   accent-color: var(--accent);
+}
+
+.margin-summary {
+  padding: 0.65rem 1rem;
+  font-weight: 600;
+  color: var(--good);
+  background: var(--good-surface);
+  border-radius: var(--radius-sm);
+}
+
+.margin-summary[data-losing='true'] {
+  color: var(--alert);
+  background: var(--alert-surface);
 }
 
 .product-codes {
@@ -1083,103 +1372,181 @@ kbd {
 
 .product-codes li {
   display: flex;
-  align-items: center;
   gap: 0.5rem;
-  padding: 0.25rem 0.25rem 0.25rem 0.75rem;
-  background: var(--ground);
+  align-items: center;
+  padding: 0.25rem 0.3rem 0.25rem 0.8rem;
+  background: var(--field);
   border: 1px solid var(--rule);
+  border-radius: 999px;
 }
 
 .product-codes code {
-  font-size: 1.125rem;
+  font-size: 1.05rem;
   font-variant-numeric: tabular-nums;
 }
 
 .product-code-remove {
-  padding: 0.25rem 0.6rem;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.85rem;
   color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--ink-soft);
   cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
 }
-
-/* Product panel (E1-43): the figures of a product as a short list of label and value. */
 
 .product-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem 1rem;
-  padding: 0.75rem 1rem;
+  gap: 0.6rem 1rem;
+  padding: 1rem 1.2rem;
   margin: 0;
   background: var(--ground);
-  border-left: 0.35rem solid var(--accent);
+  border-radius: var(--radius);
 }
 
 .product-summary dt {
+  font-size: 0.85rem;
   color: var(--ink-soft);
 }
 
 .product-summary dd {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-/* Summary of the business (E1-45): indicators, charts and tables. The colors are the ones of the appearance, so both themes work. */
+.cost-note,
+.hint,
+.settings-help {
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+}
+
+/* Small labels that tell a state at a glance. */
+.badge,
+.badge-warning,
+.count {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--good);
+  background: var(--good-surface);
+  border-radius: 999px;
+}
+
+.badge-warning,
+.badge[data-tone='partial'] {
+  color: var(--warn);
+  background: var(--warn-surface);
+}
+
+.badge[data-tone='cancelled'] {
+  color: var(--alert);
+  background: var(--alert-surface);
+}
+
+.count {
+  color: var(--ink-soft);
+  background: var(--ground);
+}
+
+/* Summary of the business: indicators, charts and tables, in the colors of the appearance. */
 
 .dashboard {
-  width: min(72rem, calc(100vw - 2rem));
+  width: min(76rem, calc(100vw - 2rem));
   height: calc(100vh - 2rem);
-  overflow: hidden;
 }
 
-.dashboard h2 {
-  margin: 0;
+.dashboard-controls,
+.charts-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: flex-end;
 }
 
-.dashboard-period {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: 1.125rem;
+.dashboard-panel,
+.settings-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1.1rem;
+  min-height: 0;
+  padding-right: 0.25rem;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
-.dashboard-controls {
+.settings-body {
+  max-height: none;
+  padding: 1rem;
+}
+
+.dashboard-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dashboard-pin {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: flex-end;
 }
 
-.segmented {
-  display: inline-flex;
+.filter-group {
+  display: grid;
+  gap: 0.3rem;
 }
 
-.segment {
-  min-height: 2.75rem;
-  padding: 0 1rem;
-  margin-left: -2px;
-  color: var(--ink);
+.filter-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.segmented,
+.tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  padding: 0.25rem;
+  background: var(--ground);
+  border-radius: calc(var(--radius-sm) + 2px);
+}
+
+.segment,
+.tab {
+  min-height: 2.4rem;
+  padding: 0 0.95rem;
+  font-weight: 600;
+  color: var(--ink-soft);
   cursor: pointer;
   background: none;
-  border: 2px solid var(--ink);
+  border: 0;
+  border-radius: var(--radius-sm);
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
-.segment:first-child {
-  margin-left: 0;
+.segment:hover,
+.tab:hover {
+  color: var(--ink);
 }
 
-.segment[aria-pressed='true'] {
-  color: var(--surface);
-  background: var(--ink);
-}
-
-.segment:focus-visible,
-.tab:focus-visible,
-.link-button:focus-visible,
-.date-field input:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 2px;
+.segment[aria-pressed='true'],
+.tab[aria-selected='true'] {
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .date-field {
@@ -1188,38 +1555,199 @@ kbd {
 }
 
 .date-field span {
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   color: var(--ink-soft);
 }
 
 .date-field input {
-  height: 2.75rem;
-  padding: 0 0.6rem;
+  height: 2.6rem;
   font-size: 1rem;
-/* Orders to suppliers (E1-44): a wide dialog with the lines of the order as a table of small boxes. */
-
-.order-dialog {
-  width: min(78rem, calc(100vw - 2rem));
 }
 
-.order-lines {
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1rem 1.15rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.kpi dt {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kpi dd {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.kpi-detail,
+.kpi-compare {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.charts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.15rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chart figcaption {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.chart-svg {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 1.0625rem;
+  height: auto;
+  max-height: 22rem;
 }
 
+.chart-bar {
+  fill: color-mix(in srgb, var(--accent) 62%, var(--surface));
+  transition: fill 120ms ease;
+}
+
+.chart-bar[data-peak='true'],
+.chart-bar:hover {
+  fill: var(--accent);
+}
+
+.chart-grid {
+  stroke: var(--rule);
+  stroke-dasharray: 3 5;
+  stroke-width: 1;
+}
+
+.chart-axis {
+  stroke: var(--ink-soft);
+  stroke-width: 1.5;
+}
+
+.chart-label {
+  font-size: 12px;
+  fill: var(--ink-soft);
+}
+
+.chart-value {
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-summary {
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.chart-table summary {
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.chart-table table,
+.dashboard-table {
+  width: 100%;
+  margin-top: 0.5rem;
+  border-collapse: collapse;
+}
+
+.chart-table th,
+.chart-table td,
+.dashboard-table th,
+.dashboard-table td,
 .order-lines th,
-.order-lines td {
-  padding: 0.4rem 0.5rem;
+.order-lines td,
+.keys-table th,
+.keys-table td {
+  padding: 0.55rem 0.7rem;
   text-align: left;
   vertical-align: top;
   border-bottom: 1px solid var(--rule);
 }
 
-.order-lines th {
-  font-size: 0.9375rem;
+.dashboard-table caption {
+  padding-bottom: 0.4rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.chart-table thead th,
+.dashboard-table thead th,
+.order-lines thead th,
+.keys-table thead th {
+  font-size: 0.8rem;
+  font-weight: 600;
   color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dashboard-table td,
+.chart-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.left {
+  text-align: left !important;
+}
+
+.empty,
+.order-empty {
+  padding: 1.25rem;
+  color: var(--ink-soft);
+  text-align: center;
   background: var(--ground);
+  border-radius: var(--radius-sm);
+}
+
+/* Orders to suppliers: a wide dialog with the lines of the order as a table of small boxes. */
+
+.order-dialog {
+  width: min(80rem, calc(100vw - 2rem));
+}
+
+.order-lines {
+  font-size: 1rem;
 }
 
 .order-lines small {
@@ -1230,13 +1758,153 @@ kbd {
 .order-input {
   width: 7.5rem;
   height: 2.5rem;
-  padding: 0 0.5rem;
-  font-size: 1.125rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-  background: var(--ground);
-  border: 2px solid var(--ink);
-  border-radius: 2px;
+  font-size: 1.05rem;
 }
 
-undefined}
+.order-amount,
+.order-total {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.order-total {
+  font-size: 1.35rem;
+}
+
+.order-code {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.order-level,
+.order-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--ground);
+  border-radius: var(--radius);
+}
+
+/* Settings of the register and list of sales */
+
+.settings {
+  width: min(64rem, calc(100vw - 2rem));
+  height: min(48rem, calc(100vh - 2rem));
+}
+
+.history {
+  width: min(62rem, calc(100vw - 2rem));
+}
+
+.history-list {
+  max-height: 56vh;
+}
+
+.keys-table th[scope='row'] {
+  font-weight: 600;
+}
+
+.keys-table tr[data-changed='true'] th[scope='row']::after {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--warn);
+  content: 'cambiada';
+}
+
+.settings-steps {
+  display: grid;
+  gap: 0.5rem;
+  padding-left: 1.4rem;
+  margin: 0 0 1rem;
+  color: var(--ink-soft);
+}
+
+.settings-steps code {
+  padding: 0.05rem 0.4rem;
+  color: var(--ink);
+  background: var(--ground);
+  border-radius: 6px;
+}
+
+.settings-body section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.ticket-designer {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.5rem !important;
+  align-items: start;
+}
+
+.ticket-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+/* The sample reads like the paper: white, narrow, and in the letter of a ticket printer. */
+.ticket-preview {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ticket-preview figcaption {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ticket-preview pre {
+  padding: 1.1rem 0.9rem;
+  margin: 0;
+  overflow-x: auto;
+  font-family: Consolas, 'Cascadia Mono', 'Courier New', monospace;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #111827;
+  background: #ffffff;
+  border-radius: 6px;
+  box-shadow: var(--shadow-lg);
+}
+
+@media (max-width: 1100px) {
+  .sale {
+    grid-template-columns: minmax(0, 1fr) 19rem;
+  }
+
+  .ticket-designer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .sale {
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .product-form-row,
+  .cash-counts,
+  .product-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

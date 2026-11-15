@@ -82,7 +82,9 @@ test('adds a product that is not in the catalog from the sale screen, writes eve
 
   await page.getByRole('textbox', { name: 'Nombre' }).fill('Cinta métrica 5 m');
   await page.getByRole('textbox', { name: 'Precio (IVA incluido)' }).fill('89.50');
-  await page.getByRole('textbox', { name: 'Costo (opcional)' }).fill('52.25');
+  // The cost is typed with VAT: 60.61 with the 16 % is 52.25 without it, which is what the register keeps.
+  await page.getByRole('textbox', { name: 'Costo con IVA (opcional)' }).fill('60.61');
+  await expect(page.getByLabel('Costo sin IVA')).toHaveText('$52.25');
   await page.getByRole('textbox', { name: 'Existencia inicial (opcional)' }).fill('12');
   await page.keyboard.press('F2');
 

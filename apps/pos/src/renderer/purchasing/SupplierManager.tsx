@@ -136,7 +136,7 @@ function SupplierList({ api, isOwner, onChanged, onBack, onCodes }: SupplierList
       <Field label="Contacto (opcional)" value={contact} onChange={setContact} maxLength={200} hint="Teléfono, correo o con quién se pide." />
       <Field label="Notas (opcional)" value={notes} onChange={setNotes} maxLength={500} />
       {editing !== null && <CheckField label="Activo (quita la marca para darlo de baja)" checked={isActive} onChange={setIsActive} />}
-      {!isOwner && <Field label="PIN del dueño" value={pin} onChange={setPin} type="password" maxLength={8} />}
+      {!isOwner && <Field label="PIN del dueño" numeric="integer" value={pin} onChange={setPin} type="password" maxLength={8} />}
       {note !== null && (
         <p className="notice notice-info" role="status">
           {note}
@@ -298,7 +298,7 @@ function SupplierCodes({ api, isOwner, supplier, onBack }: SupplierCodesProps): 
             <fieldset key={index} className="order-code">
               <legend>Código {index + 1}</legend>
               <Field label={`Código o SKU del proveedor ${index + 1}`} value={row.supplierCode} onChange={(supplierCode) => change(index, { supplierCode })} maxLength={64} />
-              <Field label={`Costo de lista ${index + 1} (opcional)`} value={row.listCost} onChange={(listCost) => change(index, { listCost })} maxLength={16} hint="Por unidad del producto, en pesos." />
+              <Field label={`Costo de lista ${index + 1} (opcional)`} numeric="decimal" value={row.listCost} onChange={(listCost) => change(index, { listCost })} maxLength={16} hint="Por unidad del producto, en pesos." />
               <Field label={`Presentación ${index + 1} (opcional)`} value={row.purchaseUnit} onChange={(purchaseUnit) => change(index, { purchaseUnit })} maxLength={60} hint="Por ejemplo: Caja con 12." />
               <button type="button" className="button" tabIndex={-1} onClick={() => setRows((previous) => previous.filter((_, position) => position !== index))}>
                 Quitar código {index + 1}
@@ -313,7 +313,7 @@ function SupplierCodes({ api, isOwner, supplier, onBack }: SupplierCodesProps): 
           {others.length > 0 && (
             <p className="quantity-price">También lo conocen: {others.map((link) => `${link.supplierName} (${link.codes.map(({ supplierCode }) => supplierCode).join(', ')})`).join('; ')}.</p>
           )}
-          {!isOwner && <Field label="PIN del dueño" value={pin} onChange={setPin} type="password" maxLength={8} />}
+          {!isOwner && <Field label="PIN del dueño" numeric="integer" value={pin} onChange={setPin} type="password" maxLength={8} />}
         </>
       )}
       {note !== null && (

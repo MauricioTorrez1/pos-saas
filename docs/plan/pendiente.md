@@ -1,13 +1,13 @@
 # Estado del proyecto
 
-Actualizado el 2026-11-11 desde `docs/plan/progreso.md` y los roadmaps.
+Actualizado el 2026-11-15 desde `docs/plan/progreso.md` y los roadmaps.
 
 Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusionadas en `main`) · ⚠️ falta. Las horas son la estimación del plan.
 
 
 ## Fase 0 · Cimientos del servidor y del catálogo
 
-✅ 20 de 26 tareas hechas · ⚠️ 6 faltan (28 h)
+✅ 22 de 26 tareas hechas · ⚠️ 4 faltan (19 h)
 
 - ✅ **F0-01 · Inicializar repositorio y monorepo** (2 h): el repositorio de GitHub tiene la estructura del monorepo y una licencia AGPL-3.0.
 - ✅ **F0-02 · CI base en GitHub Actions** (3 h): cada PR compila y prueba Java, TypeScript y Python.
@@ -26,8 +26,8 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **F0-15 · Registro de caja y PIN en el servidor** (5 h) _(En revisión)_: una caja se registra una vez y recibe los hashes de PIN.
 - ✅ **F0-16 · Productos, códigos y unidades** (6 h) _(En revisión)_: un rollo de 100 m se registra con unidad base metro y varios códigos.
 - ✅ **F0-17 · Precios, impuestos y claves SAT** (5 h) _(En revisión)_: cada producto tiene listas de precio, IVA y claves SAT.
-- ⚠️ **F0-18 · Importación de catálogo** (6 h): un CSV entra con reporte de errores por fila, incluyendo la plantilla de Eleventa.
-- ⚠️ **F0-19 · Cambio masivo de precios** (3 h): el dueño sube 5% a una marca con vista previa.
+- ✅ **F0-18 · Importación de catálogo** (6 h) _(En revisión)_: un CSV entra con reporte de errores por fila, incluyendo la plantilla de Eleventa.
+- ✅ **F0-19 · Cambio masivo de precios** (3 h) _(En revisión)_: el dueño sube 5% a una marca con vista previa.
 - ✅ **F0-20 · Panel Next.js con login** (5 h) _(En revisión)_: el dueño entra al panel por Keycloak.
 - ⚠️ **F0-21 · Pantallas de catálogo** (6 h): el dueño crea, busca, edita e importa productos.
 - ⚠️ **F0-22 · Etiquetas en PDF** (3 h): el dueño imprime etiquetas desde cualquier impresora.
@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 41 de 46 tareas hechas · ⚠️ 5 faltan (21 h)
+✅ 42 de 47 tareas hechas · ⚠️ 5 faltan (21 h)
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -85,7 +85,8 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-43 · Panel de modificación de productos** (5 h) _(En revisión)_: el dueño busca un producto y modifica su nombre, códigos, unidad, impuesto, costo y estado, cambia su precio y ajusta su inventario desde una sola pantalla, sin perder el historial.
 - ✅ **E1-45 · Tablero de indicadores y más vendidos** (6 h) _(En revisión)_: el dueño ve en la caja, sin internet, cómo va el negocio en un día, una semana, un mes, un año o un rango, contra el periodo anterior, con los más vendidos y lo que no se mueve, y se lo lleva a Excel o PDF.
 - ✅ **E1-44 · Pedido al proveedor** (6 h) _(En revisión)_: en la caja el dueño arma un pedido a un proveedor, lo guarda como borrador o lo marca como enviado, y saca un archivo de Excel o de PDF para mandarlo por correo o por WhatsApp, sin internet y sin mover el inventario.
-- ✅ **E1-47 · Un solo escritor de Excel** (2 h) _(En revisión)_: el pedido al proveedor y el resumen del negocio salen del mismo módulo de Excel, que escribe los números como decimales exactos y los textos nunca como fórmulas, sin cambiar lo que el dueño ve en los archivos.
+- ✅ **E1-47 · Un solo escritor de Excel** (2 h) _(En revisión)_: el pedido al proveedor y el resumen del negocio salen del mismo módulo de Excel, con los mismos archivos de antes, y la caja deja de tener dos formas de escribir un `.xlsx`.
+- ✅ **E1-48 · Rediseño de la caja y herramientas del dueño** (10 h) _(En revisión)_: la caja se ve actual y clara, y el dueño ajusta lo que antes pedía un programador: teclas, ticket e impresora; la cajera cobra un precio distinto solo en esa venta y cancela ventas sin perder rastro.
 
 ## Entrega 2 · Terminal de tarjeta integrada
 
@@ -204,4 +205,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 61 de 162 tareas hechas (252 h de 714 h) · ⚠️ 101 faltan (462 h).
+✅ 64 de 163 tareas hechas (271 h de 724 h) · ⚠️ 99 faltan (453 h).

@@ -187,7 +187,7 @@ export function PriceChangeDialog({ posApi, pricingApi, isOwner, initialProduct,
               {info.lastCostE6 !== null && (marginBasisPoints(reading.unitPriceE4, info.product.taxRate, info.lastCostE6) ?? 0) < 0 ? ' Ojo: queda por debajo del costo.' : ''}
             </p>
           )}
-          {!isOwner && <Field label="PIN del dueño" value={pin} onChange={setPin} type="password" maxLength={8} />}
+          {!isOwner && <Field label="PIN del dueño" numeric="integer" value={pin} onChange={setPin} type="password" maxLength={8} />}
           <p>La venta que ya tienes armada conserva los precios de sus productos. Las ventas ya cobradas no cambian.</p>
         </>
       )}

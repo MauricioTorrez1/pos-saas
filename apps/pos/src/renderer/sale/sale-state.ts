@@ -12,6 +12,11 @@ export interface SaleLine {
   readonly product: CatalogProduct;
   readonly quantity: Quantity;
   readonly totals: LineTotals;
+  /**
+   * The price of the catalog, kept only when this line is charged at another price for this sale. The price charged is
+   * the one of `product`, and the catalog itself does not change.
+   */
+  readonly catalogPriceE4?: number;
 }
 
 /** The sale being rung up. */
@@ -30,6 +35,8 @@ export type SaleAction =
   | { readonly type: 'add-product'; readonly product: CatalogProduct; readonly quantityMilli?: number }
   | { readonly type: 'change-quantity'; readonly units: 1 | -1 }
   | { readonly type: 'remove-selected' }
+  /** Charges the selected line at another price, for this sale only. The price of the catalog puts it back. */
+  | { readonly type: 'set-line-price'; readonly unitPriceE4: number }
   | { readonly type: 'clear' }
   | { readonly type: 'move-selection'; readonly offset: 1 | -1 }
   | { readonly type: 'select'; readonly productId: string };
@@ -59,6 +66,8 @@ export function saleReducer(sale: SaleState, action: SaleAction): SaleState {
       return changeSelectedQuantity(sale, action.units);
     case 'remove-selected':
       return removeSelected(sale);
+    case 'set-line-price':
+      return setSelectedPrice(sale, action.unitPriceE4);
     case 'clear':
       return EMPTY_SALE;
     case 'move-selection':
@@ -90,6 +99,19 @@ function changeSelectedQuantity(sale: SaleState, units: 1 | -1): SaleState {
   return withLines(sale, selected.product.id, () => replaceLine(sale.lines, selected, milli));
 }
 
+function setSelectedPrice(sale: SaleState, unitPriceE4: number): SaleState {
+  const selected = selectedLine(sale);
+  if (selected === undefined) {
+    return sale;
+  }
+  const catalogPriceE4 = selected.catalogPriceE4 ?? selected.product.unitPriceE4;
+  return withLines(sale, selected.product.id, () =>
+    sale.lines.map((line) =>
+      line === selected ? buildLine({ ...selected.product, unitPriceE4 }, selected.quantity.milli, unitPriceE4 === catalogPriceE4 ? undefined : catalogPriceE4) : line,
+    ),
+  );
+}
+
 function removeSelected(sale: SaleState): SaleState {
   const selected = selectedLine(sale);
   if (selected === undefined) {
@@ -115,13 +137,18 @@ function selectedLine(sale: SaleState): SaleLine | undefined {
   return sale.lines.find((line) => line.product.id === sale.selectedProductId);
 }
 
-function buildLine(product: CatalogProduct, milli: number): SaleLine {
+function buildLine(product: CatalogProduct, milli: number, catalogPriceE4?: number): SaleLine {
   const quantity = quantityOf(milli, product.unit);
-  return { product, quantity, totals: lineTotals(product.unitPriceE4, quantity, product.taxRate) };
+  return {
+    product,
+    quantity,
+    totals: lineTotals(product.unitPriceE4, quantity, product.taxRate),
+    ...(catalogPriceE4 === undefined ? {} : { catalogPriceE4 }),
+  };
 }
 
 function replaceLine(lines: readonly SaleLine[], line: SaleLine, milli: number): SaleLine[] {
-  return lines.map((current) => (current === line ? buildLine(line.product, milli) : current));
+  return lines.map((current) => (current === line ? buildLine(line.product, milli, line.catalogPriceE4) : current));
 }
 
 /** The line and the sale are recalculated together, so a change that overflows either one leaves both untouched. */

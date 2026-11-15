@@ -55,6 +55,10 @@ test('loads the catalog and the stock of Eleventa, and then sells from it (RF-03
   await page.keyboard.press('F1');
   await expect(page.getByRole('heading', { name: 'Administración' })).toBeVisible();
   await page.keyboard.press('F5');
+  // The register first shows how to write the titles of the columns, and Enter opens the file window.
+  await expect(page.getByRole('heading', { name: 'Cargar productos desde un archivo' })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Columnas del archivo de productos' })).toContainText('Costo con IVA');
+  await page.keyboard.press('Enter');
 
   await expect(page.getByRole('heading', { name: 'Catálogo cargado' })).toBeVisible();
   const result = page.getByLabel('Resultado de la carga');

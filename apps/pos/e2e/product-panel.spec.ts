@@ -93,7 +93,8 @@ test('edits a product from the panel, gives it up so the sale cannot find it, an
   await page.getByRole('textbox', { name: 'Código de barras' }).fill(NEW_CODE);
   await page.keyboard.press('Enter');
   await expect(page.getByRole('list', { name: 'Códigos del producto' })).toContainText(NEW_CODE);
-  await page.getByRole('textbox', { name: 'Costo (opcional)' }).fill('60');
+  // 69.60 with the 16 % of VAT is 60.00 without it.
+  await page.getByRole('textbox', { name: 'Costo con IVA (opcional)' }).fill('69.60');
   await page.keyboard.press('F2');
   await expect(panel).toContainText('Listo. Los cambios quedaron guardados');
   await expect(page.getByRole('heading', { name: 'Martillo de bola 16 oz' })).toBeVisible();

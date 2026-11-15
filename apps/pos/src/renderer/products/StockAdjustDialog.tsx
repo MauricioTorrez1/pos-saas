@@ -104,9 +104,9 @@ export function StockAdjustDialog({ posApi, productId, productName, unit, isOwne
         onChange={setKind}
         options={(Object.keys(STOCK_KINDS) as StockKind[]).map((key) => ({ value: key, label: STOCK_KINDS[key].label }))}
       />
-      <Field label="Cantidad" value={quantity} onChange={setQuantity} autoFocus maxLength={12} hint="Sin signo: la caja lo pone según lo que elegiste." />
+      <Field label="Cantidad" numeric="decimal" value={quantity} onChange={setQuantity} autoFocus maxLength={12} hint="Sin signo: la caja lo pone según lo que elegiste." />
       <Field label="Motivo" value={reason} onChange={setReason} maxLength={200} />
-      {!isOwner && <Field label="PIN del dueño" value={pin} onChange={setPin} type="password" maxLength={8} />}
+      {!isOwner && <Field label="PIN del dueño" numeric="integer" value={pin} onChange={setPin} type="password" maxLength={8} />}
       <Message text={message} />
       <div className="payment-actions">
         <button type="button" className="button" tabIndex={-1} onClick={onCancel}>

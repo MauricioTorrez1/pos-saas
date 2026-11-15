@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import type { BackupOutcome, BackupStatus, ImportOutcome, RestoreOutcome } from '../../shared/admin-api';
 import { backupFileName, BackupError, createEncryptedBackup, pruneBackups, stageRestore } from '../backup/backup-service';
 import type { CatalogImporter } from '../import/catalog-importer';
-import { parseEleventaCatalog } from '../import/eleventa-csv';
+import { parseCatalogTable, parseEleventaCatalog, type CatalogReading } from '../import/eleventa-csv';
+import { readXlsxTable, WorkbookError } from '../import/xlsx-reader';
 import type { LocalStore } from '../local-store/local-store';
 
 /** A file of Eleventa is a list of products: more than this is not one. */
@@ -63,20 +64,24 @@ export class AdminActions {
    * @returns what was loaded, or why not
    */
   async importCatalog(): Promise<ImportOutcome> {
-    const file = await this.#dependencies.pickFile('Elige el archivo de productos de Eleventa (CSV)');
+    const file = await this.#dependencies.pickFile('Elige el archivo de productos (Excel .xlsx o CSV)');
     if (file === null) {
       return { status: 'cancelled' };
     }
-    let text: string;
+    let reading: CatalogReading;
     try {
       if (statSync(file).size > MAX_IMPORT_BYTES) {
         return { status: 'unreadable', message: 'El archivo es demasiado grande para ser una lista de productos.' };
       }
-      text = decode(readFileSync(file));
-    } catch {
+      const bytes = readFileSync(file);
+      // A workbook is a zip, and every zip starts with the letters PK, whatever the file is called.
+      reading = bytes.subarray(0, 2).toString('latin1') === 'PK' ? parseCatalogTable(readXlsxTable(bytes)) : parseEleventaCatalog(decode(bytes));
+    } catch (error) {
+      if (error instanceof WorkbookError) {
+        return { status: 'unreadable', message: error.message };
+      }
       return { status: 'unreadable', message: 'No se pudo leer el archivo. Revisa que no esté abierto en otro programa.' };
     }
-    const reading = parseEleventaCatalog(text);
     if (reading.status === 'unreadable') {
       return reading;
     }

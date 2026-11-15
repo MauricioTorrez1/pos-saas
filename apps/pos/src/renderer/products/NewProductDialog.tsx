@@ -90,7 +90,7 @@ export function NewProductDialog({ posApi, productApi, isOwner, initialValues, o
       <h2 id="new-product-title">Producto nuevo</h2>
       <p>Da de alta lo que no está en el catálogo. Queda guardado con tu nombre y se puede vender de inmediato, aunque no haya internet.</p>
       <ProductFields values={values} problems={problems} onChange={change} findCodeOwner={findCodeOwner} />
-      {!isOwner && <Field label="PIN del dueño" value={pin} onChange={setPin} type="password" maxLength={8} />}
+      {!isOwner && <Field label="PIN del dueño" numeric="integer" value={pin} onChange={setPin} type="password" maxLength={8} />}
       <Message text={message} />
       <div className="payment-actions">
         <button type="button" className="button" tabIndex={-1} onClick={onCancel}>

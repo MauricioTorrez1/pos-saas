@@ -1035,7 +1035,8 @@ describe('checkout', () => {
     ['cash that does not reach the total', '100', '', 'Faltan $16.00'],
     ['a transfer for more than the total', '', '120', 'No dan cambio'],
     ['cash when the transfer already covers the total', '10', '116', 'Quita el efectivo'],
-    ['text that is not an amount', 'cien', '', 'Escribe solo números'],
+    // Letters never get into a box for money, so text that is not an amount is the same as an empty box.
+    ['text that is not an amount', 'cien', '', 'Faltan $116.00'],
   ])('does not collect with %s', async (_case, cash, transfer, message) => {
     const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve(COMPLETED));
     await renderApp(posApiThatSaves({ checkoutSale }));
@@ -1367,15 +1368,17 @@ describe('the cash of the register (E1-21, E1-22, E1-23)', () => {
     expect(await screen.findByRole('dialog', { name: 'Caja abierta', hidden: true })).toBeDefined();
   });
 
-  it('refuses a float that is not an amount', async () => {
+  it('takes only numbers as the float, so letters and a second point never get into the box', async () => {
     const openCashSession = vi.fn<PosApi['openCashSession']>();
     render(<App posApi={fakePosApi({ getCashStatus: () => Promise.resolve(CLOSED_CASH), openCashSession })} />);
     await screen.findByRole('dialog', { name: 'Abrir la caja', hidden: true });
+    const box = screen.getByRole<HTMLInputElement>('textbox', { name: 'Fondo de caja', hidden: true });
 
     typeInto('Fondo de caja', 'mucho');
-    pressKey('F2');
+    expect(box.value).toBe('');
 
-    expect((await screen.findByRole('alert', { hidden: true })).textContent).toContain('Escribe solo números');
+    typeInto('Fondo de caja', '$1,50x0.5.0 pesos');
+    expect(box.value).toBe('1500.50');
     expect(openCashSession).not.toHaveBeenCalled();
   });
 
@@ -1739,6 +1742,8 @@ describe('administration (E1-29, E1-35)', () => {
     const dialog = await openAdmin({ importCatalog });
 
     pressKey('F5');
+    await within(dialog).findByRole('heading', { name: 'Cargar productos desde un archivo', hidden: true });
+    pressKey('Enter');
 
     const result = await within(dialog).findByRole('heading', { name: 'Catálogo cargado', hidden: true });
     expect(result).toBeDefined();
@@ -1755,10 +1760,12 @@ describe('administration (E1-29, E1-35)', () => {
     const dialog = await openAdmin({ importCatalog });
 
     pressKey('F5');
+    await within(dialog).findByRole('heading', { name: 'Cargar productos desde un archivo', hidden: true });
+    pressKey('Enter');
     await waitFor(() => expect(importCatalog).toHaveBeenCalledTimes(1));
     expect(within(dialog).queryByRole('heading', { name: 'Catálogo cargado', hidden: true })).toBeNull();
     await new Promise((resolve) => setTimeout(resolve, 30));
-    pressKey('F5');
+    pressKey('Enter');
 
     expect((await within(dialog).findByText(/No se encontró el código/, { selector: 'p' })).textContent).toBeDefined();
   });

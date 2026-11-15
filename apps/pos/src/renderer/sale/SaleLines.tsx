@@ -24,7 +24,14 @@ const SaleLineRow = memo(function SaleLineRow({ line, isSelected, onSelect }: Sa
     <tr ref={rowRef} aria-current={isSelected ? 'true' : undefined} onClick={() => onSelect(line.product.id)}>
       <td className="line-name">{line.product.name}</td>
       <td className="line-number">{formatQuantity(line.quantity)}</td>
-      <td className="line-number">{formatUnitPriceE4(line.product.unitPriceE4)}</td>
+      <td className="line-number">
+        {formatUnitPriceE4(line.product.unitPriceE4)}
+        {line.catalogPriceE4 !== undefined && (
+          <small className="line-override" title={`Precio del catálogo: ${formatUnitPriceE4(line.catalogPriceE4)}`}>
+            solo esta venta
+          </small>
+        )}
+      </td>
       <td className="line-number line-amount">{formatCents(line.totals.totalCents)}</td>
     </tr>
   );

@@ -4,13 +4,15 @@ import { useCallback, useEffect, useReducer, useRef, useState, type KeyboardEven
 import { isMiscLineId, MISC_LINE_ID_PREFIX, MISC_TAX_RATE_BP } from '../../shared/miscellaneous';
 import { MAX_LOOKUP_TEXT_LENGTH, type CatalogProduct, type PendingSale, type PosApi, type SavePendingSaleResult } from '../../shared/pos-api';
 import type { PricingApi } from '../../shared/pricing';
+import { actionOf, comboLabel, DEFAULT_KEYMAP, type KeyAction, type Keymap, type ToolsApi } from '../../shared/register-tools';
 import type { ProductAdminApi, ProductDetail } from '../../shared/product-admin';
 import { CheckoutDialog } from '../checkout/CheckoutDialog';
-import { PriceChangeDialog } from '../pricing/PriceChangeDialog';
 import { NewProductDialog } from '../products/NewProductDialog';
 import { ProductPanelDialog } from '../products/ProductPanelDialog';
 import { newProductFormFor, type ProductFormValues } from '../products/product-form';
 import { describeReprint, REPRINT_FAILED } from '../checkout/reprint-message';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { LinePriceDialog } from './LinePriceDialog';
 import { MiscItemDialog, type MiscItem } from './MiscItemDialog';
 import { QuantityDialog } from './QuantityDialog';
 import { needsMeasuring } from './quantity-entry';
@@ -27,6 +29,8 @@ const EMPTY_SALE_MESSAGE = 'Agrega al menos un producto para cobrar.';
 const CATALOG_CHANGED =
   'El catálogo cambió mientras armabas la venta, y un precio o un producto ya no es el que ves. No se cobró nada. Quita los productos y vuelve a agregarlos para ver los precios nuevos.';
 const CASH_CLOSED = 'La caja está cerrada. Ábrela con su fondo para poder cobrar.';
+const NO_LINE_FOR_PRICE = 'Elige primero un producto de la venta: agrégalo o muévete a él con las flechas, y cambia su precio para esta venta.';
+const MISC_PRICE = 'El artículo varios ya lleva el precio que escribiste. Quítalo y agrégalo otra vez para cambiarlo.';
 const SAVE_FAILURE = 'No se pudo guardar la venta. No se cobró nada. Intenta de nuevo y, si sigue fallando, reinicia la caja.';
 
 function describeMiscRefusal(result: Extract<SavePendingSaleResult, { status: 'authorization_required' | 'wrong_pin' | 'locked' }>): string {
@@ -73,6 +77,14 @@ interface SaleScreenProps {
   readonly onOpenSupplierOrder?: () => void;
   /** Called after a sale was collected, so the cash of the register is read again. */
   readonly onCashChanged: () => void;
+  /** The keys of each action. Without it, the register answers to the keys it was born with. */
+  readonly keymap?: Keymap;
+  /** Bridge for the tools of the register. Without it, a dropped sale leaves no entry in the audit log. */
+  readonly toolsApi?: ToolsApi;
+  /** Opens the settings of the register. Without it, its key does nothing. */
+  readonly onOpenSettings?: () => void;
+  /** Opens the list of sales, where a past sale is cancelled. Without it, its key does nothing. */
+  readonly onOpenSalesHistory?: () => void;
 }
 
 /**
@@ -93,7 +105,7 @@ interface SaleScreenProps {
  * @param props.onCashChanged called after a sale was collected
  * @returns the screen
  */
-export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onOpenDashboard, onOpenSupplierOrder, onCashChanged }: SaleScreenProps): ReactElement {
+export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onOpenDashboard, onOpenSupplierOrder, onCashChanged, keymap = DEFAULT_KEYMAP, toolsApi, onOpenSettings, onOpenSalesHistory }: SaleScreenProps): ReactElement {
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
@@ -101,8 +113,10 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
   const [info, setInfo] = useState<string | null>(null);
   const [measuring, setMeasuring] = useState<CatalogProduct | null>(null);
   const [isAddingMisc, setIsAddingMisc] = useState(false);
-  /** The price dialog, with the product it starts from. Null while it is closed. */
-  const [priceChange, setPriceChange] = useState<{ readonly product: CatalogProduct | null } | null>(null);
+  /** Whether the price of the selected line is being changed for this sale. */
+  const [isPricingLine, setIsPricingLine] = useState(false);
+  /** Whether the cashier is being asked before the sale is dropped. */
+  const [isCancelling, setIsCancelling] = useState(false);
   /** What was looked for and not found, so the cashier can add it as a new product (E1-42). */
   const [missing, setMissing] = useState<{ readonly text: string; readonly fromScanner: boolean } | null>(null);
   /** The panel of a product (E1-43), with the product it starts from. Null while it is closed. */
@@ -118,10 +132,10 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
   const search = useProductSearch(posApi, showCatalogFailure);
 
   useEffect(() => {
-    if (!isKeyboardElsewhere && savedSale === null && measuring === null && !isAddingMisc && priceChange === null && newProduct === null && productPanel === null) {
+    if (!isKeyboardElsewhere && savedSale === null && measuring === null && !isAddingMisc && !isPricingLine && !isCancelling && newProduct === null && productPanel === null) {
       inputRef.current?.focus();
     }
-  }, [isKeyboardElsewhere, savedSale, measuring, isAddingMisc, priceChange, newProduct, productPanel]);
+  }, [isKeyboardElsewhere, savedSale, measuring, isAddingMisc, isPricingLine, isCancelling, newProduct, productPanel]);
 
   const addMiscItem = ({ name, unitPriceE4, quantityMilli, ownerPin: pin }: MiscItem): void => {
     const product: CatalogProduct = {
@@ -152,7 +166,7 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
       setNotice(EMPTY_SALE_MESSAGE);
       return;
     }
-    if (isSaving.current || isKeyboardElsewhere || measuring !== null || isAddingMisc || priceChange !== null || newProduct !== null || productPanel !== null) {
+    if (isSaving.current || isKeyboardElsewhere || measuring !== null || isAddingMisc || isPricingLine || isCancelling || newProduct !== null || productPanel !== null) {
       return;
     }
     isSaving.current = true;
@@ -162,10 +176,12 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
       const saveSale = (withSeenPrices: boolean): Promise<SavePendingSaleResult> =>
         posApi.savePendingSale({
           idempotencyKey,
-          lines: sale.lines.map(({ product, quantity }) =>
+          lines: sale.lines.map(({ product, quantity, catalogPriceE4 }) =>
             isMiscLineId(product.id)
               ? { miscellaneous: { name: product.name, unitPriceE4: product.unitPriceE4 }, quantityMilli: quantity.milli }
-              : { productId: product.id, quantityMilli: quantity.milli, ...(withSeenPrices ? { unitPriceE4: product.unitPriceE4 } : {}) },
+              : catalogPriceE4 !== undefined
+                ? { productId: product.id, quantityMilli: quantity.milli, saleUnitPriceE4: product.unitPriceE4 }
+                : { productId: product.id, quantityMilli: quantity.milli, ...(withSeenPrices ? { unitPriceE4: product.unitPriceE4 } : {}) },
           ),
           expectedTotalCents: sale.totals.totalCents,
           ...(hasMisc && ownerPin.current !== undefined ? { ownerPin: ownerPin.current } : {}),
@@ -195,24 +211,53 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
     }
   };
 
-  // The product to start from is the one the cashier is pointing at: the highlighted result, or else the selected line.
-  const openPriceChange = (): void => {
-    if (pricingApi === undefined || isSaving.current) {
+  // The price of the selected line, for this sale only. The catalog keeps its price (ADR 0061).
+  const openLinePrice = (): void => {
+    if (isSaving.current) {
       return;
     }
-    const highlighted = search.results[search.highlightedIndex];
     const selectedLine = sale.lines.find((line) => line.product.id === sale.selectedProductId);
-    const product = highlighted ?? (selectedLine !== undefined && !isMiscLineId(selectedLine.product.id) ? selectedLine.product : null);
-    setPriceChange({ product });
+    if (selectedLine === undefined) {
+      setNotice(NO_LINE_FOR_PRICE);
+    } else if (isMiscLineId(selectedLine.product.id)) {
+      setNotice(MISC_PRICE);
+    } else {
+      setIsPricingLine(true);
+    }
   };
 
-  const finishPriceChange = (product: CatalogProduct, previousUnitPriceE4: number): void => {
-    setPriceChange(null);
-    // What the lookup box listed still shows the old price, and the next search must show the new one.
-    clearLookup();
+  const finishLinePrice = (unitPriceE4: number): void => {
+    const line = sale.lines.find((candidate) => candidate.product.id === sale.selectedProductId);
+    setIsPricingLine(false);
+    if (line === undefined) {
+      return;
+    }
+    const catalogPriceE4 = line.catalogPriceE4 ?? line.product.unitPriceE4;
+    dispatch({ type: 'set-line-price', unitPriceE4 });
+    setNotice(null);
     setInfo(
-      `Precio de ${product.name}: ${formatUnitPriceE4(previousUnitPriceE4)} → ${formatUnitPriceE4(product.unitPriceE4)}. La venta que armaste conserva los precios de sus productos.`,
+      unitPriceE4 === catalogPriceE4
+        ? `${line.product.name} vuelve a su precio del catálogo: ${formatUnitPriceE4(catalogPriceE4)}.`
+        : `${line.product.name} se cobra a ${formatUnitPriceE4(unitPriceE4)} solo en esta venta. El catálogo sigue en ${formatUnitPriceE4(catalogPriceE4)}.`,
     );
+  };
+
+  const askToCancelSale = (): void => {
+    if (sale.lines.length > 0 && !isSaving.current) {
+      setIsCancelling(true);
+    }
+  };
+
+  const cancelSale = (): void => {
+    // The entry is best effort: a sale that was never saved must be dropped even if the log cannot be written.
+    toolsApi?.recordSaleCancelled({ lineCount: sale.lines.length, totalCents: sale.totals.totalCents }).catch(() => undefined);
+    setIsCancelling(false);
+    ownerPin.current = undefined;
+    dispatch({ type: 'clear' });
+    clearLookup();
+    setNotice(null);
+    setMissing(null);
+    setInfo('Venta cancelada. No se cobró nada.');
   };
 
   // The product to start from is the one the cashier is pointing at, as with the price.
@@ -341,7 +386,7 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
       dispatch({ type: 'change-quantity', units: 1 });
     } else if (event.key === '-') {
       dispatch({ type: 'change-quantity', units: -1 });
-    } else if (event.key === 'Delete') {
+    } else if (event.key === 'Delete' && !event.shiftKey && !event.ctrlKey && !event.altKey) {
       dispatch({ type: 'remove-selected' });
     } else {
       return false;
@@ -354,6 +399,59 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
       search.moveHighlight(offset);
     } else {
       dispatch({ type: 'move-selection', offset });
+    }
+  };
+
+  const runAction = (action: KeyAction): void => {
+    switch (action) {
+      case 'checkout':
+        void startCheckout();
+        return;
+      case 'misc':
+        setIsAddingMisc(true);
+        return;
+      case 'linePrice':
+        openLinePrice();
+        return;
+      case 'cancelSale':
+        askToCancelSale();
+        return;
+      case 'newProduct':
+        openNewProduct();
+        return;
+      case 'productPanel':
+        openProductPanel();
+        return;
+      case 'cash':
+        onOpenCash();
+        return;
+      case 'returns':
+        onOpenReturns();
+        return;
+      case 'salesHistory':
+        onOpenSalesHistory?.();
+        return;
+      case 'reprint':
+        void reprintLast();
+        return;
+      case 'dashboard':
+        onOpenDashboard?.();
+        return;
+      case 'supplierOrder':
+        onOpenSupplierOrder?.();
+        return;
+      case 'admin':
+        onOpenAdmin();
+        return;
+      case 'appearance':
+        onOpenAppearance();
+        return;
+      case 'settings':
+        onOpenSettings?.();
+        return;
+      case 'signOut':
+        onSignOut();
+        return;
     }
   };
 
@@ -381,61 +479,22 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
         event.preventDefault();
         handleArrow(-1);
         return;
-      case 'F9':
-        event.preventDefault();
-        onOpenAppearance();
-        return;
-      case 'F12':
-        event.preventDefault();
-        void startCheckout();
-        return;
-      case 'F2':
-        event.preventDefault();
-        setIsAddingMisc(true);
-        return;
-      case 'F8':
-        event.preventDefault();
-        void reprintLast();
-        return;
-      case 'F7':
-        event.preventDefault();
-        openPriceChange();
-        return;
-      case 'F5':
-        event.preventDefault();
-        openNewProduct();
-        return;
-      case 'F10':
-        event.preventDefault();
-        openProductPanel();
-        return;
-      case 'F6':
-        event.preventDefault();
-        onSignOut();
-        return;
-      case 'F3':
-        event.preventDefault();
-        onOpenCash();
-        return;
-      case 'F4':
-        event.preventDefault();
-        onOpenReturns();
-        return;
-      case 'F11':
-        event.preventDefault();
-        // Plain F11 is the summary of the business (E1-45), and Shift+F11 the orders to suppliers (E1-44).
-        (event.shiftKey ? onOpenSupplierOrder : onOpenDashboard)?.();
-        return;
-      case 'F1':
-        event.preventDefault();
-        onOpenAdmin();
-        return;
-      default:
+      default: {
+        const action = actionOf(keymap, event);
+        if (action !== null) {
+          event.preventDefault();
+          // A dialog that is open owns its keys: the same key may mean something else there.
+          if (!isKeyboardElsewhere) {
+            runAction(action);
+          }
+          return;
+        }
         if (isPrintableKey(event)) {
           detector.recordCharacter(event.timeStamp);
         } else if (event.key === 'Backspace' || event.key === 'Delete') {
           detector.recordEdit();
         }
+      }
     }
   };
 
@@ -507,7 +566,7 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
         {missing !== null && productApi !== undefined && (
           <p>
             <button type="button" className="button" tabIndex={-1} onClick={openNewProduct}>
-              Dar de alta «{missing.text}» <kbd>F5</kbd>
+              Dar de alta «{missing.text}» <kbd>{comboLabel(keymap.newProduct)}</kbd>
             </button>
           </p>
         )}
@@ -520,15 +579,19 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
       </section>
       <SaleSummary lineCount={sale.lines.length} totals={sale.totals} />
       {isAddingMisc && <MiscItemDialog isOwner={isOwner} onAdd={addMiscItem} onCancel={() => setIsAddingMisc(false)} />}
-      {priceChange !== null && pricingApi !== undefined && (
-        <PriceChangeDialog
-          posApi={posApi}
-          pricingApi={pricingApi}
-          isOwner={isOwner}
-          initialProduct={priceChange.product}
-          onChanged={finishPriceChange}
-          onCancel={() => setPriceChange(null)}
+      {isPricingLine && sale.lines.some((line) => line.product.id === sale.selectedProductId) && (
+        <LinePriceDialog
+          line={sale.lines.find((line) => line.product.id === sale.selectedProductId)!}
+          onConfirm={finishLinePrice}
+          onCancel={() => setIsPricingLine(false)}
         />
+      )}
+      {isCancelling && (
+        <ConfirmDialog title="¿Cancelar esta venta?" confirmLabel="Sí, cancelar la venta" isDangerous onConfirm={cancelSale} onCancel={() => setIsCancelling(false)}>
+          <p>
+            {sale.lines.length === 1 ? 'Se quita el producto' : `Se quitan los ${String(sale.lines.length)} productos`} de la venta. No se cobró nada todavía, así que no hay nada que devolver.
+          </p>
+        </ConfirmDialog>
       )}
       {newProduct !== null && productApi !== undefined && (
         <NewProductDialog

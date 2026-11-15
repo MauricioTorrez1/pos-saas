@@ -1,5 +1,7 @@
 import { useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
 
+import { keepNumeric, type NumericKind } from './numeric';
+
 const FAILED = 'No se pudo completar. Intenta de nuevo y, si sigue fallando, reinicia la caja.';
 export interface FieldProps {
   readonly label: string;
@@ -13,10 +15,12 @@ export interface FieldProps {
   readonly onEnter?: () => void;
   /** Shown in place of the hint when something about this box is wrong. */
   readonly problem?: string | undefined;
+  /** Makes the box take numbers only: an amount or a quantity (`decimal`), or a count or a PIN (`integer`). */
+  readonly numeric?: NumericKind;
 }
 
 /** A labeled box. Enter moves to the next box of the form, and never submits it. */
-export function Field({ label, value, onChange, type = 'text', autoFocus = false, hint, maxLength, onEnter, problem }: FieldProps): ReactElement {
+export function Field({ label, value, onChange, type = 'text', autoFocus = false, hint, maxLength, onEnter, problem, numeric }: FieldProps): ReactElement {
   const ref = useRef<HTMLInputElement>(null);
   return (
     <label className="payment-field">
@@ -25,13 +29,13 @@ export function Field({ label, value, onChange, type = 'text', autoFocus = false
         ref={ref}
         aria-label={label}
         type={type}
-        inputMode={type === 'password' ? 'numeric' : 'decimal'}
+        inputMode={numeric === 'integer' || type === 'password' ? 'numeric' : numeric === 'decimal' ? 'decimal' : 'text'}
         autoComplete="off"
         spellCheck={false}
         autoFocus={autoFocus}
         maxLength={maxLength}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => onChange(numeric === undefined ? event.target.value : keepNumeric(event.target.value, numeric))}
         aria-invalid={problem === undefined ? undefined : true}
         onKeyDown={onEnter === undefined ? moveOnEnter : (event) => runOnEnter(event, onEnter)}
       />

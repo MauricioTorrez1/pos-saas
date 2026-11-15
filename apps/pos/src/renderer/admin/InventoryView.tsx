@@ -215,7 +215,7 @@ function KardexView({ posApi, pricingApi, productApi, isChangingPrice, setIsChan
           <kbd>F5</kbd> Merma · <kbd>F6</kbd> Sobrante · <kbd>F7</kbd> Faltante
         </p>
       </fieldset>
-      <Field label="Cantidad" value={quantity} onChange={setQuantity} autoFocus maxLength={12} hint="Sin signo: la caja lo pone según lo que elegiste." />
+      <Field label="Cantidad" numeric="decimal" value={quantity} onChange={setQuantity} autoFocus maxLength={12} hint="Sin signo: la caja lo pone según lo que elegiste." />
       <Field label="Motivo" value={reason} onChange={setReason} maxLength={200} />
       {note !== null && (
         <p className="notice notice-info" role="status">

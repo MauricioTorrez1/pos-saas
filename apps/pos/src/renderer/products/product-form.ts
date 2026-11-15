@@ -11,6 +11,7 @@ import {
   type ProductDetail,
   type UpdateProductRequest,
 } from '../../shared/product-admin';
+import { costWithoutTaxE6, costWithTaxE6 } from '../../shared/pricing';
 import { readNewPrice } from '../pricing/price-input';
 
 /** What the boxes of the product form hold while the person types: text, until it is read. */
@@ -267,4 +268,88 @@ export function readEditForm(values: ProductFormValues): ProductEditReading {
       barcodes: values.barcodes.map((code) => code.trim()),
     },
   };
+}
+
+const E4_TO_E6 = 100;
+const E6_PER_CENT = 10_000n;
+/** A markup is typed with one decimal at most, and a larger one than this is a slip of the finger. */
+const MAX_MARKUP_TENTHS = 100_000;
+
+/**
+ * Shows with VAT a cost kept without it.
+ *
+ * @param costText the cost without VAT, as the form keeps it
+ * @param taxRate the VAT of the product
+ * @returns the cost with VAT as text, or an empty text when there is no cost to show
+ */
+export function costWithTaxText(costText: string, taxRate: TaxRate): string {
+  if (costText.trim() === '') {
+    return '';
+  }
+  const cost = readUnitCost(costText);
+  return cost.ok ? unitCostText(roundToCents(costWithTaxE6(cost.unitCostE6, taxRate))) : '';
+}
+
+/**
+ * Takes the VAT out of the cost the person typed.
+ *
+ * @param withTaxText the cost with VAT, as typed
+ * @param taxRate the VAT of the product
+ * @returns the cost without VAT as text, an empty text for an empty box, or null when it is not a cost
+ */
+export function costWithoutTaxText(withTaxText: string, taxRate: TaxRate): string | null {
+  if (withTaxText.trim() === '') {
+    return '';
+  }
+  const cost = readUnitCost(withTaxText);
+  return cost.ok ? unitCostText(costWithoutTaxE6(cost.unitCostE6, taxRate)) : null;
+}
+
+/** A cost with VAT comes from a division, and the box shows it to the cent when the rest is only rounding dust. */
+function roundToCents(valueE6: number): number {
+  const cents = (BigInt(valueE6) * 2n + E6_PER_CENT) / (E6_PER_CENT * 2n);
+  const rounded = Number(cents * E6_PER_CENT);
+  return Math.abs(rounded - valueE6) <= 1 ? rounded : valueE6;
+}
+
+/**
+ * Works out how much is earned over the cost: a product that costs 100 and sells at 130 earns 30 %.
+ *
+ * @param priceText the price with VAT, as typed
+ * @param withTaxText the cost with VAT, as typed
+ * @returns the percentage with one decimal, or an empty text when either number is missing
+ */
+export function markupText(priceText: string, withTaxText: string): string {
+  const price = readNewPrice(priceText);
+  const cost = withTaxText.trim() === '' ? null : readUnitCost(withTaxText);
+  if (!price.ok || cost === null || !cost.ok || cost.unitCostE6 === 0) {
+    return '';
+  }
+  const costE6 = BigInt(cost.unitCostE6);
+  const difference = BigInt(price.unitPriceE4 * E4_TO_E6) - costE6;
+  const magnitude = difference < 0n ? -difference : difference;
+  const tenths = Number((magnitude * 1000n * 2n + costE6) / (costE6 * 2n));
+  return `${difference < 0n ? '-' : ''}${String(Math.floor(tenths / 10))}.${String(tenths % 10)}`;
+}
+
+/**
+ * Works out the price that earns a percentage over the cost.
+ *
+ * @param withTaxText the cost with VAT, as typed
+ * @param markup the percentage to earn over the cost, with one decimal at most
+ * @returns the price with VAT to the cent, or null when the cost or the percentage is missing
+ */
+export function priceForMarkup(withTaxText: string, markup: string): string | null {
+  const cost = withTaxText.trim() === '' ? null : readUnitCost(withTaxText);
+  const match = /^(\d+)(?:\.(\d))?$/u.exec(markup.trim());
+  if (cost === null || !cost.ok || cost.unitCostE6 === 0 || match === null) {
+    return null;
+  }
+  const tenths = Number(match[1]) * 10 + Number(match[2] ?? '0');
+  if (tenths > MAX_MARKUP_TENTHS) {
+    return null;
+  }
+  const priceE6 = (BigInt(cost.unitCostE6) * BigInt(1000 + tenths)) / 1000n;
+  const cents = (priceE6 * 2n + E6_PER_CENT) / (E6_PER_CENT * 2n);
+  return cents === 0n ? null : `${String(cents / 100n)}.${String(cents % 100n).padStart(2, '0')}`;
 }

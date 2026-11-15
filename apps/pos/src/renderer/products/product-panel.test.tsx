@@ -212,11 +212,11 @@ describe('the product panel (E1-43)', () => {
     await openPanel();
 
     type('Nombre', '');
-    type('Costo (opcional)', '-2');
+    type('Costo con IVA (opcional)', '1.2345678');
     pressF2();
 
     expect(await screen.findByText('Escribe el nombre del producto.')).toBeDefined();
-    expect(screen.getByText(/solo números y un punto decimal/)).toBeDefined();
+    expect(screen.getByText(/El costo admite hasta 6 decimales/)).toBeDefined();
     expect(updateProduct).not.toHaveBeenCalled();
   });
 

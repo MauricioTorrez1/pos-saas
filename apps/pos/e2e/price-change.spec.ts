@@ -61,7 +61,7 @@ async function readRows<Row>(register: ElectronApplication, databasePath: string
   ) as Promise<Row[]>;
 }
 
-test('changes the price of a product from the sale screen, writes it down, and leaves the sale in progress alone (E1-39)', async ({ userDataDir, launch }) => {
+test('charges one line at another price for this sale only, and leaves the catalog alone (ADR 0061)', async ({ userDataDir, launch }) => {
   const register = await launch();
   const page = await signInWindow(register);
   const { databasePath } = testSalePaths(userDataDir);
@@ -72,50 +72,65 @@ test('changes the price of a product from the sale screen, writes it down, and l
   await expect(total(page)).toHaveText('$116.00');
 
   await page.keyboard.press('F7');
+  const priceBox = page.getByRole('textbox', { name: 'Precio para esta venta (IVA incluido)' });
+  await expect(priceBox).toBeVisible();
+  await expect(page.getByRole('dialog')).toContainText('Precio del catálogo: $116.00');
+  // Letters never get into a box for money.
+  await priceBox.fill('1x00');
+  await expect(priceBox).toHaveValue('100');
+  await page.keyboard.press('Enter');
+
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(total(page)).toHaveText('$100.00');
+  await expect(page.getByRole('status').filter({ hasText: 'solo en esta venta' })).toBeVisible();
+  await expect(lookupBox(page)).toBeFocused();
+
+  await page.keyboard.press('F12');
+  await expect(page.getByRole('dialog', { name: 'Cobrar' })).toBeVisible();
+  await expect(page.getByRole('status', { name: 'Total a cobrar' })).toHaveText('$100.00');
+
+  expect(await readRows(register, databasePath, 'SELECT total_cents FROM sale')).toEqual([{ total_cents: 10_000 }]);
+  expect(await readRows(register, databasePath, "SELECT unit_price_e4 FROM product WHERE name LIKE 'Martillo%'")).toEqual([{ unit_price_e4: 1_160_000 }]);
+  expect(await readRows(register, databasePath, "SELECT action, detail FROM audit_log WHERE action = 'sale.price_override'")).toEqual([
+    { action: 'sale.price_override', detail: expect.stringContaining('catalog 1160000, charged 1000000') },
+  ]);
+  expect(await readRows(register, databasePath, "SELECT type FROM sync_outbox WHERE type = 'product.price_changed'")).toEqual([]);
+});
+
+test('changes the price of the catalog from the panel of the product, and the sale in progress keeps its price (E1-39, ADR 0047)', async ({ userDataDir, launch }) => {
+  const register = await launch();
+  const page = await signInWindow(register);
+  const { databasePath } = testSalePaths(userDataDir);
+  const panel = page.locator('dialog[aria-labelledby="product-panel-title"]');
+
+  await page.keyboard.type(HAMMER_CODE);
+  await page.keyboard.press('Enter');
+  await expect(total(page)).toHaveText('$116.00');
+
+  await page.keyboard.press('F10');
+  await expect(panel).toBeVisible();
+  await page.keyboard.press('F8');
   await expect(page.getByRole('heading', { name: 'Cambiar precio' })).toBeVisible();
-  await expect(page.getByRole('dialog')).toContainText('Precio actual: $116.00');
   await page.getByRole('textbox', { name: 'Precio nuevo (IVA incluido)' }).fill('0');
   await page.keyboard.press('F2');
   await expect(page.getByRole('alert')).toContainText('mayor que cero');
   await page.getByRole('textbox', { name: 'Precio nuevo (IVA incluido)' }).fill('139.20');
-  await expect(page.getByRole('dialog')).toContainText('Antes $116.00 → ahora $139.20');
   await page.keyboard.press('F2');
-
+  await expect(panel).toContainText('Precio cambiado: $116.00 → $139.20');
+  await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByRole('status').filter({ hasText: 'Precio de Martillo' })).toContainText('$116.00 → $139.20');
-  // The line that was already on the sale keeps its price, and a new one gets the new price.
-  await expect(total(page)).toHaveText('$116.00');
+  // The keyboard comes back to the lookup box a moment after the dialog closes, and F12 typed before that is lost.
   await expect(lookupBox(page)).toBeFocused();
-  await page.keyboard.press('Delete');
-  await expect(total(page)).toHaveText('$0.00');
-  await page.keyboard.type(HAMMER_CODE);
-  await page.keyboard.press('Enter');
-  await expect(total(page)).toHaveText('$139.20');
 
+  // The line that was already on the sale keeps the price it showed.
+  await page.keyboard.press('F12');
+  await expect(page.getByRole('dialog', { name: 'Cobrar' })).toBeVisible();
+  await expect(page.getByRole('status', { name: 'Total a cobrar' })).toHaveText('$116.00');
+
+  expect(await readRows(register, databasePath, 'SELECT total_cents FROM sale')).toEqual([{ total_cents: 11_600 }]);
   expect(await readRows(register, databasePath, "SELECT unit_price_e4 FROM product WHERE name LIKE 'Martillo%'")).toEqual([{ unit_price_e4: 1_392_000 }]);
   expect(await readRows(register, databasePath, "SELECT action, detail FROM audit_log WHERE action = 'product.price_change'")).toEqual([
     { action: 'product.price_change', detail: expect.stringContaining('$116.00 to $139.20') },
   ]);
   expect(await readRows(register, databasePath, "SELECT type FROM sync_outbox WHERE type = 'product.price_changed'")).toEqual([{ type: 'product.price_changed' }]);
-});
-
-test('charges a sale rung up before the price changed with the prices it showed (ADR 0047)', async ({ userDataDir, launch }) => {
-  const register = await launch();
-  const page = await signInWindow(register);
-  const { databasePath } = testSalePaths(userDataDir);
-
-  await page.keyboard.type(HAMMER_CODE);
-  await page.keyboard.press('Enter');
-  await expect(total(page)).toHaveText('$116.00');
-  await page.keyboard.press('F7');
-  await page.getByRole('textbox', { name: 'Precio nuevo (IVA incluido)' }).fill('139.20');
-  await page.keyboard.press('F2');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  // The keyboard comes back to the lookup box a moment after the dialog closes, and F12 typed before that is lost.
-  await expect(lookupBox(page)).toBeFocused();
-
-  await page.keyboard.press('F12');
-  await expect(page.getByRole('dialog', { name: 'Cobrar' })).toBeVisible();
-  await expect(page.getByRole('status', { name: 'Total a cobrar' })).toHaveText('$116.00');
-  expect(await readRows(register, databasePath, 'SELECT total_cents FROM sale')).toEqual([{ total_cents: 11_600 }]);
 });

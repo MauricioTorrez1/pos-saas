@@ -5,6 +5,7 @@ import type { UserSummary } from '../shared/auth';
 import type { AuthState, PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
+import { comboLabel, DEFAULT_KEYMAP, type KeyAction, type Keymap, type ToolsApi } from '../shared/register-tools';
 import type { PurchasingApi } from '../shared/supplier-order';
 import { applyAppearance } from './appearance/apply-appearance';
 import { AppearanceDialog } from './appearance/AppearanceDialog';
@@ -19,28 +20,32 @@ import { PendingSaleDialog } from './recovery/PendingSaleDialog';
 import { usePendingSales } from './recovery/use-pending-sales';
 import { SupplierOrderDialog } from './purchasing/SupplierOrderDialog';
 import { SaleScreen } from './sale/SaleScreen';
+import { SalesHistoryDialog } from './tools/SalesHistoryDialog';
+import { SettingsDialog } from './tools/SettingsDialog';
 
 type AppInfoState = { status: 'loading' } | { status: 'ready'; version: string } | { status: 'failed' };
 
 const UNNAMED_REGISTER = 'Caja';
 
-const SHORTCUTS: readonly { readonly keys: string; readonly action: string }[] = [
+/** The keys that never change, because the scanner and the hands of the cashier count on them. */
+const FIXED_SHORTCUTS: readonly { readonly keys: string; readonly action: string }[] = [
   { keys: 'Enter', action: 'Agregar' },
   { keys: '↑ ↓', action: 'Moverse' },
   { keys: '+ −', action: 'Cantidad' },
   { keys: 'Supr', action: 'Quitar' },
   { keys: 'Esc', action: 'Limpiar' },
-  { keys: 'F12', action: 'Cobrar' },
-  { keys: 'F2', action: 'Varios' },
-  { keys: 'F3', action: 'Caja' },
-  { keys: 'F4', action: 'Devolución' },
-  { keys: 'F7', action: 'Precio' },
-  { keys: 'F5', action: 'Producto nuevo' },
-  { keys: 'F10', action: 'Producto' },
-  { keys: 'F11', action: 'Resumen' },
-  { keys: 'Mayús F11', action: 'Pedido' },
-  { keys: 'F8', action: 'Reimprimir' },
-  { keys: 'F6', action: 'Salir' },
+];
+
+/** The actions the footer reminds of, with the name it shows for each. The rest have a button in the header. */
+const FOOTER_ACTIONS: readonly { readonly action: KeyAction; readonly label: string }[] = [
+  { action: 'checkout', label: 'Cobrar' },
+  { action: 'misc', label: 'Varios' },
+  { action: 'linePrice', label: 'Precio' },
+  { action: 'cancelSale', label: 'Cancelar venta' },
+  { action: 'newProduct', label: 'Producto nuevo' },
+  { action: 'productPanel', label: 'Producto' },
+  { action: 'supplierOrder', label: 'Pedido' },
+  { action: 'reprint', label: 'Reimprimir' },
 ];
 
 interface AppProps {
@@ -53,6 +58,8 @@ interface AppProps {
   readonly dashboardApi?: DashboardApi;
   /** Orders to suppliers (E1-44). Without it, the register offers no purchase order. */
   readonly purchasingApi?: PurchasingApi;
+  /** The keys, the ticket, the printer and the list of sales. Without it, the register keeps its keys and offers no settings. */
+  readonly toolsApi?: ToolsApi;
 }
 
 /**
@@ -64,9 +71,10 @@ interface AppProps {
  * @param props.productApi bridge for adding products, when the register offers it
  * @param props.dashboardApi bridge for the summary of the business, when the register offers it
  * @param props.purchasingApi bridge for the orders to suppliers, when the register offers it
+ * @param props.toolsApi bridge for the settings and the list of sales, when the register offers them
  * @returns the screen
  */
-export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingApi }: AppProps): ReactElement {
+export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi }: AppProps): ReactElement {
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [authState, setAuthState] = useState<AuthState | null>(null);
   const [authFailed, setAuthFailed] = useState(false);
@@ -110,6 +118,7 @@ export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingAp
       {...(productApi === undefined ? {} : { productApi })}
       {...(dashboardApi === undefined ? {} : { dashboardApi })}
       {...(purchasingApi === undefined ? {} : { purchasingApi })}
+      {...(toolsApi === undefined ? {} : { toolsApi })}
       user={authState.current}
       appearance={appearance}
       onAppearanceSaved={setAppearance}
@@ -124,13 +133,14 @@ interface RegisterScreenProps {
   readonly productApi?: ProductAdminApi;
   readonly dashboardApi?: DashboardApi;
   readonly purchasingApi?: PurchasingApi;
+  readonly toolsApi?: ToolsApi;
   readonly user: UserSummary;
   readonly appearance: Appearance;
   readonly onAppearanceSaved: (appearance: Appearance) => void;
   readonly onSignOut: () => void;
 }
 
-function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
+function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
   const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
   const [cash, setCash] = useState<CashStatus | null>(null);
@@ -140,6 +150,9 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
   const [isViewingDashboard, setIsViewingDashboard] = useState(false);
   // Where the orders to suppliers were opened from, so closing them goes back there.
   const [ordering, setOrdering] = useState<'sale' | 'admin' | null>(null);
+  const [keymap, setKeymap] = useState<Keymap>(DEFAULT_KEYMAP);
+  const [isEditingSettings, setIsEditingSettings] = useState(false);
+  const [isViewingSales, setIsViewingSales] = useState(false);
   const pendingSales = usePendingSales(posApi);
   const hasPendingSales = pendingSales.sales.length > 0;
   const isOwner = user.role === 'owner';
@@ -150,6 +163,11 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
       () => setAppInfo({ status: 'failed' }),
     );
   }, [posApi]);
+
+  useEffect(() => {
+    // Selling matters more than the keys, so a keymap that cannot be read leaves the ones the register was born with.
+    toolsApi?.getKeymap().then(setKeymap, () => undefined);
+  }, [toolsApi]);
 
   const refreshCash = useCallback(() => {
     posApi.getCashStatus().then(setCash, () => setCash(null));
@@ -189,6 +207,11 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
     setIsAdministering(ordering === 'admin' && isOwner);
     setOrdering(null);
   }, [ordering, isOwner]);
+  const openSettings = useCallback(() => setIsEditingSettings(isOwner && toolsApi !== undefined), [isOwner, toolsApi]);
+  const closeSettings = useCallback(() => setIsEditingSettings(false), []);
+  const openSales = useCallback(() => setIsViewingSales(toolsApi !== undefined), [toolsApi]);
+  const closeSales = useCallback(() => setIsViewingSales(false), []);
+  const key = (action: KeyAction): string => comboLabel(keymap[action]);
   const openReturns = useCallback(() => setIsReturning(true), []);
   const closeReturns = useCallback(() => setIsReturning(false), []);
 
@@ -215,39 +238,49 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
         {/* Out of the tab order: the keys are the keyboard route, and Tab must not pull a scan out of the lookup box. */}
         {isOwner && (
           <button type="button" className="header-button" tabIndex={-1} onClick={openAdmin}>
-            Administración <kbd>F1</kbd>
+            Administración <kbd>{key('admin')}</kbd>
           </button>
         )}
         {isOwner && (
           <button type="button" className="header-button" tabIndex={-1} onClick={openAppearance}>
-            Apariencia <kbd>F9</kbd>
+            Apariencia <kbd>{key('appearance')}</kbd>
           </button>
         )}
         {dashboardApi !== undefined && (
           <button type="button" className="header-button" tabIndex={-1} onClick={openDashboard}>
-            Resumen <kbd>F11</kbd>
+            Resumen <kbd>{key('dashboard')}</kbd>
+          </button>
+        )}
+        {isOwner && toolsApi !== undefined && (
+          <button type="button" className="header-button" tabIndex={-1} onClick={openSettings}>
+            Ajustes <kbd>{key('settings')}</kbd>
+          </button>
+        )}
+        {toolsApi !== undefined && (
+          <button type="button" className="header-button" tabIndex={-1} onClick={openSales}>
+            Ventas <kbd>{key('salesHistory')}</kbd>
           </button>
         )}
         <button type="button" className="header-button" tabIndex={-1} onClick={openReturns}>
-          Devolución <kbd>F4</kbd>
+          Devolución <kbd>{key('returns')}</kbd>
         </button>
         <button type="button" className="header-button" tabIndex={-1} onClick={openCash}>
-          Caja <kbd>F3</kbd>
+          Caja <kbd>{key('cash')}</kbd>
         </button>
         <button type="button" className="header-button" tabIndex={-1} onClick={onSignOut}>
-          Salir <kbd>F6</kbd>
+          Salir <kbd>{key('signOut')}</kbd>
         </button>
       </header>
       {cash?.shouldWithdraw === true && (
         <p className="notice register-banner" role="status">
-          Hay mucho efectivo en el cajón. Haz un retiro parcial cuando puedas (F3). Puedes seguir vendiendo.
+          Hay mucho efectivo en el cajón. Haz un retiro parcial cuando puedas ({key('cash')}). Puedes seguir vendiendo.
         </p>
       )}
       <SaleScreen
         posApi={posApi}
         {...(pricingApi === undefined ? {} : { pricingApi })}
         {...(productApi === undefined ? {} : { productApi })}
-        isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering || isViewingDashboard || ordering !== null}
+        isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering || isViewingDashboard || ordering !== null || isEditingSettings || isViewingSales}
         isOwner={isOwner}
         onOpenAppearance={openAppearance}
         onSignOut={onSignOut}
@@ -257,12 +290,19 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
         {...(dashboardApi === undefined ? {} : { onOpenDashboard: openDashboard })}
         {...(purchasingApi === undefined ? {} : { onOpenSupplierOrder: openOrders })}
         onCashChanged={refreshCash}
+        keymap={keymap}
+        {...(toolsApi === undefined ? {} : { toolsApi, onOpenSettings: openSettings, onOpenSalesHistory: openSales })}
       />
       <footer className="register-footer">
         <ul className="shortcuts" aria-label="Atajos de teclado">
-          {SHORTCUTS.map(({ keys, action }) => (
+          {FIXED_SHORTCUTS.map(({ keys, action }) => (
             <li key={action}>
               <kbd>{keys}</kbd> {action}
+            </li>
+          ))}
+          {FOOTER_ACTIONS.map(({ action, label }) => (
+            <li key={action}>
+              <kbd>{key(action)}</kbd> {label}
             </li>
           ))}
         </ul>
@@ -283,6 +323,12 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
       )}
       {isViewingDashboard && !hasPendingSales && dashboardApi !== undefined && <DashboardDialog api={dashboardApi} user={user} onClose={closeDashboard} />}
       {ordering !== null && !hasPendingSales && purchasingApi !== undefined && <SupplierOrderDialog api={purchasingApi} isOwner={isOwner} onClose={closeOrders} />}
+      {isEditingSettings && !hasPendingSales && toolsApi !== undefined && (
+        <SettingsDialog toolsApi={toolsApi} keymap={keymap} onKeymapSaved={setKeymap} onClose={closeSettings} />
+      )}
+      {isViewingSales && !hasPendingSales && toolsApi !== undefined && (
+        <SalesHistoryDialog posApi={posApi} toolsApi={toolsApi} isOwner={isOwner} onCancelled={refreshCash} onClose={closeSales} />
+      )}
       {isReturning && !hasPendingSales && <ReturnDialog posApi={posApi} user={user} onReturned={refreshCash} onClose={closeReturns} />}
       {isEditingCash && !hasPendingSales && cash !== null && (
         <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} onClose={closeCash} />

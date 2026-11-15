@@ -1,3 +1,4 @@
+import { IMPORT_COLUMN_GUIDE } from '../../shared/import-guide';
 import { formatCents } from '@pos-saas/money';
 import { useEffect, useState, type ReactElement } from 'react';
 
@@ -19,7 +20,8 @@ type View =
   | { readonly kind: 'passphrase'; readonly purpose: 'configure' | 'restore' }
   | { readonly kind: 'imported'; readonly report: ImportReportView }
   | { readonly kind: 'inventory' }
-  | { readonly kind: 'report' };
+  | { readonly kind: 'report' }
+  | { readonly kind: 'import-guide' };
 
 interface AdminDialogProps {
   readonly posApi: PosApi;
@@ -106,7 +108,7 @@ export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, o
           F2: () => setView({ kind: 'inventory' }),
           F3: checkLedger,
           F4: () => setView({ kind: 'report' }),
-          F5: importCatalog,
+          F5: () => setView({ kind: 'import-guide' }),
           F6: () => setView({ kind: 'passphrase', purpose: 'configure' }),
           F7: backupNow,
           F8: () => setView({ kind: 'passphrase', purpose: 'restore' }),
@@ -116,13 +118,53 @@ export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, o
         }
       : view.kind === 'imported'
         ? { Enter: () => setView({ kind: 'summary' }), Escape: () => setView({ kind: 'summary' }) }
+        : view.kind === 'import-guide'
+          ? { Enter: importCatalog, Escape: () => setView({ kind: 'summary' }) }
         : {},
     isBusy,
   );
 
   return (
     <ModalDialog titleId="admin-title" className="cash">
-      {view.kind === 'inventory' ? (
+      {view.kind === 'import-guide' ? (
+        <>
+          <h2 id="admin-title">Cargar productos desde un archivo</h2>
+          <p className="notice notice-info" role="note">
+            Sirve un archivo de Excel (.xlsx) o un CSV exportado de Eleventa o de otro punto de venta. La <strong>primera fila</strong> debe llevar los títulos de las columnas, escritos así (no importan
+            mayúsculas ni acentos):
+          </p>
+          <div className="scroll-area">
+            <table className="dashboard-table" aria-label="Columnas del archivo de productos">
+              <thead>
+                <tr>
+                  <th scope="col">Título de la columna</th>
+                  <th scope="col">¿Obligatoria?</th>
+                  <th scope="col">Qué lleva</th>
+                </tr>
+              </thead>
+              <tbody>
+                {IMPORT_COLUMN_GUIDE.map((column) => (
+                  <tr key={column.title}>
+                    <th scope="row">{column.title}</th>
+                    <td>{column.required ? 'Sí' : 'Opcional'}</td>
+                    <td>{column.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p>Los productos que ya existen (mismo código) no se duplican. Las filas con errores se listan al final para corregirlas.</p>
+          <Message text={message} />
+          <div className="payment-actions">
+            <button type="button" className="button" tabIndex={-1} disabled={isBusy} onClick={() => setView({ kind: 'summary' })}>
+              Volver <kbd>Esc</kbd>
+            </button>
+            <button type="button" className="button button-primary" tabIndex={-1} disabled={isBusy} onClick={importCatalog}>
+              Elegir el archivo <kbd>Enter</kbd>
+            </button>
+          </div>
+        </>
+      ) : view.kind === 'inventory' ? (
         <InventoryView posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} {...(productApi === undefined ? {} : { productApi })} {...(onOpenSupplierOrder === undefined ? {} : { onOpenSupplierOrder })} onBack={() => setView({ kind: 'summary' })} />
       ) : view.kind === 'report' ? (
         <ReportView posApi={posApi} onBack={() => setView({ kind: 'summary' })} />
@@ -168,7 +210,7 @@ export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, o
               </li>
             )}
             <li>
-              <kbd>F5</kbd> Cargar el catálogo y las existencias de Eleventa
+              <kbd>F5</kbd> Cargar el catálogo y las existencias (Excel o CSV)
             </li>
             <li>
               <kbd>F6</kbd> Configurar los respaldos (carpeta y contraseña)

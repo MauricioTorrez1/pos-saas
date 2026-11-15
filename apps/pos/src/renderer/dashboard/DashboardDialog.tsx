@@ -252,7 +252,7 @@ export function DashboardDialog({ api, user, onClose }: DashboardDialogProps): R
       )}
       {isAskingPin && (
         <div className="dashboard-pin">
-          <Field label="PIN del dueño" type="password" value={pinText} onChange={setPinText} autoFocus maxLength={8} onEnter={submitPin} hint="Enter para entrar. Esc para cancelar." />
+          <Field label="PIN del dueño" numeric="integer" type="password" value={pinText} onChange={setPinText} autoFocus maxLength={8} onEnter={submitPin} hint="Enter para entrar. Esc para cancelar." />
         </div>
       )}
       <div role="tablist" aria-label="Secciones" className="tabs">

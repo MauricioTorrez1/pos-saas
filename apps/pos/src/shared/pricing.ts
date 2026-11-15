@@ -61,6 +61,35 @@ export interface PricingApi {
   changePrice(request: ChangePriceRequest): Promise<ChangePriceResult>;
 }
 
+/**
+ * Takes the VAT out of a cost.
+ *
+ * @param costWithTaxE6 the cost with VAT, in millionths of a peso
+ * @param taxRate the VAT of the product
+ * @returns the cost without VAT, in millionths of a peso, rounded half up
+ */
+export function costWithoutTaxE6(costWithTaxE6: number, taxRate: TaxRate): number {
+  if (taxRate.factor === 'exempt' || taxRate.rateBp === 0) {
+    return costWithTaxE6;
+  }
+  const divisor = 10_000n + BigInt(taxRate.rateBp);
+  return Number((BigInt(costWithTaxE6) * 10_000n * 2n + divisor) / (divisor * 2n));
+}
+
+/**
+ * Adds the VAT to a cost.
+ *
+ * @param costE6 the cost without VAT, in millionths of a peso
+ * @param taxRate the VAT of the product
+ * @returns the cost with VAT, in millionths of a peso, rounded half up
+ */
+export function costWithTaxE6(costE6: number, taxRate: TaxRate): number {
+  if (taxRate.factor === 'exempt' || taxRate.rateBp === 0) {
+    return costE6;
+  }
+  return Number((BigInt(costE6) * (10_000n + BigInt(taxRate.rateBp)) * 2n + 10_000n) / 20_000n);
+}
+
 const BP_PER_UNIT = 10_000n;
 const E4_TO_E6 = 100n;
 
