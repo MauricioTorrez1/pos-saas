@@ -1,5 +1,6 @@
 import { MAX_MISC_NAME_LENGTH } from '../../shared/miscellaneous';
 import type { PaymentRequest, PendingSaleRequest } from '../../shared/pos-api';
+import { MAX_UNIT_PRICE_E4 } from '../../shared/pricing';
 
 /** More lines than any ticket at the counter, so a broken screen cannot make one request hold the main process. */
 export const MAX_SALE_LINES = 500;
@@ -35,6 +36,14 @@ function requireRecord(value: unknown, description: string): Record<string, unkn
   return value as Record<string, unknown>;
 }
 
+function requireSalePrice(value: unknown): number {
+  const price = requirePositiveInteger(value, 'a price for this sale in ten-thousandths');
+  if (price > MAX_UNIT_PRICE_E4) {
+    throw new TypeError('Expected a price for this sale of at most one million pesos');
+  }
+  return price;
+}
+
 function parseLine(value: unknown): PendingSaleRequest['lines'][number] {
   const line = requireRecord(value, 'a sale line');
   if (line.miscellaneous !== undefined) {
@@ -51,6 +60,7 @@ function parseLine(value: unknown): PendingSaleRequest['lines'][number] {
     productId: requireMatch(line.productId, UUID_V7_TEXT, 'the UUIDv7 of a product'),
     quantityMilli: requirePositiveInteger(line.quantityMilli, 'a quantity in thousandths'),
     ...(line.unitPriceE4 === undefined ? {} : { unitPriceE4: requirePositiveInteger(line.unitPriceE4, 'a unit price in ten-thousandths') }),
+    ...(line.saleUnitPriceE4 === undefined ? {} : { saleUnitPriceE4: requireSalePrice(line.saleUnitPriceE4) }),
   };
 }
 

@@ -1,5 +1,6 @@
 import { formatCents } from '@pos-saas/money';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
+import { keepNumeric } from '../ui/numeric';
 
 import { planPayments, type PaymentPlan, type PaymentTender } from '../../shared/payment-plan';
 import { describePlan, readTypedCents } from './amount-input';
@@ -146,7 +147,7 @@ export function PaymentForm({ totalCents, isBusy, onSubmit, onBack, submitLabel,
           autoComplete="off"
           spellCheck={false}
           value={cashText}
-          onChange={(event) => setCashText(event.target.value)}
+          onChange={(event) => setCashText(keepNumeric(event.target.value, 'decimal'))}
           onKeyDown={moveOnEnter(transferRef.current)}
         />
         <kbd>F5</kbd>
@@ -162,7 +163,7 @@ export function PaymentForm({ totalCents, isBusy, onSubmit, onBack, submitLabel,
           autoComplete="off"
           spellCheck={false}
           value={transferText}
-          onChange={(event) => setTransferText(event.target.value)}
+          onChange={(event) => setTransferText(keepNumeric(event.target.value, 'decimal'))}
           onKeyDown={moveOnEnter(referenceRef.current)}
         />
         <kbd>F6</kbd>
@@ -192,7 +193,7 @@ export function PaymentForm({ totalCents, isBusy, onSubmit, onBack, submitLabel,
           autoComplete="off"
           spellCheck={false}
           value={cardText}
-          onChange={(event) => setCardText(event.target.value)}
+          onChange={(event) => setCardText(keepNumeric(event.target.value, 'decimal'))}
           onKeyDown={moveOnEnter(folioRef.current)}
         />
         <kbd>F7</kbd>

@@ -1,5 +1,6 @@
 import { formatCents, formatUnitPriceE4 } from '@pos-saas/money';
 import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type ReactElement } from 'react';
+import { keepNumeric } from '../ui/numeric';
 
 import type { CatalogProduct } from '../../shared/pos-api';
 import { formatQuantity, unitLabel } from './format';
@@ -81,7 +82,7 @@ export function QuantityDialog({ product, onConfirm, onCancel }: QuantityDialogP
             autoComplete="off"
             spellCheck={false}
             value={text}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => setText(event.target.value)}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => setText(keepNumeric(event.target.value, 'decimal'))}
           />
         </label>
       )}

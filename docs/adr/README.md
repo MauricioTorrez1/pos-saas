@@ -63,3 +63,5 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0058](0058-panel-de-modificacion-de-productos.md) | Panel de modificación de productos: borrado lógico, revisión optimista, unidad bloqueada con movimientos y precio e inventario por sus servicios | Aceptada |
 | [0060](0060-tablero-de-indicadores-y-mas-vendidos.md) | Tablero «Resumen del negocio» en la caja: periodos en America/Mexico_City, costo promedio, permisos por turno, gráficas SVG y exportación sin librerías | Aceptada |
 | [0059](0059-pedido-al-proveedor-en-la-caja.md) | Pedido al proveedor en la caja: documento local sin movimiento de inventario, borrador y enviado inmutable, códigos del proveedor, Excel con `exceljs` y PDF con la impresión de Electron | Aceptada |
+| [0061](0061-rediseno-de-la-caja-y-herramientas-del-dueno.md) | Rediseño de la caja y herramientas del dueño | Aceptada |
+| [0062](0062-importacion-de-catalogo-y-cambio-masivo-de-precios.md) | Importación de catálogo y cambio masivo de precios en el núcleo | Aceptada |

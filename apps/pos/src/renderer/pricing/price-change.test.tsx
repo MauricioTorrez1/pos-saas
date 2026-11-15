@@ -7,6 +7,7 @@ import type { CashStatus } from '../../shared/cash-api';
 import type { CatalogProduct, PosApi } from '../../shared/pos-api';
 import type { ChangePriceResult, PriceInfo, PricingApi } from '../../shared/pricing';
 import { App } from '../App';
+import { PriceChangeDialog } from './PriceChangeDialog';
 import { readNewPrice } from './price-input';
 
 const HAMMER: CatalogProduct = { id: 'hammer', name: 'Martillo', unit: 'piece', unitPriceE4: 1_160_000, taxRate: { factor: 'rate', rateBp: 1600 } };
@@ -80,8 +81,21 @@ async function addHammer(): Promise<void> {
   await waitFor(() => expect(screen.getByRole('status', { name: 'Total' }).textContent).not.toBe('$0.00'));
 }
 
-async function openPriceDialog(): Promise<HTMLInputElement> {
-  fireEvent.keyDown(lookupBox(), { key: 'F7' });
+const changed = vi.fn<(product: CatalogProduct, previousUnitPriceE4: number) => void>();
+const cancelled = vi.fn<() => void>();
+
+/**
+ * Opens the dialog that changes the price of the catalog, the way the panel of a product opens it. Since ADR 0061 the
+ * sale screen no longer opens it: F7 there changes the price of one line for that sale only.
+ */
+async function renderDialog(posApi: PosApi, pricingApi: PricingApi, initialProduct: CatalogProduct | null = HAMMER): Promise<void> {
+  const { current } = await posApi.getAuthState();
+  changed.mockReset();
+  cancelled.mockReset().mockImplementation(cleanup);
+  render(<PriceChangeDialog posApi={posApi} pricingApi={pricingApi} isOwner={current?.role === 'owner'} initialProduct={initialProduct} onChanged={changed} onCancel={cancelled} />);
+}
+
+function priceBox(): Promise<HTMLInputElement> {
   return screen.findByRole<HTMLInputElement>('textbox', { name: 'Precio nuevo (IVA incluido)', hidden: true });
 }
 
@@ -122,12 +136,11 @@ describe('reading the price that was typed', () => {
   });
 });
 
-describe('changing the price from the sale screen (E1-39)', () => {
-  it('opens with F7 on the product of the selected line, and shows the price, the margin and the new margin', async () => {
-    await renderApp(posApiWith(OWNER), pricingWith());
-    await addHammer();
+describe('changing the price of the catalog (E1-39)', () => {
+  it('opens on a product, and shows the price, the margin and the new margin', async () => {
+    await renderDialog(posApiWith(OWNER), pricingWith());
 
-    const box = await openPriceDialog();
+    const box = await priceBox();
     typePrice(box, '139.20');
 
     expect(await screen.findByText(/Precio actual:/, { selector: 'p', exact: false })).toBeDefined();
@@ -138,17 +151,15 @@ describe('changing the price from the sale screen (E1-39)', () => {
   });
 
   it('warns when the new price is below the cost, and says there is no margin without a cost', async () => {
-    await renderApp(posApiWith(OWNER), pricingWith({ getPriceInfo: () => Promise.resolve({ product: HAMMER, lastCostE6: 150_000_000 }) }));
-    await addHammer();
+    await renderDialog(posApiWith(OWNER), pricingWith({ getPriceInfo: () => Promise.resolve({ product: HAMMER, lastCostE6: 150_000_000 }) }));
 
-    typePrice(await openPriceDialog(), '100');
+    typePrice(await priceBox(), '100');
 
     expect(document.body.textContent).toContain('Ojo: queda por debajo del costo.');
     cleanup();
 
-    await renderApp(posApiWith(OWNER), pricingWith({ getPriceInfo: () => Promise.resolve({ product: HAMMER, lastCostE6: null }) }));
-    await addHammer();
-    typePrice(await openPriceDialog(), '100');
+    await renderDialog(posApiWith(OWNER), pricingWith({ getPriceInfo: () => Promise.resolve({ product: HAMMER, lastCostE6: null }) }));
+    typePrice(await priceBox(), '100');
 
     expect(document.body.textContent).toContain('Sin costo registrado: no se puede calcular el margen.');
   });
@@ -157,23 +168,21 @@ describe('changing the price from the sale screen (E1-39)', () => {
     const changePrice = vi.fn<PricingApi['changePrice']>(() =>
       Promise.resolve({ status: 'changed', product: { ...HAMMER, unitPriceE4: 1_392_000 }, previousUnitPriceE4: HAMMER.unitPriceE4 }),
     );
-    await renderApp(posApiWith(OWNER), pricingWith({ changePrice }));
-    await addHammer();
+    await renderDialog(posApiWith(OWNER), pricingWith({ changePrice }));
 
-    const box = await openPriceDialog();
+    const box = await priceBox();
     expect(screen.queryByLabelText('PIN del dueño')).toBeNull();
     typePrice(box, '139.20');
     pressF2();
 
     await waitFor(() => expect(changePrice).toHaveBeenCalledExactlyOnceWith({ productId: 'hammer', previousUnitPriceE4: 1_160_000, newUnitPriceE4: 1_392_000 }));
-    expect(await screen.findByText(/Precio de Martillo: \$116\.00 → \$139\.20/)).toBeDefined();
+    await waitFor(() => expect(changed).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ unitPriceE4: 1_392_000 }), 1_160_000));
   });
 
   it('refuses a price of zero, a negative one, and one with too many decimals before asking the main process', async () => {
     const changePrice = vi.fn<PricingApi['changePrice']>();
-    await renderApp(posApiWith(OWNER), pricingWith({ changePrice }));
-    await addHammer();
-    const box = await openPriceDialog();
+    await renderDialog(posApiWith(OWNER), pricingWith({ changePrice }));
+    const box = await priceBox();
 
     for (const [text, message] of [
       ['0', 'mayor que cero'],
@@ -189,10 +198,9 @@ describe('changing the price from the sale screen (E1-39)', () => {
 
   it('makes a cashier type the PIN of the owner, and shows a wrong one without closing', async () => {
     const changePrice = vi.fn<PricingApi['changePrice']>((): Promise<ChangePriceResult> => Promise.resolve({ status: 'wrong_pin', attemptsLeft: 4 }));
-    await renderApp(posApiWith(CASHIER), pricingWith({ changePrice }));
-    await addHammer();
+    await renderDialog(posApiWith(CASHIER), pricingWith({ changePrice }));
 
-    const box = await openPriceDialog();
+    const box = await priceBox();
     typePrice(box, '139.20');
     pressF2();
     expect((await screen.findByRole('alert', { hidden: true })).textContent).toContain('Pídele al dueño que escriba su PIN.');
@@ -208,13 +216,13 @@ describe('changing the price from the sale screen (E1-39)', () => {
 
   it('closes with Esc and changes nothing', async () => {
     const changePrice = vi.fn<PricingApi['changePrice']>();
-    await renderApp(posApiWith(OWNER), pricingWith({ changePrice }));
-    await addHammer();
-    await openPriceDialog();
+    await renderDialog(posApiWith(OWNER), pricingWith({ changePrice }));
+    await priceBox();
 
     fireEvent.keyDown(document.body, { key: 'Escape' });
 
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Cambiar precio', hidden: true })).toBeNull());
+    await waitFor(() => expect(cancelled).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('dialog', { name: 'Cambiar precio', hidden: true })).toBeNull();
     expect(changePrice).not.toHaveBeenCalled();
   });
 
@@ -222,9 +230,8 @@ describe('changing the price from the sale screen (E1-39)', () => {
     const changePrice = vi.fn<PricingApi['changePrice']>(() =>
       Promise.resolve({ status: 'changed', product: { ...HAMMER, unitPriceE4: 1_392_000 }, previousUnitPriceE4: HAMMER.unitPriceE4 }),
     );
-    await renderApp(posApiWith(OWNER), pricingWith({ changePrice }));
+    await renderDialog(posApiWith(OWNER), pricingWith({ changePrice }), null);
 
-    fireEvent.keyDown(lookupBox(), { key: 'F7' });
     const search = await screen.findByRole('textbox', { name: 'Producto', hidden: true });
     fireEvent.change(search, { target: { value: 'mart' } });
     fireEvent.submit(search.closest('form')!);
@@ -236,27 +243,34 @@ describe('changing the price from the sale screen (E1-39)', () => {
 });
 
 describe('the sale in progress and the next one (ADR 0047)', () => {
-  it('keeps the total of the lines already added when the price changes meanwhile', async () => {
-    const repriced: CatalogProduct = { ...HAMMER, unitPriceE4: 1_392_000 };
-    let current = HAMMER;
-    await renderApp(
-      posApiWith(OWNER, { findProductByCode: (code) => Promise.resolve(code === HAMMER_CODE ? current : null) }),
-      pricingWith({
-        changePrice: () => {
-          current = repriced;
-          return Promise.resolve({ status: 'changed', product: repriced, previousUnitPriceE4: HAMMER.unitPriceE4 });
-        },
-      }),
-    );
+  it('charges one line at another price for this sale only with F7, and leaves the catalog alone (ADR 0061)', async () => {
+    const savePendingSale = vi.fn<PosApi['savePendingSale']>(() => Promise.resolve({ status: 'no_cash_session' }));
+    const changePrice = vi.fn<PricingApi['changePrice']>();
+    await renderApp(posApiWith(OWNER, { savePendingSale }), pricingWith({ changePrice }));
     await addHammer();
     expect(screen.getByRole('status', { name: 'Total' }).textContent).toBe('$116.00');
 
-    typePrice(await openPriceDialog(), '139.20');
-    pressF2();
-    await screen.findByText(/Precio de Martillo/);
+    fireEvent.keyDown(lookupBox(), { key: 'F7' });
+    const box = await screen.findByRole<HTMLInputElement>('textbox', { name: 'Precio para esta venta (IVA incluido)', hidden: true });
+    typePrice(box, '100abc');
+    expect(box.value).toBe('100');
+    fireEvent.keyDown(box, { key: 'Enter' });
 
-    // The line on the screen is the old one.
-    expect(screen.getByRole('status', { name: 'Total' }).textContent).toBe('$116.00');
+    await waitFor(() => expect(screen.getByRole('status', { name: 'Total' }).textContent).toBe('$100.00'));
+    expect(document.body.textContent).toContain('solo en esta venta');
+    expect(changePrice).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(lookupBox(), { key: 'F12' });
+    await waitFor(() => expect(savePendingSale).toHaveBeenCalledTimes(1));
+    expect(savePendingSale.mock.calls[0]![0].lines).toEqual([{ productId: 'hammer', quantityMilli: 1000, saleUnitPriceE4: 1_000_000 }]);
+  });
+
+  it('asks which line when F7 is pressed with no product on the sale', async () => {
+    await renderApp(posApiWith(OWNER), pricingWith());
+
+    fireEvent.keyDown(lookupBox(), { key: 'F7' });
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Elige primero un producto de la venta');
   });
 
   it('offers the sale again with the prices it shows when the catalog says it changed, and only once', async () => {

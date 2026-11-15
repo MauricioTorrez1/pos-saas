@@ -1,5 +1,6 @@
 import { formatCents, parseQuantity } from '@pos-saas/money';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { keepNumeric } from '../ui/numeric';
 
 import {
   formatFolio,
@@ -526,8 +527,8 @@ export function OrderEditor({ api, isOwner, suppliers, orderId, onManageSupplier
           <p>
             <strong>Mínimo de {lines.find(({ key }) => key === level.lineKey)?.description}.</strong> Cuando la existencia baje de ahí, la caja lo sugiere en un pedido.
           </p>
-          <Field label="Mínimo" value={level.minimum} onChange={(minimum) => setLevel({ ...level, minimum })} autoFocus maxLength={12} />
-          <Field label="Pedir hasta (opcional)" value={level.maximum} onChange={(maximum) => setLevel({ ...level, maximum })} maxLength={12} onEnter={saveLevel} hint="Sin esto, se sugiere llegar al doble del mínimo." />
+          <Field label="Mínimo" numeric="decimal" value={level.minimum} onChange={(minimum) => setLevel({ ...level, minimum })} autoFocus maxLength={12} />
+          <Field label="Pedir hasta (opcional)" numeric="decimal" value={level.maximum} onChange={(maximum) => setLevel({ ...level, maximum })} maxLength={12} onEnter={saveLevel} hint="Sin esto, se sugiere llegar al doble del mínimo." />
           <div className="payment-actions">
             <button type="button" className="button" tabIndex={-1} onClick={() => setLevel(null)}>
               Cancelar
@@ -546,7 +547,7 @@ export function OrderEditor({ api, isOwner, suppliers, orderId, onManageSupplier
         <span>Notas para el proveedor (opcional)</span>
         <input aria-label="Notas del pedido" value={notes} maxLength={NOTES_LIMIT} disabled={isSent} onChange={(event) => { touched(); setNotes(event.target.value); }} />
       </label>
-      {!isOwner && <Field label="PIN del dueño" value={pin} onChange={setPin} type="password" maxLength={8} />}
+      {!isOwner && <Field label="PIN del dueño" numeric="integer" value={pin} onChange={setPin} type="password" maxLength={8} />}
       {confirming === 'send' && (
         <p className="notice" role="alert">
           ¿Marcar como enviado? Ya no se podrá cambiar, y queda en el historial. Oprime F4 otra vez para confirmar, o Esc para cancelar.
@@ -662,7 +663,7 @@ function LineRow({ line, isReadOnly, showProblems, isBusy, onChange, onRemove, o
               autoComplete="off"
               maxLength={12}
               value={line.quantityText}
-              onChange={(event) => onChange({ quantityText: event.target.value })}
+              onChange={(event) => onChange({ quantityText: keepNumeric(event.target.value, 'decimal') })}
             />{' '}
             {unitLabel(line.unit)}
             {quantityProblem !== undefined && <small className="payment-field-problem">{quantityProblem}</small>}
@@ -687,7 +688,7 @@ function LineRow({ line, isReadOnly, showProblems, isBusy, onChange, onRemove, o
               maxLength={16}
               placeholder="Sin costo"
               value={line.costText}
-              onChange={(event) => onChange({ costText: event.target.value })}
+              onChange={(event) => onChange({ costText: keepNumeric(event.target.value, 'decimal') })}
             />
             {costProblem !== undefined && <small className="payment-field-problem">{costProblem}</small>}
           </>

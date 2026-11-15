@@ -65,9 +65,9 @@ export function MiscItemDialog({ isOwner, onAdd, onCancel }: MiscItemDialogProps
       <h2 id="misc-title">Artículo varios</h2>
       <p>Para algo que no está en el catálogo. El precio lleva el IVA incluido, y queda anotado quién lo aprobó.</p>
       <Field label="Qué es" value={name} onChange={setName} autoFocus maxLength={MAX_MISC_NAME_LENGTH} />
-      <Field label="Precio de cada uno" value={price} onChange={setPrice} maxLength={12} hint="En pesos, por ejemplo 12.50" />
-      <Field label="Cantidad" value={quantity} onChange={setQuantity} maxLength={6} />
-      {!isOwner && <Field label="PIN del dueño" value={pin} onChange={setPin} type="password" maxLength={8} />}
+      <Field label="Precio de cada uno" numeric="decimal" value={price} onChange={setPrice} maxLength={12} hint="En pesos, por ejemplo 12.50" />
+      <Field label="Cantidad" numeric="decimal" value={quantity} onChange={setQuantity} maxLength={6} />
+      {!isOwner && <Field label="PIN del dueño" numeric="integer" value={pin} onChange={setPin} type="password" maxLength={8} />}
       <Message text={message} />
       <div className="payment-actions">
         <button type="button" className="button" tabIndex={-1} onClick={onCancel}>

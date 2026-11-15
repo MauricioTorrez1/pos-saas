@@ -525,3 +525,13 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 [electron-builder]: https://www.electron.build/
 [Runbook]: https://sre.google/workbook/canarying-releases/
 [Postmortem]: https://sre.google/sre-book/postmortem-culture/
+
+### E1-48 · Rediseño de la caja y herramientas del dueño
+- **Objetivo:** la caja se ve actual y clara, y el dueño ajusta lo que antes pedía un programador: teclas, ticket e impresora; la cajera cobra un precio distinto solo en esa venta y cancela ventas sin perder rastro.
+- **Conceptos:** [Tokens de diseño], [Atajos configurables], [Formato .xlsx], [ESC/POS]
+- **Claude / tú:** Claude reescribe la hoja de estilos y escribe los ajustes, el historial de ventas, el precio por venta, el lector de Excel y el formulario de costo y margen. Tú pruebas la impresora, el lector y un Excel real de Eleventa en la tienda.
+- **Pruebas:** Vitest para atajos, diseño del ticket, lector de Excel, columnas de importación, precio por venta con bitácora, cancelaciones y casillas numéricas; Playwright para el precio por venta, el precio del catálogo desde el panel y la guía de importación.
+- **Criterios:** ADR 0061; sin dependencias nuevas; sin migración local; el ticket por defecto sale igual que antes; ninguna casilla de dinero acepta letras.
+- **Depende de:** E1-39, E1-42, E1-43, E1-45 · **Estimación:** 10 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Cómo dejas que el usuario cambie atajos sin romper el lector de códigos? (2) ¿Por qué un precio por venta se audita en lugar de prohibirse?

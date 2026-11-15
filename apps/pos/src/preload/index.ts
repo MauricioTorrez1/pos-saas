@@ -4,6 +4,7 @@ import { DASHBOARD_CHANNELS, type DashboardApi } from '../shared/dashboard-api';
 import { IPC_CHANNELS, type PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
+import { TOOLS_CHANNELS, type ToolsApi } from '../shared/register-tools';
 import { PURCHASING_CHANNELS, type PurchasingApi } from '../shared/supplier-order';
 
 const posApi: PosApi & PricingApi & ProductAdminApi & DashboardApi = {
@@ -67,5 +68,20 @@ const purchasingApi: PurchasingApi = {
   revealFile: (path) => ipcRenderer.invoke(PURCHASING_CHANNELS.revealFile, path),
 };
 
+/** The keys, the ticket, the printer and the list of sales. A bridge of their own, like the purchase orders. */
+const toolsApi: ToolsApi = {
+  getKeymap: () => ipcRenderer.invoke(TOOLS_CHANNELS.getKeymap),
+  saveKeymap: (keymap) => ipcRenderer.invoke(TOOLS_CHANNELS.saveKeymap, keymap),
+  getTicketDesign: () => ipcRenderer.invoke(TOOLS_CHANNELS.getTicketDesign),
+  saveTicketDesign: (design) => ipcRenderer.invoke(TOOLS_CHANNELS.saveTicketDesign, design),
+  previewTicket: (design) => ipcRenderer.invoke(TOOLS_CHANNELS.previewTicket, design),
+  getPrinter: () => ipcRenderer.invoke(TOOLS_CHANNELS.getPrinter),
+  savePrinter: (share) => ipcRenderer.invoke(TOOLS_CHANNELS.savePrinter, share),
+  testPrint: () => ipcRenderer.invoke(TOOLS_CHANNELS.testPrint),
+  listRecentSales: (text) => ipcRenderer.invoke(TOOLS_CHANNELS.listRecentSales, text),
+  recordSaleCancelled: (request) => ipcRenderer.invoke(TOOLS_CHANNELS.recordSaleCancelled, request),
+};
+
 contextBridge.exposeInMainWorld('pos', posApi);
+contextBridge.exposeInMainWorld('tools', toolsApi);
 contextBridge.exposeInMainWorld('purchasing', purchasingApi);

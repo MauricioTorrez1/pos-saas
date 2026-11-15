@@ -1,5 +1,6 @@
 import { formatCents, formatUnitPriceE4, type Quantity, type TaxGroup, type TaxRate } from '@pos-saas/money';
 
+import { DEFAULT_TICKET_DESIGN, type TicketDesign } from '../../../shared/register-tools';
 import type { SalePayment } from '../sale-recorder';
 import { EscPosBuilder } from './escpos';
 
@@ -60,67 +61,125 @@ export function formatFolio(folioNumber: number): string {
   return `${PROVISIONAL_REGISTER_CODE}-${String(folioNumber).padStart(FOLIO_DIGITS, '0')}`;
 }
 
+/** One printed line of a ticket, with how the printer sets it. */
+export interface TicketPart {
+  readonly text: string;
+  readonly align: 'left' | 'center';
+  readonly bold: boolean;
+  /** Double width and height. A big line holds half the characters. */
+  readonly big: boolean;
+}
+
 /**
- * Lays the ticket out as lines of text that fit the paper, before they become bytes.
+ * Lays out a ticket as the lines the printer prints, with the design of the owner (ADR 0061).
  *
- * @param ticket what the ticket shows
- * @returns the lines. The first one is the name of the business, and none passes `TICKET_COLUMNS` characters.
+ * @param ticket what was sold and how it was paid
+ * @param design how the ticket looks
+ * @returns every line in order, from the name of the business to the foot
  */
-export function layoutTicket(ticket: TicketData): string[] {
-  const lines: string[] = [fit(ticket.businessName, TICKET_COLUMNS), `Folio ${ticket.folio}`, MOMENT_FORMAT.format(new Date(ticket.completedAt))];
+export function composeTicket(ticket: TicketData, design: TicketDesign = DEFAULT_TICKET_DESIGN): TicketPart[] {
+  const width = design.columns;
+  const centered = (text: string, bold = false): TicketPart => ({ text: fit(text, width), align: 'center', bold, big: false });
+  const left = (text: string): TicketPart => ({ text, align: 'left', bold: false, big: false });
+  const parts: TicketPart[] = [centered(ticket.businessName, true)];
+  design.headerLines.filter((line) => line.trim() !== '').forEach((line) => parts.push(centered(line)));
+  parts.push(centered(`Folio ${ticket.folio}`), centered(MOMENT_FORMAT.format(new Date(ticket.completedAt))));
   if (ticket.isReprint) {
-    lines.push('REIMPRESIÓN');
+    parts.push(centered('REIMPRESIÓN'));
   }
-  lines.push(rule());
+  parts.push(left(rule(width)));
   for (const line of ticket.lines) {
-    lines.push(twoColumns(line.name, formatCents(line.totalCents)));
-    lines.push(`  ${formatQuantity(line.quantity)} x ${formatUnitPriceE4(line.unitPriceE4)}`);
+    if (design.showUnitPrice) {
+      parts.push(left(twoColumns(line.name, formatCents(line.totalCents), width)));
+      parts.push(left(`  ${formatQuantity(line.quantity)} x ${formatUnitPriceE4(line.unitPriceE4)}`));
+    } else {
+      parts.push(left(twoColumns(`${formatQuantity(line.quantity)} ${line.name}`, formatCents(line.totalCents), width)));
+    }
   }
-  lines.push(rule(), twoColumns('Subtotal', formatCents(ticket.subtotalCents)));
-  for (const group of ticket.taxGroups) {
-    lines.push(twoColumns(taxLabel(group.taxRate), group.taxRate.factor === 'exempt' ? 'Sin IVA' : formatCents(group.taxCents)));
+  parts.push(left(rule(width)));
+  if (design.showTaxBreakdown) {
+    parts.push(left(twoColumns('Subtotal', formatCents(ticket.subtotalCents), width)));
+    for (const group of ticket.taxGroups) {
+      parts.push(left(twoColumns(taxLabel(group.taxRate), group.taxRate.factor === 'exempt' ? 'Sin IVA' : formatCents(group.taxCents), width)));
+    }
   }
-  lines.push(twoColumns('TOTAL', formatCents(ticket.totalCents)), rule());
+  parts.push(
+    design.bigTotal
+      ? { text: twoColumns('TOTAL', formatCents(ticket.totalCents), Math.floor(width / 2)), align: 'left', bold: true, big: true }
+      : left(twoColumns('TOTAL', formatCents(ticket.totalCents), width)),
+    left(rule(width)),
+  );
   for (const payment of ticket.payments) {
-    lines.push(twoColumns(paymentLabel(payment), formatCents(payment.amountCents)));
+    parts.push(left(twoColumns(paymentLabel(payment), formatCents(payment.amountCents), width)));
   }
   if (ticket.changeCents !== null && ticket.changeCents > 0) {
-    lines.push(twoColumns('Cambio', formatCents(ticket.changeCents)));
+    parts.push(left(twoColumns('Cambio', formatCents(ticket.changeCents), width)));
   }
-  return lines;
+  design.footerLines.filter((line) => line.trim() !== '').forEach((line) => parts.push(centered(line)));
+  return parts;
 }
 
 /**
- * Builds the bytes the printer understands for a ticket. The same sale always gives the same bytes.
+ * Lays out the body of a ticket as plain text, without the foot. Kept for what reads a ticket as text.
  *
- * @param ticket what the ticket shows
- * @returns the ESC/POS job: it resets the printer, prints the ticket, and cuts the paper
+ * @param ticket what was sold and how it was paid
+ * @param design how the ticket looks
+ * @returns the lines from the name of the business to the change
  */
-export function renderTicket(ticket: TicketData): Uint8Array {
-  const [name, ...rest] = layoutTicket(ticket);
-  const builder = new EscPosBuilder().initialize().align('center').bold(true).line(name!).bold(false);
-  const headerLines = ticket.isReprint ? 3 : 2;
-  rest.slice(0, headerLines).forEach((line) => builder.line(line));
-  builder.align('left');
-  rest.slice(headerLines).forEach((line) => builder.line(line));
-  return builder.align('center').line('Gracias por su compra').feed(FEED_BEFORE_CUT).cut().toBytes();
+export function layoutTicket(ticket: TicketData, design: TicketDesign = DEFAULT_TICKET_DESIGN): string[] {
+  const footers = design.footerLines.filter((line) => line.trim() !== '').length;
+  const parts = composeTicket(ticket, design);
+  return parts.slice(0, parts.length - footers).map((part) => part.text);
 }
 
-function rule(): string {
-  return '-'.repeat(TICKET_COLUMNS);
+/**
+ * Turns a ticket into the bytes the printer understands (ESC/POS).
+ *
+ * @param ticket what was sold and how it was paid
+ * @param design how the ticket looks; without it, the ticket is the plain one
+ * @returns one print job with as many tickets as the design asks for, each one cut
+ */
+export function renderTicket(ticket: TicketData, design: TicketDesign = DEFAULT_TICKET_DESIGN): Uint8Array {
+  const builder = new EscPosBuilder().initialize();
+  for (let copy = 0; copy < design.copies; copy += 1) {
+    let align: TicketPart['align'] | null = null;
+    for (const part of composeTicket(ticket, design)) {
+      if (part.align !== align) {
+        builder.align(part.align);
+        align = part.align;
+      }
+      if (part.big) {
+        builder.doubleSize(true);
+      }
+      if (part.bold) {
+        builder.bold(true);
+      }
+      builder.line(part.text);
+      if (part.bold) {
+        builder.bold(false);
+      }
+      if (part.big) {
+        builder.doubleSize(false);
+      }
+    }
+    builder.feed(FEED_BEFORE_CUT).cut();
+  }
+  return builder.toBytes();
 }
 
-/** Cuts a text that does not fit, so a long product name never pushes its amount to the next line. */
+function rule(width: number): string {
+  return '-'.repeat(width);
+}
+
 function fit(text: string, width: number): string {
   const characters = [...text];
   return characters.length <= width ? text : characters.slice(0, width).join('');
 }
 
-/** Puts the text at the left and the amount at the right edge of the paper. */
-function twoColumns(left: string, right: string): string {
-  const room = Math.max(TICKET_COLUMNS - [...right].length - 1, 0);
+function twoColumns(left: string, right: string, width: number): string {
+  const room = Math.max(width - [...right].length - 1, 0);
   const shown = fit(left, room);
-  return `${shown}${' '.repeat(TICKET_COLUMNS - [...shown].length - [...right].length)}${right}`;
+  return `${shown}${' '.repeat(Math.max(width - [...shown].length - [...right].length, 1))}${right}`;
 }
 
 function formatQuantity({ milli, unit }: Quantity): string {

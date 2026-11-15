@@ -1,5 +1,6 @@
 import { formatCents, formatUnitPriceE4 } from '@pos-saas/money';
 import { useMemo, useState, type ReactElement } from 'react';
+import { keepNumeric } from '../ui/numeric';
 
 import type { UserSummary } from '../../shared/auth';
 import type { PosApi } from '../../shared/pos-api';
@@ -192,7 +193,7 @@ function SelectView({ posApi, user, sale, onBack, onReturned }: SelectViewProps)
                   spellCheck={false}
                   disabled={line.returnableMilli === 0}
                   value={quantities[line.saleLineId] ?? ''}
-                  onChange={(event) => setQuantities((current) => ({ ...current, [line.saleLineId]: event.target.value }))}
+                  onChange={(event) => setQuantities((current) => ({ ...current, [line.saleLineId]: keepNumeric(event.target.value, 'decimal') }))}
                 />
               </td>
             </tr>
@@ -200,7 +201,7 @@ function SelectView({ posApi, user, sale, onBack, onReturned }: SelectViewProps)
         </tbody>
       </table>
       <Field label="Motivo de la devolución" value={reason} onChange={setReason} maxLength={200} autoFocus />
-      {needsPin && <Field label="PIN del dueño" value={pin} onChange={(value) => setPin(value.replace(/\D/g, ''))} type="password" maxLength={8} hint="El dueño autoriza cada devolución" />}
+      {needsPin && <Field label="PIN del dueño" numeric="integer" value={pin} onChange={(value) => setPin(value.replace(/\D/g, ''))} type="password" maxLength={8} hint="El dueño autoriza cada devolución" />}
       {sale.violations.length > 0 && (
         <label className="return-override">
           <input type="checkbox" checked={override} onChange={(event) => setOverride(event.target.checked)} /> El dueño autoriza esta excepción

@@ -127,6 +127,18 @@ Money is kept in whole cents and costs in millionths of a peso, with no floating
 | Who | The owner. A cashier sees everything and types the PIN of an owner to save, send, discard, export or set a minimum. Every refusal is written in the audit log |
 | One transaction | Each change, its audit entry and, when it travels, its operation in `sync_outbox` (`supplier.upserted`, `supplier_product.upserted`, `purchase_order.sent`) are written together or not at all. Drafts and minimums do not travel. The core receives them in F2-11 and F2-12 |
 
+## Settings, sales list and price for one sale
+Since [ADR 0061](../../docs/adr/0061-rediseno-de-la-caja-y-herramientas-del-dueno.md) the register has three more things on the sale screen. The keys below are the defaults; the owner changes them in the settings.
+
+| Key | What it does |
+| --- | --- |
+| `F7` | Charges the selected line at another price **for this sale only**. The catalog keeps its price, the line is marked, and the audit log gets `sale.price_override`. The base price changes from the product panel (`F10`, then `F8`) |
+| `Shift+Delete` | Drops the sale being rung up, after asking. Nothing was charged, so only an audit entry is left |
+| `Shift+F4` | Opens **Ventas**, the completed sales. A past sale is cancelled there as a return of everything that is left, with a reason and the approval of the owner |
+| `Shift+F9` | Opens **Ajustes** (owner only): shortcuts, ticket design with a live sample, and the ticket printer with a test print |
+
+Boxes for amounts, quantities and PINs take digits and one decimal point only (`keepNumeric`). The settings live in `register_setting`, so there is no migration. The catalog import reads `.xlsx` as well as CSV with a reader of its own (`main/import/xlsx-reader.ts`), and shows how to title the columns before the file is chosen.
+
 ## Sale states and recovery
 A sale is saved as `pending_payment` before anything is charged, so a power cut can never leave money without a record ([ADR 0010](../../docs/adr/0010-guardar-antes-de-cobrar.md)). From there it can only become `completed` or `cancelled`, and each change is one transaction. `src/main/checkout/sale-state-machine.ts` gives a clear error, and triggers in the database refuse the same changes if the code ever gets it wrong ([ADR 0025](../../docs/adr/0025-maquina-de-estados-de-la-venta.md)).
 

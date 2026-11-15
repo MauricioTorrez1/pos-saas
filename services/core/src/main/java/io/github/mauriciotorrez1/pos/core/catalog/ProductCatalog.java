@@ -321,6 +321,34 @@ public class ProductCatalog {
                 + " AND (p.sat_product_key IS NULL OR p.sat_unit_key IS NULL)", List.of(), page, size);
     }
 
+    /** A live product with a price, as a bulk price change sees it. */
+    public record PricedProduct(UUID id, String name, long unitPriceE4) {
+    }
+
+    /**
+     * Lists the live products that have a price and whose name contains some words, ordered by name. It is what a
+     * bulk price change works on (RF-006).
+     *
+     * @param text  words that the name contains (ignoring case and accents); {@code null} or blank for every product
+     * @param limit the most products to return
+     * @return the products, at most {@code limit}
+     */
+    @Transactional(readOnly = true)
+    public List<PricedProduct> pricedMatching(String text, int limit) {
+        String term = text == null ? "" : text.strip();
+        List<Object> arguments = new ArrayList<>();
+        String where = "p.tenant_id = current_tenant_id() AND p.deleted_at IS NULL AND p.unit_price_e4 > 0";
+        if (!term.isEmpty()) {
+            where += " AND p.search_text LIKE '%' || catalog_search_key(?) || '%' ESCAPE '\\'";
+            arguments.add(escapeLike(term));
+        }
+        arguments.add(limit);
+        return jdbc.query("SELECT p.id, p.name, p.unit_price_e4 FROM product p WHERE " + where
+                + " ORDER BY p.search_text, p.id LIMIT ?",
+                (rs, n) -> new PricedProduct(rs.getObject(1, UUID.class), rs.getString(2), rs.getLong(3)),
+                arguments.toArray());
+    }
+
     private ProductPage pageOf(String where, List<Object> filters, int page, int size) {
         Long total = jdbc.queryForObject("SELECT count(*) FROM product p WHERE " + where, Long.class, filters.toArray());
         List<Object> pageArguments = new ArrayList<>(filters);

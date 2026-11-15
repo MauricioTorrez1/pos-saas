@@ -1,5 +1,7 @@
 import { MoneyError, parseQuantity, parseUnitPriceE4, taxRateOf, type TaxRate, type Unit } from '@pos-saas/money';
 
+import { costWithoutTaxE6 } from '../../shared/pricing';
+
 /** One product of the file, ready to load. */
 export interface CatalogRow {
   /** Line of the file, counting the header as line 1. */
@@ -35,10 +37,11 @@ const DEFAULT_TAX_RATE_BP = 1600;
 
 /** The names a column can have in the files of Eleventa, without accents or capitals. */
 const COLUMN_ALIASES = {
-  code: ['codigo', 'codigo de barras', 'clave', 'sku', 'barcode', 'codigo barras'],
-  name: ['descripcion', 'producto', 'nombre', 'articulo', 'descripcion del producto'],
+  code: ['codigo', 'codigo del producto', 'codigo de producto', 'codigo de barras', 'clave', 'sku', 'barcode', 'codigo barras'],
+  name: ['descripcion', 'producto', 'nombre', 'nombre del producto', 'articulo', 'descripcion del producto'],
   price: ['precio venta', 'precio de venta', 'precio publico', 'precio 1', 'precio'],
-  cost: ['precio costo', 'costo', 'precio de costo'],
+  costWithoutTax: ['costo sin iva', 'precio costo', 'costo', 'precio de costo', 'costo neto'],
+  costWithTax: ['costo con iva', 'costo c/iva', 'costo iva incluido', 'costo con impuesto'],
   stock: ['existencia', 'existencias', 'inventario', 'cantidad', 'stock'],
   unit: ['unidad', 'tipo de venta', 'unidad de medida', 'u/m'],
   tax: ['iva', 'impuesto', 'tasa de iva'],
@@ -107,7 +110,16 @@ export function parseCsv(text: string): string[][] {
  * @returns the products and the rows that were left out, or why the file cannot be understood
  */
 export function parseEleventaCatalog(text: string): CatalogReading {
-  const table = parseCsv(text);
+  return parseCatalogTable(parseCsv(text));
+}
+
+/**
+ * Reads a table of products, whatever file it came from. The first row holds the titles.
+ *
+ * @param table the rows of the file, each one a list of cells as text
+ * @returns the rows that can be loaded and the ones that cannot, or why the file cannot be read at all
+ */
+export function parseCatalogTable(table: readonly (readonly string[])[]): CatalogReading {
   const header = table[0];
   if (header === undefined) {
     return { status: 'unreadable', message: 'El archivo está vacío.' };
@@ -120,8 +132,11 @@ export function parseEleventaCatalog(text: string): CatalogReading {
   ) as Record<keyof typeof COLUMN_ALIASES, number>;
   const missing = (['code', 'name', 'price'] as const).filter((key) => columns[key] === -1);
   if (missing.length > 0) {
-    const names = { code: 'el código', name: 'la descripción', price: 'el precio de venta' };
-    return { status: 'unreadable', message: `No se encontró ${missing.map((key) => names[key]).join(', ')} en la primera fila del archivo.` };
+    const names = { code: 'el código del producto', name: 'el nombre del producto', price: 'el precio de venta' };
+    return {
+      status: 'unreadable',
+      message: `No se encontró ${missing.map((key) => names[key]).join(', ')} en la primera fila del archivo. Escribe los títulos así: Código del producto, Nombre del producto, Precio de venta, Costo con IVA, Costo sin IVA, Existencias.`,
+    };
   }
 
   const rows: CatalogRow[] = [];
@@ -158,7 +173,8 @@ function readRow(fields: readonly string[], columns: Record<keyof typeof COLUMN_
   }
   try {
     const price = readMoney(cell('price'));
-    const cost = cell('cost') === '' ? undefined : readMoney(cell('cost'));
+    const taxRate = readTax(cell('tax'));
+    const cost = readCost(cell('costWithoutTax'), cell('costWithTax'), taxRate);
     const stock = cell('stock') === '' ? undefined : readStock(cell('stock'), unit);
     return {
       line,
@@ -166,9 +182,9 @@ function readRow(fields: readonly string[], columns: Record<keyof typeof COLUMN_
       name,
       unit,
       unitPriceE4: price,
-      ...(cost === undefined ? {} : { unitCostE6: cost * COST_E4_TO_E6 }),
+      ...(cost === undefined ? {} : { unitCostE6: cost }),
       ...(stock === undefined ? {} : { stockMilli: stock }),
-      taxRate: readTax(cell('tax')),
+      taxRate,
     };
   } catch (error) {
     if (error instanceof MoneyError) {
@@ -180,6 +196,20 @@ function readRow(fields: readonly string[], columns: Record<keyof typeof COLUMN_
 
 function readMoney(text: string): number {
   return parseUnitPriceE4(text.replace(/[\s$,]/g, ''));
+}
+
+/**
+ * The cost of a unit without VAT, in millionths of a peso. A cost without VAT is used as it comes. A cost with VAT is
+ * divided by one plus the rate, in whole numbers, rounded half up.
+ */
+function readCost(withoutTax: string, withTax: string, taxRate: TaxRate): number | undefined {
+  if (withoutTax !== '') {
+    return readMoney(withoutTax) * COST_E4_TO_E6;
+  }
+  if (withTax === '') {
+    return undefined;
+  }
+  return costWithoutTaxE6(readMoney(withTax) * COST_E4_TO_E6, taxRate);
 }
 
 function readStock(text: string, unit: Unit): number {

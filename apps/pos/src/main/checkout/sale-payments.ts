@@ -6,6 +6,7 @@ import type { SaleStore } from '../local-store/sale-store';
 import { SaleNotFoundError } from '../local-store/sale-store';
 import type { SaleCheckout } from './sale-checkout';
 import type { SalePayment, SaleToSave } from './sale-recorder';
+import { DEFAULT_TICKET_DESIGN, type TicketDesign } from '../../shared/register-tools';
 import { renderTicket, formatFolio } from './ticket/ticket';
 import { toTicketData } from './ticket/ticket-data';
 
@@ -16,6 +17,8 @@ export interface ReprintDependencies {
   readonly printer: PrinterProvider;
   /** The name printed at the top of the ticket. */
   readonly businessName: () => string;
+  /** How the ticket looks. Without it, the reprint is the plain ticket. */
+  readonly ticketDesign?: () => TicketDesign;
 }
 
 /**
@@ -100,7 +103,8 @@ export class SalePayments {
       isReprint: true,
     });
     try {
-      await this.#reprint.printer.print(renderTicket(ticket));
+      // A reprint is one ticket, however many copies a sale prints.
+      await this.#reprint.printer.print(renderTicket(ticket, { ...(this.#reprint.ticketDesign?.() ?? DEFAULT_TICKET_DESIGN), copies: 1 }));
     } catch (error) {
       return { status: 'printer_failed', folio, message: error instanceof DeviceError ? error.message : String(error) };
     }

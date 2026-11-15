@@ -107,7 +107,7 @@ function SummaryView({ posApi, user, status, onStatusChange, onClose, onGo }: Su
       <>
         <h2 id="cash-title">Abrir la caja</h2>
         <p>La caja está cerrada y no se puede cobrar. Cuenta el efectivo que dejas en el cajón para empezar.</p>
-        <Field label="Fondo de caja" value={floatText} onChange={setFloatText} autoFocus hint="Puede ser 0" />
+        <Field label="Fondo de caja" numeric="decimal" value={floatText} onChange={setFloatText} autoFocus hint="Puede ser 0" />
         <Message text={message} />
         <div className="payment-actions">
           <button type="button" className="button" tabIndex={-1} onClick={onClose}>
@@ -220,9 +220,9 @@ function MovementView({ posApi, user, movement, onStatusChange, onBack }: Moveme
   return (
     <>
       <h2 id="cash-title">{movement === 'in' ? 'Entrada de efectivo' : 'Salida de efectivo'}</h2>
-      <Field label="Monto" value={amountText} onChange={setAmountText} autoFocus />
+      <Field label="Monto" numeric="decimal" value={amountText} onChange={setAmountText} autoFocus />
       <Field label="Motivo" value={reason} onChange={setReason} maxLength={200} hint={movement === 'out' ? 'Por ejemplo: pago a proveedor' : 'Por ejemplo: cambio del dueño'} />
-      {needsOwner && <Field label="PIN del dueño" value={pin} onChange={(value) => setPin(value.replace(/\D/g, ''))} type="password" maxLength={8} hint="Un cajero necesita al dueño para sacar efectivo" />}
+      {needsOwner && <Field label="PIN del dueño" numeric="integer" value={pin} onChange={(value) => setPin(value.replace(/\D/g, ''))} type="password" maxLength={8} hint="Un cajero necesita al dueño para sacar efectivo" />}
       <Message text={message} />
       <div className="payment-actions">
         <button type="button" className="button" tabIndex={-1} onClick={onBack}>
@@ -323,7 +323,7 @@ function CloseView({ posApi, onStatusChange, onBack, onCut }: CloseViewProps): R
       </div>
       <p className="payment-folio">Efectivo contado: {countedCash === null ? '—' : formatCents(countedCash)}</p>
       <Field label="Total de vouchers de tarjeta" value={cardText} onChange={setCardText} />
-      <Field label="Total de transferencias recibidas" value={transferText} onChange={setTransferText} />
+      <Field label="Total de transferencias recibidas" numeric="decimal" value={transferText} onChange={setTransferText} />
       {comparison !== null && <Differences comparison={comparison} />}
       <Field label="Motivo de la diferencia" value={reason} onChange={setReason} maxLength={200} hint="Solo si no cuadra" />
       <Message text={message} />
@@ -425,7 +425,7 @@ function LimitView({ posApi, current, onStatusChange, onBack }: LimitViewProps):
     <>
       <h2 id="cash-title">Aviso de retiro</h2>
       <p>La caja avisa cuando el efectivo del cajón pasa de {formatCents(current)}. Avisa, pero nunca frena una venta.</p>
-      <Field label="Nuevo límite" value={text} onChange={setText} autoFocus />
+      <Field label="Nuevo límite" numeric="decimal" value={text} onChange={setText} autoFocus />
       <Message text={message} />
       <div className="payment-actions">
         <button type="button" className="button" tabIndex={-1} onClick={onBack}>

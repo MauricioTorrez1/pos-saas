@@ -70,13 +70,15 @@ export class PendingSales {
     if ('status' in authorization) {
       return authorization;
     }
-    const sale = this.#price(request);
+    const overrides: PriceOverride[] = [];
+    const sale = this.#price(request, overrides);
     if (sale === null) {
       return { status: 'catalog_changed' };
     }
     // The entries come first: if saving fails, the log says a price was typed and approved, and a sale that was saved
     // always has its entries, even when the screen asks again with the same key (ADR 0033).
     this.#recordMiscItems(sale, authorization.authorizedBy);
+    this.#recordPriceOverrides(sale, overrides);
     this.#sales.savePendingPayment({ ...sale, ...context });
     return { status: 'saved', sale: this.#sales.findPendingByIdempotencyKey(request.idempotencyKey)! };
   }
@@ -136,7 +138,24 @@ export class PendingSales {
     }
   }
 
-  #price(request: PendingSaleRequest): SaleToSave | null {
+  /** Leaves in the audit log every line charged at a price that is not the one of the catalog, with who did it. */
+  #recordPriceOverrides(sale: SaleToSave, overrides: readonly PriceOverride[]): void {
+    const user = this.#misc?.auth.currentUser();
+    if (this.#misc === null || user === null || user === undefined) {
+      return;
+    }
+    for (const override of overrides) {
+      this.#misc.audit.record({
+        userId: user.id,
+        action: 'sale.price_override',
+        entity: 'sale',
+        entityId: sale.saleId,
+        detail: `${override.productName} (${override.productId}): catalog ${override.catalogPriceE4}, charged ${override.salePriceE4} ten-thousandths, for this sale only`,
+      });
+    }
+  }
+
+  #price(request: PendingSaleRequest, overrides: PriceOverride[] = []): SaleToSave | null {
     const lines: SaleLineToSave[] = [];
     for (const requested of request.lines) {
       if ('miscellaneous' in requested) {
@@ -148,9 +167,13 @@ export class PendingSales {
       if (product === null) {
         return null;
       }
-      const unitPriceE4 = this.#honoredPrice(productId, product.unitPriceE4, requested.unitPriceE4);
-      if (unitPriceE4 === null) {
+      const honored = requested.saleUnitPriceE4 ?? this.#honoredPrice(productId, product.unitPriceE4, requested.unitPriceE4);
+      if (honored === null) {
         return null;
+      }
+      const unitPriceE4 = honored;
+      if (requested.saleUnitPriceE4 !== undefined && requested.saleUnitPriceE4 !== product.unitPriceE4) {
+        overrides.push({ productId, productName: product.name, catalogPriceE4: product.unitPriceE4, salePriceE4: requested.saleUnitPriceE4 });
       }
       const quantity = quantityOf(quantityMilli, product.unit);
       lines.push({
@@ -195,6 +218,13 @@ export class PendingSales {
 }
 
 /** What selling a miscellaneous item needs besides the catalog: who is signed in, who can approve, and where it is written down. */
+interface PriceOverride {
+  readonly productId: string;
+  readonly productName: string;
+  readonly catalogPriceE4: number;
+  readonly salePriceE4: number;
+}
+
 export interface MiscSupport {
   readonly auth: Pick<AuthService, 'currentUser' | 'authorizeWithOwnerPin'>;
   readonly audit: Pick<AuditLog, 'record'>;

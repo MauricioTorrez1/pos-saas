@@ -4,7 +4,8 @@ import { useState, type ReactElement } from 'react';
 import { problemWithBarcode } from '../../shared/product-admin';
 import { formatTaxLabel } from '../sale/format';
 import { CheckField, Field, SelectField } from '../ui/form-parts';
-import { offeredTaxRates, taxKeyOf, type ProductFormProblems, type ProductFormValues } from './product-form';
+import { CostAndMargin } from './CostAndMargin';
+import { offeredTaxRates, taxKeyOf, taxRateOfKey, type ProductFormProblems, type ProductFormValues } from './product-form';
 
 const UNIT_NAMES: Readonly<Record<Unit, string>> = {
   piece: 'Pieza',
@@ -41,6 +42,8 @@ interface ProductFieldsProps {
   readonly currentTaxRate?: TaxRate;
   /** The label of the box that says whether the product is sold. */
   readonly activeLabel?: string;
+  /** The price the product has now, as text in pesos, to show what it earns when the price is not edited here. */
+  readonly currentPrice?: string;
 }
 
 /**
@@ -64,6 +67,7 @@ export function ProductFields({
   unitLockedReason,
   currentTaxRate,
   activeLabel = 'A la venta',
+  currentPrice,
 }: ProductFieldsProps): ReactElement {
   const [codeText, setCodeText] = useState('');
   const [codeProblem, setCodeProblem] = useState<string | undefined>(undefined);
@@ -113,12 +117,15 @@ export function ProductFields({
           options={offeredTaxRates(currentTaxRate).map((rate) => ({ value: taxKeyOf(rate), label: formatTaxLabel(rate) }))}
         />
       </div>
-      <div className="product-form-row">
-        {showPrice && (
-          <Field label="Precio (IVA incluido)" value={values.price} onChange={(price) => onChange({ price })} maxLength={14} hint="En pesos, por ejemplo 135.50" problem={problems.price} />
-        )}
-        <Field label="Costo (opcional)" value={values.cost} onChange={(cost) => onChange({ cost })} maxLength={16} hint="Lo que te cuesta cada unidad, sin IVA." problem={problems.cost} />
-      </div>
+      <CostAndMargin
+        cost={values.cost}
+        price={showPrice ? values.price : (currentPrice ?? '')}
+        taxRate={taxRateOfKey(values.taxKey)}
+        onCostChange={(cost) => onChange({ cost })}
+        {...(showPrice ? { onPriceChange: (price: string) => onChange({ price }) } : {})}
+        costProblem={problems.cost}
+        priceProblem={problems.price}
+      />
       <Field
         label="Código de barras"
         value={codeText}
@@ -144,7 +151,7 @@ export function ProductFields({
         </ul>
       )}
       {showStock && (
-        <Field label="Existencia inicial (opcional)" value={values.stock} onChange={(stock) => onChange({ stock })} maxLength={12} hint={`Lo que hay en el estante ahora. ${STOCK_HINTS[values.unit]}`} problem={problems.stock} />
+        <Field label="Existencia inicial (opcional)" numeric="decimal" value={values.stock} onChange={(stock) => onChange({ stock })} maxLength={12} hint={`Lo que hay en el estante ahora. ${STOCK_HINTS[values.unit]}`} problem={problems.stock} />
       )}
       <CheckField label={activeLabel} checked={values.isActive} onChange={(isActive) => onChange({ isActive })} />
     </div>

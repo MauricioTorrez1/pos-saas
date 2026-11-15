@@ -304,7 +304,8 @@ describe('adding a product from the sale screen (E1-42)', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Dar de alta/ }));
     await screen.findByRole('heading', { name: 'Producto nuevo', hidden: true });
     type('Precio (IVA incluido)', '89.50');
-    type('Costo (opcional)', '52.25');
+    // 60.61 with the 16 % of VAT is 52.25 without it, which is what the register keeps.
+    type('Costo con IVA (opcional)', '60.61');
     type('Existencia inicial (opcional)', '12');
     pressF2();
 

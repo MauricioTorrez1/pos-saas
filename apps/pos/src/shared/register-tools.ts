@@ -1,0 +1,312 @@
+/**
+ * What the owner tunes at the register besides its colors: the keys of each action, how the ticket looks, and the
+ * printer it goes to. It also carries the list of recent sales, which is where a past sale is cancelled from.
+ */
+
+/** Every action of the sale screen that answers to a key. The order is the order of the settings screen. */
+export const KEY_ACTIONS = [
+  'checkout',
+  'misc',
+  'linePrice',
+  'cancelSale',
+  'newProduct',
+  'productPanel',
+  'cash',
+  'returns',
+  'salesHistory',
+  'reprint',
+  'dashboard',
+  'supplierOrder',
+  'admin',
+  'appearance',
+  'settings',
+  'signOut',
+] as const;
+
+export type KeyAction = (typeof KEY_ACTIONS)[number];
+
+/** The keys of the register, by action. A key is written as it is shown: `F12`, `Shift+F11`, `Ctrl+P`. */
+export type Keymap = Readonly<Record<KeyAction, string>>;
+
+export const KEY_ACTION_LABELS: Readonly<Record<KeyAction, string>> = {
+  checkout: 'Cobrar',
+  misc: 'Varios',
+  linePrice: 'Precio en esta venta',
+  cancelSale: 'Cancelar venta',
+  newProduct: 'Producto nuevo',
+  productPanel: 'Producto',
+  cash: 'Caja',
+  returns: 'Devolución',
+  salesHistory: 'Ventas',
+  reprint: 'Reimprimir',
+  dashboard: 'Resumen',
+  supplierOrder: 'Pedido',
+  admin: 'Administración',
+  appearance: 'Apariencia',
+  settings: 'Ajustes',
+  signOut: 'Salir',
+};
+
+export const DEFAULT_KEYMAP: Keymap = {
+  checkout: 'F12',
+  misc: 'F2',
+  linePrice: 'F7',
+  cancelSale: 'Shift+Delete',
+  newProduct: 'F5',
+  productPanel: 'F10',
+  cash: 'F3',
+  returns: 'F4',
+  salesHistory: 'Shift+F4',
+  reprint: 'F8',
+  dashboard: 'F11',
+  supplierOrder: 'Shift+F11',
+  admin: 'F1',
+  appearance: 'F9',
+  settings: 'Shift+F9',
+  signOut: 'F6',
+};
+
+const FUNCTION_KEY = /^F([1-9]|1[0-2])$/u;
+const LETTER_OR_DIGIT = /^[A-Z0-9]$/u;
+const NAVIGATION_KEYS = ['Delete', 'Insert', 'Home', 'End', 'PageUp', 'PageDown'] as const;
+
+/** What the keyboard tells about a key press. A KeyboardEvent of the browser fits it. */
+export interface KeyPress {
+  readonly key: string;
+  readonly ctrlKey: boolean;
+  readonly altKey: boolean;
+  readonly shiftKey: boolean;
+}
+
+/**
+ * Writes a key press the way the keymap stores it.
+ *
+ * @param press the key and its modifiers
+ * @returns the combination, such as `Shift+F11`, or null when the key cannot be a shortcut
+ */
+export function comboOf({ key, ctrlKey, altKey, shiftKey }: KeyPress): string | null {
+  const name = key.length === 1 ? key.toUpperCase() : key;
+  const combo = `${ctrlKey ? 'Ctrl+' : ''}${altKey ? 'Alt+' : ''}${shiftKey ? 'Shift+' : ''}${name}`;
+  return problemWithCombo(combo) === null ? combo : null;
+}
+
+/**
+ * Says why a combination cannot be a shortcut. Letters and digits need Ctrl or Alt, because alone they are what the
+ * cashier types and what the scanner sends. Enter, Esc, the arrows, plus and minus keep their meaning in the sale.
+ *
+ * @param combo the combination as text
+ * @returns the problem in Spanish, or null when it can be used
+ */
+export function problemWithCombo(combo: string): string | null {
+  const parts = combo.split('+');
+  const key = parts.pop() ?? '';
+  const modifiers = parts;
+  if (modifiers.some((modifier, index) => !['Ctrl', 'Alt', 'Shift'].includes(modifier) || modifiers.indexOf(modifier) !== index)) {
+    return 'Usa una tecla de función (F1 a F12), sola o con Ctrl, Alt o Mayús.';
+  }
+  if (FUNCTION_KEY.test(key)) {
+    return null;
+  }
+  if (LETTER_OR_DIGIT.test(key)) {
+    return modifiers.includes('Ctrl') || modifiers.includes('Alt') ? null : 'Una letra o un número necesita Ctrl o Alt, porque sola se escribe en la búsqueda.';
+  }
+  if ((NAVIGATION_KEYS as readonly string[]).includes(key)) {
+    return modifiers.length > 0 ? null : 'Esa tecla sola ya hace otra cosa en la venta. Combínala con Ctrl, Alt o Mayús.';
+  }
+  return 'Usa una tecla de función (F1 a F12), sola o con Ctrl, Alt o Mayús.';
+}
+
+/**
+ * Checks a keymap that came from the screen or from the database.
+ *
+ * @param value anything
+ * @returns whether it names every action once, with a usable key each, and no key twice
+ */
+export function isKeymap(value: unknown): value is Keymap {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  if (Object.keys(record).length !== KEY_ACTIONS.length) {
+    return false;
+  }
+  const combos = KEY_ACTIONS.map((action) => record[action]);
+  return combos.every((combo) => typeof combo === 'string' && problemWithCombo(combo) === null) && new Set(combos).size === combos.length;
+}
+
+/**
+ * Finds the action of a key press.
+ *
+ * @param keymap the keys of the register
+ * @param press the key and its modifiers
+ * @returns the action, or null when the key has none
+ */
+export function actionOf(keymap: Keymap, press: KeyPress): KeyAction | null {
+  const combo = comboOf(press);
+  return combo === null ? null : (KEY_ACTIONS.find((action) => keymap[action] === combo) ?? null);
+}
+
+/** @returns the combination as the screen shows it, with Mayús for Shift and Supr for Delete */
+export function comboLabel(combo: string): string {
+  return combo.replace('Shift', 'Mayús').replace('Delete', 'Supr').replace('Insert', 'Ins').replace('PageUp', 'RePág').replace('PageDown', 'AvPág').replace(/\+/gu, ' ');
+}
+
+/** How many characters fit in a line of each paper: 58 mm, 72 mm and 80 mm. */
+export const TICKET_COLUMN_CHOICES = [32, 42, 48] as const;
+export type TicketColumns = (typeof TICKET_COLUMN_CHOICES)[number];
+
+export const MAX_TICKET_EXTRA_LINES = 4;
+export const MAX_TICKET_COPIES = 3;
+
+/** How the ticket looks. The owner changes it from the settings and sees it before saving. */
+export interface TicketDesign {
+  /** Lines under the name of the business: address, phone, RFC. */
+  readonly headerLines: readonly string[];
+  /** Lines at the foot: thanks, return policy, social networks. */
+  readonly footerLines: readonly string[];
+  readonly columns: TicketColumns;
+  /** Whether each product shows its quantity and its unit price under its name. */
+  readonly showUnitPrice: boolean;
+  /** Whether the subtotal and each VAT are listed above the total. */
+  readonly showTaxBreakdown: boolean;
+  /** Whether the total is printed in double size. */
+  readonly bigTotal: boolean;
+  /** How many tickets come out for each sale. */
+  readonly copies: number;
+}
+
+/** The ticket as it was before it could be designed, so a register that never opened the settings prints the same. */
+export const DEFAULT_TICKET_DESIGN: TicketDesign = {
+  headerLines: [],
+  footerLines: ['Gracias por su compra'],
+  columns: 48,
+  showUnitPrice: true,
+  showTaxBreakdown: true,
+  bigTotal: false,
+  copies: 1,
+};
+
+function isLineList(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= MAX_TICKET_EXTRA_LINES &&
+    value.every((line) => typeof line === 'string' && line.length <= 48 && !/[\u0000-\u001f]/u.test(line))
+  );
+}
+
+/**
+ * Checks a ticket design that came from the screen or from the database.
+ *
+ * @param value anything
+ * @returns whether it is a complete design with allowed values
+ */
+export function isTicketDesign(value: unknown): value is TicketDesign {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const { headerLines, footerLines, columns, showUnitPrice, showTaxBreakdown, bigTotal, copies } = value as Record<string, unknown>;
+  return (
+    isLineList(headerLines) &&
+    isLineList(footerLines) &&
+    (TICKET_COLUMN_CHOICES as readonly unknown[]).includes(columns) &&
+    typeof showUnitPrice === 'boolean' &&
+    typeof showTaxBreakdown === 'boolean' &&
+    typeof bigTotal === 'boolean' &&
+    typeof copies === 'number' &&
+    Number.isInteger(copies) &&
+    copies >= 1 &&
+    copies <= MAX_TICKET_COPIES
+  );
+}
+
+const SHARED_PRINTER_PATH = /^\\\\[^\\/]+\\[^\\/]+$/u;
+const SHARE_NAME = /^[^\\/\u0000-\u001f]{1,80}$/u;
+
+/**
+ * Reads what the owner typed as the printer. Windows shares a ticket printer under a name, and the register sends the
+ * ticket to `\\computer\name`. A bare name means a printer shared by this same computer.
+ *
+ * @param text what was typed
+ * @returns the path of the shared printer, an empty text for no printer, or null when it cannot be one
+ */
+export function normalizePrinterShare(text: string): string | null {
+  const trimmed = text.trim();
+  if (trimmed === '') {
+    return '';
+  }
+  if (SHARED_PRINTER_PATH.test(trimmed)) {
+    return trimmed;
+  }
+  return SHARE_NAME.test(trimmed) ? `\\\\localhost\\${trimmed}` : null;
+}
+
+/** One sale of the list of recent sales. */
+export interface SaleSummary {
+  readonly saleId: string;
+  readonly folio: string;
+  readonly completedAt: string;
+  readonly totalCents: number;
+  /** What already went back to the customer. Equal to the total when the sale was cancelled whole. */
+  readonly refundedCents: number;
+  readonly cashierName: string | null;
+  readonly lineCount: number;
+}
+
+export type TestPrintResult = { readonly status: 'printed' } | { readonly status: 'no_printer' } | { readonly status: 'failed'; readonly message: string };
+
+export type SavePrinterResult = { readonly status: 'saved'; readonly share: string } | { readonly status: 'invalid' };
+
+export const TOOLS_CHANNELS = {
+  getKeymap: 'tools:get-keymap',
+  saveKeymap: 'tools:save-keymap',
+  getTicketDesign: 'tools:get-ticket-design',
+  saveTicketDesign: 'tools:save-ticket-design',
+  previewTicket: 'tools:preview-ticket',
+  getPrinter: 'tools:get-printer',
+  savePrinter: 'tools:save-printer',
+  testPrint: 'tools:test-print',
+  listRecentSales: 'tools:list-recent-sales',
+  recordSaleCancelled: 'tools:record-sale-cancelled',
+} as const;
+
+/** The bridge of the register tools. It is its own bridge, so the register bridge stays as it was. */
+export interface ToolsApi {
+  /** @returns the keys of the register */
+  getKeymap(): Promise<Keymap>;
+
+  /** Saves the keys. Only the owner can. */
+  saveKeymap(keymap: Keymap): Promise<void>;
+
+  /** @returns how the ticket looks */
+  getTicketDesign(): Promise<TicketDesign>;
+
+  /** Saves how the ticket looks. Only the owner can. */
+  saveTicketDesign(design: TicketDesign): Promise<void>;
+
+  /**
+   * Draws a sample ticket with a design that is not saved yet.
+   *
+   * @param design the design being edited
+   * @returns the lines of the ticket, as the printer would print them
+   */
+  previewTicket(design: TicketDesign): Promise<readonly string[]>;
+
+  /** @returns the path of the shared printer, or an empty text when there is none */
+  getPrinter(): Promise<string>;
+
+  /** Saves the printer. Only the owner can. */
+  savePrinter(share: string): Promise<SavePrinterResult>;
+
+  /** Prints a sample ticket with the saved design. */
+  testPrint(): Promise<TestPrintResult>;
+
+  /**
+   * Lists the last completed sales, the newest first.
+   *
+   * @param text a folio or part of it, or an empty text for the latest
+   */
+  listRecentSales(text: string): Promise<readonly SaleSummary[]>;
+
+  /** Leaves in the audit log that a sale being rung up was dropped, with what it held. */
+  recordSaleCancelled(request: { readonly lineCount: number; readonly totalCents: number }): Promise<void>;
+}

@@ -47,7 +47,7 @@ export class CatalogImporter {
     this.#stock = stock;
     this.#findByCode = store.prepare('SELECT product_id FROM product_barcode WHERE tenant_id = ? AND code = ?');
     this.#insertProduct = store.prepare(`
-      INSERT INTO product (id, tenant_id, name, base_unit, unit_price_e4, tax_factor, tax_rate_bp) VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO product (id, tenant_id, name, base_unit, unit_price_e4, tax_factor, tax_rate_bp, unit_cost_e6) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     this.#insertBarcode = store.prepare('INSERT INTO product_barcode (tenant_id, code, product_id) VALUES (?, ?, ?)');
     this.#deleteSamples = store.prepare('DELETE FROM product WHERE tenant_id = ? AND is_sample = 1');
@@ -96,7 +96,7 @@ export class CatalogImporter {
 
   #create(row: CatalogRow): string {
     const id = uuidV7();
-    this.#insertProduct.run(id, this.#tenantId, row.name, row.unit, row.unitPriceE4, row.taxRate.factor, row.taxRate.rateBp);
+    this.#insertProduct.run(id, this.#tenantId, row.name, row.unit, row.unitPriceE4, row.taxRate.factor, row.taxRate.rateBp, row.unitCostE6 ?? null);
     this.#insertBarcode.run(this.#tenantId, row.code, id);
     return id;
   }

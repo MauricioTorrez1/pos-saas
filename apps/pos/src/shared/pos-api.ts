@@ -99,6 +99,12 @@ export type PendingSaleRequestLine =
        * catalog and only honors this one if it is the price the owner just replaced (E1-39, ADR 0047).
        */
       readonly unitPriceE4?: number;
+      /**
+       * A price for this sale only, in ten-thousandths of a peso. The label on the shelf said one price and the register
+       * another, and the cashier charges what the customer saw. The catalog keeps its price, and the change of the base
+       * price is made from the panel of the product. It is written in the audit log with who did it.
+       */
+      readonly saleUnitPriceE4?: number;
     }
   | {
       /** What it is, as it will appear on the ticket. */
@@ -308,7 +314,8 @@ export interface PosApi {
    * Records cash going into or out of the drawer, with its reason (RF-025). A cashier needs an owner's PIN to take cash out.
    *
    * @param request the kind, the amount, the reason, and the owner's PIN when needed
-   * @returns ecorded with the new status, or why not
+   * @returns 
+ecorded with the new status, or why not
    */
   recordCashMovement(request: CashMovementRequest): Promise<CashMovementResult>;
 

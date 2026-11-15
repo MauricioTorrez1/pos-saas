@@ -26,12 +26,14 @@ import { ReturnStore } from './returns/return-store';
 import { SaleCheckout } from './checkout/sale-checkout';
 import { SalePayments } from './checkout/sale-payments';
 import { renderTicket } from './checkout/ticket/ticket';
+import { normalizePrinterShare } from '../shared/register-tools';
+import { SalesHistory } from './tools/sales-history';
+import { SwitchablePrinter } from './tools/switchable-printer';
+import { ToolsStore } from './tools/tools-store';
 import { toTicketData } from './checkout/ticket/ticket-data';
 import { createFakeHardware } from './hardware/fakes/fake-hardware';
 import { RecordingPrinter } from './hardware/fakes/recording-printer';
 import { PrinterCashDrawer } from './hardware/printer-cash-drawer';
-import type { PrinterProvider } from './hardware/printer-provider';
-import { WindowsSharedPrinter } from './hardware/windows-shared-printer';
 import { registerIpcHandlers } from './ipc-handlers';
 import { AppearanceStore } from './local-store/appearance-store';
 import { LocalStore } from './local-store/local-store';
@@ -88,12 +90,12 @@ function openLocalStore(): LocalStore {
 }
 
 /**
- * Picks the ticket printer. `POS_PRINTER_SHARE` names a printer shared by Windows, such as `\\localhost\TM-T20`. Without
- * it the register sells normally and prints nothing, because a missing printer must never stop a sale.
+ * Picks the ticket printer. The owner sets it in the settings of the register, as a printer shared by Windows such as
+ * `\localhost\TM-T20`. `POS_PRINTER_SHARE` still works for a register set up before the settings existed. Without
+ * either, the register sells normally and prints nothing, because a missing printer must never stop a sale.
  */
-function choosePrinter(): PrinterProvider {
-  const share = process.env.POS_PRINTER_SHARE;
-  return share ? new WindowsSharedPrinter(share) : new RecordingPrinter();
+function choosePrinter(tools: ToolsStore): SwitchablePrinter {
+  return new SwitchablePrinter(() => tools.printerShare() || normalizePrinterShare(process.env.POS_PRINTER_SHARE ?? '') || '', new RecordingPrinter());
 }
 
 const BACKUP_KEY_FILE_NAME = 'backup.key';
@@ -158,13 +160,14 @@ async function start(): Promise<void> {
   const backupTimer = setInterval(() => admin.backupNow(), BACKUP_INTERVAL_MS);
   backupTimer.unref();
   app.once('will-quit', () => clearInterval(backupTimer));
-  const printer = choosePrinter();
+  const tools = new ToolsStore(store, LOCAL_TENANT_ID);
+  const printer = choosePrinter(tools);
   // The drawer hangs from the printer, so both are real once the printer is configured and fakes until then (ADR 0028).
   const checkout = new SaleCheckout({
     hardware: { ...createFakeHardware(), printer, cashDrawer: new PrinterCashDrawer(printer) },
     sales,
     renderTicket: (sale, receipt) =>
-      renderTicket(toTicketData(appearance.read().businessName || UNNAMED_BUSINESS, sale, { ...receipt, isReprint: false })),
+      renderTicket(toTicketData(appearance.read().businessName || UNNAMED_BUSINESS, sale, { ...receipt, isReprint: false }), tools.ticketDesign()),
   });
   const prices = new PriceChangeService(store, LOCAL_TENANT_ID, auth, catalog, new AuditLog(store, LOCAL_TENANT_ID));
   const inventory = new InventoryService(store, LOCAL_TENANT_ID, auth, new StockStore(store, LOCAL_TENANT_ID), new AuditLog(store, LOCAL_TENANT_ID), catalog);
@@ -205,7 +208,15 @@ async function start(): Promise<void> {
     salePayments: new SalePayments(sales, checkout, {
       printer,
       businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
+      ticketDesign: () => tools.ticketDesign(),
     }),
+    tools: {
+      store: tools,
+      history: new SalesHistory(store, LOCAL_TENANT_ID),
+      printer,
+      audit: new AuditLog(store, LOCAL_TENANT_ID),
+      businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
+    },
   });
   await openMainWindow(rendererEntry, PRELOAD_PATH);
 }

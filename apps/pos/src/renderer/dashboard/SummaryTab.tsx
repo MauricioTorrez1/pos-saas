@@ -3,14 +3,12 @@ import type { ReactElement } from 'react';
 import type { DashboardSummary, PeriodTotals } from '../../shared/dashboard-api';
 import {
   PAYMENT_KIND_LABELS,
-  WEEKDAY_LABELS,
   changeLabel,
   hundredthsLabel,
   percentLabel,
   pesosLabel,
-  trendLabel,
 } from '../../shared/dashboard-format';
-import { BarChart, type Bar } from './BarChart';
+import { SalesCharts } from './SalesCharts';
 
 interface KpiProps {
   readonly label: string;
@@ -50,28 +48,6 @@ const compareOf = (
 export function SummaryTab({ summary }: { readonly summary: DashboardSummary }): ReactElement {
   const { totals, previousTotals: before, includesCosts } = summary;
   const money = (value: number): string => pesosLabel(value);
-  const hourBars: Bar[] = summary.byHour.map((row) => ({
-    key: String(row.hour),
-    label: `${String(row.hour).padStart(2, '0')}h`,
-    value: row.totalCents,
-    valueLabel: pesosLabel(row.totalCents),
-    extra: String(row.salesCount),
-  }));
-  const weekdayBars: Bar[] = summary.byWeekday.map((row) => ({
-    key: String(row.weekday),
-    label: (WEEKDAY_LABELS[row.weekday] ?? '').slice(0, 3),
-    value: row.totalCents,
-    valueLabel: pesosLabel(row.totalCents),
-    extra: String(row.salesCount),
-  }));
-  const trendBars: Bar[] = summary.trend.map((row) => ({
-    key: row.key,
-    label: trendLabel(row.key),
-    value: row.totalCents,
-    valueLabel: pesosLabel(row.totalCents),
-    extra: String(row.salesCount),
-  }));
-
   return (
     <>
       {summary.isInProgress && summary.previousPeriod !== null && (
@@ -140,13 +116,7 @@ export function SummaryTab({ summary }: { readonly summary: DashboardSummary }):
           en Más vendidos.
         </p>
       )}
-      <BarChart
-        title={summary.trendUnit === 'day' ? 'Ventas por día' : 'Ventas por mes'}
-        bars={trendBars}
-        columns={[summary.trendUnit === 'day' ? 'Día' : 'Mes', 'Total (con IVA)', 'Ventas']}
-      />
-      <BarChart title="Ventas por hora del día" bars={hourBars} columns={['Hora', 'Total (con IVA)', 'Ventas']} />
-      <BarChart title="Ventas por día de la semana" bars={weekdayBars} columns={['Día', 'Total (con IVA)', 'Ventas']} />
+      <SalesCharts summary={summary} />
       <table className="dashboard-table" aria-label="Ventas por forma de pago">
         <caption>Ventas por forma de pago</caption>
         <thead>

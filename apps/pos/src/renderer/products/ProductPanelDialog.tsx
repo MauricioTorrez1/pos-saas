@@ -1,3 +1,5 @@
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { unitCostText } from '../../shared/product-admin';
 import { formatUnitPriceE4 } from '@pos-saas/money';
 import { useEffect, useState, type ReactElement } from 'react';
 
@@ -93,6 +95,7 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, isOwner, in
   const [note, setNote] = useState<string | null>(null);
   const [isChangingPrice, setIsChangingPrice] = useState(false);
   const [isAdjusting, setIsAdjusting] = useState(false);
+  const [isConfirmingRemoval, setIsConfirmingRemoval] = useState(false);
   const { isBusy, message, setMessage, run } = useAction();
 
   const show = (loaded: ProductPanelDetail): void => {
@@ -157,11 +160,13 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, isOwner, in
     return owner === null || owner.id === product?.id ? null : owner.name;
   };
 
-  const save = (): void => {
+  /** Saves the form. `isActive` puts the product on or off sale whatever the form says, for the red button. */
+  const save = (isActive?: boolean): void => {
     if (product === null || values === null) {
       return;
     }
-    const reading = readEditForm(values);
+    setIsConfirmingRemoval(false);
+    const reading = readEditForm(isActive === undefined ? values : { ...values, isActive });
     if (!reading.ok) {
       setProblems(reading.problems);
       setMessage('Revisa lo marcado en rojo.');
@@ -180,7 +185,13 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, isOwner, in
       });
       if (result.status === 'updated') {
         show(result.product);
-        setNote('Listo. Los cambios quedaron guardados con tu nombre y el valor anterior.');
+        setNote(
+          isActive === false
+            ? 'Producto dado de baja. Ya no sale en la venta; sus ventas y movimientos se conservan y puedes reactivarlo cuando quieras.'
+            : isActive === true
+              ? 'Producto reactivado. Ya se puede vender otra vez.'
+              : 'Listo. Los cambios quedaron guardados con tu nombre y el valor anterior.',
+        );
         return;
       }
       if (result.status === 'stale' || result.status === 'unchanged') {
@@ -212,8 +223,8 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, isOwner, in
 
   // While a dialog opened from here is open it has the keyboard, so these keys wait.
   useWindowKeys(
-    { F2: product === null ? undefined : save, F8: openPriceChange, F9: openAdjust, Escape: onClose },
-    isBusy || isChangingPrice || isAdjusting,
+    { F2: product === null ? undefined : () => save(), F8: openPriceChange, F9: openAdjust, Escape: onClose },
+    isBusy || isChangingPrice || isAdjusting || isConfirmingRemoval,
   );
 
   return (
@@ -303,8 +314,9 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, isOwner, in
             unitLockedReason={product.movementCount > 0 ? 'No se puede cambiar: el producto ya tiene movimientos de existencia.' : undefined}
             currentTaxRate={product.taxRate}
             activeLabel={product.isActive ? 'A la venta (quita la marca para darlo de baja)' : 'A la venta (márcalo para activarlo otra vez)'}
+            currentPrice={unitCostText(product.unitPriceE4 * 100)}
           />
-          {!isOwner && <Field label="PIN del dueño" value={pin} onChange={setPin} type="password" maxLength={8} />}
+          {!isOwner && <Field label="PIN del dueño" numeric="integer" value={pin} onChange={setPin} type="password" maxLength={8} />}
         </>
       )}
       {note !== null && (
@@ -340,6 +352,11 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, isOwner, in
           onCancel={() => setIsAdjusting(false)}
         />
       )}
+      {isConfirmingRemoval && product !== null && (
+        <ConfirmDialog title={`¿Dar de baja ${product.name}?`} confirmLabel="Sí, dar de baja" isDangerous onConfirm={() => save(false)} onCancel={() => setIsConfirmingRemoval(false)}>
+          <p>Deja de salir en la venta y en las búsquedas. No se borra nada: sus ventas, su existencia y su historial se conservan, y puedes reactivarlo después.</p>
+        </ConfirmDialog>
+      )}
       <div className="payment-actions">
         <button type="button" className="button" tabIndex={-1} onClick={onClose}>
           Cerrar <kbd>Esc</kbd>
@@ -354,8 +371,18 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, isOwner, in
             Ajustar existencia <kbd>F9</kbd>
           </button>
         )}
+        {product !== null && product.isActive && (
+          <button type="button" className="button button-danger" tabIndex={-1} disabled={isBusy} onClick={() => setIsConfirmingRemoval(true)}>
+            Dar de baja
+          </button>
+        )}
+        {product !== null && !product.isActive && (
+          <button type="button" className="button" tabIndex={-1} disabled={isBusy} onClick={() => save(true)}>
+            Reactivar producto
+          </button>
+        )}
         {product !== null && (
-          <button type="button" className="button button-primary" tabIndex={-1} disabled={isBusy} onClick={save}>
+          <button type="button" className="button button-primary" tabIndex={-1} disabled={isBusy} onClick={() => save()}>
             Guardar cambios <kbd>F2</kbd>
           </button>
         )}

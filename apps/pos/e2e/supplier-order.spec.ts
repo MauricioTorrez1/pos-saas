@@ -112,8 +112,9 @@ test('orders from a supplier: finds the product by the code of the supplier, sav
   // The list is read again on the way back, and the keys wait until it is there.
   await expect(page.getByRole('button', { name: /Pedido nuevo/ })).toBeEnabled();
   await expect(dialog).toContainText('Todavía no has hecho ningún pedido.');
-  // A new order: the supplier is already chosen, and the code of the supplier finds the product.
-  await page.keyboard.press('F2');
+  // A new order: the supplier is already chosen, and the code of the supplier finds the product. The button is used
+  // instead of F2, because the key is dropped if it lands while the dialog is still settling, and that made this test flaky.
+  await page.getByRole('button', { name: /Pedido nuevo/ }).click();
   await expect(page.getByRole('heading', { name: 'Pedido nuevo' })).toBeVisible();
   await page.getByRole('textbox', { name: 'Buscar producto para el pedido' }).fill('mar-16');
   await page.keyboard.press('Enter');
