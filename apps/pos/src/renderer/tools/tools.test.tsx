@@ -252,11 +252,14 @@ describe('the settings of the register', () => {
     fireEvent.change(screen.getByLabelText('Encabezado del ticket'), { target: { value: 'Av. Juárez 12\nTel. 555 123' } });
     fireEvent.change(screen.getByLabelText('Ancho del papel'), { target: { value: '32' } });
     fireEvent.click(screen.getByLabelText('Total en letra grande'));
+    fireEvent.change(screen.getByLabelText('Fuente'), { target: { value: 'b' } });
+    fireEvent.change(screen.getByLabelText('Tamaño de letra'), { target: { value: 'tall' } });
+    expect(screen.getByText('Caben 42 letras por renglón con este papel, fuente y tamaño.').tagName).toBe('SMALL');
     await waitFor(() => expect(preview.textContent).toContain('ancho 32\nAv. Juárez 12\nTel. 555 123'));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar diseño', hidden: true }));
 
     await waitFor(() =>
-      expect(saveTicketDesign).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_TICKET_DESIGN, headerLines: ['Av. Juárez 12', 'Tel. 555 123'], columns: 32, bigTotal: true }),
+      expect(saveTicketDesign).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_TICKET_DESIGN, headerLines: ['Av. Juárez 12', 'Tel. 555 123'], columns: 32, bigTotal: true, font: 'b', textSize: 'tall' }),
     );
   });
 

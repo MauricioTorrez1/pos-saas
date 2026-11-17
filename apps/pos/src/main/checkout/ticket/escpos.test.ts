@@ -62,4 +62,11 @@ describe('EscPosBuilder', () => {
 
     expect([...builder.toBytes()]).toEqual([0x41, 0x0a, 0x42, 0x0a]);
   });
+
+  it('chooses the font and the size of the letters, and refuses a size the printer does not have', () => {
+    expect(bytesOf((builder) => builder.font('b'))).toEqual([0x1b, 0x4d, 1]);
+    expect(bytesOf((builder) => builder.font('a'))).toEqual([0x1b, 0x4d, 0]);
+    expect(bytesOf((builder) => builder.textSize(2, 3))).toEqual([0x1d, 0x21, 0x12]);
+    expect(() => new EscPosBuilder().textSize(9, 1)).toThrow(RangeError);
+  });
 });

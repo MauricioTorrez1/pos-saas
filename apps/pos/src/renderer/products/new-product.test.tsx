@@ -14,6 +14,7 @@ import {
   type ProductAdminApi,
   type ProductDetail,
 } from '../../shared/product-admin';
+import type { MissingItemsApi } from '../../shared/missing-items';
 import { App } from '../App';
 import { looksLikeBarcode, newProductFormFor, readNewProductForm, readStock, taxRateOfKey, EMPTY_PRODUCT_FORM, type ProductFormValues } from './product-form';
 
@@ -372,5 +373,24 @@ describe('adding a product from the sale screen (E1-42)', () => {
 
     const dialog = await screen.findByRole('dialog', { hidden: true });
     expect(await within(dialog).findByText(/El código 7501 ya lo usa «Cinta vieja»/)).toBeDefined();
+  });
+});
+
+describe('writing down a missing item from the sale screen (E1-49)', () => {
+  it('offers to write down what was not found, and opens the log with it loaded', async () => {
+    const missingApi: MissingItemsApi = {
+      record: vi.fn(() => Promise.resolve({ status: 'recorded' as const, timesAsked: 1 })),
+      report: () => Promise.resolve({ period: 30, groups: [], byWeek: [], byWeekday: [], totalRequests: 0, generatedAt: '2026-11-18T18:00:00.000Z' }),
+      resolve: () => Promise.resolve(),
+      exportPdf: () => Promise.resolve({ status: 'cancelled' as const }),
+    };
+    render(<App posApi={posApiWith(CASHIER)} productApi={productApiWith(vi.fn())} missingApi={missingApi} />);
+    await screen.findByRole('combobox', { name: 'Buscar producto' });
+
+    await lookFor('pintura de aceite roja');
+    fireEvent.click(await screen.findByRole('button', { name: /Anotar como faltante/ }));
+
+    expect(await screen.findByRole('heading', { name: 'Faltantes', hidden: true })).toBeDefined();
+    expect(box('¿Qué pidió el cliente?').value).toBe('pintura de aceite roja');
   });
 });

@@ -6,6 +6,7 @@ import type { AuthState, PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
 import { comboLabel, DEFAULT_KEYMAP, type KeyAction, type Keymap, type ToolsApi } from '../shared/register-tools';
+import type { MissingItemsApi } from '../shared/missing-items';
 import type { PurchasingApi } from '../shared/supplier-order';
 import { applyAppearance } from './appearance/apply-appearance';
 import { AppearanceDialog } from './appearance/AppearanceDialog';
@@ -18,6 +19,7 @@ import { CashDialog } from './cash/CashDialog';
 import { ReturnDialog } from './returns/ReturnDialog';
 import { PendingSaleDialog } from './recovery/PendingSaleDialog';
 import { usePendingSales } from './recovery/use-pending-sales';
+import { MissingItemsDialog } from './missing/MissingItemsDialog';
 import { SupplierOrderDialog } from './purchasing/SupplierOrderDialog';
 import { SaleScreen } from './sale/SaleScreen';
 import { SalesHistoryDialog } from './tools/SalesHistoryDialog';
@@ -58,6 +60,8 @@ interface AppProps {
   readonly dashboardApi?: DashboardApi;
   /** Orders to suppliers (E1-44). Without it, the register offers no purchase order. */
   readonly purchasingApi?: PurchasingApi;
+  /** The log of what customers ask for and the store does not carry (E1-49). Without it, the register offers no log. */
+  readonly missingApi?: MissingItemsApi;
   /** The keys, the ticket, the printer and the list of sales. Without it, the register keeps its keys and offers no settings. */
   readonly toolsApi?: ToolsApi;
 }
@@ -74,7 +78,7 @@ interface AppProps {
  * @param props.toolsApi bridge for the settings and the list of sales, when the register offers them
  * @returns the screen
  */
-export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi }: AppProps): ReactElement {
+export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi }: AppProps): ReactElement {
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [authState, setAuthState] = useState<AuthState | null>(null);
   const [authFailed, setAuthFailed] = useState(false);
@@ -118,6 +122,7 @@ export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingAp
       {...(productApi === undefined ? {} : { productApi })}
       {...(dashboardApi === undefined ? {} : { dashboardApi })}
       {...(purchasingApi === undefined ? {} : { purchasingApi })}
+      {...(missingApi === undefined ? {} : { missingApi })}
       {...(toolsApi === undefined ? {} : { toolsApi })}
       user={authState.current}
       appearance={appearance}
@@ -133,6 +138,8 @@ interface RegisterScreenProps {
   readonly productApi?: ProductAdminApi;
   readonly dashboardApi?: DashboardApi;
   readonly purchasingApi?: PurchasingApi;
+  /** The log of what customers ask for and the store does not carry (E1-49). Without it, the register offers no log. */
+  readonly missingApi?: MissingItemsApi;
   readonly toolsApi?: ToolsApi;
   readonly user: UserSummary;
   readonly appearance: Appearance;
@@ -140,7 +147,7 @@ interface RegisterScreenProps {
   readonly onSignOut: () => void;
 }
 
-function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
+function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
   const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
   const [cash, setCash] = useState<CashStatus | null>(null);
@@ -153,6 +160,8 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
   const [keymap, setKeymap] = useState<Keymap>(DEFAULT_KEYMAP);
   const [isEditingSettings, setIsEditingSettings] = useState(false);
   const [isViewingSales, setIsViewingSales] = useState(false);
+  // What the log of missing items opened with: null while it is closed.
+  const [missingFor, setMissingFor] = useState<string | null>(null);
   const pendingSales = usePendingSales(posApi);
   const hasPendingSales = pendingSales.sales.length > 0;
   const isOwner = user.role === 'owner';
@@ -211,6 +220,8 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
   const closeSettings = useCallback(() => setIsEditingSettings(false), []);
   const openSales = useCallback(() => setIsViewingSales(toolsApi !== undefined), [toolsApi]);
   const closeSales = useCallback(() => setIsViewingSales(false), []);
+  const openMissing = useCallback((text: string) => setMissingFor(missingApi === undefined ? null : text), [missingApi]);
+  const closeMissing = useCallback(() => setMissingFor(null), []);
   const key = (action: KeyAction): string => comboLabel(keymap[action]);
   const openReturns = useCallback(() => setIsReturning(true), []);
   const closeReturns = useCallback(() => setIsReturning(false), []);
@@ -261,6 +272,11 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
             Ventas <kbd>{key('salesHistory')}</kbd>
           </button>
         )}
+        {missingApi !== undefined && (
+          <button type="button" className="header-button" tabIndex={-1} onClick={() => openMissing('')}>
+            Faltantes <kbd>{key('missingItems')}</kbd>
+          </button>
+        )}
         <button type="button" className="header-button" tabIndex={-1} onClick={openReturns}>
           Devolución <kbd>{key('returns')}</kbd>
         </button>
@@ -280,7 +296,7 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
         posApi={posApi}
         {...(pricingApi === undefined ? {} : { pricingApi })}
         {...(productApi === undefined ? {} : { productApi })}
-        isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering || isViewingDashboard || ordering !== null || isEditingSettings || isViewingSales}
+        isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering || isViewingDashboard || ordering !== null || isEditingSettings || isViewingSales || missingFor !== null}
         isOwner={isOwner}
         onOpenAppearance={openAppearance}
         onSignOut={onSignOut}
@@ -289,6 +305,7 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
         onOpenAdmin={openAdmin}
         {...(dashboardApi === undefined ? {} : { onOpenDashboard: openDashboard })}
         {...(purchasingApi === undefined ? {} : { onOpenSupplierOrder: openOrders })}
+        {...(missingApi === undefined ? {} : { onOpenMissingItems: openMissing })}
         onCashChanged={refreshCash}
         keymap={keymap}
         {...(toolsApi === undefined ? {} : { toolsApi, onOpenSettings: openSettings, onOpenSalesHistory: openSales })}
@@ -328,6 +345,9 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
       )}
       {isViewingSales && !hasPendingSales && toolsApi !== undefined && (
         <SalesHistoryDialog posApi={posApi} toolsApi={toolsApi} isOwner={isOwner} onCancelled={refreshCash} onClose={closeSales} />
+      )}
+      {missingFor !== null && !hasPendingSales && missingApi !== undefined && (
+        <MissingItemsDialog api={missingApi} isOwner={isOwner} initialDescription={missingFor} onClose={closeMissing} />
       )}
       {isReturning && !hasPendingSales && <ReturnDialog posApi={posApi} user={user} onReturned={refreshCash} onClose={closeReturns} />}
       {isEditingCash && !hasPendingSales && cash !== null && (

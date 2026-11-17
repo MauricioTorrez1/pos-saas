@@ -65,3 +65,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0059](0059-pedido-al-proveedor-en-la-caja.md) | Pedido al proveedor en la caja: documento local sin movimiento de inventario, borrador y enviado inmutable, códigos del proveedor, Excel con `exceljs` y PDF con la impresión de Electron | Aceptada |
 | [0061](0061-rediseno-de-la-caja-y-herramientas-del-dueno.md) | Rediseño de la caja y herramientas del dueño | Aceptada |
 | [0062](0062-importacion-de-catalogo-y-cambio-masivo-de-precios.md) | Importación de catálogo y cambio masivo de precios en el núcleo | Aceptada |
+| [0063](0063-bitacora-de-faltantes-y-letra-del-ticket.md) | Bitácora de faltantes con PDF y gráficas, y fuente y tamaño de letra del ticket | Aceptada |

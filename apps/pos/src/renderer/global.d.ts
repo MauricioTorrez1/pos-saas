@@ -1,4 +1,5 @@
 import type { DashboardApi } from '../shared/dashboard-api';
+import type { MissingItemsApi } from '../shared/missing-items';
 import type { PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
@@ -13,5 +14,7 @@ declare global {
     readonly purchasing: PurchasingApi;
     /** Bridge for the keys, the ticket, the printer and the list of sales. */
     readonly tools: ToolsApi;
+    /** Bridge for the log of missing items (E1-49). */
+    readonly missing: MissingItemsApi;
   }
 }

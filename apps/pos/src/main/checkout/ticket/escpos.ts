@@ -23,6 +23,8 @@ const CODE_PAGE_858: Readonly<Record<string, number>> = {
 
 const ESC = 0x1b;
 const GS = 0x1d;
+/** The largest factor a printer multiplies a letter by. */
+const MAX_TEXT_SCALE = 8;
 const LINE_FEED = 0x0a;
 const SPACE = 0x20;
 const QUESTION_MARK = 0x3f;
@@ -80,6 +82,33 @@ export class EscPosBuilder {
    */
   doubleSize(isOn: boolean): this {
     return this.#command(GS, 0x21, isOn ? 0x11 : 0x00);
+  }
+
+  /**
+   * Chooses the font of the following text (ESC M). Font B is narrower, so a line holds more letters.
+   *
+   * @param font `a` for the usual font, `b` for the narrow one
+   * @returns this builder
+   */
+  font(font: 'a' | 'b'): this {
+    return this.#command(ESC, 0x4d, font === 'a' ? 0 : 1);
+  }
+
+  /**
+   * Sets how many times wider and taller than normal the following text prints (GS !).
+   *
+   * @param width from 1 to 8
+   * @param height from 1 to 8
+   * @returns this builder
+   * @throws RangeError if a factor is not between 1 and 8
+   */
+  textSize(width: number, height: number): this {
+    for (const factor of [width, height]) {
+      if (!Number.isInteger(factor) || factor < 1 || factor > MAX_TEXT_SCALE) {
+        throw new RangeError(`Expected a size between 1 and ${MAX_TEXT_SCALE}, got ${factor}`);
+      }
+    }
+    return this.#command(GS, 0x21, ((width - 1) << 4) | (height - 1));
   }
 
   /**

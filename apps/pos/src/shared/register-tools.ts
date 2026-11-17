@@ -17,6 +17,7 @@ export const KEY_ACTIONS = [
   'reprint',
   'dashboard',
   'supplierOrder',
+  'missingItems',
   'admin',
   'appearance',
   'settings',
@@ -41,6 +42,7 @@ export const KEY_ACTION_LABELS: Readonly<Record<KeyAction, string>> = {
   reprint: 'Reimprimir',
   dashboard: 'Resumen',
   supplierOrder: 'Pedido',
+  missingItems: 'Faltantes',
   admin: 'Administración',
   appearance: 'Apariencia',
   settings: 'Ajustes',
@@ -60,6 +62,7 @@ export const DEFAULT_KEYMAP: Keymap = {
   reprint: 'F8',
   dashboard: 'F11',
   supplierOrder: 'Shift+F11',
+  missingItems: 'Shift+F2',
   admin: 'F1',
   appearance: 'F9',
   settings: 'Shift+F9',
@@ -155,6 +158,36 @@ export function comboLabel(combo: string): string {
 export const TICKET_COLUMN_CHOICES = [32, 42, 48] as const;
 export type TicketColumns = (typeof TICKET_COLUMN_CHOICES)[number];
 
+/** The two fonts of a thermal printer: A is the usual one, B is narrower and fits a third more letters in a line. */
+export const TICKET_FONT_CHOICES = ['a', 'b'] as const;
+export type TicketFont = (typeof TICKET_FONT_CHOICES)[number];
+
+/** The size of the letters: as the printer comes, twice as tall, or twice as tall and twice as wide. */
+export const TICKET_TEXT_SIZE_CHOICES = ['normal', 'tall', 'large'] as const;
+export type TicketTextSize = (typeof TICKET_TEXT_SIZE_CHOICES)[number];
+
+/** How many letters of font B fit where font A fits 32, 42 or 48. */
+const FONT_B_COLUMNS: Readonly<Record<TicketColumns, number>> = { 32: 42, 42: 56, 48: 64 };
+
+/** How many times wider and taller than normal each size prints a letter. */
+export const TEXT_SIZE_SCALE: Readonly<Record<TicketTextSize, { readonly width: number; readonly height: number }>> = {
+  normal: { width: 1, height: 1 },
+  tall: { width: 1, height: 2 },
+  large: { width: 2, height: 2 },
+};
+
+/**
+ * Counts the letters that fit in a line of the ticket with its paper, its font and its size.
+ *
+ * @param design how the ticket looks
+ * @param isBig whether the line is the big total, which prints twice as wide as the rest
+ * @returns the letters of one line
+ */
+export function ticketLineWidth(design: Pick<TicketDesign, 'columns' | 'font' | 'textSize'>, isBig = false): number {
+  const letters = design.font === 'b' ? FONT_B_COLUMNS[design.columns] : design.columns;
+  return Math.floor(letters / (TEXT_SIZE_SCALE[design.textSize].width * (isBig ? 2 : 1)));
+}
+
 export const MAX_TICKET_EXTRA_LINES = 4;
 export const MAX_TICKET_COPIES = 3;
 
@@ -165,6 +198,10 @@ export interface TicketDesign {
   /** Lines at the foot: thanks, return policy, social networks. */
   readonly footerLines: readonly string[];
   readonly columns: TicketColumns;
+  /** The font of the printer. */
+  readonly font: TicketFont;
+  /** The size of every letter of the ticket. */
+  readonly textSize: TicketTextSize;
   /** Whether each product shows its quantity and its unit price under its name. */
   readonly showUnitPrice: boolean;
   /** Whether the subtotal and each VAT are listed above the total. */
@@ -180,6 +217,8 @@ export const DEFAULT_TICKET_DESIGN: TicketDesign = {
   headerLines: [],
   footerLines: ['Gracias por su compra'],
   columns: 48,
+  font: 'a',
+  textSize: 'normal',
   showUnitPrice: true,
   showTaxBreakdown: true,
   bigTotal: false,
@@ -204,11 +243,13 @@ export function isTicketDesign(value: unknown): value is TicketDesign {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
-  const { headerLines, footerLines, columns, showUnitPrice, showTaxBreakdown, bigTotal, copies } = value as Record<string, unknown>;
+  const { headerLines, footerLines, columns, font, textSize, showUnitPrice, showTaxBreakdown, bigTotal, copies } = value as Record<string, unknown>;
   return (
     isLineList(headerLines) &&
     isLineList(footerLines) &&
     (TICKET_COLUMN_CHOICES as readonly unknown[]).includes(columns) &&
+    (TICKET_FONT_CHOICES as readonly unknown[]).includes(font) &&
+    (TICKET_TEXT_SIZE_CHOICES as readonly unknown[]).includes(textSize) &&
     typeof showUnitPrice === 'boolean' &&
     typeof showTaxBreakdown === 'boolean' &&
     typeof bigTotal === 'boolean' &&

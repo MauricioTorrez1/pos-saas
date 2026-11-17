@@ -1,6 +1,6 @@
 {
   "name": "@pos-saas/pos",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Desktop register built with Electron, React, and TypeScript.",
   "license": "AGPL-3.0-only",
