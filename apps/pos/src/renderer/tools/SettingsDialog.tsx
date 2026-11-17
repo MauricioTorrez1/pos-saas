@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from 'react';
+import { Fragment, useEffect, useState, type ReactElement } from 'react';
 
 import {
   comboLabel,
@@ -11,11 +11,17 @@ import {
   MAX_TICKET_COPIES,
   MAX_TICKET_EXTRA_LINES,
   problemWithCombo,
+  TEXT_SIZE_SCALE,
   TICKET_COLUMN_CHOICES,
+  TICKET_FONT_CHOICES,
+  TICKET_TEXT_SIZE_CHOICES,
+  ticketLineWidth,
   type KeyAction,
   type Keymap,
   type TicketColumns,
   type TicketDesign,
+  type TicketFont,
+  type TicketTextSize,
   type ToolsApi,
 } from '../../shared/register-tools';
 import { CheckField, Field, Message, SelectField, useAction } from '../ui/form-parts';
@@ -34,6 +40,22 @@ const PAPER_LABELS: Readonly<Record<TicketColumns, string>> = {
   42: 'Papel de 72 mm (42 letras por línea)',
   48: 'Papel de 80 mm (48 letras por línea)',
 };
+
+const FONT_LABELS: Readonly<Record<TicketFont, string>> = {
+  a: 'Normal (fuente A)',
+  b: 'Compacta (fuente B, caben más letras)',
+};
+
+const TEXT_SIZE_LABELS: Readonly<Record<TicketTextSize, string>> = {
+  normal: 'Normal',
+  tall: 'Alta (doble de alto)',
+  large: 'Grande (doble de alto y de ancho)',
+};
+
+/** The size of a letter of font A in the preview; the other fonts and sizes scale from it. */
+const PREVIEW_LETTER_REM = 0.78;
+/** Font B is about three quarters as wide as font A. */
+const FONT_B_WIDTH = 0.75;
 
 const MODIFIER_KEYS = ['Control', 'Shift', 'Alt', 'Meta', 'AltGraph'];
 
@@ -293,6 +315,19 @@ function TicketTab({ toolsApi }: { readonly toolsApi: ToolsApi }): ReactElement 
           options={TICKET_COLUMN_CHOICES.map((columns) => ({ value: String(columns), label: PAPER_LABELS[columns] }))}
         />
         <SelectField
+          label="Fuente"
+          value={design.font}
+          onChange={(value) => change({ font: value as TicketFont })}
+          options={TICKET_FONT_CHOICES.map((font) => ({ value: font, label: FONT_LABELS[font] }))}
+        />
+        <SelectField
+          label="Tamaño de letra"
+          value={design.textSize}
+          onChange={(value) => change({ textSize: value as TicketTextSize })}
+          options={TICKET_TEXT_SIZE_CHOICES.map((size) => ({ value: size, label: TEXT_SIZE_LABELS[size] }))}
+          hint={`Caben ${String(ticketLineWidth(design))} letras por renglón con este papel, fuente y tamaño.`}
+        />
+        <SelectField
           label="Copias por venta"
           value={String(design.copies)}
           onChange={(value) => change({ copies: Number(value) })}
@@ -328,8 +363,19 @@ function TicketTab({ toolsApi }: { readonly toolsApi: ToolsApi }): ReactElement 
       </div>
       <figure className="ticket-preview">
         <figcaption>Así sale el ticket</figcaption>
-        <pre aria-label="Vista previa del ticket" data-columns={design.columns}>
-          {preview.join('\n')}
+        <pre
+          aria-label="Vista previa del ticket"
+          data-columns={design.columns}
+          data-font={design.font}
+          data-size={design.textSize}
+          style={{ fontSize: `${String(PREVIEW_LETTER_REM * (design.font === 'b' ? FONT_B_WIDTH : 1) * TEXT_SIZE_SCALE[design.textSize].width)}rem` }}
+        >
+          {preview.map((line, index) => (
+            <Fragment key={index}>
+              <span className="ticket-preview-line">{line}</span>
+              {'\n'}
+            </Fragment>
+          ))}
         </pre>
       </figure>
     </section>

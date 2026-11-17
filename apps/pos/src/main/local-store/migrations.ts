@@ -736,4 +736,37 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'the lines of a sent order never change'); END;
     `,
   },
+  {
+    version: 19,
+    name: 'create_missing_items',
+    // What customers ask for that the store does not carry (E1-49, ADR 0063). Each time is a row that never changes, like
+    // a sale; item_key is the description without accents, capitals or extra spaces, so the times of the same thing are
+    // counted together. What the owner decided about an item is a row of its own, and going back to pending removes it.
+    sql: `
+      CREATE TABLE missing_item_request (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        description TEXT NOT NULL CHECK (length(trim(description)) BETWEEN 1 AND 80),
+        item_key TEXT NOT NULL CHECK (length(item_key) > 0),
+        quantity INTEGER CHECK (quantity IS NULL OR quantity BETWEEN 1 AND 99999),
+        notes TEXT CHECK (notes IS NULL OR length(notes) <= 120),
+        recorded_by TEXT NOT NULL,
+        recorded_at TEXT NOT NULL
+      ) STRICT;
+
+      CREATE INDEX missing_item_request_by_time ON missing_item_request (tenant_id, recorded_at);
+
+      CREATE TRIGGER missing_item_request_never_changes BEFORE UPDATE ON missing_item_request
+      BEGIN SELECT RAISE(ABORT, 'a missing item request never changes'); END;
+
+      CREATE TABLE missing_item_status (
+        tenant_id TEXT NOT NULL,
+        item_key TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('added', 'dismissed')),
+        decided_by TEXT NOT NULL,
+        decided_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, item_key)
+      ) STRICT, WITHOUT ROWID;
+    `,
+  },
 ];

@@ -1,6 +1,6 @@
 import { formatCents, formatUnitPriceE4, type Quantity, type TaxGroup, type TaxRate } from '@pos-saas/money';
 
-import { DEFAULT_TICKET_DESIGN, type TicketDesign } from '../../../shared/register-tools';
+import { DEFAULT_TICKET_DESIGN, TEXT_SIZE_SCALE, ticketLineWidth, type TicketDesign } from '../../../shared/register-tools';
 import type { SalePayment } from '../sale-recorder';
 import { EscPosBuilder } from './escpos';
 
@@ -66,7 +66,7 @@ export interface TicketPart {
   readonly text: string;
   readonly align: 'left' | 'center';
   readonly bold: boolean;
-  /** Double width and height. A big line holds half the characters. */
+  /** Twice as wide as the rest of the ticket. A big line holds half the characters. */
   readonly big: boolean;
 }
 
@@ -78,7 +78,7 @@ export interface TicketPart {
  * @returns every line in order, from the name of the business to the foot
  */
 export function composeTicket(ticket: TicketData, design: TicketDesign = DEFAULT_TICKET_DESIGN): TicketPart[] {
-  const width = design.columns;
+  const width = ticketLineWidth(design);
   const centered = (text: string, bold = false): TicketPart => ({ text: fit(text, width), align: 'center', bold, big: false });
   const left = (text: string): TicketPart => ({ text, align: 'left', bold: false, big: false });
   const parts: TicketPart[] = [centered(ticket.businessName, true)];
@@ -105,7 +105,7 @@ export function composeTicket(ticket: TicketData, design: TicketDesign = DEFAULT
   }
   parts.push(
     design.bigTotal
-      ? { text: twoColumns('TOTAL', formatCents(ticket.totalCents), Math.floor(width / 2)), align: 'left', bold: true, big: true }
+      ? { text: twoColumns('TOTAL', formatCents(ticket.totalCents), ticketLineWidth(design, true)), align: 'left', bold: true, big: true }
       : left(twoColumns('TOTAL', formatCents(ticket.totalCents), width)),
     left(rule(width)),
   );
@@ -141,6 +141,15 @@ export function layoutTicket(ticket: TicketData, design: TicketDesign = DEFAULT_
  */
 export function renderTicket(ticket: TicketData, design: TicketDesign = DEFAULT_TICKET_DESIGN): Uint8Array {
   const builder = new EscPosBuilder().initialize();
+  const base = TEXT_SIZE_SCALE[design.textSize];
+  // The big total is twice as wide as the rest, and at least twice as tall as a normal letter.
+  const big = { width: base.width * 2, height: Math.max(base.height, base.width * 2) };
+  if (design.font === 'b') {
+    builder.font('b');
+  }
+  if (design.textSize !== 'normal') {
+    builder.textSize(base.width, base.height);
+  }
   for (let copy = 0; copy < design.copies; copy += 1) {
     let align: TicketPart['align'] | null = null;
     for (const part of composeTicket(ticket, design)) {
@@ -149,7 +158,7 @@ export function renderTicket(ticket: TicketData, design: TicketDesign = DEFAULT_
         align = part.align;
       }
       if (part.big) {
-        builder.doubleSize(true);
+        builder.textSize(big.width, big.height);
       }
       if (part.bold) {
         builder.bold(true);
@@ -159,7 +168,7 @@ export function renderTicket(ticket: TicketData, design: TicketDesign = DEFAULT_
         builder.bold(false);
       }
       if (part.big) {
-        builder.doubleSize(false);
+        builder.textSize(base.width, base.height);
       }
     }
     builder.feed(FEED_BEFORE_CUT).cut();

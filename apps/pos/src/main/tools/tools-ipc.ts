@@ -5,6 +5,7 @@ import {
   isKeymap,
   isTicketDesign,
   normalizePrinterShare,
+  ticketLineWidth,
   TOOLS_CHANNELS,
   type Keymap,
   type SaleSummary,
@@ -103,7 +104,7 @@ export function registerToolsHandlers(
   answerSignedIn(TOOLS_CHANNELS.previewTicket, (value): string[] => {
     const design = requireDesign(value);
     return composeTicket(sampleTicket(businessName()), design).map((part) =>
-      part.align === 'center' ? center(part.text, part.big ? Math.floor(design.columns / 2) : design.columns) : part.text,
+      part.align === 'center' ? center(part.text, ticketLineWidth(design, part.big)) : part.text,
     );
   });
 

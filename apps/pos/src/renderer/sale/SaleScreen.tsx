@@ -85,6 +85,8 @@ interface SaleScreenProps {
   readonly onOpenSettings?: () => void;
   /** Opens the list of sales, where a past sale is cancelled. Without it, its key does nothing. */
   readonly onOpenSalesHistory?: () => void;
+  /** Opens the log of missing items with what was looked for. Without it, its key does nothing. */
+  readonly onOpenMissingItems?: (text: string) => void;
 }
 
 /**
@@ -105,7 +107,7 @@ interface SaleScreenProps {
  * @param props.onCashChanged called after a sale was collected
  * @returns the screen
  */
-export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onOpenDashboard, onOpenSupplierOrder, onCashChanged, keymap = DEFAULT_KEYMAP, toolsApi, onOpenSettings, onOpenSalesHistory }: SaleScreenProps): ReactElement {
+export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onOpenDashboard, onOpenSupplierOrder, onCashChanged, keymap = DEFAULT_KEYMAP, toolsApi, onOpenSettings, onOpenSalesHistory, onOpenMissingItems }: SaleScreenProps): ReactElement {
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
@@ -431,6 +433,10 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
       case 'salesHistory':
         onOpenSalesHistory?.();
         return;
+      case 'missingItems':
+        onOpenMissingItems?.(missing?.text ?? '');
+        setMissing(null);
+        return;
       case 'reprint':
         void reprintLast();
         return;
@@ -563,11 +569,18 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
             {message}
           </p>
         )}
-        {missing !== null && productApi !== undefined && (
-          <p>
-            <button type="button" className="button" tabIndex={-1} onClick={openNewProduct}>
-              Dar de alta «{missing.text}» <kbd>{comboLabel(keymap.newProduct)}</kbd>
-            </button>
+        {missing !== null && (productApi !== undefined || onOpenMissingItems !== undefined) && (
+          <p className="not-found-actions">
+            {productApi !== undefined && (
+              <button type="button" className="button" tabIndex={-1} onClick={openNewProduct}>
+                Dar de alta «{missing.text}» <kbd>{comboLabel(keymap.newProduct)}</kbd>
+              </button>
+            )}
+            {onOpenMissingItems !== undefined && !missing.fromScanner && (
+              <button type="button" className="button" tabIndex={-1} onClick={() => runAction('missingItems')}>
+                Anotar como faltante <kbd>{comboLabel(keymap.missingItems)}</kbd>
+              </button>
+            )}
           </p>
         )}
         {info !== null && (

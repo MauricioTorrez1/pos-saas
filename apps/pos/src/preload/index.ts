@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import { DASHBOARD_CHANNELS, type DashboardApi } from '../shared/dashboard-api';
+import { MISSING_CHANNELS, type MissingItemsApi } from '../shared/missing-items';
 import { IPC_CHANNELS, type PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
@@ -68,6 +69,14 @@ const purchasingApi: PurchasingApi = {
   revealFile: (path) => ipcRenderer.invoke(PURCHASING_CHANNELS.revealFile, path),
 };
 
+/** The log of what customers ask for and the store does not carry (E1-49). */
+const missingApi: MissingItemsApi = {
+  record: (request) => ipcRenderer.invoke(MISSING_CHANNELS.record, request),
+  report: (period) => ipcRenderer.invoke(MISSING_CHANNELS.report, period),
+  resolve: (request) => ipcRenderer.invoke(MISSING_CHANNELS.resolve, request),
+  exportPdf: (period) => ipcRenderer.invoke(MISSING_CHANNELS.exportPdf, period),
+};
+
 /** The keys, the ticket, the printer and the list of sales. A bridge of their own, like the purchase orders. */
 const toolsApi: ToolsApi = {
   getKeymap: () => ipcRenderer.invoke(TOOLS_CHANNELS.getKeymap),
@@ -85,3 +94,4 @@ const toolsApi: ToolsApi = {
 contextBridge.exposeInMainWorld('pos', posApi);
 contextBridge.exposeInMainWorld('tools', toolsApi);
 contextBridge.exposeInMainWorld('purchasing', purchasingApi);
+contextBridge.exposeInMainWorld('missing', missingApi);

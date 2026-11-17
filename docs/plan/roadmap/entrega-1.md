@@ -535,3 +535,13 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** E1-39, E1-42, E1-43, E1-45 · **Estimación:** 10 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Cómo dejas que el usuario cambie atajos sin romper el lector de códigos? (2) ¿Por qué un precio por venta se audita en lugar de prohibirse?
+
+### E1-49 · Bitácora de faltantes y letra del ticket
+- **Objetivo:** la cajera anota en segundos lo que un cliente pidió y no hay, y el dueño ve qué se pide más, decide qué empezar a vender y lo descarga en PDF con gráficas; el ticket se imprime con la fuente y el tamaño de letra que el dueño elija.
+- **Conceptos:** [Registro de eventos inmutable], [Llave normalizada], [SVG en PDF], [ESC/POS]
+- **Claude / tú:** Claude escribe la tabla, el servicio, la pantalla, el PDF y los comandos de fuente y tamaño. Tú pruebas la fuente B y los tamaños en la impresora de la tienda.
+- **Pruebas:** Vitest para agrupar por llave, periodos, semanas vacías, decisiones del dueño con auditoría, inmutabilidad, PDF escapado con tres gráficas, canales con permisos, la pantalla y el aviso «Anotar como faltante»; bytes ESC/POS de fuente y tamaño y letras por renglón.
+- **Criterios:** ADR 0063; sin dependencias nuevas; el ticket por defecto sale con los mismos bytes; un diseño viejo se lee con fuente A y tamaño normal.
+- **Depende de:** E1-48 · **Estimación:** 4 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Por qué guardar cada vez que se pide en lugar de un contador? (2) ¿Cómo dibujas una gráfica en un PDF que se genera sin JavaScript?

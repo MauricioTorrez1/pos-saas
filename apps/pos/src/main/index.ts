@@ -19,6 +19,7 @@ import { UserStore } from './auth/user-store';
 import { PendingSales } from './checkout/pending-sales';
 import { DashboardExporter } from './reports/dashboard-exporter';
 import { DashboardService } from './reports/dashboard-service';
+import { MissingItemsLog } from './missing/missing-items-log';
 import { printHtmlToPdf } from './reports/pdf-printer';
 import { ReportService } from './reports/report-service';
 import { ReturnService } from './returns/return-service';
@@ -216,6 +217,10 @@ async function start(): Promise<void> {
       printer,
       audit: new AuditLog(store, LOCAL_TENANT_ID),
       businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
+    },
+    missingItems: {
+      log: new MissingItemsLog(store, LOCAL_TENANT_ID, new AuditLog(store, LOCAL_TENANT_ID)),
+      exporter: { pickSavePath, renderPdf: printHtmlToPdf, businessName: () => appearance.read().businessName || UNNAMED_BUSINESS },
     },
   });
   await openMainWindow(rendererEntry, PRELOAD_PATH);

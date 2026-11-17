@@ -1,6 +1,7 @@
 import { lineTotals, quantityOf, saleTotals, taxRateOf } from '@pos-saas/money';
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_TICKET_DESIGN } from '../../../shared/register-tools';
 import { EscPosBuilder } from './escpos';
 import { formatFolio, layoutTicket, renderTicket, TICKET_COLUMNS, type TicketData } from './ticket';
 
@@ -139,5 +140,28 @@ describe('renderTicket', () => {
     const expected = new EscPosBuilder().initialize().toBytes();
 
     expect([...renderTicket(aTicket()).slice(0, expected.length)]).toEqual([...expected]);
+  });
+
+  it('prints in the narrow font with more letters per line when the design asks for font B', () => {
+    const design = { ...DEFAULT_TICKET_DESIGN, font: 'b' as const };
+    const bytes = [...renderTicket(aTicket(), design)];
+
+    expect(bytes.slice(5, 8)).toEqual([0x1b, 0x4d, 1]);
+    expect(layoutTicket(aTicket(), design).every((line) => [...line].length <= 64)).toBe(true);
+    expect(layoutTicket(aTicket(), design).some((line) => [...line].length > 48)).toBe(true);
+  });
+
+  it('prints every letter twice as tall, and the big total twice as wide on top of that', () => {
+    const bytes = [...renderTicket(aTicket(), { ...DEFAULT_TICKET_DESIGN, textSize: 'tall', bigTotal: true })];
+
+    expect(bytes.slice(5, 8)).toEqual([0x1d, 0x21, 0x01]);
+    const text = bytes.join(',');
+    expect(text).toContain([0x1d, 0x21, 0x11].join(','));
+  });
+
+  it('fits half the letters in a line when the letters are large', () => {
+    const lines = layoutTicket(aTicket(), { ...DEFAULT_TICKET_DESIGN, textSize: 'large' });
+
+    expect(lines.every((line) => [...line].length <= 24)).toBe(true);
   });
 });

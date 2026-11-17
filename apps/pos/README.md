@@ -137,7 +137,17 @@ Since [ADR 0061](../../docs/adr/0061-rediseno-de-la-caja-y-herramientas-del-duen
 | `Shift+F4` | Opens **Ventas**, the completed sales. A past sale is cancelled there as a return of everything that is left, with a reason and the approval of the owner |
 | `Shift+F9` | Opens **Ajustes** (owner only): shortcuts, ticket design with a live sample, and the ticket printer with a test print |
 
+The ticket design also picks the printer font (A, or the narrow B that fits a third more letters per line) and the letter size (normal, tall, or large), and the sample shows how many letters fit per line ([ADR 0063](../../docs/adr/0063-bitacora-de-faltantes-y-letra-del-ticket.md)).
+
 Boxes for amounts, quantities and PINs take digits and one decimal point only (`keepNumeric`). The settings live in `register_setting`, so there is no migration. The catalog import reads `.xlsx` as well as CSV with a reader of its own (`main/import/xlsx-reader.ts`), and shows how to title the columns before the file is chosen.
+
+## Missing items
+**Faltantes** (`Shift+F2`, or the header button) is the log of what customers ask for and the store does not carry ([ADR 0063](../../docs/adr/0063-bitacora-de-faltantes-y-letra-del-ticket.md)). When a search by name finds nothing, the notice offers «Anotar como faltante» with the text already typed.
+
+- Each time is a row of `missing_item_request` that never changes. Times of the same item are counted together by a key without accents, capitals or extra spaces.
+- The dialog shows the most asked items, the totals, and charts by week and by day of the week, for 30 days, 3 months, a year, or everything.
+- The owner marks an item as «Ya lo vendemos» or «Descartar», or puts it back to pending. Each decision goes to the audit log.
+- «Descargar PDF con gráficas» saves the log of the period with three SVG charts and every item.
 
 ## Sale states and recovery
 A sale is saved as `pending_payment` before anything is charged, so a power cut can never leave money without a record ([ADR 0010](../../docs/adr/0010-guardar-antes-de-cobrar.md)). From there it can only become `completed` or `cancelled`, and each change is one transaction. `src/main/checkout/sale-state-machine.ts` gives a clear error, and triggers in the database refuse the same changes if the code ever gets it wrong ([ADR 0025](../../docs/adr/0025-maquina-de-estados-de-la-venta.md)).
