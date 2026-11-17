@@ -30,7 +30,7 @@ services:
 
   # Its data lives in the keycloak database of PostgreSQL, so it needs no volume of its own.
   keycloak:
-    image: quay.io/keycloak/keycloak:26.8.1@sha256:3f3c5f8e03c614774b4bd9173b88391fefa4153bfc010d8012d59ad825377332
+    image: quay.io/keycloak/keycloak:26.8.2-2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
     profiles: [core]
     # --import-realm loads the realm of keycloak/ only when it does not exist yet (ADR 0039).
     command: ["start-dev", "--import-realm"]
@@ -90,7 +90,7 @@ services:
       retries: 20
 
   redpanda:
-    image: redpandadata/redpanda:v26.2.6@sha256:8b1076e0d61bfceb66594dc01536427ce0b529f8ead35fdab9763ab6085891ce
+    image: redpandadata/redpanda:v26.2.7@sha256:43545ee03966431f5451e0b3c1e651b39fbe3eb383360220311021f50133b649
     profiles: [core]
     # Other containers use redpanda:9092. Programs on this PC use localhost:19092.
     command:
