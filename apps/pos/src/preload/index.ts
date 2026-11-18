@@ -67,6 +67,7 @@ const purchasingApi: PurchasingApi = {
   discardOrder: (request) => ipcRenderer.invoke(PURCHASING_CHANNELS.discardOrder, request),
   exportOrder: (request) => ipcRenderer.invoke(PURCHASING_CHANNELS.exportOrder, request),
   revealFile: (path) => ipcRenderer.invoke(PURCHASING_CHANNELS.revealFile, path),
+  orderMore: (request) => ipcRenderer.invoke(PURCHASING_CHANNELS.orderMore, request),
 };
 
 /** The log of what customers ask for and the store does not carry (E1-49). */
@@ -74,6 +75,8 @@ const missingApi: MissingItemsApi = {
   record: (request) => ipcRenderer.invoke(MISSING_CHANNELS.record, request),
   report: (period) => ipcRenderer.invoke(MISSING_CHANNELS.report, period),
   resolve: (request) => ipcRenderer.invoke(MISSING_CHANNELS.resolve, request),
+  editNotes: (request) => ipcRenderer.invoke(MISSING_CHANNELS.editNotes, request),
+  remove: (key) => ipcRenderer.invoke(MISSING_CHANNELS.remove, key),
   exportPdf: (period) => ipcRenderer.invoke(MISSING_CHANNELS.exportPdf, period),
 };
 

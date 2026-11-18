@@ -17,6 +17,8 @@ import {
   type OrderCandidate,
   type OrderLine,
   type OrderLineRequest,
+  type OrderMoreRequest,
+  type OrderMoreResult,
   type PurchaseOrder,
   type PurchaseOrderSummary,
   type SaveOrderRequest,
@@ -35,6 +37,9 @@ import type { ProductReader } from '../products/product-reader';
 import { SyncOutbox } from '../sync/sync-outbox';
 import { uuidV7 } from '../uuid-v7';
 import { optionalText, type SupplierService } from './supplier-service';
+
+/** One unit of any product, in thousandths: what «Pedir más» orders of a product without a reorder level. */
+const MILLI_PER_UNIT = 1000;
 
 /** The most products one search lists. */
 const SEARCH_LIMIT = 20;
@@ -149,6 +154,7 @@ export class PurchaseOrderService {
   readonly #supplierHasLinks: StatementSync;
   readonly #productHasCodeOf: StatementSync;
   readonly #upsertLevel: StatementSync;
+  readonly #latestDraftOf: StatementSync;
 
   /**
    * @param store the open local database
@@ -191,6 +197,9 @@ export class PurchaseOrderService {
         (SELECT coalesce(sum(line_total_cents), 0) FROM purchase_order_line WHERE order_id = purchase_order.id) AS total_cents
       FROM purchase_order WHERE purchase_order.tenant_id = ?
       ORDER BY purchase_order.status = 'draft' DESC, purchase_order.folio DESC
+    `);
+    this.#latestDraftOf = store.prepare(`
+      SELECT id FROM purchase_order WHERE tenant_id = ? AND supplier_id = ? AND status = 'draft' ORDER BY updated_at DESC, folio DESC LIMIT 1
     `);
     this.#nextFolio = store.prepare('SELECT coalesce(max(folio), 0) + 1 AS folio FROM purchase_order WHERE tenant_id = ?');
     this.#insertOrder = store.prepare(`
@@ -634,6 +643,44 @@ export class PurchaseOrderService {
       });
     });
     return { status: 'discarded' };
+  }
+
+  /**
+   * Adds a product to the newest draft order of a supplier, or starts a draft when it has none («Pedir más», ADR 0064).
+   * The quantity fills the product up to its maximum, or is one unit without a reorder level; the code and the cost are
+   * those of that supplier. The same rules as saving an order apply, the owner PIN included.
+   *
+   * @param request the product, the supplier and the PIN of an owner when a cashier asks
+   * @returns `added` with the order and the quantity, `already_in_order` when the draft already has it, or why not
+   * @throws Error if nobody is signed in
+   */
+  orderMore(request: OrderMoreRequest): OrderMoreResult {
+    const candidate = this.#candidate(request.productId, request.supplierId, 'name', null);
+    if (candidate === null) {
+      return { status: 'product_not_found', productId: request.productId };
+    }
+    const draftRow = this.#latestDraftOf.get(this.#tenantId, request.supplierId) as unknown as { id: string } | undefined;
+    const draft = draftRow === undefined ? null : this.get(draftRow.id);
+    if (draft !== null && draft.lines.some((line) => line.productId === request.productId)) {
+      return { status: 'already_in_order', order: draft };
+    }
+    if (draft !== null && draft.lines.length >= MAX_ORDER_LINES) {
+      return { status: 'full' };
+    }
+    const code = candidate.supplierCodes[0] ?? null;
+    const quantityMilli = candidate.suggestedMilli ?? MILLI_PER_UNIT;
+    const lines: OrderLineRequest[] = [
+      ...(draft?.lines ?? []).map((line) => ({ productId: line.productId, supplierCode: line.supplierCode, quantityMilli: line.quantityMilli, unitCostE6: line.unitCostE6 })),
+      { productId: request.productId, supplierCode: code?.supplierCode ?? null, quantityMilli, unitCostE6: code?.listCostE6 ?? candidate.estimatedCostE6 },
+    ];
+    const result = this.save({
+      ...(draft === null ? {} : { orderId: draft.id, expectedRevision: draft.revision }),
+      supplierId: request.supplierId,
+      notes: draft?.notes ?? null,
+      lines,
+      ...(request.ownerPin === undefined ? {} : { ownerPin: request.ownerPin }),
+    });
+    return result.status === 'saved' ? { status: 'added', order: result.order, quantityMilli } : result;
   }
 
   #prepareLine(line: OrderLineRequest): PreparedLine | null {

@@ -122,8 +122,8 @@ test('edits a product from the panel, gives it up so the sale cannot find it, an
   expect(await readRows(register, databasePath, "SELECT type, quantity_milli FROM stock_movement WHERE type = 'waste'")).toEqual([{ type: 'waste', quantity_milli: -1_000 }]);
 
   // Giving it up hides it from the sale, and nothing is deleted.
-  await page.getByRole('checkbox', { name: /A la venta/ }).uncheck();
-  await page.keyboard.press('F2');
+  await page.getByRole('button', { name: 'Dar de baja' }).click();
+  await page.getByRole('button', { name: /Sí, dar de baja/ }).click();
   await expect(panel).toContainText('Este producto está dado de baja');
   await page.keyboard.press('Escape');
   await expect(panel).toHaveCount(0);
@@ -145,8 +145,7 @@ test('edits a product from the panel, gives it up so the sale cannot find it, an
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Martillo de bola 16 oz' })).toBeVisible();
   await expect(panel).toContainText('Este producto está dado de baja');
-  await page.getByRole('checkbox', { name: /A la venta/ }).check();
-  await page.keyboard.press('F2');
+  await page.getByRole('button', { name: 'Reactivar producto' }).click();
   await expect(panel).not.toContainText('Este producto está dado de baja');
   await page.keyboard.press('Escape');
   await expect(panel).toHaveCount(0);

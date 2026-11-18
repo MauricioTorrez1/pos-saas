@@ -1,6 +1,6 @@
 import { formatCents, formatUnitPriceE4, type Quantity, type TaxGroup, type TaxRate } from '@pos-saas/money';
 
-import { DEFAULT_TICKET_DESIGN, TEXT_SIZE_SCALE, ticketLineWidth, type TicketDesign } from '../../../shared/register-tools';
+import { DEFAULT_TICKET_DESIGN, TEXT_SIZE_SCALE, ticketLineWidth, withCurrency, type TicketDesign } from '../../../shared/register-tools';
 import type { SalePayment } from '../sale-recorder';
 import { EscPosBuilder } from './escpos';
 
@@ -81,7 +81,9 @@ export function composeTicket(ticket: TicketData, design: TicketDesign = DEFAULT
   const width = ticketLineWidth(design);
   const centered = (text: string, bold = false): TicketPart => ({ text: fit(text, width), align: 'center', bold, big: false });
   const left = (text: string): TicketPart => ({ text, align: 'left', bold: false, big: false });
-  const parts: TicketPart[] = [centered(ticket.businessName, true)];
+  const money = (amountCents: number): string => withCurrency(formatCents(amountCents), design.currency);
+  const name = design.businessName.trim() === '' ? ticket.businessName : design.businessName.trim();
+  const parts: TicketPart[] = [centered(name, true)];
   design.headerLines.filter((line) => line.trim() !== '').forEach((line) => parts.push(centered(line)));
   parts.push(centered(`Folio ${ticket.folio}`), centered(MOMENT_FORMAT.format(new Date(ticket.completedAt))));
   if (ticket.isReprint) {
@@ -90,30 +92,30 @@ export function composeTicket(ticket: TicketData, design: TicketDesign = DEFAULT
   parts.push(left(rule(width)));
   for (const line of ticket.lines) {
     if (design.showUnitPrice) {
-      parts.push(left(twoColumns(line.name, formatCents(line.totalCents), width)));
-      parts.push(left(`  ${formatQuantity(line.quantity)} x ${formatUnitPriceE4(line.unitPriceE4)}`));
+      parts.push(left(twoColumns(line.name, money(line.totalCents), width)));
+      parts.push(left(`  ${formatQuantity(line.quantity)} x ${withCurrency(formatUnitPriceE4(line.unitPriceE4), design.currency)}`));
     } else {
-      parts.push(left(twoColumns(`${formatQuantity(line.quantity)} ${line.name}`, formatCents(line.totalCents), width)));
+      parts.push(left(twoColumns(`${formatQuantity(line.quantity)} ${line.name}`, money(line.totalCents), width)));
     }
   }
   parts.push(left(rule(width)));
   if (design.showTaxBreakdown) {
-    parts.push(left(twoColumns('Subtotal', formatCents(ticket.subtotalCents), width)));
+    parts.push(left(twoColumns('Subtotal', money(ticket.subtotalCents), width)));
     for (const group of ticket.taxGroups) {
-      parts.push(left(twoColumns(taxLabel(group.taxRate), group.taxRate.factor === 'exempt' ? 'Sin IVA' : formatCents(group.taxCents), width)));
+      parts.push(left(twoColumns(taxLabel(group.taxRate), group.taxRate.factor === 'exempt' ? 'Sin IVA' : money(group.taxCents), width)));
     }
   }
   parts.push(
     design.bigTotal
-      ? { text: twoColumns('TOTAL', formatCents(ticket.totalCents), ticketLineWidth(design, true)), align: 'left', bold: true, big: true }
-      : left(twoColumns('TOTAL', formatCents(ticket.totalCents), width)),
+      ? { text: twoColumns('TOTAL', money(ticket.totalCents), ticketLineWidth(design, true)), align: 'left', bold: true, big: true }
+      : left(twoColumns('TOTAL', money(ticket.totalCents), width)),
     left(rule(width)),
   );
   for (const payment of ticket.payments) {
-    parts.push(left(twoColumns(paymentLabel(payment), formatCents(payment.amountCents), width)));
+    parts.push(left(twoColumns(paymentLabel(payment), money(payment.amountCents), width)));
   }
   if (ticket.changeCents !== null && ticket.changeCents > 0) {
-    parts.push(left(twoColumns('Cambio', formatCents(ticket.changeCents), width)));
+    parts.push(left(twoColumns('Cambio', money(ticket.changeCents), width)));
   }
   design.footerLines.filter((line) => line.trim() !== '').forEach((line) => parts.push(centered(line)));
   return parts;

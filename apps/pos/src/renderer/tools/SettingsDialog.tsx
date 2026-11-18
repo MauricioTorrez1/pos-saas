@@ -14,6 +14,9 @@ import {
   TEXT_SIZE_SCALE,
   TICKET_COLUMN_CHOICES,
   TICKET_FONT_CHOICES,
+  TICKET_CURRENCY_CHOICES,
+  MAX_TICKET_BUSINESS_NAME,
+  type TicketCurrency,
   TICKET_TEXT_SIZE_CHOICES,
   ticketLineWidth,
   type KeyAction,
@@ -39,6 +42,12 @@ const PAPER_LABELS: Readonly<Record<TicketColumns, string>> = {
   32: 'Papel de 58 mm (32 letras por línea)',
   42: 'Papel de 72 mm (42 letras por línea)',
   48: 'Papel de 80 mm (48 letras por línea)',
+};
+
+const CURRENCY_LABELS: Readonly<Record<TicketCurrency, string>> = {
+  symbol: 'Signo de pesos ($12.50)',
+  symbol_code: 'Signo y código ($12.50 MXN)',
+  code: 'Solo código (MXN 12.50)',
 };
 
 const FONT_LABELS: Readonly<Record<TicketFont, string>> = {
@@ -286,6 +295,19 @@ function TicketTab({ toolsApi }: { readonly toolsApi: ToolsApi }): ReactElement 
   return (
     <section className="ticket-designer" aria-label="Diseño del ticket">
       <div className="ticket-options">
+        <Field
+          label="Nombre del negocio"
+          value={design.businessName}
+          onChange={(businessName) => change({ businessName })}
+          maxLength={MAX_TICKET_BUSINESS_NAME}
+          hint="Va arriba, en negritas. Vacío usa el nombre con el que se dio de alta la caja."
+        />
+        <SelectField
+          label="Moneda"
+          value={design.currency}
+          onChange={(value) => change({ currency: value as TicketCurrency })}
+          options={TICKET_CURRENCY_CHOICES.map((currency) => ({ value: currency, label: CURRENCY_LABELS[currency] }))}
+        />
         <label className="payment-field">
           <span>Encabezado (bajo el nombre del negocio)</span>
           <textarea

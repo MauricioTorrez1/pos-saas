@@ -33,6 +33,8 @@ function apiWith(overrides: Partial<MissingItemsApi> = {}): MissingItemsApi {
     record: () => Promise.resolve({ status: 'recorded', timesAsked: 6 }),
     report: () => Promise.resolve(REPORT),
     resolve: () => Promise.resolve(),
+    editNotes: () => Promise.resolve({ status: 'recorded', timesAsked: 5 }),
+    remove: () => Promise.resolve(),
     exportPdf: () => Promise.resolve({ status: 'saved', path: 'C:\\faltantes.pdf' }),
     ...overrides,
   };
@@ -68,6 +70,25 @@ describe('MissingItemsDialog', () => {
     fireEvent.click((await screen.findAllByRole('button', { name: 'Ya lo vendemos', hidden: true }))[0]!);
 
     await waitFor(() => expect(resolve).toHaveBeenCalledExactlyOnceWith({ key: 'taquete de 1/4', status: 'added' }));
+  });
+
+  it('offers no «Descartar», edits the notes, and deletes with the red button after asking', async () => {
+    const editNotes = vi.fn<MissingItemsApi['editNotes']>(() => Promise.resolve({ status: 'recorded', timesAsked: 5 }));
+    const remove = vi.fn<MissingItemsApi['remove']>(() => Promise.resolve());
+    render(<MissingItemsDialog api={apiWith({ editNotes, remove })} isOwner onClose={() => undefined} />);
+    await screen.findByRole('list', { name: 'Faltantes, lo más pedido primero', hidden: true });
+    expect(screen.queryByRole('button', { name: 'Descartar', hidden: true })).toBeNull();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Editar notas', hidden: true })[0]!);
+    fireEvent.change(screen.getByLabelText('Notas de Taquete de 1/4'), { target: { value: 'Fischer, caja de 100' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar notas', hidden: true }));
+    await waitFor(() => expect(editNotes).toHaveBeenCalledExactlyOnceWith({ key: 'taquete de 1/4', notes: 'Fischer, caja de 100' }));
+
+    const deleteButton = screen.getAllByRole('button', { name: 'Eliminar', hidden: true })[0]!;
+    expect(deleteButton.className).toContain('button-danger');
+    fireEvent.click(deleteButton);
+    fireEvent.click(await screen.findByRole('button', { name: /Sí, eliminar/, hidden: true }));
+    await waitFor(() => expect(remove).toHaveBeenCalledExactlyOnceWith('taquete de 1/4'));
   });
 
   it('reads another period and saves the PDF of it', async () => {

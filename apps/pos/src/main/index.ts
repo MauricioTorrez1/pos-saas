@@ -213,7 +213,7 @@ async function start(): Promise<void> {
     }),
     tools: {
       store: tools,
-      history: new SalesHistory(store, LOCAL_TENANT_ID),
+      history: new SalesHistory(store, LOCAL_TENANT_ID, catalog),
       printer,
       audit: new AuditLog(store, LOCAL_TENANT_ID),
       businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,

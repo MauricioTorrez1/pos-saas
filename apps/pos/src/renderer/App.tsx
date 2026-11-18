@@ -304,7 +304,7 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
         onOpenReturns={openReturns}
         onOpenAdmin={openAdmin}
         {...(dashboardApi === undefined ? {} : { onOpenDashboard: openDashboard })}
-        {...(purchasingApi === undefined ? {} : { onOpenSupplierOrder: openOrders })}
+        {...(purchasingApi === undefined ? {} : { onOpenSupplierOrder: openOrders, purchasingApi })}
         {...(missingApi === undefined ? {} : { onOpenMissingItems: openMissing })}
         onCashChanged={refreshCash}
         keymap={keymap}
@@ -338,7 +338,7 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
       {isAdministering && !hasPendingSales && (
         <AdminDialog posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} {...(productApi === undefined ? {} : { productApi })} {...(dashboardApi === undefined ? {} : { onOpenDashboard: openDashboardFromAdmin })} {...(purchasingApi === undefined ? {} : { onOpenSupplierOrder: openOrdersFromAdmin })} onClose={closeAdmin} />
       )}
-      {isViewingDashboard && !hasPendingSales && dashboardApi !== undefined && <DashboardDialog api={dashboardApi} user={user} onClose={closeDashboard} />}
+      {isViewingDashboard && !hasPendingSales && dashboardApi !== undefined && <DashboardDialog api={dashboardApi} user={user} onClose={closeDashboard} {...(toolsApi === undefined ? {} : { searchSales: (text: string) => toolsApi.listRecentSales(text) })} />}
       {ordering !== null && !hasPendingSales && purchasingApi !== undefined && <SupplierOrderDialog api={purchasingApi} isOwner={isOwner} onClose={closeOrders} />}
       {isEditingSettings && !hasPendingSales && toolsApi !== undefined && (
         <SettingsDialog toolsApi={toolsApi} keymap={keymap} onKeymapSaved={setKeymap} onClose={closeSettings} />

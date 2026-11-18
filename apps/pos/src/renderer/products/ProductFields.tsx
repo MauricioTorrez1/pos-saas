@@ -3,7 +3,7 @@ import { useState, type ReactElement } from 'react';
 
 import { problemWithBarcode } from '../../shared/product-admin';
 import { formatTaxLabel } from '../sale/format';
-import { CheckField, Field, SelectField } from '../ui/form-parts';
+import { Field, SelectField } from '../ui/form-parts';
 import { CostAndMargin } from './CostAndMargin';
 import { offeredTaxRates, taxKeyOf, taxRateOfKey, type ProductFormProblems, type ProductFormValues } from './product-form';
 
@@ -40,8 +40,6 @@ interface ProductFieldsProps {
   readonly unitLockedReason?: string | undefined;
   /** The rate the product already has, offered even if it is not one of the usual ones. */
   readonly currentTaxRate?: TaxRate;
-  /** The label of the box that says whether the product is sold. */
-  readonly activeLabel?: string;
   /** The price the product has now, as text in pesos, to show what it earns when the price is not edited here. */
   readonly currentPrice?: string;
 }
@@ -66,7 +64,6 @@ export function ProductFields({
   showStock = true,
   unitLockedReason,
   currentTaxRate,
-  activeLabel = 'A la venta',
   currentPrice,
 }: ProductFieldsProps): ReactElement {
   const [codeText, setCodeText] = useState('');
@@ -153,7 +150,6 @@ export function ProductFields({
       {showStock && (
         <Field label="Existencia inicial (opcional)" numeric="decimal" value={values.stock} onChange={(stock) => onChange({ stock })} maxLength={12} hint={`Lo que hay en el estante ahora. ${STOCK_HINTS[values.unit]}`} problem={problems.stock} />
       )}
-      <CheckField label={activeLabel} checked={values.isActive} onChange={(isActive) => onChange({ isActive })} />
     </div>
   );
 }
