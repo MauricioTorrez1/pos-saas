@@ -65,6 +65,18 @@ test('exports the whole catalog as a CSV that Excel opens with its accents (E1-5
   expect(lines).toContainEqual(expect.stringContaining('"Cable THW, calibre 12",Metro'));
   expect(lines).toContainEqual(expect.stringContaining('Leyenda'));
 
+  // The PDF is printed in landscape from a temporary file by the real engine of the app.
+  const pdfPath = join(userDataDir, 'catalogo.pdf');
+  await register.evaluate(({ dialog }, path) => {
+    dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: path });
+  }, pdfPath);
+  await page.keyboard.press('F2');
+  await expect(page.getByRole('status')).toContainText(pdfPath);
+  const pdf = readFileSync(pdfPath);
+  expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+  // Letter landscape is 792 points wide and 612 tall.
+  expect(pdf.toString('latin1')).toMatch(/\/MediaBox\s*\[\s*0 0 792 612\s*\]/);
+
   await page.keyboard.press('Escape');
   await expect(page.getByRole('heading', { name: 'Administración' })).toBeVisible();
 });
