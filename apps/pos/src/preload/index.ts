@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import { EXIT_CHANNELS, type ExitApi } from '../shared/exit-api';
+import { CATALOG_EXPORT_CHANNELS, type CatalogExportApi } from '../shared/catalog-export';
 import { DASHBOARD_CHANNELS, type DashboardApi } from '../shared/dashboard-api';
 import { EXPENSE_CHANNELS, type ExpensesApi } from '../shared/expenses';
 import { MISSING_CHANNELS, type MissingItemsApi } from '../shared/missing-items';
@@ -107,6 +108,11 @@ const toolsApi: ToolsApi = {
   recordSaleCancelled: (request) => ipcRenderer.invoke(TOOLS_CHANNELS.recordSaleCancelled, request),
 };
 
+/** Saves the whole catalog as a file (E1-55). A bridge of its own, like the log of missing items. */
+const catalogExportApi: CatalogExportApi = {
+  exportCatalog: (request) => ipcRenderer.invoke(CATALOG_EXPORT_CHANNELS.exportCatalog, request),
+};
+
 const supplierCatalogApi: SupplierCatalogApi = {
   pickPriceList: (supplierId) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.pickPriceList, supplierId),
   importPriceList: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.importPriceList, request),
@@ -133,4 +139,5 @@ contextBridge.exposeInMainWorld('exit', exitApi);
 contextBridge.exposeInMainWorld('tools', toolsApi);
 contextBridge.exposeInMainWorld('purchasing', purchasingApi);
 contextBridge.exposeInMainWorld('missing', missingApi);
+contextBridge.exposeInMainWorld('catalogExport', catalogExportApi);
 contextBridge.exposeInMainWorld('expenses', expensesApi);

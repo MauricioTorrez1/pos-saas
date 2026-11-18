@@ -12,7 +12,7 @@ if (container === null) {
 createRoot(container).render(
   <StrictMode>
     <ErrorBoundary>
-      <App posApi={window.pos} pricingApi={window.pos} productApi={window.pos} dashboardApi={window.pos} purchasingApi={window.purchasing} catalogApi={window.supplierCatalog} toolsApi={window.tools} missingApi={window.missing} exitApi={window.exit} expensesApi={window.expenses} />
+      <App posApi={window.pos} pricingApi={window.pos} productApi={window.pos} dashboardApi={window.pos} purchasingApi={window.purchasing} catalogApi={window.supplierCatalog} toolsApi={window.tools} missingApi={window.missing} exitApi={window.exit} catalogExportApi={window.catalogExport} expensesApi={window.expenses} />
     </ErrorBoundary>
   </StrictMode>,
 );

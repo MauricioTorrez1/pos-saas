@@ -48,6 +48,8 @@ import type { PendingSales } from './checkout/pending-sales';
 import type { SalePayments } from './checkout/sale-payments';
 import type { AppearanceStore } from './local-store/appearance-store';
 import type { ProductCatalog } from './local-store/product-catalog';
+import { registerCatalogExportHandlers } from './catalog-export/catalog-export-ipc';
+import type { CatalogExporter } from './catalog-export/catalog-exporter';
 import { registerMissingItemsHandlers, type MissingItemsServices } from './missing/missing-items-ipc';
 import { registerPurchasingHandlers, type PurchasingServices } from './purchasing/purchasing-ipc';
 import { registerSupplierCatalogHandlers, type SupplierCatalogServices } from './purchasing/supplier-catalog-ipc';
@@ -79,6 +81,8 @@ export interface IpcServices {
   /** The log of what customers ask for and the store does not carry (E1-49). */
   readonly missingItems: MissingItemsServices;
   readonly supplierCatalog: SupplierCatalogServices;
+  /** Saves the whole catalog as a PDF, an Excel workbook or a CSV (E1-55). */
+  readonly catalogExporter: Pick<CatalogExporter, 'export'>;
   /** The operating expenses of the business (E1-56). */
   readonly expenses: ExpenseBook;
 }
@@ -110,7 +114,7 @@ function requireLookupText(value: unknown): string {
  */
 export function registerIpcHandlers(
   rendererEntry: string,
-  { auth, cash, returns, admin, inventory, reports, dashboard, dashboardExporter, catalog, prices, products, appearance, pendingSales, salePayments, purchasing, tools, missingItems, supplierCatalog, expenses }: IpcServices,
+  { auth, cash, returns, admin, inventory, reports, dashboard, dashboardExporter, catalog, prices, products, appearance, pendingSales, salePayments, purchasing, tools, missingItems, supplierCatalog, catalogExporter, expenses }: IpcServices,
 ): void {
   const answerScreen = <Result>(channel: string, respond: (argument: unknown) => Result): void => {
     ipcMain.handle(channel, (event, argument: unknown) => {
@@ -210,4 +214,5 @@ export function registerIpcHandlers(
   registerToolsHandlers(answerSignedIn, (message) => new NotAllowedError(message), tools);
   registerMissingItemsHandlers(answerSignedIn, (message) => new NotAllowedError(message), missingItems);
   registerSupplierCatalogHandlers(answerSignedIn, (message) => new NotAllowedError(message), supplierCatalog);
+  registerCatalogExportHandlers(answerSignedIn, catalogExporter);
 }
