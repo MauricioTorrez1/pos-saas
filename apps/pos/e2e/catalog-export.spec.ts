@@ -52,10 +52,11 @@ test('exports the whole catalog as a CSV that Excel opens with its accents (E1-5
     dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: path });
   }, csvPath);
   await page.keyboard.press('F12');
+  const admin = page.locator('dialog[aria-labelledby="admin-title"]');
   await expect(page.getByRole('heading', { name: 'Exportar catálogo' })).toBeVisible();
   await expect(page.getByRole('checkbox', { name: 'Solo activos (F5)' })).toBeChecked();
   await page.keyboard.press('F4');
-  await expect(page.getByRole('status')).toContainText(csvPath);
+  await expect(admin.getByRole('status').filter({ hasText: 'Listo:' })).toContainText(csvPath);
 
   const bytes = readFileSync(csvPath);
   expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
@@ -71,7 +72,7 @@ test('exports the whole catalog as a CSV that Excel opens with its accents (E1-5
     dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: path });
   }, pdfPath);
   await page.keyboard.press('F2');
-  await expect(page.getByRole('status')).toContainText(pdfPath);
+  await expect(admin.getByRole('status').filter({ hasText: 'Listo:' })).toContainText(pdfPath);
   const pdf = readFileSync(pdfPath);
   expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
   // Letter landscape is 792 points wide and 612 tall.
