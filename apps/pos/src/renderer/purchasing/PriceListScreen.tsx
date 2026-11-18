@@ -12,6 +12,7 @@ import {
   type PriceListSource,
   type PriceListSummary,
   type SupplierCatalogApi,
+  milliText,
 } from '../../shared/supplier-catalog';
 import type { OrderCandidate, PurchasingApi, Supplier } from '../../shared/supplier-order';
 import { CheckField, Field, Message, SelectField, useAction } from '../ui/form-parts';
@@ -25,17 +26,6 @@ interface PriceListScreenProps {
 }
 
 const LINK_LABELS = { supplier_code: 'por su código', barcode: 'por código de barras', manual: 'a mano' } as const;
-
-/**
- * Writes a quantity in thousandths without decimal numbers: 12000 is "12" and 2500 is "2.5".
- *
- * @param milli the quantity in thousandths
- * @returns the text
- */
-export function milliText(milli: number): string {
-  const fraction = String(milli % 1000).padStart(3, '0').replace(/0+$/u, '');
-  return `${Math.floor(milli / 1000)}${fraction === '' ? '' : `.${fraction}`}`;
-}
 
 function today(): string {
   const now = new Date();

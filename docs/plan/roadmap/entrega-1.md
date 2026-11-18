@@ -565,3 +565,13 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** E1-50 · **Estimación:** 4 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué reemplazar la lista completa en una transacción y no actualizar renglón por renglón? (2) ¿Por qué calcular el costo por unidad base en lugar de guardarlo?
+
+### E1-52 · Comparador de proveedores y pedido con PDF
+- **Objetivo:** el dueño escribe lo que busca y ve lo que cobra cada proveedor por unidad del producto, con el más barato en verde y el más caro en rojo; arma un carrito que se vuelve un borrador por proveedor y saca el PDF con el ahorro posible y dos gráficas. Cubre F2-15.
+- **Conceptos:** [Comparar en la unidad base], [No confiar en los precios de la pantalla], [Agrupar en pedidos], [SVG en PDF]
+- **Claude / tú:** Claude escribe la búsqueda, el carrito, la división en pedidos, el PDF y la pantalla. Tú comparas dos listas reales en la tienda y revisas el PDF impreso.
+- **Pruebas:** Vitest para agrupar por producto, marcar solo cuando los precios difieren, diferencia en pesos y porcentaje, un borrador por proveedor con el costo por unidad base, carrito rechazado (vacío, artículo de otro producto, fracción de pieza), PIN del dueño para una cajera, PDF escapado con sus columnas, ahorro y dos gráficas, canales solo para el dueño, y la pantalla; Playwright de importar dos listas, comparar, cambiar de proveedor, sacar el PDF y crear el pedido.
+- **Criterios:** ADR 0068; sin dependencias nuevas; caja 0.2.3.
+- **Depende de:** E1-51 · **Estimación:** 4 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Por qué el proceso principal recalcula los precios del carrito en lugar de usar los de la pantalla? (2) ¿Cómo comparas una caja de 12 contra una pieza suelta sin usar decimales?

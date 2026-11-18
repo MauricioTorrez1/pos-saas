@@ -138,6 +138,15 @@ In the suppliers, the owner picks a supplier and presses **F5** "Lista de precio
 | Money | Costs in pesos with up to 6 decimals ("$1,234.50" works). The screen asks whether they include VAT (default no); if yes, 16 % is taken out. The cost per base unit is the cost of the presentation divided by its pieces, with integers. |
 | Replace | Importing replaces the supplier's whole list in one transaction and keeps the date of the list. A file with no readable row keeps the previous list. |
 | Links | By the code the product already has with that supplier, then by barcode. The rest are "Sin ligar" and the owner links each one once; the next list remembers it. Imports and links are in the audit log. |
+
+## Compare suppliers
+**F6** "Comparar precios" in the suppliers (owner only) searches every active supplier's list without caring about accents: «cinta de aislar» lists each product with every offer per base unit, the cheapest in green and the most expensive in red, with the difference in pesos and percent ([ADR 0068](../../docs/adr/0068-listas-de-precios-de-proveedores-y-comparador.md)).
+
+| Rule | How it works |
+| --- | --- |
+| Cart | "Agregar" puts the product in the cart with its cheapest supplier; each line can switch supplier and quantity. The screen sends only product, quantity and chosen item; the main process reads the costs again. |
+| Orders | **F2** "Crear pedidos" makes one draft per supplier through the usual order save (same owner PIN rules, audit and folio), with the note "Armado en el comparador de precios". |
+| PDF | **F5** saves product code, product, quantity, chosen price and supplier, lowest price and its supplier, the total, the possible savings, and two SVG bar charts: products and spend per supplier. |
 ## Settings, sales list and price for one sale
 Since [ADR 0061](../../docs/adr/0061-rediseno-de-la-caja-y-herramientas-del-dueno.md) the register has three more things on the sale screen. The keys below are the defaults; the owner changes them in the settings.
 

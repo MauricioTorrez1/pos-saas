@@ -101,6 +101,9 @@ const supplierCatalogApi: SupplierCatalogApi = {
   priceListSummary: (supplierId) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.priceListSummary, supplierId),
   listCatalogItems: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.listCatalogItems, request),
   linkCatalogItem: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.linkCatalogItem, request),
+  compareItems: (text) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.compareItems, text),
+  confirmCart: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.confirmCart, request),
+  exportCartPdf: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.exportCartPdf, request),
 };
 
 contextBridge.exposeInMainWorld('pos', posApi);
