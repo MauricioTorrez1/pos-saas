@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+﻿import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -8,9 +8,12 @@ import type { UserSummary } from '../../shared/auth';
 import {
   SUPPLIER_CATALOG_CHANNELS,
   baseUnitCostE6,
+  compareCatalogItems,
+  percentText,
   readListCost,
   readPiecesPerUnit,
   removeVat,
+  type CatalogItem,
   type ColumnMapping,
   type ImportPriceListResult,
   type PriceListPreview,
@@ -26,6 +29,8 @@ import { LocalStore } from '../local-store/local-store';
 import { ProductCatalog } from '../local-store/product-catalog';
 import { ProductReader } from '../products/product-reader';
 import { ProductService } from '../products/product-service';
+import { CART_ORDER_NOTE, cartHtml, confirmCart, exportCartPdf } from './comparator-cart';
+import { PurchaseOrderService } from './purchase-order-service';
 import { locateHeader, readPriceListRows, suggestMapping } from './price-list-reader';
 import { readPriceListFile, registerSupplierCatalogHandlers } from './supplier-catalog-ipc';
 import { SupplierCatalogService } from './supplier-catalog-service';
@@ -39,6 +44,8 @@ let directory: string;
 let store: LocalStore;
 let suppliers: SupplierService;
 let catalog: SupplierCatalogService;
+let orders: PurchaseOrderService;
+let auth: AuthService;
 let owner: UserSummary;
 let tapeId: string;
 let cableId: string;
@@ -47,7 +54,7 @@ let supplier: Supplier;
 beforeEach(() => {
   directory = mkdtempSync(join(tmpdir(), 'supplier-catalog-'));
   store = LocalStore.open({ path: join(directory, 'pos.db'), appVersion: '1.0.0' });
-  const auth = new AuthService(new UserStore(store, TENANT));
+  auth = new AuthService(new UserStore(store, TENANT));
   const products = new ProductCatalog(store, TENANT);
   const reader = new ProductReader(store, TENANT);
   const audit = new AuditLog(store, TENANT);
@@ -55,6 +62,7 @@ beforeEach(() => {
   const productService = new ProductService(store, TENANT, auth, audit, reader, products, inventory);
   suppliers = new SupplierService(store, TENANT, auth, audit);
   catalog = new SupplierCatalogService(store, TENANT, audit, suppliers);
+  orders = new PurchaseOrderService(store, TENANT, auth, audit, suppliers, reader, products);
   owner = auth.setupOwner('Mauricio', '4321');
   auth.login(owner.id, '4321');
   const create = (name: string, unit: 'piece' | 'meter', barcodes: string[]): string => {
@@ -142,6 +150,20 @@ describe('reading a file', () => {
     expect(preview.source).toBe('paper');
     expect(preview.mapping).toEqual({ supplierCode: 'supplier_code', description: 'description', purchaseUnit: 'purchase_unit', piecesPerUnit: 'pieces_per_unit', cost: 'cost' });
     expect(preview.costsIncludeVat).toBe(false);
+  });
+
+  it('reads the CSV exactly as the owner panel of E1-53 writes it', () => {
+    // As apps/web/src/lib/paper-catalog writes it: CRLF lines, quotes doubled, cost in pesos before VAT.
+    const result = importText('supplier_code,description,purchase_unit,pieces_per_unit,cost\r\nTB-12,"Tubo PVC 1/2"", ""hidráulico""",caja,12,1234.50\r\n');
+    expect(result).toMatchObject({ status: 'imported', summary: { itemCount: 1, skippedCount: 0 } });
+    expect(catalog.list({ supplierId: supplier.id, onlyUnlinked: false, text: 'tubo hidraulico' })[0]).toMatchObject({
+      description: 'Tubo PVC 1/2", "hidráulico"',
+      purchaseUnit: 'caja',
+      piecesPerUnitMilli: 12_000,
+      listCostE6: 1_234_500_000,
+      baseUnitCostE6: 102_875_000,
+      source: 'paper',
+    });
   });
 
   it('leaves out bad rows with their reason and keeps the first of a repeated code', () => {
@@ -251,7 +273,7 @@ describe('the bridge of the price lists', () => {
     registerSupplierCatalogHandlers(
       (channel, respond) => handlers.set(channel, respond),
       (message) => new Error(message),
-      { catalog, pickFile: () => Promise.resolve(null) },
+      { catalog, pickFile: () => Promise.resolve(null), orders, pickSavePath: () => Promise.resolve(null), renderPdf: () => Promise.resolve(Buffer.from('')), businessName: () => 'Tlapalería' },
     );
     expect([...handlers.keys()].sort()).toEqual(Object.values(SUPPLIER_CATALOG_CHANNELS).sort());
     const cashier: UserSummary = { ...owner, role: 'cashier' };
@@ -260,5 +282,124 @@ describe('the bridge of the price lists', () => {
     }
     await expect(handlers.get(SUPPLIER_CATALOG_CHANNELS.pickPriceList)!(supplier.id, owner)).resolves.toEqual({ status: 'cancelled' });
     expect(() => handlers.get(SUPPLIER_CATALOG_CHANNELS.importPriceList)!({ token: 'x' }, owner)).toThrow(TypeError);
+  });
+});
+
+describe('comparing suppliers (E1-52)', () => {
+  let other: Supplier;
+
+  function importFor(target: Supplier, text: string): void {
+    const preview = catalog.preview(target.id, 'lista.csv', parseCsv(text));
+    const result = catalog.import({ token: preview.token, supplierId: target.id, mapping: preview.mapping, costsIncludeVat: false, listDate: '2026-11-18', source: 'file' }, owner.id);
+    if (result.status !== 'imported') {
+      throw new Error(`Expected imported, got ${result.status}`);
+    }
+  }
+
+  beforeEach(() => {
+    const saved = suppliers.save({ name: 'Eléctrica del Norte', contact: null, notes: null, isActive: true });
+    if (saved.status !== 'saved') {
+      throw new Error('Could not save the second supplier');
+    }
+    other = saved.supplier;
+    // The first sells a box of 10 at $85.00 ($8.50 each); the second sells by the piece at $10.00, and describes it otherwise.
+    importFor(supplier, 'codigo,descripcion,costo,piezas,barras\nCA-34,Cinta de aislar 3/4 caja,85,10,7501234567890\nTH-12,Cable THW 12,1250,100,\n');
+    importFor(other, 'codigo,descripcion,costo,piezas,barras\nN-1,Cinta plástica negra,10,1,7501234567890\nN-2,Cinta de aislár roja,9,1,\n');
+  });
+
+  it('lists every supplier of a product in its base unit, the cheapest first, with the difference in pesos and percent', () => {
+    const groups = catalog.compare('cinta de aislar');
+    const tape = groups.find((group) => group.productId === tapeId)!;
+    expect(tape.options.map((option) => [option.item.supplierName, option.item.baseUnitCostE6, option.isCheapest, option.isMostExpensive, option.differenceE6, option.differenceBp])).toEqual([
+      ['Ferretera del Centro', 8_500_000, true, false, 0, 0],
+      // Found because it is tied to the same product, though its description says «plástica».
+      ['Eléctrica del Norte', 10_000_000, false, true, 1_500_000, 1765],
+    ]);
+    expect(percentText(1765)).toBe('17.7 %');
+    // The item without a product is the last group.
+    expect(groups[groups.length - 1]).toMatchObject({ productId: null, options: [{ item: { supplierCode: 'N-2' } }] });
+  });
+
+  it('marks nothing when there is only one offer or all cost the same', () => {
+    const item = catalog.list({ supplierId: supplier.id, onlyUnlinked: false, text: 'cable' })[0]!;
+    expect(compareCatalogItems([item])[0]?.options[0]).toMatchObject({ isCheapest: false, isMostExpensive: false });
+    const twin: CatalogItem = { ...item, id: 'twin', supplierName: 'Otro' };
+    expect(compareCatalogItems([item, twin])[0]?.options.every((option) => !option.isCheapest && !option.isMostExpensive)).toBe(true);
+  });
+
+  it('splits the cart into one draft order per supplier through the order save, with the cost per base unit', () => {
+    const tapeItems = catalog.compare('cinta').find((group) => group.productId === tapeId)!.options;
+    const cableItem = catalog.list({ supplierId: supplier.id, onlyUnlinked: false, text: 'cable' })[0]!;
+    catalog.link({ itemId: cableItem.id, productId: cableId }, owner.id);
+    const result = confirmCart(
+      [
+        { productId: tapeId, quantityMilli: 20_000, itemId: tapeItems[1]!.item.id },
+        { productId: cableId, quantityMilli: 2_500, itemId: cableItem.id },
+      ],
+      { catalog, orders },
+    );
+    expect(result.status).toBe('created');
+    const created = result.status === 'created' ? result.orders : [];
+    expect(created.map((order) => [order.supplierName, order.lineCount, order.totalCents])).toEqual([
+      ['Eléctrica del Norte', 1, 20_000],
+      // 2.5 m at $12.50 a meter.
+      ['Ferretera del Centro', 1, 3_125],
+    ]);
+    const order = orders.get(created[0]!.orderId)!;
+    expect(order).toMatchObject({ status: 'draft', notes: CART_ORDER_NOTE, lines: [{ productId: tapeId, supplierCode: 'N-1', quantityMilli: 20_000, unitCostE6: 10_000_000 }] });
+  });
+
+  it('refuses a cart with an item of another product, a fraction of a piece, or nothing in it', () => {
+    const tapeItem = catalog.compare('cinta').find((group) => group.productId === tapeId)!.options[0]!.item;
+    expect(confirmCart([], { catalog, orders })).toEqual({ status: 'empty' });
+    expect(confirmCart([{ productId: cableId, quantityMilli: 1_000, itemId: tapeItem.id }], { catalog, orders })).toEqual({ status: 'item_mismatch', productId: cableId });
+    expect(confirmCart([{ productId: tapeId, quantityMilli: 1_500, itemId: tapeItem.id }], { catalog, orders })).toEqual({ status: 'bad_quantity', productId: tapeId });
+    expect(count('SELECT count(*) AS total FROM purchase_order')).toBe(0);
+  });
+
+  it('asks a cashier for the PIN of an owner like any order', () => {
+    const tapeItem = catalog.compare('cinta').find((group) => group.productId === tapeId)!.options[0]!.item;
+    const cashier = auth.createUser('Ana', 'cashier', '5555');
+    auth.logout();
+    auth.login(cashier.id, '5555');
+    expect(confirmCart([{ productId: tapeId, quantityMilli: 1_000, itemId: tapeItem.id }], { catalog, orders }).status).toBe('authorization_required');
+  });
+
+  it('builds a PDF with the chosen and the lowest price, the savings and two charts, with every text escaped', () => {
+    importFor(other, 'codigo,descripcion,costo,piezas,barras\nN-1,<script>alert(1)</script>,10,1,7501234567890\n');
+    const options = catalog.compare('cinta').find((group) => group.productId === tapeId)!.options;
+    const expensive = options.find((option) => option.isMostExpensive)!.item;
+    const report = catalog.cartReport([{ productId: tapeId, quantityMilli: 4_000, itemId: expensive.id }]);
+    if ('status' in report) {
+      throw new Error(report.status);
+    }
+    expect(report).toMatchObject({ totalCents: 4_000, cheapestTotalCents: 3_400, possibleSavingsCents: 600, suppliers: [{ supplierName: 'Eléctrica del Norte', productCount: 1, spendCents: 4_000 }] });
+    const html = cartHtml(report, 'Tlapalería <La Esquina>', new Date('2026-11-18T12:00:00Z'));
+    expect(html).toContain('Tlapalería &lt;La Esquina&gt;');
+    expect(html).not.toContain('<script>');
+    expect(html).toContain("default-src 'none'");
+    for (const heading of ['Código', 'Producto', 'Precio elegido', 'Proveedor elegido', 'Precio más bajo', 'Proveedor más barato', 'ahorro posible', 'Productos por proveedor', 'Gasto por proveedor']) {
+      expect(html).toContain(heading);
+    }
+    expect(html.match(/<svg /g)).toHaveLength(2);
+    expect(html).toContain('7501234567890');
+    expect(html).toContain('$6.00');
+  });
+
+  it('saves the PDF where the owner chooses, and says when it was cancelled', async () => {
+    const tapeItem = catalog.compare('cinta').find((group) => group.productId === tapeId)!.options[0]!.item;
+    const lines = [{ productId: tapeId, quantityMilli: 1_000, itemId: tapeItem.id }];
+    const written: string[] = [];
+    const dependencies = {
+      catalog,
+      renderPdf: (html: string) => Promise.resolve(Buffer.from(html)),
+      businessName: () => 'Tlapalería',
+      writeFile: (path: string) => written.push(path),
+      now: () => new Date('2026-11-18T12:00:00Z'),
+    };
+    await expect(exportCartPdf(lines, { ...dependencies, pickSavePath: () => Promise.resolve('C:/pedido.pdf') })).resolves.toEqual({ status: 'saved', path: 'C:/pedido.pdf' });
+    expect(written).toEqual(['C:/pedido.pdf']);
+    await expect(exportCartPdf(lines, { ...dependencies, pickSavePath: () => Promise.resolve(null) })).resolves.toEqual({ status: 'cancelled' });
+    await expect(exportCartPdf(lines, { ...dependencies, pickSavePath: () => Promise.resolve('x'), renderPdf: () => Promise.reject(new Error('no')) })).resolves.toMatchObject({ status: 'failed' });
   });
 });

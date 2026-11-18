@@ -1,4 +1,4 @@
-﻿import { writeFileSync } from 'node:fs';
+﻿import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { test as base, expect, type ElectronApplication } from '@playwright/test';
@@ -109,5 +109,67 @@ test('imports the price list of a supplier from the agreed CSV, links by barcode
     { action: 'supplier_price_list.import' },
     { action: 'supplier_catalog.link' },
     { action: 'supplier_price_list.import' },
+  ]);
+});
+
+test('compares two suppliers per piece, switches a line, gets the PDF and turns the cart into a draft order (E1-52)', async ({ userDataDir, launch }) => {
+  const register = await launch();
+  const page = await signInWindow(register);
+  const { databasePath } = testSalePaths(userDataDir);
+  const dialog = page.locator('dialog[aria-labelledby="order-title"]');
+  const firstList = join(userDataDir, 'centro.csv');
+  const secondList = join(userDataDir, 'norte.csv');
+  const pdfPath = join(userDataDir, 'comparador.pdf');
+  // A box of 6 hammers at $330.00 is $55.00 each; the other supplier sells one at $60.00. The screwdriver is cheaper there.
+  writeFileSync(firstList, `codigo,descripcion,costo,piezas,barras\nMAR-6,Martillo 16 oz caja,330,6,${HAMMER_CODE}\nDES-1,Desarmador plano,45,1,\n`);
+  writeFileSync(secondList, `codigo,descripcion,costo,piezas,barras\nN-MAR,Martillo uña curva,60,1,${HAMMER_CODE}\n`);
+  await register.evaluate(({ dialog: electronDialog }, paths) => {
+    const opened = [...paths.open];
+    electronDialog.showOpenDialog = (() => Promise.resolve({ canceled: false, filePaths: [opened.shift() ?? ''] })) as typeof electronDialog.showOpenDialog;
+    electronDialog.showSaveDialog = (() => Promise.resolve({ canceled: false, filePath: paths.save })) as typeof electronDialog.showSaveDialog;
+  }, { open: [firstList, secondList], save: pdfPath });
+
+  await page.keyboard.press('Shift+F11');
+  await expect(page.getByRole('heading', { name: 'Pedido al proveedor' })).toBeVisible();
+  await page.getByRole('button', { name: /Proveedores/ }).click();
+  for (const name of ['Ferretera del Centro', 'Eléctrica del Norte']) {
+    await page.getByRole('button', { name: /Proveedor nuevo/ }).click();
+    await page.getByRole('textbox', { name: 'Nombre del proveedor' }).fill(name);
+    await page.getByRole('button', { name: /Guardar/ }).click();
+    await expect(dialog).toContainText('Listo. El proveedor quedó guardado');
+    await page.getByRole('button', { name: /Lista de precios/ }).click();
+    await page.getByRole('button', { name: /Importar lista/ }).click();
+    await page.getByRole('button', { name: /Reemplazar la lista/ }).click();
+    await expect(dialog).toContainText('Entraron');
+    await page.getByRole('button', { name: /Volver/ }).click();
+    await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
+  }
+
+  await page.getByRole('button', { name: /Comparar precios/ }).click();
+  await page.getByRole('textbox', { name: 'Buscar en las listas' }).fill('martillo');
+  await page.keyboard.press('Enter');
+  const prices = page.getByRole('table', { name: 'Precios de Martillo uña curva 16 oz' });
+  await expect(prices.locator('tr.price-cheapest')).toContainText('Ferretera del Centro');
+  await expect(prices.locator('tr.price-highest')).toContainText('+$5.00 (+9.1 %)');
+  await page.getByRole('button', { name: 'Agregar Martillo uña curva 16 oz' }).click();
+  await page.getByRole('textbox', { name: 'Cantidad de Martillo uña curva 16 oz' }).fill('12');
+
+  await page.getByRole('textbox', { name: 'Buscar en las listas' }).fill('desarmador');
+  await page.getByRole('button', { name: /Buscar/ }).click();
+  // The screwdriver is not tied to a product yet, so it cannot go in the cart.
+  await expect(dialog).toContainText('lígalos a un producto');
+
+  // Switching the hammer to the dearer supplier shows what it costs.
+  await page.getByRole('combobox', { name: 'Proveedor de Martillo uña curva 16 oz' }).selectOption({ label: 'Eléctrica del Norte · $60.00' });
+  await expect(page.getByRole('status', { name: 'Total del carrito' })).toContainText('ahorro posible: $60.00');
+  await page.getByRole('button', { name: /PDF del pedido/ }).click();
+  await expect(dialog).toContainText('PDF guardado en');
+  expect(existsSync(pdfPath)).toBe(true);
+
+  await page.getByRole('combobox', { name: 'Proveedor de Martillo uña curva 16 oz' }).selectOption({ label: 'Ferretera del Centro · $55.00 (el más barato)' });
+  await page.getByRole('button', { name: /Crear pedidos/ }).click();
+  await expect(dialog).toContainText('Quedaron como borrador: PED-0001 para Ferretera del Centro ($660.00)');
+  expect(await readRows(register, databasePath, 'SELECT supplier_code, quantity_milli, unit_cost_e6, line_total_cents FROM purchase_order_line')).toEqual([
+    { supplier_code: 'MAR-6', quantity_milli: 12_000, unit_cost_e6: 55_000_000, line_total_cents: 66_000 },
   ]);
 });

@@ -1,11 +1,16 @@
 import type { StatementSync } from 'node:sqlite';
 
-import type { Unit } from '@pos-saas/money';
+import { quantityOf, type Unit } from '@pos-saas/money';
 
 import {
+  MAX_CART_LINES,
   MAX_PRICE_LIST_ITEMS,
   baseUnitCostE6,
+  compareCatalogItems,
+  type CartLineRequest,
+  type CartProblem,
   type CatalogItem,
+  type ComparisonGroup,
   type ColumnMapping,
   type ImportPriceListRequest,
   type ImportPriceListResult,
@@ -17,6 +22,7 @@ import {
   type PriceListSource,
   type PriceListSummary,
 } from '../../shared/supplier-catalog';
+import { MAX_ORDER_QUANTITY_MILLI, orderLineCents } from '../../shared/supplier-order';
 import type { AuditLog } from '../audit/audit-log';
 import type { LocalStore } from '../local-store/local-store';
 import { toPrefixQuery } from '../local-store/product-catalog';
@@ -30,6 +36,39 @@ const SAMPLE_ROWS = 5;
 const LIST_LIMIT = 500;
 /** The rows left out that the summary names one by one. */
 const SKIPPED_SHOWN = 50;
+/** The most items one comparison looks at. */
+const COMPARE_LIMIT = 200;
+
+/** A line of the cart checked against the lists: what was chosen and what was cheapest. */
+export interface CartReportLine {
+  readonly productId: string;
+  readonly productName: string;
+  readonly productCode: string | null;
+  readonly unit: Unit;
+  readonly quantityMilli: number;
+  readonly chosen: CatalogItem;
+  readonly cheapest: CatalogItem;
+  readonly chosenCents: number;
+  readonly cheapestCents: number;
+}
+
+/** What a supplier gets in the cart. */
+export interface CartSupplierShare {
+  readonly supplierId: string;
+  readonly supplierName: string;
+  readonly productCount: number;
+  readonly spendCents: number;
+}
+
+/** The cart with the prices of the lists of today, worked out in the main process. */
+export interface CartReport {
+  readonly lines: readonly CartReportLine[];
+  readonly totalCents: number;
+  /** What the cart would cost buying every line from its cheapest supplier. */
+  readonly cheapestTotalCents: number;
+  readonly possibleSavingsCents: number;
+  readonly suppliers: readonly CartSupplierShare[];
+}
 
 interface ItemRow {
   readonly id: string;
@@ -120,6 +159,8 @@ export class SupplierCatalogService {
   readonly #setLink: StatementSync;
   readonly #upsertManualLink: StatementSync;
   readonly #deleteManualLink: StatementSync;
+  readonly #searchAll: StatementSync;
+  readonly #itemsOfProduct: StatementSync;
 
   /**
    * @param store the open local database
@@ -174,6 +215,14 @@ export class SupplierCatalogService {
       ON CONFLICT (tenant_id, supplier_id, supplier_code) DO UPDATE SET product_id = excluded.product_id, linked_by = excluded.linked_by, linked_at = excluded.linked_at
     `);
     this.#deleteManualLink = store.prepare('DELETE FROM supplier_catalog_link WHERE tenant_id = ? AND supplier_id = ? AND supplier_code = ?');
+    this.#searchAll = store.prepare(`
+      ${ITEM_SELECT}
+      WHERE item.tenant_id = ? AND supplier.is_active = 1
+        AND item.local_rowid IN (SELECT rowid FROM supplier_catalog_search WHERE supplier_catalog_search MATCH ?)
+      ORDER BY item.description COLLATE NOCASE
+      LIMIT ${COMPARE_LIMIT}
+    `);
+    this.#itemsOfProduct = store.prepare(`${ITEM_SELECT} WHERE item.tenant_id = ? AND item.product_id = ? AND supplier.is_active = 1`);
   }
 
   /**
@@ -333,6 +382,91 @@ export class SupplierCatalogService {
     return { status: 'linked', item: toCatalogItem(this.#itemById.get(this.#tenantId, itemId) as unknown as ItemRow) };
   }
 
+  /**
+   * Compares what every active supplier asks for the items that match the words (E1-52). A product that matched brings
+   * every item tied to it, even the ones of another supplier described with other words, so the comparison is complete.
+   *
+   * @param text words of the description or the code, without caring about accents
+   * @returns the groups by product, the cheapest option first
+   */
+  compare(text: string): ComparisonGroup[] {
+    const query = toPrefixQuery(text);
+    if (query === null) {
+      return [];
+    }
+    const found = new Map<string, CatalogItem>();
+    for (const row of this.#searchAll.all(this.#tenantId, query) as unknown as ItemRow[]) {
+      found.set(row.id, toCatalogItem(row));
+    }
+    const products = new Set([...found.values()].map((item) => item.productId).filter((id): id is string => id !== null));
+    for (const productId of products) {
+      for (const item of this.#optionsOf(productId)) {
+        found.set(item.id, item);
+      }
+    }
+    return compareCatalogItems([...found.values()]);
+  }
+
+  /**
+   * Checks a cart against today's lists and works out every amount in the main process, so a screen cannot send its own
+   * prices. Each line needs an item tied to its product and a whole quantity of its unit.
+   *
+   * @param lines the lines of the cart
+   * @returns the report with the cheapest option of each line and what each supplier gets, or what is wrong
+   */
+  cartReport(lines: readonly CartLineRequest[]): CartReport | CartProblem {
+    if (lines.length === 0) {
+      return { status: 'empty' };
+    }
+    if (lines.length > MAX_CART_LINES) {
+      throw new RangeError(`A cart has at most ${MAX_CART_LINES} lines`);
+    }
+    const report: CartReportLine[] = [];
+    for (const line of lines) {
+      const row = this.#itemById.get(this.#tenantId, line.itemId) as unknown as ItemRow | undefined;
+      if (row === undefined) {
+        return { status: 'item_not_found', itemId: line.itemId };
+      }
+      const chosen = toCatalogItem(row);
+      if (chosen.productId !== line.productId || chosen.productName === null || chosen.productUnit === null) {
+        return { status: 'item_mismatch', productId: line.productId };
+      }
+      if (!Number.isSafeInteger(line.quantityMilli) || line.quantityMilli <= 0 || line.quantityMilli > MAX_ORDER_QUANTITY_MILLI || !isWholeQuantity(line.quantityMilli, chosen.productUnit)) {
+        return { status: 'bad_quantity', productId: line.productId };
+      }
+      const cheapest = this.#optionsOf(line.productId).reduce((best, item) => (item.baseUnitCostE6 < best.baseUnitCostE6 ? item : best), chosen);
+      report.push({
+        productId: line.productId,
+        productName: chosen.productName,
+        productCode: chosen.productBarcode,
+        unit: chosen.productUnit,
+        quantityMilli: line.quantityMilli,
+        chosen,
+        cheapest,
+        chosenCents: orderLineCents(chosen.baseUnitCostE6, line.quantityMilli),
+        cheapestCents: orderLineCents(cheapest.baseUnitCostE6, line.quantityMilli),
+      });
+    }
+    const shares = new Map<string, CartSupplierShare>();
+    for (const line of report) {
+      const share = shares.get(line.chosen.supplierId) ?? { supplierId: line.chosen.supplierId, supplierName: line.chosen.supplierName, productCount: 0, spendCents: 0 };
+      shares.set(line.chosen.supplierId, { ...share, productCount: share.productCount + 1, spendCents: share.spendCents + line.chosenCents });
+    }
+    const totalCents = report.reduce((total, line) => total + line.chosenCents, 0);
+    const cheapestTotalCents = report.reduce((total, line) => total + line.cheapestCents, 0);
+    return {
+      lines: report,
+      totalCents,
+      cheapestTotalCents,
+      possibleSavingsCents: totalCents - cheapestTotalCents,
+      suppliers: [...shares.values()].sort((left, right) => right.spendCents - left.spendCents),
+    };
+  }
+
+  #optionsOf(productId: string): CatalogItem[] {
+    return (this.#itemsOfProduct.all(this.#tenantId, productId) as unknown as ItemRow[]).map(toCatalogItem);
+  }
+
   /** The link of an item: what the owner chose before, then the code given to a product with this supplier, then the barcode. */
   #findLink(supplierId: string, supplierCode: string, barcode: string | null): { productId: string; origin: LinkOrigin } | null {
     const manual = this.#manualLinkOf.get(this.#tenantId, supplierId, supplierCode) as unknown as { product_id: string } | undefined;
@@ -353,5 +487,14 @@ export class SupplierCatalogService {
       }
     }
     return null;
+  }
+}
+
+function isWholeQuantity(quantityMilli: number, unit: Unit): boolean {
+  try {
+    quantityOf(quantityMilli, unit);
+    return true;
+  } catch {
+    return false;
   }
 }

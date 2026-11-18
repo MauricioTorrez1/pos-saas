@@ -228,6 +228,10 @@ async function start(): Promise<void> {
     supplierCatalog: {
       catalog: new SupplierCatalogService(store, LOCAL_TENANT_ID, new AuditLog(store, LOCAL_TENANT_ID), suppliers),
       pickFile: (title) => pickPath(['openFile'], title),
+      orders,
+      pickSavePath,
+      renderPdf: printHtmlToPdf,
+      businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
     },
     missingItems: {
       log: new MissingItemsLog(store, LOCAL_TENANT_ID, new AuditLog(store, LOCAL_TENANT_ID)),

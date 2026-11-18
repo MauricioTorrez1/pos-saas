@@ -33,10 +33,10 @@ function shortDay(key: string): string {
 /**
  * Draws a horizontal bar chart in SVG: one bar per item, the longest one in another color, with its number at its end.
  *
- * @param rows the label and the number of each bar, in the order they are drawn
+ * @param rows the label and the number of each bar, in the order they are drawn, and how the number reads if not as is
  * @returns the SVG, with every label escaped
  */
-export function horizontalBars(rows: readonly { readonly label: string; readonly value: number }[]): string {
+export function horizontalBars(rows: readonly { readonly label: string; readonly value: number; readonly valueText?: string }[]): string {
   const labelWidth = 260;
   const plotWidth = 400;
   const rowHeight = 22;
@@ -50,7 +50,7 @@ export function horizontalBars(rows: readonly { readonly label: string; readonly
       return (
         `<text x="${labelWidth - 8}" y="${y + 14}" text-anchor="end" font-size="11" fill="${INK}">${escapeHtml(label)}</text>` +
         `<rect x="${labelWidth}" y="${y + 3}" width="${width}" height="${rowHeight - 8}" rx="3" fill="${row.value === peak ? PEAK : BAR}"/>` +
-        `<text x="${labelWidth + width + 6}" y="${y + 14}" font-size="11" fill="${SOFT_INK}">${row.value}</text>`
+        `<text x="${labelWidth + width + 6}" y="${y + 14}" font-size="11" fill="${SOFT_INK}">${escapeHtml(row.valueText ?? String(row.value))}</text>`
       );
     })
     .join('');
