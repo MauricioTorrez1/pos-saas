@@ -565,3 +565,13 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** F0-21, E1-51 · **Estimación:** 6 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué el modelo copia el precio como texto en lugar de devolver un número? (2) ¿Qué riesgos tiene aprobar en automático las filas que el modelo considera seguras?
+
+### E1-56 · «Resumen» por grupos y estado de resultados
+- **Objetivo:** el dueño lee «Resumen» por grupos con nombre (Ventas, Clientes y tickets, Rentabilidad, Devoluciones y cancelaciones, Formas de pago, Caja, Cuándo se vende) y ve en «Estado de resultados» si el negocio gana después del costo y de los gastos, antes de ISR y sin IVA, con vista general y detallada, por periodo y «Desde el inicio». En «Gastos» anota la renta, la luz o los sueldos; lo pagado de la caja sale también en el corte, una sola vez.
+- **Conceptos:** [Estado de resultados], [Utilidad bruta, de operación y neta], [El IVA no es ingreso], [Registro inmutable con anulación], [Una transacción para dos registros]
+- **Claude / tú:** Claude escribe la migración, el libro de gastos, el cálculo, las pestañas, la exportación y las pruebas. Tú anotas los gastos reales de un mes y comparas el resultado con lo que sabes del negocio.
+- **Pruebas:** Vitest del cálculo en centavos (periodo sin ventas, devoluciones, productos sin costo marcados, pérdida, porcentajes, tasas de IVA, «Otros productos»), del libro de gastos (alta, validaciones, PIN del dueño, de la caja una sola vez en el corte y en el estado, anulación con la caja abierta y cerrada, disparadores, lista de conceptos), de la exportación a Excel y PDF, y de las pantallas; Playwright de abrir el estado de resultados y contar un gasto.
+- **Criterios:** ADR 0072; dinero solo en enteros; un gasto pagado de la caja nunca se resta dos veces; un retiro que no es gasto nunca entra al estado de resultados; solo el dueño o una cajera con su PIN.
+- **Depende de:** E1-45, E1-50 · **Estimación:** 6 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Por qué el IVA cobrado no es ingreso y dónde se muestra? (2) ¿Cómo evitas contar dos veces un gasto que también es un movimiento de caja?

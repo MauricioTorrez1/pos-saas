@@ -1,5 +1,7 @@
 import type { Unit } from '@pos-saas/money';
 
+import type { StatementRequest, StatementResult } from './income-statement';
+
 /** The time zone every day, week, month and year of the dashboard is counted in (ADR 0060). */
 export const DASHBOARD_TIME_ZONE = 'America/Mexico_City';
 
@@ -37,7 +39,8 @@ export interface DashboardRequest {
 
 /** A stretch of whole days in the time zone of the register. */
 export interface PeriodRange {
-  readonly kind: PeriodKind | 'shift';
+  /** `all` is «Desde el inicio» of the income statement. */
+  readonly kind: PeriodKind | 'shift' | 'all';
   /** First day as `YYYY-MM-DD`. */
   readonly fromDay: string;
   /** Last day, included. */
@@ -169,6 +172,15 @@ export interface InventorySection {
   readonly withoutCost: LimitedList<StockLine>;
 }
 
+/** The cash that went in and out of the drawer by hand in the period, apart from sales and refunds. */
+export interface CashMovementTotals {
+  readonly inCents: number;
+  /** Every exit: withdrawals, payments to suppliers and the expenses paid from the drawer. */
+  readonly outCents: number;
+  /** The part of the exits that is an operating expense (ADR 0072), voided ones left out. */
+  readonly drawerExpensesCents: number;
+}
+
 /** Everything the dashboard shows. */
 export interface DashboardSummary {
   /** `business` for an owner, `shift` for a cashier without the PIN of an owner. */
@@ -199,6 +211,8 @@ export interface DashboardSummary {
   readonly topSellers: readonly TopSeller[];
   /** Only for the owner. */
   readonly inventory: InventorySection | null;
+  /** Only for the owner. */
+  readonly cashMovements: CashMovementTotals | null;
 }
 
 /** Why the whole summary was not given to a cashier. */
@@ -212,12 +226,16 @@ export type ExportResult =
   | { readonly status: 'saved'; readonly path: string }
   | { readonly status: 'cancelled' }
   | { readonly status: 'failed'; readonly message: string }
+  /** A cashier asked for the income statement without the PIN of an owner. */
+  | { readonly status: 'authorization_required' }
   | DashboardRefusal;
 
 /** The IPC channels of the dashboard. */
 export const DASHBOARD_CHANNELS = {
   getDashboard: 'dashboard:get',
   exportDashboard: 'dashboard:export',
+  getIncomeStatement: 'dashboard:income-statement',
+  exportIncomeStatement: 'dashboard:export-income-statement',
 } as const;
 
 /** What the screen can ask of the dashboard. */
@@ -239,4 +257,21 @@ export interface DashboardApi {
    * @returns where it was saved, or why not
    */
   exportDashboard(request: DashboardRequest, format: ExportFormat): Promise<ExportResult>;
+
+  /**
+   * Reads the income statement of a period (ADR 0072). Only an owner, or a cashier with the PIN of an owner.
+   *
+   * @param request the period, «Desde el inicio» included
+   * @returns the statement, or why it was not given
+   */
+  getIncomeStatement(request: StatementRequest): Promise<StatementResult>;
+
+  /**
+   * Saves the income statement alone as an Excel file or a PDF, asking where.
+   *
+   * @param request the same request the screen made to read it
+   * @param format `xlsx` or `pdf`
+   * @returns where it was saved, or why not
+   */
+  exportIncomeStatement(request: StatementRequest, format: ExportFormat): Promise<ExportResult>;
 }

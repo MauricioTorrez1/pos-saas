@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import { DASHBOARD_CHANNELS, type DashboardApi } from '../shared/dashboard-api';
+import { EXPENSE_CHANNELS, type ExpensesApi } from '../shared/expenses';
 import { MISSING_CHANNELS, type MissingItemsApi } from '../shared/missing-items';
 import { IPC_CHANNELS, type PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
@@ -41,6 +42,8 @@ const posApi: PosApi & PricingApi & ProductAdminApi & DashboardApi = {
   updateProduct: (request) => ipcRenderer.invoke(IPC_CHANNELS.updateProduct, request),
   getDashboard: (request) => ipcRenderer.invoke(DASHBOARD_CHANNELS.getDashboard, request),
   exportDashboard: (request, format) => ipcRenderer.invoke(DASHBOARD_CHANNELS.exportDashboard, { request, format }),
+  getIncomeStatement: (request) => ipcRenderer.invoke(DASHBOARD_CHANNELS.getIncomeStatement, request),
+  exportIncomeStatement: (request, format) => ipcRenderer.invoke(DASHBOARD_CHANNELS.exportIncomeStatement, { request, format }),
   getAppearance: () => ipcRenderer.invoke(IPC_CHANNELS.getAppearance),
   saveAppearance: (appearance) => ipcRenderer.invoke(IPC_CHANNELS.saveAppearance, appearance),
   savePendingSale: (request) => ipcRenderer.invoke(IPC_CHANNELS.savePendingSale, request),
@@ -80,6 +83,14 @@ const missingApi: MissingItemsApi = {
   exportPdf: (period) => ipcRenderer.invoke(MISSING_CHANNELS.exportPdf, period),
 };
 
+/** The operating expenses of the business (E1-56). */
+const expensesApi: ExpensesApi = {
+  record: (request) => ipcRenderer.invoke(EXPENSE_CHANNELS.record, request),
+  list: (request) => ipcRenderer.invoke(EXPENSE_CHANNELS.list, request),
+  void: (request) => ipcRenderer.invoke(EXPENSE_CHANNELS.void, request),
+  saveConcepts: (request) => ipcRenderer.invoke(EXPENSE_CHANNELS.saveConcepts, request),
+};
+
 /** The keys, the ticket, the printer and the list of sales. A bridge of their own, like the purchase orders. */
 const toolsApi: ToolsApi = {
   getKeymap: () => ipcRenderer.invoke(TOOLS_CHANNELS.getKeymap),
@@ -98,3 +109,4 @@ contextBridge.exposeInMainWorld('pos', posApi);
 contextBridge.exposeInMainWorld('tools', toolsApi);
 contextBridge.exposeInMainWorld('purchasing', purchasingApi);
 contextBridge.exposeInMainWorld('missing', missingApi);
+contextBridge.exposeInMainWorld('expenses', expensesApi);

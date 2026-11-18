@@ -20,6 +20,7 @@ import { PendingSales } from './checkout/pending-sales';
 import { DashboardExporter } from './reports/dashboard-exporter';
 import { DashboardService } from './reports/dashboard-service';
 import { MissingItemsLog } from './missing/missing-items-log';
+import { ExpenseBook } from './expenses/expense-book';
 import { printHtmlToPdf } from './reports/pdf-printer';
 import { ReportService } from './reports/report-service';
 import { ReturnService } from './returns/return-service';
@@ -218,6 +219,7 @@ async function start(): Promise<void> {
       audit: new AuditLog(store, LOCAL_TENANT_ID),
       businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
     },
+    expenses: new ExpenseBook(store, LOCAL_TENANT_ID, cashStore, new OwnerGate(auth, new AuditLog(store, LOCAL_TENANT_ID)), new AuditLog(store, LOCAL_TENANT_ID)),
     missingItems: {
       log: new MissingItemsLog(store, LOCAL_TENANT_ID, new AuditLog(store, LOCAL_TENANT_ID)),
       exporter: { pickSavePath, renderPdf: printHtmlToPdf, businessName: () => appearance.read().businessName || UNNAMED_BUSINESS },

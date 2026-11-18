@@ -1622,6 +1622,107 @@ kbd {
   color: var(--ink-soft);
 }
 
+/* «Resumen» in labeled groups, and the income statement and the expenses (E1-56). */
+.kpi-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.kpi-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.kpi-group-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.kpi-group-header p {
+  margin: 0.1rem 0 0;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+.statement {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.statement-table th[scope='row'] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.statement-label {
+  font-weight: 600;
+}
+
+.statement-explanation {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+.statement-result th,
+.statement-result td {
+  font-weight: 800;
+  border-top: 2px solid var(--rule);
+}
+
+.amount-negative {
+  color: var(--danger);
+}
+
+.statement-notes {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+.expenses {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.expense-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.expense-voided td,
+.expense-voided th {
+  color: var(--ink-soft);
+  text-decoration: line-through;
+}
+
+.expense-void {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.expense-concepts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: end;
+}
+
+.expense-concepts textarea {
+  min-width: 18rem;
+  font: inherit;
+}
+
 .charts {
   display: flex;
   flex-direction: column;

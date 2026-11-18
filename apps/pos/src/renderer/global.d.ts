@@ -1,4 +1,5 @@
 import type { DashboardApi } from '../shared/dashboard-api';
+import type { ExpensesApi } from '../shared/expenses';
 import type { MissingItemsApi } from '../shared/missing-items';
 import type { PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
@@ -16,5 +17,7 @@ declare global {
     readonly tools: ToolsApi;
     /** Bridge for the log of missing items (E1-49). */
     readonly missing: MissingItemsApi;
+    /** Bridge for the operating expenses (E1-56). */
+    readonly expenses: ExpensesApi;
   }
 }

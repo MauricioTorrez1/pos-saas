@@ -6,6 +6,7 @@ import type { AuthState, PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
 import { comboLabel, DEFAULT_KEYMAP, type KeyAction, type Keymap, type ToolsApi } from '../shared/register-tools';
+import type { ExpensesApi } from '../shared/expenses';
 import type { MissingItemsApi } from '../shared/missing-items';
 import type { PurchasingApi } from '../shared/supplier-order';
 import { applyAppearance } from './appearance/apply-appearance';
@@ -64,6 +65,8 @@ interface AppProps {
   readonly missingApi?: MissingItemsApi;
   /** The keys, the ticket, the printer and the list of sales. Without it, the register keeps its keys and offers no settings. */
   readonly toolsApi?: ToolsApi;
+  /** The operating expenses (E1-56). Without it, the summary has no «Gastos» tab. */
+  readonly expensesApi?: ExpensesApi;
 }
 
 /**
@@ -76,9 +79,10 @@ interface AppProps {
  * @param props.dashboardApi bridge for the summary of the business, when the register offers it
  * @param props.purchasingApi bridge for the orders to suppliers, when the register offers it
  * @param props.toolsApi bridge for the settings and the list of sales, when the register offers them
+ * @param props.expensesApi bridge for the operating expenses, when the register offers them
  * @returns the screen
  */
-export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi }: AppProps): ReactElement {
+export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi, expensesApi }: AppProps): ReactElement {
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [authState, setAuthState] = useState<AuthState | null>(null);
   const [authFailed, setAuthFailed] = useState(false);
@@ -124,6 +128,7 @@ export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingAp
       {...(purchasingApi === undefined ? {} : { purchasingApi })}
       {...(missingApi === undefined ? {} : { missingApi })}
       {...(toolsApi === undefined ? {} : { toolsApi })}
+      {...(expensesApi === undefined ? {} : { expensesApi })}
       user={authState.current}
       appearance={appearance}
       onAppearanceSaved={setAppearance}
@@ -141,13 +146,14 @@ interface RegisterScreenProps {
   /** The log of what customers ask for and the store does not carry (E1-49). Without it, the register offers no log. */
   readonly missingApi?: MissingItemsApi;
   readonly toolsApi?: ToolsApi;
+  readonly expensesApi?: ExpensesApi;
   readonly user: UserSummary;
   readonly appearance: Appearance;
   readonly onAppearanceSaved: (appearance: Appearance) => void;
   readonly onSignOut: () => void;
 }
 
-function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
+function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi, expensesApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
   const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
   const [cash, setCash] = useState<CashStatus | null>(null);
@@ -338,7 +344,7 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
       {isAdministering && !hasPendingSales && (
         <AdminDialog posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} {...(productApi === undefined ? {} : { productApi })} {...(dashboardApi === undefined ? {} : { onOpenDashboard: openDashboardFromAdmin })} {...(purchasingApi === undefined ? {} : { onOpenSupplierOrder: openOrdersFromAdmin })} onClose={closeAdmin} />
       )}
-      {isViewingDashboard && !hasPendingSales && dashboardApi !== undefined && <DashboardDialog api={dashboardApi} user={user} onClose={closeDashboard} {...(toolsApi === undefined ? {} : { searchSales: (text: string) => toolsApi.listRecentSales(text) })} />}
+      {isViewingDashboard && !hasPendingSales && dashboardApi !== undefined && <DashboardDialog api={dashboardApi} user={user} onClose={closeDashboard} {...(toolsApi === undefined ? {} : { searchSales: (text: string) => toolsApi.listRecentSales(text) })} {...(expensesApi === undefined ? {} : { expensesApi })} />}
       {ordering !== null && !hasPendingSales && purchasingApi !== undefined && <SupplierOrderDialog api={purchasingApi} isOwner={isOwner} onClose={closeOrders} />}
       {isEditingSettings && !hasPendingSales && toolsApi !== undefined && (
         <SettingsDialog toolsApi={toolsApi} keymap={keymap} onKeymapSaved={setKeymap} onClose={closeSettings} />
