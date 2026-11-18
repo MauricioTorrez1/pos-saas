@@ -40,6 +40,7 @@ public final class EndpointPermissions {
             requires(PATCH, "/products/{id}/price", Permission.PRICE_CHANGE),
             requires(POST, "/imports/catalog", Permission.CATALOG_IMPORT),
             requires(POST, "/price-changes", Permission.PRICE_CHANGE),
+            requires(POST, "/labels", Permission.PRODUCT_READ),
             requires(GET, "/discrepancies", Permission.DISCREPANCY_VIEW),
             requires(GET, "/discrepancies/{id}", Permission.DISCREPANCY_VIEW),
             requires(POST, "/discrepancies/{id}/resolution", Permission.DISCREPANCY_RESOLVE),

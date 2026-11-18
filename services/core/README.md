@@ -75,6 +75,9 @@ Two endpoints touch many products at once ([ADR 0062](../../docs/adr/0062-import
 - `POST /imports/catalog` takes a CSV as `text/csv`. Each row is checked and saved on its own, so bad rows come back with their line and reason while the rest load. A product is known by its code, so loading a file again creates nothing. `dryRun=true` only checks, and `report=csv` returns the failed rows as a file.
 - `POST /price-changes` raises or lowers prices by a percentage for the products whose name contains `search`. Send `"preview": true` first; to apply, send the `expectedCount` the preview gave. It is all or nothing, and each product keeps its price history, its audit entry and its notice to the registers.
 
+## Shelf labels
+`POST /labels` returns a PDF of shelf labels for the chosen `productIds` or for what a `search` finds, with `copies` from 1 to 24 and 240 labels at most per file ([ADR 0065](../../docs/adr/0065-etiquetas-de-anaquel-en-pdf.md)). Each label shows the name, the price of one base unit with VAT, and the code as EAN-13 when it is a valid EAN-13 or as Code 128 otherwise. The layout lives behind `LabelLayout`: `letter-24` (letter paper, 3 by 8) is the first one, and a thermal label printer would be another bean with its own id.
+
 ## Audit log
 `AuditLog.record(AuditEntry)` appends who did what to which entity, with the value before and after, in the transaction of the change ([ADR 0038](../../docs/adr/0038-bitacora-de-auditoria-solo-agregar.md)). It fails without a transaction. The table is append-only: `pos_app` has no `UPDATE`, `DELETE` or `TRUNCATE`, and a trigger rejects them for every role. Store ids and business values only, never PINs, tokens, card data or needless personal data.
 

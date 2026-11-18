@@ -23,7 +23,7 @@ The tokens live only inside an encrypted (AES-256-GCM), `HttpOnly`, `SameSite=La
 ## Layout
 | Path | Contents |
 | --- | --- |
-| `src/app/` | Pages and Route Handlers (`auth/login`, `auth/callback`, `auth/logout`) |
+| `src/app/` | Pages and Route Handlers (`auth/login`, `auth/callback`, `auth/logout`, and `catalog/labels`, which searches products and downloads their shelf labels as a PDF through `catalog/labels/pdf`) |
 | `src/proxy.ts` | Session check, role check, and token renewal for every protected route |
 | `src/lib/` | Settings, session sealing, cookies, OIDC calls, identity of the token, route rules, and the core client |
 | `src/components/` | Small presentational components |

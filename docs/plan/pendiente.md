@@ -7,7 +7,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Fase 0 · Cimientos del servidor y del catálogo
 
-✅ 22 de 26 tareas hechas · ⚠️ 4 faltan (19 h)
+✅ 23 de 26 tareas hechas · ⚠️ 3 faltan (16 h)
 
 - ✅ **F0-01 · Inicializar repositorio y monorepo** (2 h): el repositorio de GitHub tiene la estructura del monorepo y una licencia AGPL-3.0.
 - ✅ **F0-02 · CI base en GitHub Actions** (3 h): cada PR compila y prueba Java, TypeScript y Python.
@@ -30,7 +30,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **F0-19 · Cambio masivo de precios** (3 h) _(En revisión)_: el dueño sube 5% a una marca con vista previa.
 - ✅ **F0-20 · Panel Next.js con login** (5 h) _(En revisión)_: el dueño entra al panel por Keycloak.
 - ⚠️ **F0-21 · Pantallas de catálogo** (6 h): el dueño crea, busca, edita e importa productos.
-- ⚠️ **F0-22 · Etiquetas en PDF** (3 h): el dueño imprime etiquetas desde cualquier impresora.
+- ✅ **F0-22 · Etiquetas en PDF** (3 h) _(En revisión)_: el dueño imprime etiquetas desde cualquier impresora.
 - ✅ **F0-23 · Contratos y casos compartidos** (4 h): `packages/contracts` contiene esquemas y casos de cálculo en JSON.
 - ⚠️ **F0-24 · Servidor con Terraform** (5 h): existe un servidor reproducible dentro del presupuesto decidido.
 - ⚠️ **F0-25 · Despliegue automático y respaldos** (5 h): un merge a `main` despliega en staging, con HTTPS y respaldo diario.
@@ -206,4 +206,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 65 de 164 tareas hechas (275 h de 728 h) · ⚠️ 99 faltan (453 h).
+✅ 66 de 164 tareas hechas (278 h de 728 h) · ⚠️ 98 faltan (450 h).

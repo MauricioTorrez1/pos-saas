@@ -25,6 +25,8 @@
     <!-- Each Spring Modulith line pairs with one Spring Boot line: 2.1.x goes with 4.1.x. -->
     <spring-modulith.version>2.1.2</spring-modulith.version>
     <json-schema-validator.version>3.0.6</json-schema-validator.version>
+    <openpdf.version>3.0.5</openpdf.version>
+    <zxing.version>3.5.3</zxing.version>
   </properties>
 
   <dependencyManagement>
@@ -112,6 +114,20 @@
       <artifactId>spring-boot-starter-kafka</artifactId>
     </dependency>
 
+    <!-- Writes the shelf labels as a PDF (F0-22, ADR 0064). Brotli only decodes PDF 2.0 streams when reading a
+         file, which the core never does, and it brings native libraries, so it stays out. -->
+    <dependency>
+      <groupId>com.github.librepdf</groupId>
+      <artifactId>openpdf</artifactId>
+      <version>${openpdf.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.aayushatharva.brotli4j</groupId>
+          <artifactId>brotli4j</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
     <!-- Validates each operation of a batch against the shared JSON Schema of packages/contracts (ADR 0046). -->
     <dependency>
       <groupId>com.networknt</groupId>
@@ -119,6 +135,13 @@
       <version>${json-schema-validator.version}</version>
     </dependency>
 
+    <!-- Decodes the bars of a label in a test, as the scanner of the store would. -->
+    <dependency>
+      <groupId>com.google.zxing</groupId>
+      <artifactId>core</artifactId>
+      <version>${zxing.version}</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-webmvc-test</artifactId>
