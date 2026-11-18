@@ -164,6 +164,13 @@ Boxes for amounts, quantities and PINs take digits and one decimal point only (`
 - Anyone signed in edits the notes of an item. The owner marks it as «Ya lo vendemos», puts it back to pending, or deletes it with the red «Eliminar» after confirming. Each change goes to the audit log.
 - «Descargar PDF con gráficas» saves the log of the period with three SVG charts and every item.
 
+## Export the catalog
+In Administration, **F12 · Exportar catálogo** saves the whole catalog as a PDF (**F2**), an Excel workbook (**F3**) or a CSV (**F4**), one row per product: status, main and other barcodes, name, unit, suppliers with their codes, cost without and with VAT, price with VAT, VAT, stock from the ledger, gross and net margin, and where the cost comes from ([ADR 0071](../../docs/adr/0071-exportacion-del-catalogo-completo.md)). «Solo activos» (**F5**) starts on; turn it off to include the products that were given up.
+
+- Gross margin = (price without VAT − cost without VAT) ÷ price without VAT. Net margin = the same profit ÷ price with VAT: what stays of each peso charged once the product is replaced and the VAT is paid. The register records no expenses or card fees, so the net margin does not subtract them. Both are one integer fraction rounded once; a product without a cost reads «sin costo».
+- Every file ends with the totals (products, stock value at cost and at price) and a legend. The CSV is UTF-8 with a BOM so Excel on Windows shows the accents, with CRLF lines and an apostrophe before any text that would be a formula. The PDF is letter landscape with the header row repeated on every page.
+- Only an owner exports it (or a cashier with an owner's PIN, through `OwnerGate`); refusals and every file saved go to the audit log. 5,000 products export in a few seconds without freezing the register: five queries, rows built in slices of 500, and the PDF printed from a temporary file in its own window.
+
 ## Sale states and recovery
 A sale is saved as `pending_payment` before anything is charged, so a power cut can never leave money without a record ([ADR 0010](../../docs/adr/0010-guardar-antes-de-cobrar.md)). From there it can only become `completed` or `cancelled`, and each change is one transaction. `src/main/checkout/sale-state-machine.ts` gives a clear error, and triggers in the database refuse the same changes if the code ever gets it wrong ([ADR 0025](../../docs/adr/0025-maquina-de-estados-de-la-venta.md)).
 

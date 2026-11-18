@@ -3,11 +3,13 @@ import { formatCents } from '@pos-saas/money';
 import { useEffect, useState, type ReactElement } from 'react';
 
 import type { BackupOutcome, BackupStatus, ImportOutcome, ImportReportView } from '../../shared/admin-api';
+import type { CatalogExportApi } from '../../shared/catalog-export';
 import type { PosApi } from '../../shared/pos-api';
 import type { PricingApi } from '../../shared/pricing';
 import type { ProductAdminApi } from '../../shared/product-admin';
 import { Field, Message, useAction } from '../ui/form-parts';
 import { ModalDialog } from '../ui/ModalDialog';
+import { CatalogExportView } from './CatalogExportView';
 import { InventoryView } from './InventoryView';
 import { ReportView } from './ReportView';
 import { useWindowKeys } from '../ui/use-window-keys';
@@ -21,7 +23,8 @@ type View =
   | { readonly kind: 'imported'; readonly report: ImportReportView }
   | { readonly kind: 'inventory' }
   | { readonly kind: 'report' }
-  | { readonly kind: 'import-guide' };
+  | { readonly kind: 'import-guide' }
+  | { readonly kind: 'catalog-export' };
 
 interface AdminDialogProps {
   readonly posApi: PosApi;
@@ -33,6 +36,8 @@ interface AdminDialogProps {
   readonly onOpenDashboard?: () => void;
   /** Opens the orders to suppliers (E1-44). Without it, the administration offers none. */
   readonly onOpenSupplierOrder?: () => void;
+  /** Saves the whole catalog as a file (E1-55). Without it, the administration does not offer it. */
+  readonly catalogExportApi?: CatalogExportApi;
   readonly onClose: () => void;
 }
 
@@ -45,10 +50,11 @@ interface AdminDialogProps {
  * @param props.productApi bridge for the product panel, when the register offers it
  * @param props.onOpenDashboard called to open the summary of the business, when the register offers it
  * @param props.onOpenSupplierOrder opens the orders to suppliers, when the register offers them
+ * @param props.catalogExportApi bridge to export the whole catalog, when the register offers it
  * @param props.onClose called when the dialog is done
  * @returns the dialog
  */
-export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, onOpenSupplierOrder, onClose }: AdminDialogProps): ReactElement {
+export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, onOpenSupplierOrder, catalogExportApi, onClose }: AdminDialogProps): ReactElement {
   const [view, setView] = useState<View>({ kind: 'summary' });
   const [backup, setBackup] = useState<BackupStatus | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -114,6 +120,7 @@ export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, o
           F8: () => setView({ kind: 'passphrase', purpose: 'restore' }),
           F9: onOpenDashboard,
           F11: onOpenSupplierOrder,
+          F12: catalogExportApi === undefined ? undefined : () => setView({ kind: 'catalog-export' }),
           Escape: onClose,
         }
       : view.kind === 'imported'
@@ -166,6 +173,8 @@ export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, o
         </>
       ) : view.kind === 'inventory' ? (
         <InventoryView posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} {...(productApi === undefined ? {} : { productApi })} {...(onOpenSupplierOrder === undefined ? {} : { onOpenSupplierOrder })} onBack={() => setView({ kind: 'summary' })} />
+      ) : view.kind === 'catalog-export' && catalogExportApi !== undefined ? (
+        <CatalogExportView catalogExportApi={catalogExportApi} onBack={() => setView({ kind: 'summary' })} />
       ) : view.kind === 'report' ? (
         <ReportView posApi={posApi} onBack={() => setView({ kind: 'summary' })} />
       ) : view.kind === 'passphrase' ? (
@@ -224,6 +233,11 @@ export function AdminDialog({ posApi, pricingApi, productApi, onOpenDashboard, o
             {onOpenSupplierOrder !== undefined && (
               <li>
                 <kbd>F11</kbd> Pedido al proveedor: armarlo, guardarlo y sacarlo en Excel o PDF
+              </li>
+            )}
+            {catalogExportApi !== undefined && (
+              <li>
+                <kbd>F12</kbd> Exportar catálogo: todos los productos con costo, precio, existencia y margen (PDF, Excel o CSV)
               </li>
             )}
             <li>
