@@ -12,6 +12,8 @@ interface RouteRule {
  */
 const ROUTE_RULES: readonly RouteRule[] = [
   { prefix: '/catalog/price-changes', roles: ['owner'] },
+  // Reading a paper catalog spends money on the Claude API, so only the owner may (ADR 0069).
+  { prefix: '/catalog/paper', roles: ['owner'] },
   { prefix: '/catalog', roles: ['owner', 'manager'] },
   { prefix: '/settings', roles: ['owner'] },
 ];

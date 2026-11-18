@@ -10,6 +10,8 @@ export interface PanelConfig {
   coreApiUrl: URL;
   /** Secret that encrypts the session cookie. */
   sessionSecret: string;
+  /** Address of the analytics service, which reads catalog photos (E1-53). `null` hides that screen's button. */
+  analyticsApiUrl: URL | null;
 }
 
 /** Thrown when a required setting is missing or malformed. The message never includes a value. */
@@ -47,5 +49,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PanelConfig {
     baseUrl: requireUrl(env, 'PANEL_BASE_URL'),
     coreApiUrl: requireUrl(env, 'PANEL_CORE_API_URL'),
     sessionSecret,
+    analyticsApiUrl: env.PANEL_ANALYTICS_API_URL ? requireUrl(env, 'PANEL_ANALYTICS_API_URL') : null,
   };
 }

@@ -22,6 +22,7 @@ export default async function CatalogLayout({ children }: { children: ReactNode 
           <Link href="/catalog/import">Importar</Link>
           <Link href="/catalog/labels">Etiquetas</Link>
           {isOwner && <Link href="/catalog/price-changes">Cambiar precios</Link>}
+          {isOwner && <Link href="/catalog/paper">Catálogo en papel</Link>}
         </nav>
         <form method="post" action="/auth/logout">
           <button type="submit" className="button button--quiet">
