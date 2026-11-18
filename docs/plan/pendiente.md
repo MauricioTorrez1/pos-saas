@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 45 de 49 tareas hechas · ⚠️ 4 faltan (17 h)
+✅ 47 de 49 tareas hechas · ⚠️ 2 faltan (9 h)
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -76,8 +76,8 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-34 · Reportes básicos** (5 h) _(En revisión)_: el dueño ve ventas, ticket promedio, margen, agotados y productos sin venta.
 - ✅ **E1-35 · Respaldo de la caja** (4 h): la base de la caja se copia cada hora a otro dispositivo.
 - ✅ **E1-36 · Instalador para Windows** (4 h): tu familia instala y actualiza la caja sin ayuda técnica.
-- ⚠️ **E1-37 · Piloto paralelo** (4 h): 1 a 2 semanas registrando en ambos sistemas.
-- ⚠️ **E1-38 · Salida de Eleventa** (4 h): la tienda opera solo con este sistema y tiene plan de regreso.
+- ✅ **E1-37 · Piloto paralelo** (4 h) _(Hecha en la tienda)_: 1 a 2 semanas registrando en ambos sistemas.
+- ✅ **E1-38 · Salida de Eleventa** (4 h) _(Hecha en la tienda)_: la tienda opera solo con este sistema y tiene plan de regreso.
 - ✅ **E1-39 · Editar precio de un producto en la caja** (3 h): el dueño cambia el precio de un producto ya dado de alta, sin tocar las ventas hechas ni la que está en curso.
 - ✅ **E1-40 · Recepción de cambios de precio en el núcleo** (3 h) _(En revisión)_: el núcleo guarda, audita y anuncia los cambios de precio que hace la caja, aunque todavía no conozca el producto.
 - ✅ **E1-41 · Credencial de dispositivo en `/sync/push`** (4 h) _(En revisión)_: solo una caja enrolada puede enviar, y solo sus propios lotes; una caja perdida se da de baja y deja de enviar.
@@ -207,4 +207,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 69 de 165 tareas hechas (292 h de 732 h) · ⚠️ 96 faltan (440 h).
+✅ 71 de 165 tareas hechas (300 h de 732 h) · ⚠️ 94 faltan (432 h).
