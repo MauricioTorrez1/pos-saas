@@ -104,6 +104,8 @@ test('exposes only the agreed functions through the bridge', async ({ appWindow 
     'updateProduct',
     'getDashboard',
     'exportDashboard',
+    'getIncomeStatement',
+    'exportIncomeStatement',
     'getAppearance',
     'saveAppearance',
     'savePendingSale',
