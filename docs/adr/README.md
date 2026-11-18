@@ -72,3 +72,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0067](0067-proveedores-en-el-producto-faltantes-editables-y-busqueda-de-ventas.md) | Proveedores y «Pedir más» en el producto, faltantes editables, nombre y moneda del ticket, y búsqueda de ventas en «Resumen» | Aceptada |
 | [0068](0068-listas-de-precios-de-proveedores-y-comparador.md) | Listas de precios de proveedores: lista vigente reemplazada en una transacción, columnas recordadas por proveedor, IVA preguntado, ligado por código, barras o a mano, búsqueda sin acentos | Aceptada |
 | [0069](0069-lectura-de-catalogos-en-papel-con-claude.md) | Lectura de catálogos de proveedor en papel con Claude, revisión humana de cada fila y CSV para la caja | Aceptada |
+| [0070](0070-fondo-de-caja-al-entrar-y-corte-al-salir.md) | Fondo de caja al entrar, «Solo administrar» para el dueño y pregunta de corte al cerrar la caja, decidida en el proceso principal | Aceptada |

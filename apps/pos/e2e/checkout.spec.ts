@@ -318,7 +318,7 @@ test('sells an item that is not in the catalog with a typed price, writes who ap
     try {
       return {
         sales: database.prepare('SELECT status, total_cents FROM sale').all(),
-        audit: database.prepare('SELECT action FROM audit_log').all(),
+        audit: database.prepare("SELECT action FROM audit_log WHERE entity <> 'cash_session'").all(),
         saleMovements: (database.prepare("SELECT count(*) AS total FROM stock_movement WHERE type = 'sale'").get() as { total: number }).total,
       };
     } finally {

@@ -10,9 +10,9 @@ import { isTrustedUrl } from './trusted-url';
  *
  * @param rendererEntry address of the register screen
  * @param preloadPath path of the built preload script
- * @returns once the screen has loaded
+ * @returns the window, once the screen has loaded
  */
-export async function openMainWindow(rendererEntry: string, preloadPath: string): Promise<void> {
+export async function openMainWindow(rendererEntry: string, preloadPath: string): Promise<BrowserWindow> {
   const window = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -27,6 +27,7 @@ export async function openMainWindow(rendererEntry: string, preloadPath: string)
   });
   keepOnRegisterScreen(window.webContents, rendererEntry);
   await window.loadURL(rendererEntry);
+  return window;
 }
 
 /** The bridge must never be offered to a foreign page, so the window cannot leave the register screen. */
