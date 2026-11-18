@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 
 import { DEFAULT_APPEARANCE, type Appearance } from '../shared/appearance';
 import type { UserSummary } from '../shared/auth';
@@ -12,10 +12,12 @@ import { applyAppearance } from './appearance/apply-appearance';
 import { AppearanceDialog } from './appearance/AppearanceDialog';
 import type { CashStatus } from '../shared/cash-api';
 import type { DashboardApi } from '../shared/dashboard-api';
+import type { ExitApi } from '../shared/exit-api';
+import { ExitDialog } from './exit/ExitDialog';
 import { DashboardDialog } from './dashboard/DashboardDialog';
 import { AdminDialog } from './admin/AdminDialog';
 import { LoginScreen } from './auth/LoginScreen';
-import { CashDialog } from './cash/CashDialog';
+import { CashDialog, type CashDialogMode } from './cash/CashDialog';
 import { ReturnDialog } from './returns/ReturnDialog';
 import { PendingSaleDialog } from './recovery/PendingSaleDialog';
 import { usePendingSales } from './recovery/use-pending-sales';
@@ -28,6 +30,15 @@ import { SettingsDialog } from './tools/SettingsDialog';
 type AppInfoState = { status: 'loading' } | { status: 'ready'; version: string } | { status: 'failed' };
 
 const UNNAMED_REGISTER = 'Caja';
+const SHIFT_MOMENT = new Intl.DateTimeFormat('es-MX', { dateStyle: 'short', timeStyle: 'short' });
+
+/**
+ * Where a request to close the register stands: nobody is closing, the question is showing, or the person chose to make
+ * the cut first (E1-54).
+ */
+type ExitFlow = { readonly kind: 'idle' } | { readonly kind: 'asking'; readonly openedBy: string | null } | { readonly kind: 'cutting' };
+
+const NOT_EXITING: ExitFlow = { kind: 'idle' };
 
 /** The keys that never change, because the scanner and the hands of the cashier count on them. */
 const FIXED_SHORTCUTS: readonly { readonly keys: string; readonly action: string }[] = [
@@ -64,6 +75,8 @@ interface AppProps {
   readonly missingApi?: MissingItemsApi;
   /** The keys, the ticket, the printer and the list of sales. Without it, the register keeps its keys and offers no settings. */
   readonly toolsApi?: ToolsApi;
+  /** Closing the register with the cash open (E1-54). Without it, closing never asks. */
+  readonly exitApi?: ExitApi;
 }
 
 /**
@@ -76,12 +89,38 @@ interface AppProps {
  * @param props.dashboardApi bridge for the summary of the business, when the register offers it
  * @param props.purchasingApi bridge for the orders to suppliers, when the register offers it
  * @param props.toolsApi bridge for the settings and the list of sales, when the register offers them
+ * @param props.exitApi bridge for closing the register with the cash open
  * @returns the screen
  */
-export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi }: AppProps): ReactElement {
+export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi, exitApi }: AppProps): ReactElement {
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [authState, setAuthState] = useState<AuthState | null>(null);
   const [authFailed, setAuthFailed] = useState(false);
+  const [exitFlow, setExitFlow] = useState<ExitFlow>(NOT_EXITING);
+
+  useEffect(() => {
+    if (exitApi === undefined) {
+      return undefined;
+    }
+    return exitApi.onExitRequested(() => {
+      // Said at once, so the main process knows the screen is alive and does not take a second close as a frozen screen.
+      void exitApi.answerExit('received');
+      const ask = (openedBy: string | null): void => setExitFlow((flow) => (flow.kind === 'cutting' ? flow : { kind: 'asking', openedBy }));
+      posApi.getCashStatus().then(
+        (status) => ask(status.session?.openedBy ?? null),
+        () => ask(null),
+      );
+    });
+  }, [exitApi, posApi]);
+
+  const answerExit = useCallback(
+    (answer: 'leave_open' | 'cut_done' | 'cancel') => {
+      setExitFlow(NOT_EXITING);
+      void exitApi?.answerExit(answer);
+    },
+    [exitApi],
+  );
+  const exitCut = useMemo(() => ({ onDone: () => answerExit('cut_done'), onCancel: () => answerExit('cancel') }), [answerExit]);
 
   useEffect(() => {
     posApi.getAppearance().then(setAppearance, (error: unknown) => {
@@ -112,11 +151,32 @@ export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingAp
   if (authState === null) {
     return <div className="register" aria-busy="true" />;
   }
+  const exitDialog =
+    exitFlow.kind === 'asking' ? (
+      <ExitDialog
+        openedBy={exitFlow.openedBy}
+        needsSignIn={authState.current === null}
+        onCut={() => setExitFlow({ kind: 'cutting' })}
+        onLeaveOpen={() => answerExit('leave_open')}
+        onCancel={() => answerExit('cancel')}
+      />
+    ) : null;
   if (authState.current === null) {
-    return <LoginScreen posApi={posApi} authState={authState} onSignedIn={loadAuthState} />;
+    return (
+      <>
+        {exitFlow.kind === 'cutting' && (
+          <p className="notice register-banner" role="status">
+            Entra con tu PIN para hacer el corte de caja. Al terminarlo, la caja se cierra.
+          </p>
+        )}
+        <LoginScreen posApi={posApi} authState={authState} onSignedIn={loadAuthState} />
+        {exitDialog}
+      </>
+    );
   }
   return (
-    <RegisterScreen
+    <>
+      <RegisterScreen
       posApi={posApi}
       {...(pricingApi === undefined ? {} : { pricingApi })}
       {...(productApi === undefined ? {} : { productApi })}
@@ -128,7 +188,11 @@ export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingAp
       appearance={appearance}
       onAppearanceSaved={setAppearance}
       onSignOut={signOut}
-    />
+      isExiting={exitFlow.kind === 'asking'}
+      {...(exitFlow.kind === 'cutting' ? { exitCut } : {})}
+      />
+      {exitDialog}
+    </>
   );
 }
 
@@ -145,13 +209,18 @@ interface RegisterScreenProps {
   readonly appearance: Appearance;
   readonly onAppearanceSaved: (appearance: Appearance) => void;
   readonly onSignOut: () => void;
+  /** True while the question about closing holds the keyboard. */
+  readonly isExiting: boolean;
+  /** Set while the person makes the cut before closing the register. */
+  readonly exitCut?: { readonly onDone: () => void; readonly onCancel: () => void };
 }
 
-function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
+function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi, user, appearance, onAppearanceSaved, onSignOut, isExiting, exitCut }: RegisterScreenProps): ReactElement {
   const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
   const [cash, setCash] = useState<CashStatus | null>(null);
   const [isEditingCash, setIsEditingCash] = useState(false);
+  const [cashMode, setCashMode] = useState<CashDialogMode>('normal');
   const [isReturning, setIsReturning] = useState(false);
   const [isAdministering, setIsAdministering] = useState(false);
   const [isViewingDashboard, setIsViewingDashboard] = useState(false);
@@ -182,13 +251,15 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
     posApi.getCashStatus().then(setCash, () => setCash(null));
   }, [posApi]);
 
-  // A closed register cannot sell, so the first thing a cashier sees is how to open it. An open register leaves the dialog
-  // alone: the cashier may have asked for it (F3) before the first answer came, and that answer must not close it.
+  // A closed register cannot sell, so the first thing a person sees after signing in is the opening float (E1-54). An open
+  // register, from another shift or from before a restart, is not asked again. It also leaves the dialog alone: the cashier
+  // may have asked for it (F3) before the first answer came, and that answer must not close it.
   useEffect(() => {
     posApi.getCashStatus().then(
       (status) => {
         setCash(status);
         if (status.session === null) {
+          setCashMode('opening');
           setIsEditingCash(true);
         }
       },
@@ -196,7 +267,11 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
     );
   }, [posApi]);
 
-  const openCash = useCallback(() => setIsEditingCash(true), []);
+  const openCash = useCallback(() => {
+    setCashMode('normal');
+    setIsEditingCash(true);
+  }, []);
+  // In the opening, closing the dialog is «Solo administrar», which only the owner is offered.
   const closeCash = useCallback(() => setIsEditingCash(false), []);
   const openAdmin = useCallback(() => setIsAdministering(isOwner), [isOwner]);
   const closeAdmin = useCallback(() => setIsAdministering(false), []);
@@ -246,6 +321,11 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
         <p className="register-cash" data-open={cash?.session !== null && cash !== null} aria-label="Estado de la caja">
           {cash === null ? '' : cash.session === null ? 'Caja cerrada' : 'Caja abierta'}
         </p>
+        {cash?.session != null && (
+          <p className="register-user" aria-label="Turno de caja">
+            Abrió {cash.session.openedBy} · {SHIFT_MOMENT.format(new Date(cash.session.openedAt))}
+          </p>
+        )}
         {/* Out of the tab order: the keys are the keyboard route, and Tab must not pull a scan out of the lookup box. */}
         {isOwner && (
           <button type="button" className="header-button" tabIndex={-1} onClick={openAdmin}>
@@ -287,6 +367,14 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
           Salir <kbd>{key('signOut')}</kbd>
         </button>
       </header>
+      {cash !== null && cash.session === null && !isEditingCash && exitCut === undefined && (
+        <p className="notice register-banner" role="status" aria-label="Caja sin abrir">
+          {isOwner ? 'Solo administrar: l' : 'L'}a caja no está abierta y no se puede cobrar.{' '}
+          <button type="button" className="header-button" tabIndex={-1} onClick={openCash}>
+            Abrir caja <kbd>{key('cash')}</kbd>
+          </button>
+        </p>
+      )}
       {cash?.shouldWithdraw === true && (
         <p className="notice register-banner" role="status">
           Hay mucho efectivo en el cajón. Haz un retiro parcial cuando puedas ({key('cash')}). Puedes seguir vendiendo.
@@ -296,7 +384,7 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
         posApi={posApi}
         {...(pricingApi === undefined ? {} : { pricingApi })}
         {...(productApi === undefined ? {} : { productApi })}
-        isKeyboardElsewhere={isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering || isViewingDashboard || ordering !== null || isEditingSettings || isViewingSales || missingFor !== null}
+        isKeyboardElsewhere={isExiting || exitCut !== undefined || isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering || isViewingDashboard || ordering !== null || isEditingSettings || isViewingSales || missingFor !== null}
         isOwner={isOwner}
         onOpenAppearance={openAppearance}
         onSignOut={onSignOut}
@@ -307,6 +395,7 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
         {...(purchasingApi === undefined ? {} : { onOpenSupplierOrder: openOrders, purchasingApi })}
         {...(missingApi === undefined ? {} : { onOpenMissingItems: openMissing })}
         onCashChanged={refreshCash}
+        isCashOpen={cash === null || cash.session !== null}
         keymap={keymap}
         {...(toolsApi === undefined ? {} : { toolsApi, onOpenSettings: openSettings, onOpenSalesHistory: openSales })}
       />
@@ -350,8 +439,11 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
         <MissingItemsDialog api={missingApi} isOwner={isOwner} initialDescription={missingFor} onClose={closeMissing} />
       )}
       {isReturning && !hasPendingSales && <ReturnDialog posApi={posApi} user={user} onReturned={refreshCash} onClose={closeReturns} />}
-      {isEditingCash && !hasPendingSales && cash !== null && (
-        <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} onClose={closeCash} />
+      {exitCut !== undefined && !hasPendingSales && cash !== null && (
+        <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} mode="exit_cut" onClose={exitCut.onCancel} onCutDone={exitCut.onDone} />
+      )}
+      {isEditingCash && exitCut === undefined && !hasPendingSales && cash !== null && (
+        <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} onClose={closeCash} mode={cashMode} onSignOut={onSignOut} />
       )}
       {isEditingAppearance && !hasPendingSales && (
         <AppearanceDialog saved={appearance} onPreview={applyAppearance} onSave={saveAppearance} onClose={closeAppearance} />

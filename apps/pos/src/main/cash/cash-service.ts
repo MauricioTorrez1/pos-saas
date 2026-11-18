@@ -16,6 +16,7 @@ import type {
   OpenCashResult,
 } from '../../shared/cash-api';
 import type { UserSummary } from '../../shared/auth';
+import type { AuditEntry } from '../audit/audit-log';
 import type { AuthService } from '../auth/auth-service';
 import type { CashSessionStore } from './cash-session-store';
 
@@ -43,14 +44,17 @@ function requireReason(reason: string): string {
 export class CashService {
   readonly #store: CashSessionStore;
   readonly #auth: Pick<AuthService, 'currentUser' | 'authorizeWithOwnerPin'>;
+  readonly #audit: { record(entry: AuditEntry): void } | null;
 
   /**
    * @param store where the sessions are kept
    * @param auth who is signed in, and the check of an owner's PIN
+   * @param audit where the opening of each shift is written, with who and how much (E1-54)
    */
-  constructor(store: CashSessionStore, auth: Pick<AuthService, 'currentUser' | 'authorizeWithOwnerPin'>) {
+  constructor(store: CashSessionStore, auth: Pick<AuthService, 'currentUser' | 'authorizeWithOwnerPin'>, audit: { record(entry: AuditEntry): void } | null = null) {
     this.#store = store;
     this.#auth = auth;
+    this.#audit = audit;
   }
 
   /**
@@ -94,7 +98,15 @@ export class CashService {
     if (this.#store.findOpen() !== null) {
       return { status: 'already_open', cash: this.status() };
     }
-    this.#store.open(user.id, floatCents);
+    this.#store.open(user.id, floatCents, (sessionId) =>
+      this.#audit?.record({
+        userId: user.id,
+        action: 'cash_session.opened',
+        entity: 'cash_session',
+        entityId: sessionId,
+        detail: `${user.name} abrió la caja con un fondo de ${floatCents} centavos`,
+      }),
+    );
     return { status: 'opened', cash: this.status() };
   }
 

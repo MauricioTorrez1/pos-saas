@@ -11,6 +11,7 @@ import {
   removeTemporaryUserData,
   signInWindow,
   testSalePaths,
+  quitRegister,
 } from './register-harness.ts';
 
 /** The sample products the register starts with. Written out here so a change in the list breaks these tests. */
@@ -268,7 +269,7 @@ test('keeps the appearance the owner chose after restarting', async ({ launch, r
 
   await expect(page.getByRole('heading', { name: 'Tlapalería Torres' })).toBeVisible();
   await expect(lookupBox(page)).toBeFocused();
-  await register.close();
+  await quitRegister(register);
 
   const reopened = await signInWindow(await launch());
   await expect(reopened.getByRole('heading', { name: 'Tlapalería Torres' })).toBeVisible();

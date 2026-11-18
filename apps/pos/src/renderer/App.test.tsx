@@ -1918,3 +1918,132 @@ describe('appearance', () => {
     expect(document.activeElement).toBe(nameField);
   });
 });
+
+describe('opening the shift and closing the register (E1-54)', () => {
+  const CASHIER: UserSummary = { id: '019a5f2e-7c41-7b1a-9d2e-3f4a5b6c7d8f', name: 'Ana', role: 'cashier' };
+
+  function asCashier(): Pick<PosApi, 'getAuthState'> {
+    return { getAuthState: () => Promise.resolve({ needsSetup: false, users: [OWNER, CASHIER], current: CASHIER }) };
+  }
+
+  function pressKey(key: string): void {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key });
+  }
+
+  /** A bridge for closing that the test drives: `request` is the main process asking, `answers` what the screen said. */
+  function fakeExitApi() {
+    const listeners = new Set<() => void>();
+    const answers: string[] = [];
+    return {
+      api: {
+        onExitRequested: (listener: () => void) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        answerExit: (answer: string) => {
+          answers.push(answer);
+          return Promise.resolve();
+        },
+      },
+      answers,
+      request: () => listeners.forEach((listener) => listener()),
+    };
+  }
+
+  it('asks a cashier for the opening float and offers no way around it', async () => {
+    const openCashSession = vi.fn<PosApi['openCashSession']>(() => Promise.resolve({ status: 'opened', cash: OPEN_CASH }));
+    render(<App posApi={fakePosApi({ ...asCashier(), getCashStatus: () => Promise.resolve(CLOSED_CASH), openCashSession })} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Abrir la caja', hidden: true });
+
+    expect(within(dialog).queryByRole('button', { name: /Solo administrar/, hidden: true })).toBeNull();
+    pressKey('Escape');
+    expect(screen.getByRole('dialog', { name: 'Abrir la caja', hidden: true })).toBeDefined();
+
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Fondo de caja', hidden: true }), { target: { value: '300' } });
+    pressKey('F2');
+    await waitFor(() => expect(openCashSession).toHaveBeenCalledExactlyOnceWith({ floatCents: 30000 }));
+  });
+
+  it('lets the owner choose «Solo administrar», and then blocks charging with a way to open the cash', async () => {
+    const savePendingSale = vi.fn<PosApi['savePendingSale']>();
+    render(<App posApi={fakePosApi({ getCashStatus: () => Promise.resolve(CLOSED_CASH), savePendingSale })} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Abrir la caja', hidden: true });
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Solo administrar/, hidden: true }));
+
+    const banner = await screen.findByRole('status', { name: 'Caja sin abrir' });
+    expect(banner.textContent).toContain('Solo administrar');
+    await addByCode();
+    press('F12');
+    expect((await screen.findByRole('alert')).textContent).toContain('No se puede cobrar');
+    expect(savePendingSale).not.toHaveBeenCalled();
+    expect(await screen.findByRole('dialog', { name: 'Abrir la caja', hidden: true })).toBeDefined();
+  });
+
+  it('does not ask for the float again when the cash is already open, and says whose shift it is', async () => {
+    await renderApp(fakePosApi({ ...asCashier() }));
+
+    expect(screen.queryByRole('dialog', { hidden: true })).toBeNull();
+    expect((await screen.findByLabelText('Turno de caja')).textContent).toContain('Abrió Mauricio');
+  });
+
+  it('asks before closing with the cash open, and leaves it open when told to', async () => {
+    const exit = fakeExitApi();
+    render(<App posApi={fakePosApi()} exitApi={exit.api} />);
+    await screen.findByRole('combobox', { name: 'Buscar producto' });
+
+    exit.request();
+    const dialog = await screen.findByRole('dialog', { name: '¿Cerrar la caja?', hidden: true });
+    expect(dialog.textContent).toContain('la abrió Mauricio');
+    fireEvent.click(within(dialog).getByRole('button', { name: /No hacer corte y salir/, hidden: true }));
+
+    expect(exit.answers).toEqual(['received', 'leave_open']);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '¿Cerrar la caja?', hidden: true })).toBeNull());
+  });
+
+  it('opens the cut when asked to make it, and closes the register once it is done', async () => {
+    const exit = fakeExitApi();
+    const closeCashSession = vi.fn<PosApi['closeCashSession']>(() =>
+      Promise.resolve({
+        status: 'closed',
+        cut: {
+          id: 'cut',
+          cutAt: '2026-11-18T22:00:00.000Z',
+          cutBy: 'Mauricio',
+          reason: null,
+          isBalanced: true,
+          cash: { expectedCents: 60000, countedCents: 60000, differenceCents: 0 },
+          card: { expectedCents: 0, countedCents: 0, differenceCents: 0 },
+          transfer: { expectedCents: 0, countedCents: 0, differenceCents: 0 },
+        },
+      }),
+    );
+    const getCashStatus = vi.fn<PosApi['getCashStatus']>(() => Promise.resolve(OPEN_CASH));
+    render(<App posApi={fakePosApi({ closeCashSession, getCashStatus })} exitApi={exit.api} />);
+    await screen.findByRole('combobox', { name: 'Buscar producto' });
+
+    exit.request();
+    fireEvent.click(within(await screen.findByRole('dialog', { name: '¿Cerrar la caja?', hidden: true })).getByRole('button', { name: /Hacer corte de caja/, hidden: true }));
+    await screen.findByRole('heading', { name: 'Corte de caja', hidden: true });
+    getCashStatus.mockResolvedValue(CLOSED_CASH);
+    pressKey('F2');
+    await screen.findByRole('status', { name: 'Resultado del corte', hidden: true });
+    pressKey('Enter');
+
+    await waitFor(() => expect(exit.answers).toEqual(['received', 'cut_done']));
+  });
+
+  it('gives up closing when the cut is left with Esc', async () => {
+    const exit = fakeExitApi();
+    render(<App posApi={fakePosApi()} exitApi={exit.api} />);
+    await screen.findByRole('combobox', { name: 'Buscar producto' });
+
+    exit.request();
+    fireEvent.click(within(await screen.findByRole('dialog', { name: '¿Cerrar la caja?', hidden: true })).getByRole('button', { name: /Hacer corte de caja/, hidden: true }));
+    await screen.findByRole('heading', { name: 'Corte de caja', hidden: true });
+    pressKey('Escape');
+
+    await waitFor(() => expect(exit.answers).toEqual(['received', 'cancel']));
+    expect(screen.queryByRole('dialog', { hidden: true })).toBeNull();
+  });
+});

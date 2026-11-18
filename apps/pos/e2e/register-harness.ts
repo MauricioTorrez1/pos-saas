@@ -16,6 +16,9 @@ const CLEANUP_ATTEMPTS = 20;
 const CLEANUP_RETRY_MS = 500;
 const FORCE_CLOSE_ATTEMPTS = 50;
 const FORCE_CLOSE_RETRY_MS = 100;
+const QUIT_ATTEMPTS = 3;
+const QUIT_QUESTION_MS = 5_000;
+const QUIT_POLL_MS = 100;
 
 /** How to open the register in a special way. */
 export interface LaunchOptions {
@@ -403,4 +406,39 @@ async function openCashIfClosed(page: Page): Promise<void> {
     await expect(state).toHaveText('Caja abierta');
     await expect(page.getByRole('dialog')).toHaveCount(0);
   }
+}
+/**
+ * Quits the register the way a person does. With the cash open the register asks first (E1-54), so this answers «No hacer
+ * corte y salir» when the question shows; with the cash closed it quits without asking.
+ *
+ * @param register the running app
+ */
+export async function quitRegister(register: ElectronApplication): Promise<void> {
+  const page = register.windows()[0];
+  let isClosed = false;
+  const closed = new Promise<void>((resolve) => register.once('close', () => resolve())).then(() => {
+    isClosed = true;
+  });
+  // The same `close` event as the X. A screen that never shows the question is taken as frozen, and the next close lets
+  // the window go (ADR 0070). The answer is a click in the page, which, unlike a locator, does not wait for a navigation
+  // the window refused.
+  for (let attempt = 0; attempt < QUIT_ATTEMPTS && !isClosed; attempt += 1) {
+    await register.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => undefined);
+    const deadline = Date.now() + QUIT_QUESTION_MS;
+    while (!isClosed && Date.now() < deadline) {
+      const answered = await page
+        ?.evaluate(() => {
+          const leave = [...document.querySelectorAll('button')].find((button) => button.textContent?.includes('No hacer corte y salir'));
+          leave?.click();
+          return leave !== undefined;
+        })
+        .catch(() => false);
+      if (answered === true) {
+        break;
+      }
+      await delay(QUIT_POLL_MS);
+    }
+    await Promise.race([closed, delay(QUIT_QUESTION_MS)]);
+  }
+  await closed;
 }
