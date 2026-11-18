@@ -1,0 +1,7 @@
+# Known vulnerabilities the dependency scan ignores for a while (scripts/scan-dependencies.sh).
+# Each one says why and when it stops being ignored, so it fails again if nobody fixed it.
+
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "picomatch 4.0.7 has no fixed version yet. Only vite and vitest use it to build and test; it does not ship in the register or the core. Update when a fix exists."
