@@ -853,4 +853,44 @@ export const MIGRATIONS: readonly Migration[] = [
       ) STRICT, WITHOUT ROWID;
     `,
   },
+  {
+    version: 22,
+    name: 'create_expenses',
+    // The operating expenses of the business: rent, power, wages (E1-56, ADR 0072). An expense never changes and is never
+    // deleted: a mistake is voided once, with a reason. One paid from the drawer points at the cash movement written with
+    // it, so the cut subtracts it once and the income statement counts it once.
+    sql: `
+      CREATE TABLE expense (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        concept TEXT NOT NULL CHECK (length(trim(concept)) BETWEEN 1 AND 40),
+        amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+        expense_day TEXT NOT NULL CHECK (expense_day GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+        note TEXT CHECK (note IS NULL OR length(note) <= 120),
+        paid_from_drawer INTEGER NOT NULL CHECK (paid_from_drawer IN (0, 1)),
+        cash_movement_id TEXT REFERENCES cash_movement (id),
+        recorded_by TEXT NOT NULL,
+        authorized_by TEXT NOT NULL,
+        recorded_at TEXT NOT NULL,
+        voided_by TEXT,
+        voided_at TEXT,
+        void_reason TEXT,
+        CHECK ((paid_from_drawer = 1) = (cash_movement_id IS NOT NULL)),
+        CHECK ((voided_at IS NULL) = (voided_by IS NULL) AND (voided_at IS NULL) = (void_reason IS NULL))
+      ) STRICT;
+
+      CREATE INDEX expense_by_day ON expense (tenant_id, expense_day);
+
+      CREATE TRIGGER expense_keeps_its_facts
+      BEFORE UPDATE OF id, tenant_id, concept, amount_cents, expense_day, note, paid_from_drawer, cash_movement_id, recorded_by, authorized_by, recorded_at ON expense
+      BEGIN SELECT RAISE(ABORT, 'what an expense says never changes: void it instead'); END;
+
+      CREATE TRIGGER expense_is_voided_once BEFORE UPDATE OF voided_by, voided_at, void_reason ON expense
+      WHEN OLD.voided_at IS NOT NULL
+      BEGIN SELECT RAISE(ABORT, 'an expense is voided only once'); END;
+
+      CREATE TRIGGER expense_is_never_deleted BEFORE DELETE ON expense
+      BEGIN SELECT RAISE(ABORT, 'an expense is never deleted: void it instead'); END;
+    `,
+  },
 ];

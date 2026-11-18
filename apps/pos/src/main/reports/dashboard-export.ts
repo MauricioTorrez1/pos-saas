@@ -15,7 +15,9 @@ import {
   quantityText,
   trendLabel,
 } from '../../shared/dashboard-format';
+import type { IncomeStatement } from '../../shared/income-statement';
 import type { Cell, Sheet } from '../export/xlsx';
+import { statementSection, statementSheet } from './income-statement-export';
 
 const UNIT_NAMES = { piece: 'Pieza', meter: 'Metro', kilogram: 'Kilogramo', liter: 'Litro' } as const;
 const COST_SOURCE_NAMES = { typed: 'Capturado', average: 'Promedio ponderado', none: 'Sin costo' } as const;
@@ -113,9 +115,10 @@ function topRow(seller: TopSeller, includesCosts: boolean): Cell[] {
  * format, written from integers, so the owner can add them up.
  *
  * @param summary what the dashboard showed
+ * @param statement the income statement of the same period, when the person may see it
  * @returns the sheets
  */
-export function summarySheets(summary: DashboardSummary): Sheet[] {
+export function summarySheets(summary: DashboardSummary, statement: IncomeStatement | null = null): Sheet[] {
   const { totals, previousTotals, includesCosts } = summary;
   const summaryRows: Cell[][] = [
     [heading(summary.scope === 'shift' ? 'Resumen de mi turno' : 'Resumen del negocio')],
@@ -136,6 +139,13 @@ export function summarySheets(summary: DashboardSummary): Sheet[] {
   summaryRows.push(['Cancelaciones (cantidad)', count(summary.cancellations.count)], ['Cancelaciones (monto)', money(summary.cancellations.totalCents)]);
   if (summary.inventory !== null) {
     summaryRows.push(['Valor del inventario a costo', money(summary.inventory.valueCents)]);
+  }
+  if (summary.cashMovements !== null) {
+    summaryRows.push(
+      ['Entradas de efectivo a la caja', money(summary.cashMovements.inCents)],
+      ['Salidas de efectivo de la caja', money(summary.cashMovements.outCents)],
+      ['De ellas, gastos pagados de la caja', money(summary.cashMovements.drawerExpensesCents)],
+    );
   }
   if (includesCosts && totals.productsWithoutCostSold > 0) {
     summaryRows.push([`${totals.productsWithoutCostSold} producto(s) vendidos sin costo no cuentan en la utilidad`]);
@@ -213,6 +223,9 @@ export function summarySheets(summary: DashboardSummary): Sheet[] {
       widths: [30, 40, 12, 14, 16],
     });
   }
+  if (statement !== null) {
+    sheets.splice(1, 0, statementSheet(statement));
+  }
   return sheets;
 }
 
@@ -248,9 +261,10 @@ const PDF_STYLES = `
  *
  * @param summary what the dashboard showed
  * @param businessName the name of the business for the title
+ * @param statement the income statement of the same period, when the person may see it
  * @returns the HTML
  */
-export function summaryHtml(summary: DashboardSummary, businessName: string): string {
+export function summaryHtml(summary: DashboardSummary, businessName: string, statement: IncomeStatement | null = null): string {
   const { totals, previousTotals, includesCosts } = summary;
   const indicatorRows = indicators(includesCosts).map((indicator) => {
     const now = indicator.value(totals);
@@ -268,6 +282,9 @@ export function summaryHtml(summary: DashboardSummary, businessName: string): st
     table('Indicadores', ['Indicador', 'Periodo', ...(previousTotals === null ? [] : ['Periodo anterior', 'Cambio'])], indicatorRows),
     `<p>Cancelaciones: ${summary.cancellations.count} por ${escapeHtml(pesosLabel(summary.cancellations.totalCents))}. La caja todavía no maneja descuentos.</p>`,
     summary.inventory === null ? '' : `<p>Valor del inventario a costo: ${escapeHtml(pesosLabel(summary.inventory.valueCents))}</p>`,
+    summary.cashMovements === null
+      ? ''
+      : `<p>Caja: entraron ${escapeHtml(pesosLabel(summary.cashMovements.inCents))} y salieron ${escapeHtml(pesosLabel(summary.cashMovements.outCents))}, de ellos ${escapeHtml(pesosLabel(summary.cashMovements.drawerExpensesCents))} en gastos.</p>`,
     includesCosts && totals.productsWithoutCostSold > 0
       ? `<p>${totals.productsWithoutCostSold} producto(s) vendidos sin costo no cuentan en la utilidad.</p>`
       : '',
@@ -322,7 +339,25 @@ export function summaryHtml(summary: DashboardSummary, businessName: string): st
       table(`Sin costo (${inventory.withoutCost.total})`, ['Producto', 'Existencia', 'Valor a costo'], toRows(inventory.withoutCost.items)),
     );
   }
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>Resumen del negocio</title><style>${PDF_STYLES}</style></head><body>${parts.join('')}</body></html>`;
+  if (statement !== null) {
+    parts.push(statementSection(statement));
+  }
+  return pdfPage('Resumen del negocio', parts.join(''));
+}
+
+function pdfPage(title: string, body: string): string {
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>${escapeHtml(title)}</title><style>${PDF_STYLES}</style></head><body>${body}</body></html>`;
+}
+
+/**
+ * Builds the page of the PDF of the income statement alone.
+ *
+ * @param statement the statement
+ * @param businessName the name of the business for the title
+ * @returns the HTML
+ */
+export function statementHtml(statement: IncomeStatement, businessName: string): string {
+  return pdfPage('Estado de resultados', `<h1>${escapeHtml(businessName)}</h1><p>Generado el ${escapeHtml(statement.generatedAt)}</p>${statementSection(statement)}`);
 }
 
 /**

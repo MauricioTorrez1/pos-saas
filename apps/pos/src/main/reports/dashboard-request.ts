@@ -9,6 +9,7 @@ import {
   type TopLimit,
   type TopMetric,
 } from '../../shared/dashboard-api';
+import { STATEMENT_PERIOD_KINDS, type StatementPeriodKind, type StatementRequest } from '../../shared/income-statement';
 
 const MAX_PIN_LENGTH = 32;
 
@@ -53,6 +54,32 @@ export function parseDashboardRequest(value: unknown): DashboardRequest {
     topLimit,
     ...(ownerPin === undefined ? {} : { ownerPin }),
   };
+}
+
+/**
+ * Checks a request for the income statement that came over the bridge. The service checks that the days exist.
+ *
+ * @param value what the screen sent
+ * @returns the request, with only the fields it knows
+ * @throws TypeError if a field is missing or is not one of its allowed values
+ */
+export function parseStatementRequest(value: unknown): StatementRequest {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new TypeError('Expected an income statement request');
+  }
+  const record = value as Record<string, unknown>;
+  const { date, endDate, ownerPin } = record;
+  if (typeof date !== 'string' || date.length !== 10) {
+    throw new TypeError('Expected a day as YYYY-MM-DD');
+  }
+  if (endDate !== undefined && (typeof endDate !== 'string' || endDate.length !== 10)) {
+    throw new TypeError('Expected the last day as YYYY-MM-DD');
+  }
+  if (ownerPin !== undefined && (typeof ownerPin !== 'string' || ownerPin.length > MAX_PIN_LENGTH)) {
+    throw new TypeError('Expected the PIN as text');
+  }
+  const period: StatementPeriodKind = oneOf(record.period, STATEMENT_PERIOD_KINDS, 'a period');
+  return { period, date, ...(endDate === undefined ? {} : { endDate }), ...(ownerPin === undefined ? {} : { ownerPin }) };
 }
 
 /**

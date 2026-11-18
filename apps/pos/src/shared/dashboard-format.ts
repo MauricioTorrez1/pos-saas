@@ -151,6 +151,9 @@ export function hundredthsLabel(hundredths: number): string {
  * @returns text such as "10 nov 2026" or "9 nov 2026 al 15 nov 2026"
  */
 export function periodLabel(range: PeriodRange): string {
+  if (range.kind === 'all') {
+    return `Desde el inicio · ${DAY_FORMAT.format(civil(range.fromDay))} al ${DAY_FORMAT.format(civil(range.toDay))}`;
+  }
   if (range.kind === 'month') {
     return MONTH_FORMAT.format(civil(range.fromDay));
   }

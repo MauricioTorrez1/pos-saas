@@ -1,6 +1,7 @@
 import type { ExitApi } from '../shared/exit-api';
 import type { CatalogExportApi } from '../shared/catalog-export';
 import type { DashboardApi } from '../shared/dashboard-api';
+import type { ExpensesApi } from '../shared/expenses';
 import type { MissingItemsApi } from '../shared/missing-items';
 import type { PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
@@ -25,5 +26,7 @@ declare global {
     readonly exit: ExitApi;
     /** Bridge to save the whole catalog as a file (E1-55). */
     readonly catalogExport: CatalogExportApi;
+    /** Bridge for the operating expenses (E1-56). */
+    readonly expenses: ExpensesApi;
   }
 }

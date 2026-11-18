@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { UserSummary } from '../../shared/auth';
 import type { DashboardRequest, DashboardSummary } from '../../shared/dashboard-api';
+import type { IncomeStatement } from '../../shared/income-statement';
 import { AuditLog } from '../audit/audit-log';
 import { AuthService } from '../auth/auth-service';
 import { OwnerGate } from '../auth/owner-gate';
@@ -560,4 +561,95 @@ describe('the speed of a year of sales', () => {
     // The first run opens the caches of the database, so the best of three is what a second look at the screen costs.
     expect(Math.min(...timings)).toBeLessThan(300);
   }, 60_000);
+});
+
+describe('the income statement (ADR 0072)', () => {
+  function statement(statementRequest: Parameters<DashboardService['statement']>[0], user: UserSummary = owner): IncomeStatement {
+    const result = service.statement(statementRequest, user);
+    if (result.status !== 'ok') {
+      throw new Error(`expected a statement, got ${result.status}`);
+    }
+    return result.statement;
+  }
+
+  function writeExpense(day: string, amountCents: number, options: { voided?: boolean } = {}): void {
+    store
+      .prepare(
+        `INSERT INTO expense (id, tenant_id, concept, amount_cents, expense_day, note, paid_from_drawer, cash_movement_id, recorded_by, authorized_by, recorded_at, voided_by, voided_at, void_reason)
+         VALUES (?, ?, 'Renta', ?, ?, NULL, 0, NULL, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(uuidV7(), TENANT, amountCents, day, owner.id, owner.id, now.toISOString(), options.voided ? owner.id : null, options.voided ? now.toISOString() : null, options.voided ? 'error' : null);
+  }
+
+  it('agrees with «Resumen» on the net sales and the cost, and keeps the VAT apart', () => {
+    seedTheDay();
+
+    const result = statement({ period: 'day', date: '2026-11-10' });
+
+    expect(result.grossSales.amountCents).toBe(43_529);
+    expect(result.returns.amountCents).toBe(10_000);
+    expect(result.netSales).toEqual({ amountCents: 33_529, shareBp: 10_000 });
+    expect(result.costOfGoods.amountCents).toBe(19_638);
+    expect(result.grossProfit).toEqual({ amountCents: 13_891, shareBp: 4_143 });
+    // 6,965 of VAT charged less the 1,600 that went back with the refund of one hammer.
+    expect(result.vatCollectedCents).toBe(5_365);
+    expect(result.detail.byTaxRate).toEqual([{ factor: 'rate', rateBp: 1600, soldCents: 43_529, returnedCents: 10_000, netCents: 33_529 }]);
+  });
+
+  it('subtracts only the expenses of the period that were not voided', () => {
+    seedTheDay();
+    writeExpense('2026-11-10', 5_000);
+    writeExpense('2026-11-10', 9_999, { voided: true });
+    writeExpense('2026-11-11', 7_000);
+
+    const result = statement({ period: 'day', date: '2026-11-10' });
+
+    expect(result.operatingExpenses.amountCents).toBe(5_000);
+    expect(result.operatingProfit.amountCents).toBe(13_891 - 5_000);
+    expect(result.netProfit.amountCents).toBe(8_891);
+  });
+
+  it('is zero with no share for a period with no sales, returns or expenses', () => {
+    seedTheDay();
+
+    const result = statement({ period: 'day', date: '2026-11-11' });
+
+    expect(result.hasActivity).toBe(false);
+    expect(result.netSales).toEqual({ amountCents: 0, shareBp: null });
+    expect(result.costOfGoods.amountCents).toBe(0);
+  });
+
+  it('flags the products sold without a cost instead of guessing it', () => {
+    const glue = fixture.product('Pegamento', 'piece', { priceE4: 58_000 });
+    fixture.sale({ at: at('2026-11-10T11:00:00.000'), lines: [{ productId: glue, milli: 2_000 }, { productId: hammer, milli: 1_000 }] });
+
+    const result = statement({ period: 'day', date: '2026-11-10' });
+
+    // Two glues at $5.80 with VAT are $10.00 before VAT; the hammer is $100.00 and costs $60.00.
+    expect(result.netSales.amountCents).toBe(11_000);
+    expect(result.costOfGoods.amountCents).toBe(6_000);
+    expect(result.uncosted).toEqual({ productCount: 1, netSalesCents: 1_000 });
+  });
+
+  it('goes «Desde el inicio» from the first day with a sale or an expense up to today', () => {
+    seedTheDay();
+    writeExpense('2026-11-03', 1_000);
+
+    const result = statement({ period: 'all', date: '2026-11-12' });
+
+    expect(result.period).toEqual({ kind: 'all', fromDay: '2026-11-03', toDay: '2026-11-12', dayCount: 10 });
+    expect(result.netSales.amountCents).toBe(33_529);
+    expect(result.operatingExpenses.amountCents).toBe(1_000);
+  });
+
+  it('is only for an owner, or a cashier with the PIN of an owner, and writes down every refusal', () => {
+    seedTheDay();
+
+    expect(service.statement({ period: 'day', date: '2026-11-10' }, cashier)).toEqual({ status: 'authorization_required' });
+    expect(service.statement({ period: 'day', date: '2026-11-10', ownerPin: '0000' }, cashier)).toMatchObject({ status: 'wrong_pin' });
+    expect(statement({ period: 'day', date: '2026-11-10', ownerPin: '4321' }, cashier).netSales.amountCents).toBe(33_529);
+
+    const denied = store.prepare("SELECT count(*) AS total FROM audit_log WHERE action = 'report.statement_denied'").get();
+    expect(denied).toEqual({ total: 2 });
+  });
 });

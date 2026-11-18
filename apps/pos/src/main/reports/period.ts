@@ -103,7 +103,7 @@ function weekStart(civilMs: number): number {
   return addDays(civilMs, -((sundayFirst + 6) % 7));
 }
 
-function range(kind: PeriodKind, firstCivil: number, lastCivil: number): ResolvedPeriod {
+function range(kind: PeriodKind | 'all', firstCivil: number, lastCivil: number): ResolvedPeriod {
   return {
     kind,
     fromDay: dayText(firstCivil),
@@ -152,6 +152,20 @@ export function resolvePeriod(kind: PeriodKind, date: string, endDate?: string):
       return range(kind, civil, last);
     }
   }
+}
+
+/**
+ * «Desde el inicio»: every day from the first one with something to count up to today, both included. It has no limit of
+ * length, because the register counts its whole history with one query per table.
+ *
+ * @param firstDay `YYYY-MM-DD`, the first day with a sale, a return or an expense, or today when there is none
+ * @param today `YYYY-MM-DD`
+ * @returns the period, of kind `all`
+ */
+export function sinceStart(firstDay: string, today: string): ResolvedPeriod {
+  const first = parseDay(firstDay);
+  const last = parseDay(today);
+  return range('all', Math.min(first, last), last);
 }
 
 /**

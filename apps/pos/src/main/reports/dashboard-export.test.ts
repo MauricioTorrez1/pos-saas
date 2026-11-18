@@ -288,3 +288,80 @@ describe('saving the files', () => {
     expect(Object.keys(workbook)).not.toContain('Existencias');
   });
 });
+
+describe('the income statement in the files (E1-56)', () => {
+  function statementExporter(): { target: DashboardExporter; printed: string[]; dialogs: string[]; path: string } {
+    const printed: string[] = [];
+    const dialogs: string[] = [];
+    const path = join(directory, 'estado.out');
+    const target = new DashboardExporter(service, {
+      pickSavePath: (title, name) => {
+        dialogs.push(`${title}|${name}`);
+        return Promise.resolve(path);
+      },
+      renderPdf: (html) => {
+        printed.push(html);
+        return Promise.resolve(Buffer.from('%PDF-fake'));
+      },
+      businessName: () => 'Tlapalería <Don Pepe>',
+      writeFile: (target, bytes) => writeFileSync(target, bytes),
+    });
+    return { target, printed, dialogs, path };
+  }
+
+  function writeExpense(concept: string, amountCents: number): void {
+    store
+      .prepare(
+        `INSERT INTO expense (id, tenant_id, concept, amount_cents, expense_day, note, paid_from_drawer, cash_movement_id, recorded_by, authorized_by, recorded_at)
+         VALUES (?, ?, ?, ?, '2026-11-10', NULL, 0, NULL, ?, ?, '2026-11-10T18:00:00.000Z')`,
+      )
+      .run(`expense-${concept}`, TENANT, concept, amountCents, owner.id, owner.id);
+  }
+
+  it('goes as its own sheet of the Excel file of the summary, with the lines and their share', async () => {
+    writeExpense('Renta', 5_000);
+    const { target, path } = statementExporter();
+
+    await target.export(request(), 'xlsx', owner);
+
+    const sheet = readWorkbook(readFileSync(path))['Estado de resultados'];
+    expect(sheet).toBeDefined();
+    const byLabel = new Map(sheet!.map((row) => [row[0], row.slice(1)]));
+    // Net sales before VAT: three hammers 30,000 and the cable 3,529, less the 10,000 of the hammer that came back.
+    expect(byLabel.get('Ventas netas')?.slice(0, 2)).toEqual(['235.29', '100.00']);
+    expect(byLabel.get('− Gastos de operación')?.[0]).toBe('50.00');
+    expect(byLabel.get('Renta')?.[0]).toBe('50.00');
+  });
+
+  it('goes as a section of the PDF of the summary for the owner, and not for a cashier on their shift', async () => {
+    const { target, printed } = statementExporter();
+
+    await target.export(request(), 'pdf', owner);
+    await target.export(request(), 'pdf', cashier);
+
+    expect(printed[0]).toContain('Estado de resultados');
+    expect(printed[0]).toContain('Utilidad neta (antes de ISR)');
+    expect(printed[1]).not.toContain('Estado de resultados');
+  });
+
+  it('is saved alone, «Desde el inicio» included, with every typed text escaped', async () => {
+    writeExpense('<script>', 1_000);
+    const { target, printed, dialogs } = statementExporter();
+
+    const result = await target.exportStatement({ period: 'all', date: '2026-11-12' }, 'pdf', owner);
+
+    expect(result.status).toBe('saved');
+    expect(dialogs[0]).toBe('Guardar el estado de resultados en PDF|estado-de-resultados-2026-11-10_a_2026-11-12.pdf');
+    expect(printed[0]).toContain('Desde el inicio');
+    expect(printed[0]).toContain('Tlapalería &lt;Don Pepe&gt;');
+    expect(printed[0]).toContain('&lt;script&gt;');
+    expect(printed[0]).not.toContain('<script>');
+  });
+
+  it('is not saved for a cashier without the PIN of an owner', async () => {
+    const { target, dialogs } = statementExporter();
+
+    expect(await target.exportStatement({ period: 'day', date: '2026-11-10' }, 'xlsx', cashier)).toEqual({ status: 'authorization_required' });
+    expect(dialogs).toEqual([]);
+  });
+});

@@ -15,9 +15,13 @@ import {
   type TopMetric,
 } from '../../shared/dashboard-api';
 import { periodLabel } from '../../shared/dashboard-format';
+import type { ExpensesApi } from '../../shared/expenses';
+import type { StatementRequest } from '../../shared/income-statement';
 import { Field, Message } from '../ui/form-parts';
 import { ModalDialog } from '../ui/ModalDialog';
 import { useWindowKeys } from '../ui/use-window-keys';
+import { ExpensesTab } from './ExpensesTab';
+import { IncomeStatementTab } from './IncomeStatementTab';
 import { InventoryTab } from './InventoryTab';
 import { isDayText, movePeriod, todayInRegisterZone } from './period-input';
 import { SaleSearch } from './SaleSearch';
@@ -32,12 +36,14 @@ const PERIOD_NAMES: Readonly<Record<PeriodKind, string>> = {
   custom: 'Rango',
 };
 
-type TabName = 'summary' | 'top' | 'inventory';
+type TabName = 'summary' | 'top' | 'inventory' | 'statement' | 'expenses';
 
 const TABS: readonly { readonly name: TabName; readonly label: string; readonly ownerOnly: boolean }[] = [
   { name: 'summary', label: 'Resumen', ownerOnly: false },
   { name: 'top', label: 'Más vendidos', ownerOnly: false },
   { name: 'inventory', label: 'Inventario', ownerOnly: true },
+  { name: 'statement', label: 'Estado de resultados', ownerOnly: true },
+  { name: 'expenses', label: 'Gastos', ownerOnly: true },
 ];
 
 interface DashboardDialogProps {
@@ -46,6 +52,8 @@ interface DashboardDialogProps {
   readonly onClose: () => void;
   /** Finds completed sales by ticket, product name or code. Without it, «Resumen» has no search bar. */
   readonly searchSales?: (text: string) => Promise<readonly SaleSummary[]>;
+  /** The book of expenses (E1-56). Without it, there is no «Gastos» tab. */
+  readonly expensesApi?: ExpensesApi;
 }
 
 function refusalText(result: Exclude<DashboardResult, { status: 'ok' }> | Extract<ExportResult, { status: 'wrong_pin' | 'locked' }>): string {
@@ -64,9 +72,10 @@ function refusalText(result: Exclude<DashboardResult, { status: 'ok' }> | Extrac
  * @param props.user who is signed in
  * @param props.onClose called when the person is done
  * @param props.searchSales finds sales by ticket, product name or code, for the search bar of «Resumen»
+ * @param props.expensesApi the book of expenses, for the «Gastos» tab
  * @returns the dialog
  */
-export function DashboardDialog({ api, user, onClose, searchSales }: DashboardDialogProps): ReactElement {
+export function DashboardDialog({ api, user, onClose, searchSales, expensesApi }: DashboardDialogProps): ReactElement {
   const isOwner = user.role === 'owner';
   const [period, setPeriod] = useState<PeriodKind>('day');
   const [date, setDate] = useState(() => todayInRegisterZone());
@@ -84,6 +93,10 @@ export function DashboardDialog({ api, user, onClose, searchSales }: DashboardDi
   const [pinMessage, setPinMessage] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  /** The income statement goes «Desde el inicio» instead of the period chosen above. */
+  const [sinceStart, setSinceStart] = useState(false);
+  /** Changes to make the statement read again: F2, or an expense recorded or voided. */
+  const [refreshKey, setRefreshKey] = useState(0);
   const latest = useRef(0);
 
   const hasFullAccess = isOwner || ownerPin !== null;
@@ -134,13 +147,27 @@ export function DashboardDialog({ api, user, onClose, searchSales }: DashboardDi
 
   useEffect(load, [load]);
 
+  const buildStatementRequest = (): StatementRequest => ({
+    period: sinceStart ? 'all' : period,
+    date,
+    ...(period === 'custom' && !sinceStart ? { endDate } : {}),
+    ...(ownerPin === null ? {} : { ownerPin }),
+  });
+
+  const reload = (): void => {
+    load();
+    setRefreshKey((key) => key + 1);
+  };
+
   const exportAs = (format: ExportFormat): void => {
     if (isExporting || summary === null) {
       return;
     }
     setIsExporting(true);
     setNote(null);
-    api.exportDashboard(buildRequest(), format).then(
+    // From its own tab, the statement is saved alone, so «Desde el inicio» can be saved too.
+    const saving = activeTab === 'statement' ? api.exportIncomeStatement(buildStatementRequest(), format) : api.exportDashboard(buildRequest(), format);
+    saving.then(
       (result) => {
         setIsExporting(false);
         if (result.status === 'saved') {
@@ -150,6 +177,8 @@ export function DashboardDialog({ api, user, onClose, searchSales }: DashboardDi
         } else if (result.status === 'wrong_pin' || result.status === 'locked') {
           setOwnerPin(null);
           setPinMessage(refusalText(result));
+        } else if (result.status === 'authorization_required') {
+          setMessage('El estado de resultados es solo para el dueño.');
         }
       },
       () => {
@@ -179,9 +208,14 @@ export function DashboardDialog({ api, user, onClose, searchSales }: DashboardDi
     setEndDate(moved.endDate);
   };
 
+  const visibleTabs = TABS.filter(
+    (candidate) => (!candidate.ownerOnly || summary?.inventory != null) && (candidate.name !== 'expenses' || expensesApi !== undefined),
+  );
+  const activeTab = visibleTabs.some((candidate) => candidate.name === tab) ? tab : 'summary';
+
   useWindowKeys(
     {
-      F2: load,
+      F2: reload,
       F3: () => exportAs('xlsx'),
       F4: () => exportAs('pdf'),
       Escape: isAskingPin ? () => setIsAskingPin(false) : onClose,
@@ -189,8 +223,6 @@ export function DashboardDialog({ api, user, onClose, searchSales }: DashboardDi
     isExporting,
   );
 
-  const visibleTabs = TABS.filter((candidate) => !candidate.ownerOnly || summary?.inventory != null);
-  const activeTab = visibleTabs.some((candidate) => candidate.name === tab) ? tab : 'summary';
   const isShift = summary?.scope === 'shift';
 
   return (
@@ -287,6 +319,10 @@ export function DashboardDialog({ api, user, onClose, searchSales }: DashboardDi
           </>
         ) : activeTab === 'top' ? (
           <TopSellersTab summary={summary} metric={topMetric} limit={topLimit} onMetricChange={setTopMetric} onLimitChange={setTopLimit} />
+        ) : activeTab === 'statement' ? (
+          <IncomeStatementTab api={api} request={buildStatementRequest()} sinceStart={sinceStart} onSinceStartChange={setSinceStart} refreshKey={refreshKey} />
+        ) : activeTab === 'expenses' && expensesApi !== undefined ? (
+          <ExpensesTab api={expensesApi} fromDay={summary.period.fromDay} toDay={summary.period.toDay} ownerPin={ownerPin} onChanged={reload} />
         ) : summary.inventory !== null ? (
           <InventoryTab inventory={summary.inventory} />
         ) : null}
@@ -295,7 +331,7 @@ export function DashboardDialog({ api, user, onClose, searchSales }: DashboardDi
         <button type="button" className="button" onClick={onClose}>
           Volver <kbd>Esc</kbd>
         </button>
-        <button type="button" className="button" disabled={isLoading} onClick={load}>
+        <button type="button" className="button" disabled={isLoading} onClick={reload}>
           Actualizar <kbd>F2</kbd>
         </button>
         <button type="button" className="button" disabled={isExporting || summary === null} onClick={() => exportAs('xlsx')}>

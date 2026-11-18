@@ -81,3 +81,37 @@ test('shows the summary of the business after a sale and saves it as Excel and P
   await expect(dashboard).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: 'Buscar producto' })).toBeFocused();
 });
+
+test('opens the income statement and counts an expense the owner writes down (E1-56)', async ({ launch }) => {
+  const register = await launch();
+  const page = await signInWindow(register);
+
+  await page.keyboard.type(HAMMER_CODE);
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('status', { name: 'Total', exact: true })).toHaveText('$116.00');
+  await page.keyboard.press('F12');
+  await expect(page.getByRole('textbox', { name: 'Efectivo recibido' })).toBeFocused();
+  await page.keyboard.type('116');
+  await page.keyboard.press('F2');
+  await expect(page.getByRole('status', { name: 'Cambio a entregar' })).toHaveText('Sin cambio');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await page.keyboard.press('F11');
+  const dashboard = page.locator('dialog[aria-labelledby="dashboard-title"]');
+  await expect(dashboard.getByRole('heading', { name: 'Rentabilidad' })).toBeVisible();
+
+  await dashboard.getByRole('tab', { name: 'Gastos' }).click();
+  const form = dashboard.getByRole('form', { name: 'Anotar un gasto' });
+  await form.getByLabel('Concepto').selectOption('Luz');
+  await form.getByLabel('Monto').fill('30');
+  await form.getByRole('button', { name: 'Anotar gasto' }).click();
+  await expect(dashboard.getByRole('status')).toContainText('Luz por $30.00');
+
+  await dashboard.getByRole('tab', { name: 'Estado de resultados' }).click();
+  const general = dashboard.getByRole('table', { name: 'Estado de resultados, vista general' });
+  await expect(general.getByRole('row', { name: /Ventas netas/ })).toContainText('$100.00');
+  await expect(general.getByRole('row', { name: /Gastos de operación/ })).toContainText('$30.00');
+  await dashboard.getByRole('button', { name: 'Detallado' }).click();
+  await expect(dashboard.getByRole('table', { name: 'Gastos de operación por concepto' })).toContainText('Luz');
+});

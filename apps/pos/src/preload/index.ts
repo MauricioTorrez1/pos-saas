@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { EXIT_CHANNELS, type ExitApi } from '../shared/exit-api';
 import { CATALOG_EXPORT_CHANNELS, type CatalogExportApi } from '../shared/catalog-export';
 import { DASHBOARD_CHANNELS, type DashboardApi } from '../shared/dashboard-api';
+import { EXPENSE_CHANNELS, type ExpensesApi } from '../shared/expenses';
 import { MISSING_CHANNELS, type MissingItemsApi } from '../shared/missing-items';
 import { IPC_CHANNELS, type PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
@@ -44,6 +45,8 @@ const posApi: PosApi & PricingApi & ProductAdminApi & DashboardApi = {
   updateProduct: (request) => ipcRenderer.invoke(IPC_CHANNELS.updateProduct, request),
   getDashboard: (request) => ipcRenderer.invoke(DASHBOARD_CHANNELS.getDashboard, request),
   exportDashboard: (request, format) => ipcRenderer.invoke(DASHBOARD_CHANNELS.exportDashboard, { request, format }),
+  getIncomeStatement: (request) => ipcRenderer.invoke(DASHBOARD_CHANNELS.getIncomeStatement, request),
+  exportIncomeStatement: (request, format) => ipcRenderer.invoke(DASHBOARD_CHANNELS.exportIncomeStatement, { request, format }),
   getAppearance: () => ipcRenderer.invoke(IPC_CHANNELS.getAppearance),
   saveAppearance: (appearance) => ipcRenderer.invoke(IPC_CHANNELS.saveAppearance, appearance),
   savePendingSale: (request) => ipcRenderer.invoke(IPC_CHANNELS.savePendingSale, request),
@@ -81,6 +84,14 @@ const missingApi: MissingItemsApi = {
   editNotes: (request) => ipcRenderer.invoke(MISSING_CHANNELS.editNotes, request),
   remove: (key) => ipcRenderer.invoke(MISSING_CHANNELS.remove, key),
   exportPdf: (period) => ipcRenderer.invoke(MISSING_CHANNELS.exportPdf, period),
+};
+
+/** The operating expenses of the business (E1-56). */
+const expensesApi: ExpensesApi = {
+  record: (request) => ipcRenderer.invoke(EXPENSE_CHANNELS.record, request),
+  list: (request) => ipcRenderer.invoke(EXPENSE_CHANNELS.list, request),
+  void: (request) => ipcRenderer.invoke(EXPENSE_CHANNELS.void, request),
+  saveConcepts: (request) => ipcRenderer.invoke(EXPENSE_CHANNELS.saveConcepts, request),
 };
 
 /** The keys, the ticket, the printer and the list of sales. A bridge of their own, like the purchase orders. */
@@ -132,3 +143,4 @@ contextBridge.exposeInMainWorld('tools', toolsApi);
 contextBridge.exposeInMainWorld('purchasing', purchasingApi);
 contextBridge.exposeInMainWorld('missing', missingApi);
 contextBridge.exposeInMainWorld('catalogExport', catalogExportApi);
+contextBridge.exposeInMainWorld('expenses', expensesApi);

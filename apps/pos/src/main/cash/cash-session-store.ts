@@ -201,12 +201,33 @@ export class CashSessionStore {
     recordedBy: string,
     authorizedBy: string | null,
   ): void {
-    const movementId = uuidV7();
     this.#store.transaction(() => {
-      const recordedAt = new Date().toISOString();
-      this.#insertMovement.run(movementId, this.#tenantId, sessionId, kind, amountCents, reason, recordedBy, authorizedBy, recordedAt);
-      this.#outbox.enqueue('cash_movement.recorded', { movementId, sessionId, kind, amountCents, reason, recordedBy, authorizedBy }, recordedAt);
+      this.writeMovement(sessionId, kind, amountCents, reason, recordedBy, authorizedBy);
     });
+  }
+
+  /**
+   * Writes a cash entry or exit inside a transaction that is already open, so another record (such as an expense paid
+   * from the drawer) commits or rolls back together with it.
+   *
+   * @param sessionId the open session
+   * @param kind an entry or an exit
+   * @param amountCents the cash, positive
+   * @param reason why, which cannot be empty
+   * @param recordedBy who did it
+   * @param authorizedBy the owner who approved it, or null
+   * @returns the id of the movement
+   * @throws Error if no transaction is open
+   */
+  writeMovement(sessionId: string, kind: CashMovementKind, amountCents: number, reason: string, recordedBy: string, authorizedBy: string | null): string {
+    if (!this.#store.isInTransaction) {
+      throw new Error('A cash movement written with another record needs the transaction of that record');
+    }
+    const movementId = uuidV7();
+    const recordedAt = new Date().toISOString();
+    this.#insertMovement.run(movementId, this.#tenantId, sessionId, kind, amountCents, reason, recordedBy, authorizedBy, recordedAt);
+    this.#outbox.enqueue('cash_movement.recorded', { movementId, sessionId, kind, amountCents, reason, recordedBy, authorizedBy }, recordedAt);
+    return movementId;
   }
 
   /**

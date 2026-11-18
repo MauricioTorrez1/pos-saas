@@ -74,3 +74,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0069](0069-lectura-de-catalogos-en-papel-con-claude.md) | Lectura de catálogos de proveedor en papel con Claude, revisión humana de cada fila y CSV para la caja | Aceptada |
 | [0070](0070-fondo-de-caja-al-entrar-y-corte-al-salir.md) | Fondo de caja al entrar, «Solo administrar» para el dueño y pregunta de corte al cerrar la caja, decidida en el proceso principal | Aceptada |
 | [0071](0071-exportacion-del-catalogo-completo.md) | Exportación del catálogo completo en PDF, Excel y CSV: solo el dueño, margen bruto y neto con enteros, CSV con BOM y PDF horizontal desde un archivo temporal | Aceptada |
+| [0072](0072-estado-de-resultados-y-gastos-de-operacion.md) | Estado de resultados antes de ISR y sin IVA, gastos de operación inmutables con anulación, pagados de la caja sin contarlos dos veces, y «Resumen» por grupos | Aceptada |

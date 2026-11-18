@@ -1,6 +1,7 @@
 import type { Unit } from '@pos-saas/money';
 
 import type {
+  CashMovementTotals,
   CashierBucket,
   CostSource,
   DashboardRequest,
@@ -21,10 +22,12 @@ import type {
   WeekdayBucket,
 } from '../../shared/dashboard-api';
 import type { UserSummary } from '../../shared/auth';
+import type { StatementRequest, StatementResult } from '../../shared/income-statement';
 import { MISC_PRODUCT_ID } from '../../shared/miscellaneous';
 import { isRefusal, type OwnerGate } from '../auth/owner-gate';
 import type { LocalStore } from '../local-store/local-store';
 import { averageCostE6, costInCents, divideHalfUp, type CostedEntry } from './average-cost';
+import { buildIncomeStatement, type ExpenseInput, type RateInput } from './income-statement';
 import {
   dayCountBetween,
   daysOf,
@@ -33,6 +36,7 @@ import {
   offsetSegments,
   previousPeriod,
   resolvePeriod,
+  sinceStart,
   weekdayOf,
   type ResolvedPeriod,
 } from './period';
@@ -62,6 +66,14 @@ interface ProductAggregate {
   returnedMilli: number;
   returnedSubtotalCents: number;
   returnedTotalCents: number;
+}
+
+/** One tax rate of the sales or of the returns, as the database adds it up. */
+interface RateRow {
+  readonly factor: 'rate' | 'exempt';
+  readonly rateBp: number;
+  readonly subtotal: number;
+  readonly tax: number;
 }
 
 interface CostInfo {
@@ -232,7 +244,138 @@ export class DashboardService {
       topLimit: request.topLimit,
       topSellers: topSellers(current.aggregates, catalog?.costs ?? null, request.topMetric, request.topLimit),
       inventory: catalog === null ? null : inventoryOf(catalog, current.aggregates),
+      cashMovements: catalog === null ? null : this.#cashMovements(period),
     };
+  }
+
+  /**
+   * Builds the income statement of a period (ADR 0072). Only an owner, or a cashier with the PIN of an owner: there is no
+   * shift view of it, because a shift has no rent to pay.
+   *
+   * @param request the period, «Desde el inicio» included, and for a cashier the PIN of an owner
+   * @param user who is signed in
+   * @returns the statement, or why it was not given
+   * @throws RangeError if a day does not exist or the range is not valid
+   */
+  statement(request: StatementRequest, user: UserSummary): StatementResult {
+    const approval = this.#gate.authorize({
+      user,
+      ownerPin: request.ownerPin,
+      deniedAction: 'report.statement_denied',
+      entity: 'dashboard',
+      entityId: 'income_statement',
+      deniedDetail: 'asked for the income statement',
+    });
+    if (isRefusal(approval)) {
+      return approval;
+    }
+    const period =
+      request.period === 'all' ? sinceStart(this.#firstActiveDay(), localDayOf(this.#now().getTime())) : resolvePeriod(request.period, request.date, request.endDate);
+    const [from, to] = [new Date(period.fromMs).toISOString(), new Date(period.toMs).toISOString()];
+    const { costs } = this.#catalog();
+    const products = [...this.#aggregates(from, to, WHOLE_BUSINESS).values()].map((aggregate) => ({
+      name: aggregate.name,
+      soldMilli: aggregate.soldMilli,
+      returnedMilli: aggregate.returnedMilli,
+      soldSubtotalCents: aggregate.soldSubtotalCents,
+      returnedSubtotalCents: aggregate.returnedSubtotalCents,
+      costE6: costs.get(aggregate.productId)?.costE6 ?? null,
+    }));
+    return {
+      status: 'ok',
+      statement: buildIncomeStatement({
+        period: { kind: request.period, fromDay: period.fromDay, toDay: period.toDay, dayCount: period.dayCount },
+        generatedAt: this.#now().toISOString(),
+        rates: this.#salesByRate(from, to),
+        products,
+        expenses: this.#expensesBetween(period.fromDay, period.toDay),
+      }),
+    };
+  }
+
+  /** The first local day with a completed sale, a return or an expense; today when the register has none yet. */
+  #firstActiveDay(): string {
+    const row = this.#store
+      .prepare(
+        `SELECT (SELECT min(resolved_at) FROM sale WHERE tenant_id = ? AND status = 'completed') AS sale,
+                (SELECT min(occurred_at) FROM sale_return WHERE tenant_id = ?) AS refund,
+                (SELECT min(expense_day) FROM expense WHERE tenant_id = ? AND voided_at IS NULL) AS expense`,
+      )
+      .get(this.#tenantId, this.#tenantId, this.#tenantId) as unknown as { sale: string | null; refund: string | null; expense: string | null };
+    const days = [row.sale, row.refund].filter((moment): moment is string => moment !== null).map((moment) => localDayOf(Date.parse(moment)));
+    if (row.expense !== null) {
+      days.push(row.expense);
+    }
+    return days.length === 0 ? localDayOf(this.#now().getTime()) : days.sort()[0]!;
+  }
+
+  /** The sales and the returns of the period by tax rate, before VAT and their VAT, rounded per return line as «Resumen». */
+  #salesByRate(from: string, to: string): RateInput[] {
+    const sold = this.#store
+      .prepare(
+        `SELECT l.tax_factor AS factor, l.tax_rate_bp AS rateBp, sum(l.subtotal_cents) AS subtotal, sum(l.tax_cents) AS tax
+         FROM sale s JOIN sale_line l ON l.sale_id = s.id
+         WHERE s.tenant_id = ? AND s.status = 'completed' AND s.resolved_at >= ? AND s.resolved_at < ?
+         GROUP BY l.tax_factor, l.tax_rate_bp`,
+      )
+      .all(this.#tenantId, from, to) as unknown as RateRow[];
+    const returned = this.#store
+      .prepare(
+        `SELECT factor, rateBp, sum(subtotal) AS subtotal, sum(refund - subtotal) AS tax FROM (
+           SELECT l.tax_factor AS factor, l.tax_rate_bp AS rateBp, rl.refund_cents AS refund,
+                  CASE WHEN l.line_total_cents = 0 THEN 0
+                       ELSE (rl.refund_cents * l.subtotal_cents * 2 + l.line_total_cents) / (l.line_total_cents * 2) END AS subtotal
+           FROM sale_return r JOIN sale_return_line rl ON rl.return_id = r.id JOIN sale_line l ON l.id = rl.sale_line_id
+           WHERE r.tenant_id = ? AND r.occurred_at >= ? AND r.occurred_at < ?
+         ) GROUP BY factor, rateBp`,
+      )
+      .all(this.#tenantId, from, to) as unknown as RateRow[];
+    const byKey = new Map<string, RateInput>();
+    for (const row of sold) {
+      byKey.set(`${row.factor}:${String(row.rateBp)}`, {
+        factor: row.factor,
+        rateBp: row.rateBp,
+        soldSubtotalCents: row.subtotal,
+        soldTaxCents: row.tax,
+        returnedSubtotalCents: 0,
+        returnedTaxCents: 0,
+      });
+    }
+    for (const row of returned) {
+      const key = `${row.factor}:${String(row.rateBp)}`;
+      const rate = byKey.get(key) ?? { factor: row.factor, rateBp: row.rateBp, soldSubtotalCents: 0, soldTaxCents: 0, returnedSubtotalCents: 0, returnedTaxCents: 0 };
+      byKey.set(key, { ...rate, returnedSubtotalCents: row.subtotal, returnedTaxCents: row.tax });
+    }
+    return [...byKey.values()];
+  }
+
+  /** The expenses that count in a period: not voided, with their day inside it. */
+  #expensesBetween(fromDay: string, toDay: string): ExpenseInput[] {
+    const rows = this.#store
+      .prepare(
+        `SELECT concept, amount_cents AS amountCents, paid_from_drawer AS fromDrawer FROM expense
+         WHERE tenant_id = ? AND voided_at IS NULL AND expense_day BETWEEN ? AND ?`,
+      )
+      .all(this.#tenantId, fromDay, toDay) as unknown as { concept: string; amountCents: number; fromDrawer: number }[];
+    return rows.map((row) => ({ concept: row.concept, amountCents: row.amountCents, paidFromDrawer: row.fromDrawer === 1 }));
+  }
+
+  /** The cash that went in and out of the drawer by hand in the period, and how much of it was an expense. */
+  #cashMovements(period: ResolvedPeriod): CashMovementTotals {
+    const movements = this.#store
+      .prepare(
+        `SELECT coalesce(sum(CASE WHEN kind = 'in' THEN amount_cents END), 0) AS cashIn,
+                coalesce(sum(CASE WHEN kind = 'out' THEN amount_cents END), 0) AS cashOut
+         FROM cash_movement WHERE tenant_id = ? AND recorded_at >= ? AND recorded_at < ?`,
+      )
+      .get(this.#tenantId, new Date(period.fromMs).toISOString(), new Date(period.toMs).toISOString()) as unknown as { cashIn: number; cashOut: number };
+    const expenses = this.#store
+      .prepare(
+        `SELECT coalesce(sum(amount_cents), 0) AS total FROM expense
+         WHERE tenant_id = ? AND paid_from_drawer = 1 AND voided_at IS NULL AND expense_day BETWEEN ? AND ?`,
+      )
+      .get(this.#tenantId, period.fromDay, period.toDay) as unknown as { total: number };
+    return { inCents: movements.cashIn, outCents: movements.cashOut, drawerExpensesCents: expenses.total };
   }
 
   /** The numbers of a period that do not depend on the time zone, and the sales of each product that make the profit. */
