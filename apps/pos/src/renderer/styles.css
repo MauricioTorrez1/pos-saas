@@ -2264,3 +2264,29 @@ kbd {
 .sale-search-results {
   max-height: 16rem;
 }
+
+/* The price comparator (E1-52): the cheapest offer in green and the most expensive in red, in both themes. */
+.comparison-group {
+  margin-block: 12px;
+}
+
+.order-lines tr.price-cheapest td {
+  background: var(--good-surface);
+  color: var(--good);
+  font-weight: 600;
+}
+
+.order-lines tr.price-highest td {
+  background: var(--alert-surface);
+  color: var(--alert);
+}
+
+.cart-input {
+  min-width: 6rem;
+  padding: 6px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+}

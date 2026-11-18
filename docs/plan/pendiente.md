@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 52 de 54 tareas hechas · ⚠️ 2 faltan (9 h)
+✅ 53 de 55 tareas hechas · ⚠️ 2 faltan (9 h)
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -90,6 +90,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-49 · Bitácora de faltantes y letra del ticket** (4 h) _(En revisión)_: la cajera anota lo que un cliente pidió y no hay, el dueño ve qué se pide más y lo descarga en PDF con gráficas; el ticket se imprime con la fuente y el tamaño de letra elegidos.
 - ✅ **E1-50 · Proveedores en el producto, faltantes editables y búsqueda de ventas** (4 h) _(En revisión)_: desde el producto se ven todos sus proveedores y «Pedir más» lo agrega al pedido; los faltantes se corrigen o se eliminan; el ticket lleva el nombre y la moneda elegidos; «Resumen» encuentra una venta por ticket, producto o código.
 - ✅ **E1-51 · Listas de precios de proveedores** (4 h) _(En revisión)_: el dueño importa la lista de cada proveedor desde Excel o CSV (también el del catálogo en papel), con columnas recordadas, y la liga a sus productos.
+- ✅ **E1-52 · Comparador de proveedores y pedido con PDF** (4 h) _(En revisión)_: el dueño ve qué proveedor da más barato cada producto por unidad, arma un carrito que se vuelve un borrador por proveedor y saca el PDF con el ahorro posible y dos gráficas.
 - ✅ **E1-53 · Catálogo de proveedor en papel leído con Claude** (6 h) _(En revisión)_: el dueño fotografía las hojas de un catálogo impreso, revisa en el panel las filas que propone Claude, aprueba cada una y descarga el CSV para la lista de precios del proveedor en la caja.
 - ✅ **E1-54 · Fondo de caja al entrar y corte al salir** (4 h) _(En revisión)_: al entrar sin caja abierta se pide el fondo inicial (el dueño puede «Solo administrar» sin cobrar); al cerrar la caja con la sesión abierta pregunta si hacer el corte o salir dejándola abierta, y lo anota en la bitácora.
 - ✅ **E1-55 · Exportar el catálogo completo** (4 h) _(En revisión)_: el dueño saca todo su catálogo en PDF, Excel o CSV, con códigos, proveedores, costo, precio, existencia y margen bruto y neto, más los totales y una leyenda.
@@ -111,7 +112,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Fase 2 · Clientes, crédito, compras y reparaciones
 
-✅ 0 de 24 tareas hechas · ⚠️ 24 faltan (104 h)
+✅ 1 de 24 tareas hechas · ⚠️ 23 faltan (101 h)
 
 - ⚠️ **F2-01 · Portal de autofactura** (6 h): un cliente factura su ticket con folio y datos fiscales.
 - ⚠️ **F2-02 · Autofactura de una venta en global** (3 h): el sistema aplica el tratamiento validado con el contador.
@@ -127,7 +128,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ⚠️ **F2-12 · Órdenes de compra sugeridas** (5 h): productos bajo el punto de reorden generan una sugerencia.
 - ⚠️ **F2-13 · Recepción de mercancía** (5 h): una recepción parcial crea movimientos y actualiza costo.
 - ⚠️ **F2-14 · Cuentas por pagar** (4 h): se registran saldos y pagos a proveedores.
-- ⚠️ **F2-15 · Comparativo de proveedores** (3 h): se compara el último costo por proveedor.
+- ✅ **F2-15 · Comparativo de proveedores** (3 h) _(Cubierta por E1-52)_: se compara el costo de cada proveedor por unidad del producto.
 - ⚠️ **F2-16 · Conteos cíclicos y reorden** (5 h): un conteo crea ajustes, y se configuran mínimos y máximos.
 - ⚠️ **F2-17 · Orden de reparación y folio** (5 h): un equipo recibido obtiene un folio.
 - ⚠️ **F2-18 · Fotos de recepción** (4 h): las fotos se guardan fuera de la base de datos y con acceso privado.
@@ -212,4 +213,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 76 de 170 tareas hechas (324 h de 756 h) · ⚠️ 94 faltan (432 h).
+✅ 78 de 171 tareas hechas (331 h de 760 h) · ⚠️ 93 faltan (429 h).

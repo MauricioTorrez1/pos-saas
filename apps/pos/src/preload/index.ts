@@ -119,6 +119,9 @@ const supplierCatalogApi: SupplierCatalogApi = {
   priceListSummary: (supplierId) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.priceListSummary, supplierId),
   listCatalogItems: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.listCatalogItems, request),
   linkCatalogItem: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.linkCatalogItem, request),
+  compareItems: (text) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.compareItems, text),
+  confirmCart: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.confirmCart, request),
+  exportCartPdf: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.exportCartPdf, request),
 };
 
 /** Closing the register with the cash still open (E1-54). The screen only hears about it and answers; main decides. */

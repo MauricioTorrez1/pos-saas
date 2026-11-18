@@ -6,6 +6,7 @@ import type { SupplierCatalogApi } from '../../shared/supplier-catalog';
 import { CheckField, Field, Message, useAction } from '../ui/form-parts';
 import { useWindowKeys } from '../ui/use-window-keys';
 import { describeRefusal, isOwnerRefusal } from './order-form';
+import { PriceComparator } from './PriceComparator';
 import { PriceListScreen } from './PriceListScreen';
 
 /** What is typed in the boxes of one code. */
@@ -26,7 +27,7 @@ interface SupplierManagerProps {
   readonly onBack: () => void;
 }
 
-type View = { readonly kind: 'suppliers' } | { readonly kind: 'codes'; readonly supplier: Supplier } | { readonly kind: 'prices'; readonly supplier: Supplier };
+type View = { readonly kind: 'suppliers' } | { readonly kind: 'codes'; readonly supplier: Supplier } | { readonly kind: 'prices'; readonly supplier: Supplier } | { readonly kind: 'compare' };
 
 /**
  * The suppliers of the business and the codes they give to the products (E1-44): add, edit and give up a supplier (it is
@@ -42,6 +43,9 @@ type View = { readonly kind: 'suppliers' } | { readonly kind: 'codes'; readonly 
  */
 export function SupplierManager({ api, catalogApi, isOwner, onChanged, onBack }: SupplierManagerProps): ReactElement {
   const [view, setView] = useState<View>({ kind: 'suppliers' });
+  if (view.kind === 'compare' && catalogApi !== undefined) {
+    return <PriceComparator catalogApi={catalogApi} onBack={() => setView({ kind: 'suppliers' })} />;
+  }
   if (view.kind === 'prices' && catalogApi !== undefined) {
     return <PriceListScreen api={api} catalogApi={catalogApi} supplier={view.supplier} onBack={() => setView({ kind: 'suppliers' })} />;
   }
@@ -55,7 +59,7 @@ export function SupplierManager({ api, catalogApi, isOwner, onChanged, onBack }:
       onChanged={onChanged}
       onBack={onBack}
       onCodes={(supplier) => setView({ kind: 'codes', supplier })}
-      {...(isOwner && catalogApi !== undefined ? { onPrices: (supplier: Supplier) => setView({ kind: 'prices', supplier }) } : {})}
+      {...(isOwner && catalogApi !== undefined ? { onPrices: (supplier: Supplier) => setView({ kind: 'prices', supplier }), onCompare: () => setView({ kind: 'compare' }) } : {})}
     />
   );
 }
@@ -64,9 +68,11 @@ interface SupplierListProps extends SupplierManagerProps {
   readonly onCodes: (supplier: Supplier) => void;
   /** Opens the price list of a supplier; absent for a cashier. */
   readonly onPrices?: (supplier: Supplier) => void;
+  /** Opens the price comparator; absent for a cashier. */
+  readonly onCompare?: () => void;
 }
 
-function SupplierList({ api, isOwner, onChanged, onBack, onCodes, onPrices }: SupplierListProps): ReactElement {
+function SupplierList({ api, isOwner, onChanged, onBack, onCodes, onPrices, onCompare }: SupplierListProps): ReactElement {
   const [suppliers, setSuppliers] = useState<readonly Supplier[] | null>(null);
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [name, setName] = useState('');
@@ -132,7 +138,7 @@ function SupplierList({ api, isOwner, onChanged, onBack, onCodes, onPrices }: Su
     });
   };
 
-  useWindowKeys({ F2: save, F3: () => fill(null), F4: editing === null ? undefined : () => onCodes(editing), F5: editing === null || onPrices === undefined ? undefined : () => onPrices(editing), Escape: onBack }, isBusy);
+  useWindowKeys({ F2: save, F3: () => fill(null), F4: editing === null ? undefined : () => onCodes(editing), F5: editing === null || onPrices === undefined ? undefined : () => onPrices(editing), F6: onCompare, Escape: onBack }, isBusy);
 
   return (
     <>
@@ -172,6 +178,11 @@ function SupplierList({ api, isOwner, onChanged, onBack, onCodes, onPrices }: Su
         {editing !== null && (
           <button type="button" className="button" tabIndex={-1} disabled={isBusy} onClick={() => onCodes(editing)}>
             Códigos de productos <kbd>F4</kbd>
+          </button>
+        )}
+        {onCompare !== undefined && (
+          <button type="button" className="button" tabIndex={-1} disabled={isBusy} onClick={onCompare}>
+            Comparar precios <kbd>F6</kbd>
           </button>
         )}
         {editing !== null && onPrices !== undefined && (

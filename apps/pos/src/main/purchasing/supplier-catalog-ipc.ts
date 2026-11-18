@@ -3,9 +3,14 @@ import { basename } from 'node:path';
 
 import type { UserSummary } from '../../shared/auth';
 import {
+  MAX_CART_LINES,
   PRICE_LIST_FIELDS,
   SUPPLIER_CATALOG_CHANNELS,
+  type CartRequest,
   type CatalogItem,
+  type ComparisonGroup,
+  type ConfirmCartResult,
+  type ExportCartResult,
   type ColumnMapping,
   type ImportPriceListRequest,
   type ImportPriceListResult,
@@ -18,6 +23,7 @@ import {
 import { parseCsv } from '../import/eleventa-csv';
 import { readXlsxTable, WorkbookError } from '../import/xlsx-reader';
 import { parseProductId } from '../inventory/inventory-request';
+import { confirmCart, exportCartPdf, type CartDependencies } from './comparator-cart';
 import { parseUuid } from './purchasing-request';
 import type { SupplierCatalogService } from './supplier-catalog-service';
 
@@ -28,7 +34,7 @@ const MAX_FIELD_LENGTH = 200;
 /** Costs keep up to six decimals (ADR 0011), so Excel's noise is rounded there. */
 const COST_DECIMALS = 6;
 
-export interface SupplierCatalogServices {
+export interface SupplierCatalogServices extends Omit<CartDependencies, 'catalog'> {
   readonly catalog: SupplierCatalogService;
   /** Opens the window of Windows to choose a file, or answers null when the person closes it. */
   readonly pickFile: (title: string) => Promise<string | null>;
@@ -126,6 +132,30 @@ export function parseLinkCatalogItemRequest(value: unknown): LinkCatalogItemRequ
   };
 }
 
+/**
+ * Checks a cart that came over the bridge. The amounts are never taken from the screen: only the products, the quantities
+ * and the chosen items.
+ *
+ * @param value what the screen sent
+ * @returns the cart
+ * @throws TypeError if it is not shaped as one
+ */
+export function parseCartRequest(value: unknown): CartRequest {
+  const request = asRecord(value, 'a cart');
+  if (!Array.isArray(request.lines) || request.lines.length > MAX_CART_LINES) {
+    throw new TypeError(`Expected the lines of the cart, at most ${MAX_CART_LINES}`);
+  }
+  return {
+    lines: request.lines.map((value: unknown) => {
+      const line = asRecord(value, 'a line of the cart');
+      if (typeof line.quantityMilli !== 'number' || !Number.isSafeInteger(line.quantityMilli)) {
+        throw new TypeError('Expected the quantity in thousandths as a whole number');
+      }
+      return { productId: parseProductId(line.productId), quantityMilli: line.quantityMilli, itemId: parseUuid(line.itemId, 'an item') };
+    }),
+  };
+}
+
 function decode(bytes: Buffer): string {
   const utf8 = bytes.toString('utf8');
   return utf8.includes('�') ? bytes.toString('latin1') : utf8;
@@ -162,7 +192,8 @@ export function readPriceListFile(path: string): { ok: true; table: string[][] }
  * @param refuse builds the error for a person who may not do something
  * @param services the price lists and the window to choose a file
  */
-export function registerSupplierCatalogHandlers(answerSignedIn: AnswerSignedInWithUser, refuse: (message: string) => Error, { catalog, pickFile }: SupplierCatalogServices): void {
+export function registerSupplierCatalogHandlers(answerSignedIn: AnswerSignedInWithUser, refuse: (message: string) => Error, services: SupplierCatalogServices): void {
+  const { catalog, pickFile } = services;
   const answerOwner = <Result>(channel: string, respond: (argument: unknown, user: UserSummary) => Result): void =>
     answerSignedIn(channel, (argument, user) => {
       if (user.role !== 'owner') {
@@ -189,4 +220,7 @@ export function registerSupplierCatalogHandlers(answerSignedIn: AnswerSignedInWi
   answerOwner(SUPPLIER_CATALOG_CHANNELS.priceListSummary, (value): PriceListSummary => catalog.summary(parseUuid(value, 'a supplier')));
   answerOwner(SUPPLIER_CATALOG_CHANNELS.listCatalogItems, (value): CatalogItem[] => catalog.list(parseListCatalogItemsRequest(value)));
   answerOwner(SUPPLIER_CATALOG_CHANNELS.linkCatalogItem, (value, user): LinkCatalogItemResult => catalog.link(parseLinkCatalogItemRequest(value), user.id));
+  answerOwner(SUPPLIER_CATALOG_CHANNELS.compareItems, (value): ComparisonGroup[] => catalog.compare(requireText(value, 'words to compare')));
+  answerOwner(SUPPLIER_CATALOG_CHANNELS.confirmCart, (value): ConfirmCartResult => confirmCart(parseCartRequest(value).lines, services));
+  answerOwner(SUPPLIER_CATALOG_CHANNELS.exportCartPdf, (value): Promise<ExportCartResult> => exportCartPdf(parseCartRequest(value).lines, services));
 }

@@ -1,4 +1,4 @@
-import {
+﻿import {
   AGREED_PRICE_LIST_HEADERS,
   MAX_ITEM_DESCRIPTION_LENGTH,
   PRICE_LIST_FIELDS,
@@ -23,7 +23,7 @@ const HEADER_SYNONYMS: Readonly<Record<PriceListField, readonly string[]>> = {
   cost: ['cost', 'costo', 'precio', 'precio lista', 'precio de lista', 'p. lista', 'precio unitario', 'importe', 'precio neto', 'costo unitario'],
   purchaseUnit: ['purchase_unit', 'unidad', 'presentacion', 'empaque', 'um', 'u.m.', 'unidad de medida'],
   piecesPerUnit: ['pieces_per_unit', 'piezas', 'contenido', 'piezas por caja', 'pzas', 'cantidad por empaque', 'factor'],
-  barcode: ['barcode', 'codigo de barras', 'ean', 'upc', 'cb', 'cod. barras'],
+  barcode: ['barcode', 'codigo de barras', 'barras', 'ean', 'upc', 'cb', 'cod. barras'],
 };
 
 /** A table read from the file, with the row that holds the header found. */

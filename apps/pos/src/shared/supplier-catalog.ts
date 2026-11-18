@@ -1,6 +1,7 @@
 import type { Unit } from '@pos-saas/money';
 
 import { readUnitCost } from './product-admin';
+import type { OwnerRefusalResult } from './supplier-order';
 
 /** The columns a price list can bring. The first three are required. */
 export const PRICE_LIST_FIELDS = ['supplierCode', 'description', 'cost', 'purchaseUnit', 'piecesPerUnit', 'barcode'] as const;
@@ -154,13 +155,80 @@ export type LinkCatalogItemResult =
   | { readonly status: 'not_found' }
   | { readonly status: 'product_not_found' };
 
-/** The price lists of the suppliers (E1-51). Every channel is for the owner. */
+/** One supplier's offer for a product, against the cheapest of its group. */
+export interface ComparisonOption {
+  readonly item: CatalogItem;
+  readonly isCheapest: boolean;
+  readonly isMostExpensive: boolean;
+  /** How much more than the cheapest one base unit costs, in millionths of a peso. */
+  readonly differenceE6: number;
+  /** The same difference in hundredths of a percent, or null when the cheapest costs nothing. */
+  readonly differenceBp: number | null;
+}
+
+/** The offers for one product, the cheapest first. The items without a product form one group of their own. */
+export interface ComparisonGroup {
+  readonly productId: string | null;
+  readonly productName: string | null;
+  readonly productUnit: Unit | null;
+  readonly options: readonly ComparisonOption[];
+}
+
+/** A line of the comparator's cart: a product, how much, and the item of the supplier chosen for it. */
+export interface CartLineRequest {
+  readonly productId: string;
+  /** In thousandths of the base unit of the product. */
+  readonly quantityMilli: number;
+  readonly itemId: string;
+}
+
+export interface CartRequest {
+  readonly lines: readonly CartLineRequest[];
+}
+
+/** A draft order the cart became. */
+export interface CreatedOrder {
+  readonly orderId: string;
+  readonly folio: number;
+  readonly supplierName: string;
+  readonly lineCount: number;
+  readonly totalCents: number;
+}
+
+/** Why a cart cannot be used. */
+export type CartProblem =
+  | { readonly status: 'empty' }
+  | { readonly status: 'item_not_found'; readonly itemId: string }
+  /** The chosen item is not tied to the product of the line. */
+  | { readonly status: 'item_mismatch'; readonly productId: string }
+  | { readonly status: 'bad_quantity'; readonly productId: string };
+
+export type ConfirmCartResult =
+  | { readonly status: 'created'; readonly orders: readonly CreatedOrder[] }
+  /** Some orders were saved before one failed. */
+  | { readonly status: 'partial'; readonly orders: readonly CreatedOrder[]; readonly failedSupplier: string }
+  | CartProblem
+  | OwnerRefusalResult;
+
+export type ExportCartResult =
+  | { readonly status: 'saved'; readonly path: string }
+  | { readonly status: 'cancelled' }
+  | { readonly status: 'failed'; readonly message: string }
+  | CartProblem;
+
+/** The price lists of the suppliers (E1-51) and the comparator (E1-52). Every channel is for the owner. */
 export interface SupplierCatalogApi {
   pickPriceList(supplierId: string): Promise<PickPriceListResult>;
   importPriceList(request: ImportPriceListRequest): Promise<ImportPriceListResult>;
   priceListSummary(supplierId: string): Promise<PriceListSummary>;
   listCatalogItems(request: ListCatalogItemsRequest): Promise<CatalogItem[]>;
   linkCatalogItem(request: LinkCatalogItemRequest): Promise<LinkCatalogItemResult>;
+  /** Every supplier's items that match the words, grouped by product. */
+  compareItems(text: string): Promise<ComparisonGroup[]>;
+  /** Splits the cart into one draft order per supplier. */
+  confirmCart(request: CartRequest): Promise<ConfirmCartResult>;
+  /** Saves the PDF of the cart with the cheapest option of each line and two charts. */
+  exportCartPdf(request: CartRequest): Promise<ExportCartResult>;
 }
 
 export const SUPPLIER_CATALOG_CHANNELS = {
@@ -169,7 +237,67 @@ export const SUPPLIER_CATALOG_CHANNELS = {
   priceListSummary: 'supplier-catalog:summary',
   listCatalogItems: 'supplier-catalog:list',
   linkCatalogItem: 'supplier-catalog:link',
+  compareItems: 'supplier-catalog:compare',
+  confirmCart: 'supplier-catalog:confirm-cart',
+  exportCartPdf: 'supplier-catalog:export-cart',
 } as const;
+
+/** The most lines the comparator's cart may have. */
+export const MAX_CART_LINES = 200;
+
+function optionsOf(items: readonly CatalogItem[]): ComparisonOption[] {
+  const sorted = [...items].sort((left, right) => left.baseUnitCostE6 - right.baseUnitCostE6 || left.supplierName.localeCompare(right.supplierName));
+  const lowest = sorted[0]?.baseUnitCostE6 ?? 0;
+  const highest = sorted[sorted.length - 1]?.baseUnitCostE6 ?? 0;
+  const differs = sorted.length > 1 && highest > lowest;
+  return sorted.map((item) => {
+    const differenceE6 = item.baseUnitCostE6 - lowest;
+    return {
+      item,
+      isCheapest: differs && item.baseUnitCostE6 === lowest,
+      isMostExpensive: differs && item.baseUnitCostE6 === highest,
+      differenceE6,
+      differenceBp: lowest === 0 ? null : Number((BigInt(differenceE6) * 20_000n + BigInt(lowest)) / (BigInt(lowest) * 2n)),
+    };
+  });
+}
+
+/**
+ * Groups the items of several suppliers by the product they are tied to and compares them in its base unit, so a box of 12
+ * and a single piece compare per piece. The cheapest is marked, and so is the most expensive, only when the prices differ.
+ * The items without a product form the last group, compared among themselves.
+ *
+ * @param items the items found
+ * @returns the groups by product name, each one with the cheapest option first
+ */
+export function compareCatalogItems(items: readonly CatalogItem[]): ComparisonGroup[] {
+  const byProduct = new Map<string | null, CatalogItem[]>();
+  for (const item of items) {
+    const group = byProduct.get(item.productId) ?? [];
+    group.push(item);
+    byProduct.set(item.productId, group);
+  }
+  return [...byProduct.entries()]
+    .map(([productId, group]) => ({
+      productId,
+      productName: group[0]?.productName ?? null,
+      productUnit: group[0]?.productUnit ?? null,
+      options: optionsOf(group),
+    }))
+    .sort((left, right) => Number(left.productId === null) - Number(right.productId === null) || (left.productName ?? '').localeCompare(right.productName ?? ''));
+}
+
+/**
+ * Writes a difference in hundredths of a percent as people read it, with one decimal.
+ *
+ * @param basisPoints the difference, such as 1250 for 12.5 %
+ * @returns text such as "12.5 %"
+ */
+export function percentText(basisPoints: number): string {
+  const tenths = Math.round(basisPoints / 10);
+  const fraction = tenths % 10;
+  return `${Math.floor(tenths / 10)}${fraction === 0 ? '' : `.${fraction}`} %`;
+}
 
 const THOUSANDTHS = 1000n;
 const VAT_PERCENT = 116n;
@@ -252,4 +380,15 @@ export function normalizeHeader(header: string): string {
     .toLowerCase()
     .replace(/\s+/gu, ' ')
     .trim();
+}
+
+/**
+ * Writes a quantity in thousandths without decimal numbers: 12000 is "12" and 2500 is "2.5".
+ *
+ * @param milli the quantity in thousandths
+ * @returns the text
+ */
+export function milliText(milli: number): string {
+  const fraction = String(milli % 1000).padStart(3, '0').replace(/0+$/u, '');
+  return `${Math.floor(milli / 1000)}${fraction === '' ? '' : `.${fraction}`}`;
 }

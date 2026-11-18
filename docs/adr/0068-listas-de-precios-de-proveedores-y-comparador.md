@@ -1,6 +1,6 @@
 # ADR 0068: Listas de precios de proveedores y comparador
 
-Estado: Aceptada · Fecha: 2026-11-18 · Concreta E1-51 (y E1-52 en una segunda parte). Se apoya en los ADR 0011, 0059, 0063 y 0067.
+Estado: Aceptada · Fecha: 2026-11-18 · Concreta E1-51 y E1-52, que cubre F2-15. Se apoya en los ADR 0011, 0059, 0063 y 0067.
 
 ## Contexto
 El dueño compra lo mismo a varios proveedores y hoy compara a mano con listas en Excel, PDF o papel. E1-51 mete esas listas a la caja y las liga a los productos; E1-52 las compara y arma los pedidos. La sesión de E1-53 lee los catálogos en papel con Claude y entrega un CSV con encabezados acordados: `supplier_code,description,purchase_unit,pieces_per_unit,cost`.
@@ -46,7 +46,31 @@ Lo demás queda «sin ligar» y el dueño lo liga una vez desde la pantalla, con
 
 **Archivos.** Excel (`.xlsx`, con el lector propio de E1-34, ahora con 6 decimales para costos) o CSV (coma, punto y coma o tabulador; UTF-8 o Windows-1252). Máximo 20 MB y 20,000 artículos. El archivo elegido se queda en memoria con una ficha (UUIDv7) hasta que el dueño confirma las columnas; solo se guarda el último.
 
+## Decisiones del comparador (E1-52)
+
+**Comparar en la unidad base.** «Comparar precios» (F6 en proveedores, solo dueño) busca con FTS5 en las listas de todos los proveedores activos. Los artículos se agrupan por el producto al que están ligados, y un producto que salió en la búsqueda trae también los artículos de otros proveedores ligados a él aunque los describan con otras palabras. Dentro de cada grupo:
+- se ordena por costo por unidad base, el más barato primero;
+- el más barato va en verde y el más caro en rojo, solo si hay más de una oferta y los precios difieren;
+- cada oferta dice cuánto más cuesta que la más barata, en pesos y en porcentaje (centésimas de punto con enteros).
+
+Los artículos sin ligar forman un grupo aparte que se compara pero no se puede pedir: primero hay que ligarlos.
+
+**Carrito.** «Agregar» pone el producto con su proveedor más barato y cantidad 1; el dueño cambia la cantidad y el proveedor por renglón. La pantalla solo manda producto, cantidad y artículo elegido: el proceso principal vuelve a leer los costos de las listas, revisa que el artículo siga ligado al producto y que la cantidad sea entera para piezas, y calcula todo.
+
+**Un borrador por proveedor con el `save` de siempre.** Confirmar agrupa los renglones por proveedor y llama a `PurchaseOrderService.save` una vez por proveedor, con el código del proveedor y el costo por unidad base. Así aplican las mismas reglas: PIN del dueño para una cajera, máximo de renglones, auditoría y folio sin huecos. Los borradores llevan la nota «Armado en el comparador de precios».
+
+Opciones que se consideraron para varios proveedores:
+1. Una transacción con todos los pedidos.
+2. Un `save` por proveedor.
+
+Se eligió la 2 porque `LocalStore` no anida transacciones y duplicar la lógica de `save` rompería ADR 0059. Si un pedido falla después de otros, la respuesta es `partial` con los que sí se guardaron, y la pantalla deja en el carrito solo los renglones que faltan.
+
+**PDF.** Igual que la bitácora de faltantes (ADR 0063): HTML escapado sin JavaScript, política que bloquea scripts y red, impreso por Electron. Columnas: código del producto, producto, cantidad, precio elegido, proveedor elegido, precio más bajo, proveedor más barato e importe. Arriba el total, lo que costaría con lo más barato y el ahorro posible. Dos gráficas de barras en SVG dibujadas en el proceso principal: productos por proveedor y gasto por proveedor. `horizontalBars` acepta ahora el texto de cada valor para mostrar pesos.
+
+**F2-15 queda cubierta.** El comparativo de proveedores de la fase 2 pedía comparar el último costo por proveedor; el comparador lo hace con las listas vigentes y en la unidad base. Cuando F2-13 registre recepciones, el último costo pagado puede sumarse como otra columna sin cambiar esta decisión.
+
 ## Consecuencias
-- Comparar proveedores (E1-52) ya no necesita capturar costos producto por producto.
+- Comparar proveedores ya no necesita capturar costos producto por producto.
+- La caja pasa a la versión 0.2.5.
 - La lista no viaja al núcleo: es local, como los mínimos de reorden, hasta que F2-11 la reciba.
 - Un artículo ligado a un producto que se borra queda sin ligar (`ON DELETE SET NULL`).
