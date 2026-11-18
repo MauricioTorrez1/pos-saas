@@ -51,4 +51,4 @@ Se descartaron JasperReports (demasiado para una hoja) y generar el PDF en el na
 ## Consecuencias
 - Imprimir una hoja y escanear sus códigos con el lector de la tienda queda en la lista de pruebas físicas de `progreso.md`. ZXing no sustituye al lector real, la impresora ni el papel.
 - Una impresora térmica de etiquetas (por ejemplo ZPL) será otro `LabelLayout` con su propio `id`.
-- Cuando F0-21 tenga sus pantallas de catálogo, se agrega un enlace a `/catalog/labels` desde ellas.
+- El menú del catálogo (F0-21) enlaza «Etiquetas», y una búsqueda con resultados ofrece imprimir sus etiquetas.

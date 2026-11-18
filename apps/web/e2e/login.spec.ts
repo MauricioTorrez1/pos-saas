@@ -135,13 +135,15 @@ test('the manager is allowed on the catalog route', async ({ page }) => {
 
   const response = await page.goto('/catalog');
 
-  expect(response?.status()).toBe(404);
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole('heading', { name: 'Productos' })).toBeVisible();
 });
 
-test('the owner is allowed on the catalog route (it does not exist yet, so 404)', async ({ page }) => {
+test('the owner is allowed on the catalog route', async ({ page }) => {
   await signIn(page);
 
   const response = await page.goto('/catalog');
 
-  expect(response?.status()).toBe(404);
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole('heading', { name: 'Productos' })).toBeVisible();
 });

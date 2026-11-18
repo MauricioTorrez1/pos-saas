@@ -2,6 +2,10 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  experimental: {
+    // A catalog file goes through a Server Action; the core accepts up to 8 million characters (F0-18).
+    serverActions: { bodySizeLimit: '10mb' },
+  },
   async headers() {
     return [
       {
