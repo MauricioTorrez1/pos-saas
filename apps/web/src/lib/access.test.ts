@@ -20,6 +20,12 @@ describe('canAccess', () => {
     expect(canAccess('/settings', 'cashier')).toBe(false);
   });
 
+  it('lets only the owner change prices in bulk, like price.change in the core', () => {
+    expect(canAccess('/catalog/price-changes', 'owner')).toBe(true);
+    expect(canAccess('/catalog/price-changes', 'manager')).toBe(false);
+    expect(canAccess('/catalog/import', 'manager')).toBe(true);
+  });
+
   it('does not confuse a route that only starts with the same letters', () => {
     expect(canAccess('/catalogue', null)).toBe(true);
   });
