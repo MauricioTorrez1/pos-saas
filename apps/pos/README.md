@@ -222,6 +222,12 @@ with the variable `POS_PRINTER_SHARE` set to the shared printer, such as `\\loca
 ## Sign in
 Nothing works until a person enters with a PIN of four to eight digits, with or without internet. The first start asks for the owner. PINs are kept only as scrypt hashes, five wrong ones in a row lock that person for five minutes (the lock survives a restart), and the main process refuses sales and the catalog while nobody is signed in ([ADR 0029](../../docs/adr/0029-acceso-con-pin-y-sesion-de-caja.md)). F6 signs out.
 
+### Opening float and closing the register
+
+Signing in with the cash closed opens "Abrir la caja" for the opening float ([ADR 0070](../../docs/adr/0070-fondo-de-caja-al-entrar-y-corte-al-salir.md)). A cashier cannot skip it. The owner also sees **Solo administrar** (Esc): products, the summary and the suppliers work, but a sale cannot be charged, and a banner with **Abrir caja** stays until the cash opens. A session that is already open, from another shift or from before a restart, is not asked again, and the header says who opened it and when. Every opening goes to the audit log with who and how much.
+
+Closing the window with the cash open (the X, Alt+F4 or the menu) asks first: **Hacer corte de caja** (F2) opens the cut and closes the register after it, **No hacer corte y salir** (F4) leaves the session open and writes it to the audit log, and Esc goes back to work. The main process decides it in the `close` event, so a frozen or crashed screen, or Windows shutting down, never blocks the close; every sale is already committed to SQLite, and the audit log records why the session stayed open.
+
 ## Cash
 F3 opens everything about the cash of the register. A closed register cannot sell: it opens with a float. Entries and exits of cash need a reason, and a cashier needs the PIN of an owner to take cash out. The register warns, without stopping any sale, when the drawer passes the limit the owner set (,000 at first). The cut counts bills and coins by denomination plus the card and transfer vouchers, shows the difference of each form of payment, asks for a reason when it does not balance, and closes the session. Only the owner sees what the drawer should hold.
 

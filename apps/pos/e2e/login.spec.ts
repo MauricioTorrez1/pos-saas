@@ -9,6 +9,7 @@ import {
   removeTemporaryUserData,
   signInWindow,
   TEST_OWNER,
+  quitRegister,
 } from './register-harness.ts';
 
 const test = base.extend<{
@@ -39,7 +40,7 @@ test('asks for an owner on the first start, and for the PIN on the next ones (RF
   const first = await launch();
   const page = await signInWindow(first);
   await expect(page.getByLabel('Persona en la caja')).toHaveText(TEST_OWNER.name);
-  await first.close();
+  await quitRegister(first);
 
   const second = await (await launch()).firstWindow();
 
@@ -68,7 +69,7 @@ test('refuses sales and the catalog until somebody is signed in', async ({ launc
 test('says how many tries are left, and locks the person after five wrong PINs, even after a restart', async ({ launch }) => {
   const first = await launch();
   await signInWindow(first);
-  await first.close();
+  await quitRegister(first);
   const second = await launch();
   const page = await second.firstWindow();
   const pin = page.getByLabel('PIN', { exact: true });
@@ -85,7 +86,7 @@ test('says how many tries are left, and locks the person after five wrong PINs, 
   await page.keyboard.press('Enter');
   await expect(page.getByRole('alert')).toContainText('Demasiados intentos');
 
-  await second.close();
+  await quitRegister(second);
   const reopened = await launch();
   const reopenedPage = await reopened.firstWindow();
   await reopenedPage.getByLabel('PIN', { exact: true }).fill(TEST_OWNER.pin);

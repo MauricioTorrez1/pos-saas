@@ -576,6 +576,16 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué el modelo copia el precio como texto en lugar de devolver un número? (2) ¿Qué riesgos tiene aprobar en automático las filas que el modelo considera seguras?
 
+### E1-54 · Fondo de caja al entrar y corte al salir
+- **Objetivo:** al entrar sin caja abierta se pide el fondo de caja inicial; una cajera no vende sin él y el dueño puede «Solo administrar». Al cerrar la caja con la sesión abierta se pregunta si hacer el corte o salir dejándola abierta, y queda en la bitácora.
+- **Conceptos:** [Guardia de cierre en el proceso principal], [Fallar abierto ante un cierre forzado], [Bitácora de auditoría]
+- **Claude / tú:** Claude escribe el guardia, los diálogos y las pruebas. Tú pruebas en la tienda la entrada de una cajera y el cierre con Alt+F4.
+- **Pruebas:** Vitest del guardia de cierre (sin caja, preguntar, salir sin corte, corte hecho, cancelar, pantalla congelada o caída, apagado de Windows), de la apertura con su línea en la bitácora y de la pantalla (cajera sin salida, «Solo administrar» sin cobro, turno ya abierto, diálogo de salida); Playwright de entrar → fondo → venta, de «Solo administrar» y de las dos salidas.
+- **Criterios:** ADR 0070; un cierre forzado nunca se bloquea ni pierde datos; las ventas pendientes conservan su guardia.
+- **Depende de:** E1-21, E1-23 · **Estimación:** 4 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Por qué el cierre se decide en el proceso principal y no con `beforeunload` en la pantalla? (2) ¿Qué pasa si la pantalla se congela con la caja abierta y alguien cierra la ventana?
+
 ### E1-55 · Exportar el catálogo completo
 - **Objetivo:** el dueño saca todo su catálogo, activos y dados de baja, en PDF, Excel o CSV: un renglón por producto con sus códigos, proveedores y su código, costo sin y con IVA, precio con IVA, existencia del libro, margen bruto y margen neto, y al final los totales y una leyenda.
 - **Conceptos:** [Margen bruto y margen neto], [BOM de UTF-8], [Inyección de fórmulas en CSV], [Ceder el ciclo de eventos]

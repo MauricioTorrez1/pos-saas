@@ -30,6 +30,7 @@ const EMPTY_SALE_MESSAGE = 'Agrega al menos un producto para cobrar.';
 const CATALOG_CHANGED =
   'El catálogo cambió mientras armabas la venta, y un precio o un producto ya no es el que ves. No se cobró nada. Quita los productos y vuelve a agregarlos para ver los precios nuevos.';
 const CASH_CLOSED = 'La caja está cerrada. Ábrela con su fondo para poder cobrar.';
+const CASH_NOT_OPENED = 'No se puede cobrar: la caja no está abierta (solo administrar). Ábrela con su fondo de caja (F3) para cobrar.';
 const NO_LINE_FOR_PRICE = 'Elige primero un producto de la venta: agrégalo o muévete a él con las flechas, y cambia su precio para esta venta.';
 const MISC_PRICE = 'El artículo varios ya lleva el precio que escribiste. Quítalo y agrégalo otra vez para cambiarlo.';
 const SAVE_FAILURE = 'No se pudo guardar la venta. No se cobró nada. Intenta de nuevo y, si sigue fallando, reinicia la caja.';
@@ -80,6 +81,8 @@ interface SaleScreenProps {
   readonly purchasingApi?: PurchasingApi;
   /** Called after a sale was collected, so the cash of the register is read again. */
   readonly onCashChanged: () => void;
+  /** False while nobody opened the cash, as in «Solo administrar»: the sale is rung up, but it cannot be charged (E1-54). */
+  readonly isCashOpen?: boolean;
   /** The keys of each action. Without it, the register answers to the keys it was born with. */
   readonly keymap?: Keymap;
   /** Bridge for the tools of the register. Without it, a dropped sale leaves no entry in the audit log. */
@@ -108,9 +111,10 @@ interface SaleScreenProps {
  * @param props.onOpenDashboard called when the person asks for the summary of the business
  * @param props.onOpenSupplierOrder called when the person asks for the orders to suppliers (Shift+F11)
  * @param props.onCashChanged called after a sale was collected
+ * @param props.isCashOpen false while the cash is not open, so a sale cannot be charged
  * @returns the screen
  */
-export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onOpenDashboard, onOpenSupplierOrder, onCashChanged, keymap = DEFAULT_KEYMAP, toolsApi, onOpenSettings, onOpenSalesHistory, onOpenMissingItems, purchasingApi }: SaleScreenProps): ReactElement {
+export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onOpenDashboard, onOpenSupplierOrder, onCashChanged, isCashOpen = true, keymap = DEFAULT_KEYMAP, toolsApi, onOpenSettings, onOpenSalesHistory, onOpenMissingItems, purchasingApi }: SaleScreenProps): ReactElement {
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
@@ -172,6 +176,11 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
       return;
     }
     if (isSaving.current || isKeyboardElsewhere || measuring !== null || isAddingMisc || isPricingLine || isCancelling || newProduct !== null || productPanel !== null) {
+      return;
+    }
+    if (!isCashOpen) {
+      setNotice(CASH_NOT_OPENED);
+      onOpenCash();
       return;
     }
     isSaving.current = true;

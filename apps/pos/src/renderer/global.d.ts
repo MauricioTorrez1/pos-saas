@@ -1,3 +1,4 @@
+import type { ExitApi } from '../shared/exit-api';
 import type { CatalogExportApi } from '../shared/catalog-export';
 import type { DashboardApi } from '../shared/dashboard-api';
 import type { MissingItemsApi } from '../shared/missing-items';
@@ -20,6 +21,8 @@ declare global {
     readonly tools: ToolsApi;
     /** Bridge for the log of missing items (E1-49). */
     readonly missing: MissingItemsApi;
+    /** Bridge for closing the register with the cash still open (E1-54). */
+    readonly exit: ExitApi;
     /** Bridge to save the whole catalog as a file (E1-55). */
     readonly catalogExport: CatalogExportApi;
   }
