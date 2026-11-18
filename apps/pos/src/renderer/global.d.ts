@@ -4,6 +4,7 @@ import type { PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
 import type { ToolsApi } from '../shared/register-tools';
+import type { SupplierCatalogApi } from '../shared/supplier-catalog';
 import type { PurchasingApi } from '../shared/supplier-order';
 
 declare global {
@@ -12,6 +13,8 @@ declare global {
     readonly pos: PosApi & PricingApi & ProductAdminApi & DashboardApi;
     /** Bridge for the suppliers and the purchase orders (E1-44). */
     readonly purchasing: PurchasingApi;
+    /** Bridge for the price lists of the suppliers (E1-51), only for the owner. */
+    readonly supplierCatalog: SupplierCatalogApi;
     /** Bridge for the keys, the ticket, the printer and the list of sales. */
     readonly tools: ToolsApi;
     /** Bridge for the log of missing items (E1-49). */

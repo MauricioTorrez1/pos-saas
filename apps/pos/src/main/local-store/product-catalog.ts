@@ -132,7 +132,7 @@ export class ProductCatalog {
  * Turns typed text into an FTS5 query. Quoting each word keeps what the cashier types from being read as FTS5
  * syntax: `1/2"` or `AND` are only text to look for.
  */
-function toPrefixQuery(text: string): string | null {
+export function toPrefixQuery(text: string): string | null {
   const words = text.split(/\s+/u).filter((word) => SEARCHABLE_WORD.test(word));
   if (words.length === 0) {
     return null;

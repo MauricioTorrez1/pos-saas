@@ -70,4 +70,5 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0065](0065-etiquetas-de-anaquel-en-pdf.md) | Etiquetas de anaquel en PDF: `POST /labels` con OpenPDF, EAN-13 o Code 128 y formato detrás de `LabelLayout` | Aceptada |
 | [0066](0066-prueba-de-punta-a-punta-sin-internet.md) | Prueba de punta a punta sin internet: Java levanta el núcleo con PostgreSQL, Node ejecuta la sincronización real de la caja con cortes de red y reenvíos | Aceptada |
 | [0067](0067-proveedores-en-el-producto-faltantes-editables-y-busqueda-de-ventas.md) | Proveedores y «Pedir más» en el producto, faltantes editables, nombre y moneda del ticket, y búsqueda de ventas en «Resumen» | Aceptada |
+| [0068](0068-listas-de-precios-de-proveedores-y-comparador.md) | Listas de precios de proveedores: lista vigente reemplazada en una transacción, columnas recordadas por proveedor, IVA preguntado, ligado por código, barras o a mano, búsqueda sin acentos | Aceptada |
 | [0069](0069-lectura-de-catalogos-en-papel-con-claude.md) | Lectura de catálogos de proveedor en papel con Claude, revisión humana de cada fila y CSV para la caja | Aceptada |
