@@ -691,6 +691,17 @@ kbd {
   background: color-mix(in srgb, var(--danger) 86%, #000000);
 }
 
+/* Green for what adds: «Pedir más». */
+.button-good {
+  color: #ffffff;
+  background: var(--good);
+  border-color: transparent;
+}
+
+.button-good:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--good) 86%, #000000);
+}
+
 .button-small {
   min-height: 2.1rem;
   padding: 0 0.75rem;
@@ -2065,4 +2076,90 @@ kbd {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+/* -- Suppliers of a product (E1-50) ---------------------------------------------------------------------------- */
+
+.product-suppliers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  margin-top: 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+}
+
+.product-suppliers h3 {
+  margin: 0;
+}
+
+.product-suppliers-list {
+  max-height: 16rem;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.product-suppliers-list li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.product-suppliers-list li:last-child {
+  border-bottom: none;
+}
+
+.product-suppliers-list li div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.product-suppliers-list small {
+  color: var(--ink-soft);
+}
+
+.product-suppliers-add {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1fr auto;
+  gap: 0.6rem;
+  align-items: end;
+}
+
+@media (max-width: 760px) {
+  .product-suppliers-add {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The list of suppliers scrolls, so the form under it is always reachable however many there are. */
+.supplier-list {
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.missing-notes-editor {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.missing-notes-editor .payment-field {
+  flex: 1 1 16rem;
+}
+
+.sale-search {
+  margin-bottom: 1rem;
+}
+
+.sale-search-results {
+  max-height: 16rem;
 }

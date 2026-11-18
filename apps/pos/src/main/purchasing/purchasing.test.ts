@@ -610,3 +610,46 @@ describe('who may order (E1-44)', () => {
     expect(() => suppliers.save({ name: 'X', contact: null, notes: null, isActive: true })).toThrow('signed in');
   });
 });
+
+describe('ordering more from the product panel (E1-50)', () => {
+  it('starts a draft for the supplier with its code and cost, then adds the next product to the same draft', () => {
+    suppliers.setCodes({ supplierId: supplier.id, productId: tapeId, codes: [{ supplierCode: 'CM-5', listCostE6: 50_500_000, purchaseUnit: null }] });
+
+    const first = orders.orderMore({ productId: tapeId, supplierId: supplier.id });
+    const second = orders.orderMore({ productId: nailsId, supplierId: supplier.id });
+
+    expect(first).toMatchObject({ status: 'added', quantityMilli: 1000, order: { status: 'draft', lines: [{ productId: tapeId, supplierCode: 'CM-5', unitCostE6: 50_500_000 }] } });
+    expect(second.status).toBe('added');
+    expect(second.status === 'added' && second.order.id).toBe(first.status === 'added' && first.order.id);
+    expect(second.status === 'added' && second.order.lines.map((row) => row.productId)).toEqual([tapeId, nailsId]);
+    expect(count("SELECT count(*) AS total FROM purchase_order WHERE status = 'draft'")).toBe(1);
+  });
+
+  it('orders what fills the product up to its maximum, and does not add it twice', () => {
+    orders.setReorderLevel({ productId: nailsId, minimumMilli: 2_000, maximumMilli: 10_000 });
+
+    const added = orders.orderMore({ productId: nailsId, supplierId: supplier.id });
+    const again = orders.orderMore({ productId: nailsId, supplierId: supplier.id });
+
+    expect(added).toMatchObject({ status: 'added', quantityMilli: 9_000 });
+    expect(again.status).toBe('already_in_order');
+  });
+
+  it('keeps each supplier in its own draft, with as many suppliers as there are', () => {
+    const others = ['Truper Mayoreo', 'Distribuidora Norte', 'Pinturas del Valle', 'Eléctrica Sur'].map(savedSupplier);
+
+    for (const other of others) {
+      expect(orders.orderMore({ productId: cableId, supplierId: other.id }).status).toBe('added');
+    }
+
+    expect(count("SELECT count(*) AS total FROM purchase_order WHERE status = 'draft'")).toBe(4);
+  });
+
+  it('needs the PIN of an owner from a cashier, and answers when the product does not exist', () => {
+    asCashier();
+
+    expect(orders.orderMore({ productId: tapeId, supplierId: supplier.id }).status).toBe('authorization_required');
+    expect(orders.orderMore({ productId: tapeId, supplierId: supplier.id, ownerPin: '4321' }).status).toBe('added');
+    expect(orders.orderMore({ productId: '0190f0d0-0000-7000-8000-0000000000ff', supplierId: supplier.id }).status).toBe('product_not_found');
+  });
+});

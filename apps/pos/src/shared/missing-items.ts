@@ -83,6 +83,12 @@ export interface ResolveMissingRequest {
   readonly status: MissingStatus;
 }
 
+/** Replaces the notes of an item: the last time it was asked for keeps them, and the earlier times lose theirs. */
+export interface EditMissingNotesRequest {
+  readonly key: string;
+  readonly notes: string | null;
+}
+
 export type MissingExportResult =
   | { readonly status: 'saved'; readonly path: string }
   | { readonly status: 'cancelled' }
@@ -92,6 +98,8 @@ export const MISSING_CHANNELS = {
   record: 'missing:record',
   report: 'missing:report',
   resolve: 'missing:resolve',
+  editNotes: 'missing:edit-notes',
+  remove: 'missing:remove',
   exportPdf: 'missing:export-pdf',
 } as const;
 
@@ -105,6 +113,12 @@ export interface MissingItemsApi {
 
   /** Marks an item as sold now, dismissed, or pending again. Only the owner can. */
   resolve(request: ResolveMissingRequest): Promise<void>;
+
+  /** Replaces the notes of an item. Anyone signed in can. */
+  editNotes(request: EditMissingNotesRequest): Promise<RecordMissingResult>;
+
+  /** Deletes every time an item was asked for, when it was written by mistake. Only the owner can. */
+  remove(key: string): Promise<void>;
 
   /** Saves the log of the period as a PDF with its charts, where the person chooses. */
   exportPdf(period: MissingPeriod): Promise<MissingExportResult>;

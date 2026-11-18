@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 
 import type { UserSummary } from '../../shared/auth';
+import type { SaleSummary } from '../../shared/register-tools';
 import {
   PERIOD_KINDS,
   type DashboardApi,
@@ -19,6 +20,7 @@ import { ModalDialog } from '../ui/ModalDialog';
 import { useWindowKeys } from '../ui/use-window-keys';
 import { InventoryTab } from './InventoryTab';
 import { isDayText, movePeriod, todayInRegisterZone } from './period-input';
+import { SaleSearch } from './SaleSearch';
 import { SummaryTab } from './SummaryTab';
 import { TopSellersTab } from './TopSellersTab';
 
@@ -42,6 +44,8 @@ interface DashboardDialogProps {
   readonly api: DashboardApi;
   readonly user: UserSummary;
   readonly onClose: () => void;
+  /** Finds completed sales by ticket, product name or code. Without it, «Resumen» has no search bar. */
+  readonly searchSales?: (text: string) => Promise<readonly SaleSummary[]>;
 }
 
 function refusalText(result: Exclude<DashboardResult, { status: 'ok' }> | Extract<ExportResult, { status: 'wrong_pin' | 'locked' }>): string {
@@ -59,9 +63,10 @@ function refusalText(result: Exclude<DashboardResult, { status: 'ok' }> | Extrac
  * @param props.api bridge to the main process
  * @param props.user who is signed in
  * @param props.onClose called when the person is done
+ * @param props.searchSales finds sales by ticket, product name or code, for the search bar of «Resumen»
  * @returns the dialog
  */
-export function DashboardDialog({ api, user, onClose }: DashboardDialogProps): ReactElement {
+export function DashboardDialog({ api, user, onClose, searchSales }: DashboardDialogProps): ReactElement {
   const isOwner = user.role === 'owner';
   const [period, setPeriod] = useState<PeriodKind>('day');
   const [date, setDate] = useState(() => todayInRegisterZone());
@@ -276,7 +281,10 @@ export function DashboardDialog({ api, user, onClose }: DashboardDialogProps): R
         {summary === null ? (
           <p className="sale-empty">{isLoading ? 'Calculando…' : 'Sin datos.'}</p>
         ) : activeTab === 'summary' ? (
-          <SummaryTab summary={summary} />
+          <>
+            {hasFullAccess && searchSales !== undefined && <SaleSearch search={searchSales} />}
+            <SummaryTab summary={summary} />
+          </>
         ) : activeTab === 'top' ? (
           <TopSellersTab summary={summary} metric={topMetric} limit={topLimit} onMetricChange={setTopMetric} onLimitChange={setTopLimit} />
         ) : summary.inventory !== null ? (

@@ -769,4 +769,16 @@ export const MIGRATIONS: readonly Migration[] = [
       ) STRICT, WITHOUT ROWID;
     `,
   },
+  {
+    version: 20,
+    name: 'let_missing_items_be_edited',
+    // The owner asked to fix the notes of a missing item and to delete one written by mistake (E1-50, ADR 0064). Only the
+    // notes may change now: what was asked for, when and by whom still never change, and a deletion is in the audit log.
+    sql: `
+      DROP TRIGGER missing_item_request_never_changes;
+
+      CREATE TRIGGER missing_item_request_keeps_what_was_asked BEFORE UPDATE OF id, tenant_id, description, item_key, quantity, recorded_by, recorded_at ON missing_item_request
+      BEGIN SELECT RAISE(ABORT, 'what was asked for never changes, only the notes'); END;
+    `,
+  },
 ];

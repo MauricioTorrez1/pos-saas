@@ -1,10 +1,15 @@
 import type { StatementSync } from 'node:sqlite';
 
+import type { CatalogProduct } from '../../shared/pos-api';
 import type { SaleSummary } from '../../shared/register-tools';
 import { formatFolio } from '../checkout/ticket/ticket';
 import type { LocalStore } from '../local-store/local-store';
 
 const LIST_LIMIT = 60;
+/** How many products a name can stand for in one search. More than this and the text is too vague to help. */
+const PRODUCT_MATCH_LIMIT = 50;
+/** A folio as the customer reads it out: `T1-000012`, `000012` or `12`. */
+const FOLIO_TEXT = /^(t\d+-?)?\d+$/iu;
 
 interface SaleRow {
   readonly id: string;
@@ -16,6 +21,12 @@ interface SaleRow {
   readonly cashier_name: string | null;
 }
 
+/** What the history needs of the catalog to turn a name or a code into products. */
+export interface ProductLookup {
+  search(text: string, limit: number, options: { readonly includeInactive: boolean }): CatalogProduct[];
+  findByCode(code: string, options: { readonly includeInactive: boolean }): CatalogProduct | null;
+}
+
 const COLUMNS = `
   s.id, s.folio, s.resolved_at, s.total_cents,
   (SELECT COALESCE(SUM(r.total_cents), 0) FROM sale_return r WHERE r.sale_id = s.id) AS refunded_cents,
@@ -23,46 +34,83 @@ const COLUMNS = `
   (SELECT u.name FROM app_user u WHERE u.id = s.cashier_id) AS cashier_name
 `;
 
-/** Reads the completed sales, the newest first, so a past sale can be found and cancelled. It only reads. */
+// A line matches when it is one of the products found, or when the name printed on it has the text: a product renamed
+// after the sale is still found by the name the ticket shows.
+const LINE_MATCHES = `(l.product_id IN (SELECT value FROM json_each(?)) OR l.product_name LIKE ? ESCAPE '\\')`;
+
+/** Reads the completed sales, the newest first, so a past sale can be found, reprinted or cancelled. It only reads. */
 export class SalesHistory {
   readonly #tenantId: string;
+  readonly #catalog: ProductLookup | null;
   readonly #latest: StatementSync;
-  readonly #byFolio: StatementSync;
+  readonly #search: StatementSync;
+  readonly #matchedNames: StatementSync;
 
   /**
    * @param store the open local store
    * @param tenantId the business whose sales these are
+   * @param catalog the products, to find a sale by the name or the code of what was sold; without it, only by folio
    */
-  constructor(store: LocalStore, tenantId: string) {
+  constructor(store: LocalStore, tenantId: string, catalog: ProductLookup | null = null) {
     this.#tenantId = tenantId;
+    this.#catalog = catalog;
     this.#latest = store.prepare(`
       SELECT ${COLUMNS} FROM sale s WHERE s.tenant_id = ? AND s.status = 'completed' ORDER BY s.folio DESC LIMIT ${LIST_LIMIT}
     `);
-    this.#byFolio = store.prepare(`
+    this.#search = store.prepare(`
       SELECT ${COLUMNS} FROM sale s
-      WHERE s.tenant_id = ? AND s.status = 'completed' AND CAST(s.folio AS TEXT) LIKE ?
+      WHERE s.tenant_id = ? AND s.status = 'completed' AND (
+        (? <> '' AND CAST(s.folio AS TEXT) LIKE ?)
+        OR EXISTS (SELECT 1 FROM sale_line l WHERE l.sale_id = s.id AND ${LINE_MATCHES})
+      )
       ORDER BY s.folio DESC LIMIT ${LIST_LIMIT}
+    `);
+    this.#matchedNames = store.prepare(`
+      SELECT DISTINCT l.product_name AS name FROM sale_line l WHERE l.sale_id = ? AND ${LINE_MATCHES} ORDER BY l.line_number
     `);
   }
 
   /**
-   * Lists completed sales.
+   * Lists completed sales: by folio, by the name of a product sold, or by its code.
    *
-   * @param text a folio or part of it, such as `T1-000012` or `12`; an empty text lists the latest
-   * @returns up to sixty sales, the newest first
+   * @param text a folio or part of it (`T1-000012`, `12`), part of a product name (`cinta`), or a code; empty lists the latest
+   * @returns up to sixty sales, the newest first; a sale found by a product says which products of it matched
    */
   list(text: string): SaleSummary[] {
-    // Only the digits count, without the zeros that pad the folio, so 12, 000012 and T1-000012 find the same sale.
-    const digits = text.replace(/^.*-/u, '').replace(/\D/gu, '').replace(/^0+/u, '');
-    const rows = (digits === '' ? this.#latest.all(this.#tenantId) : this.#byFolio.all(this.#tenantId, `%${digits}%`)) as unknown as SaleRow[];
-    return rows.map((row) => ({
-      saleId: row.id,
-      folio: formatFolio(row.folio),
-      completedAt: row.resolved_at,
-      totalCents: row.total_cents,
-      refundedCents: row.refunded_cents,
-      cashierName: row.cashier_name,
-      lineCount: row.line_count,
-    }));
+    const trimmed = text.trim();
+    if (trimmed === '') {
+      return (this.#latest.all(this.#tenantId) as unknown as SaleRow[]).map((row) => toSummary(row, []));
+    }
+    // Only the digits of a folio count, without the zeros that pad it, so 12, 000012 and T1-000012 find the same sale.
+    const folioDigits = FOLIO_TEXT.test(trimmed) ? trimmed.replace(/^.*-/u, '').replace(/^0+/u, '') : '';
+    const productIds = JSON.stringify(this.#productsMatching(trimmed));
+    const namePattern = `%${trimmed.replace(/[\\%_]/gu, (character) => `\\${character}`)}%`;
+    const rows = this.#search.all(this.#tenantId, folioDigits, `%${folioDigits}%`, productIds, namePattern) as unknown as SaleRow[];
+    return rows.map((row) => {
+      const names = this.#matchedNames.all(row.id, productIds, namePattern) as unknown as { name: string }[];
+      return toSummary(row, names.map((entry) => entry.name));
+    });
   }
+
+  #productsMatching(text: string): string[] {
+    if (this.#catalog === null) {
+      return [];
+    }
+    const byName = this.#catalog.search(text, PRODUCT_MATCH_LIMIT, { includeInactive: true }).map((product) => product.id);
+    const byCode = this.#catalog.findByCode(text, { includeInactive: true });
+    return byCode === null ? byName : [...new Set([byCode.id, ...byName])];
+  }
+}
+
+function toSummary(row: SaleRow, matchedProducts: readonly string[]): SaleSummary {
+  return {
+    saleId: row.id,
+    folio: formatFolio(row.folio),
+    completedAt: row.resolved_at,
+    totalCents: row.total_cents,
+    refundedCents: row.refunded_cents,
+    cashierName: row.cashier_name,
+    lineCount: row.line_count,
+    matchedProducts,
+  };
 }

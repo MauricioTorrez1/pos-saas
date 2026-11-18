@@ -50,6 +50,9 @@ export class MissingItemsLog {
   readonly #statuses: StatementSync;
   readonly #setStatus: StatementSync;
   readonly #clearStatus: StatementSync;
+  readonly #clearNotes: StatementSync;
+  readonly #setLatestNotes: StatementSync;
+  readonly #deleteRequests: StatementSync;
 
   /**
    * @param store the open local store
@@ -77,6 +80,13 @@ export class MissingItemsLog {
       ON CONFLICT (tenant_id, item_key) DO UPDATE SET status = excluded.status, decided_by = excluded.decided_by, decided_at = excluded.decided_at
     `);
     this.#clearStatus = store.prepare('DELETE FROM missing_item_status WHERE tenant_id = ? AND item_key = ?');
+    this.#clearNotes = store.prepare('UPDATE missing_item_request SET notes = NULL WHERE tenant_id = ? AND item_key = ? AND notes IS NOT NULL');
+    this.#setLatestNotes = store.prepare(`
+      UPDATE missing_item_request SET notes = ? WHERE id = (
+        SELECT id FROM missing_item_request WHERE tenant_id = ? AND item_key = ? ORDER BY recorded_at DESC, id DESC LIMIT 1
+      )
+    `);
+    this.#deleteRequests = store.prepare('DELETE FROM missing_item_request WHERE tenant_id = ? AND item_key = ?');
   }
 
   /**
@@ -127,6 +137,50 @@ export class MissingItemsLog {
         this.#setStatus.run(this.#tenantId, key, status, userId, now);
       }
       this.#audit.record({ userId, action: 'missing_item.resolved', entity: 'missing_item', entityId: uuidV7(), detail: `${key}: ${status}` });
+    });
+  }
+
+  /**
+   * Replaces the notes of an item: the last time it was asked for keeps them, and the earlier times lose theirs, so the
+   * item shows exactly what was typed. What was asked for, when and by whom does not change.
+   *
+   * @param key the key of the item
+   * @param notes the new notes, or null for none
+   * @param userId who edited them
+   * @returns how many times the item was asked for, or why the notes were not kept
+   */
+  editNotes(key: string, notes: string | null, userId: string): RecordMissingResult {
+    const text = notes?.trim() ?? '';
+    if ([...text].length > MAX_MISSING_NOTES) {
+      return { status: 'invalid', message: `Las notas caben en ${String(MAX_MISSING_NOTES)} letras.` };
+    }
+    return this.#store.transaction(() => {
+      const { times } = this.#timesOf.get(this.#tenantId, key) as unknown as { times: number };
+      if (times === 0) {
+        return { status: 'invalid', message: 'Ese faltante ya no existe.' };
+      }
+      this.#clearNotes.run(this.#tenantId, key);
+      if (text !== '') {
+        this.#setLatestNotes.run(text, this.#tenantId, key);
+      }
+      this.#audit.record({ userId, action: 'missing_item.notes_edited', entity: 'missing_item', entityId: uuidV7(), detail: `${key}: ${text === '' ? '(sin notas)' : text}` });
+      return { status: 'recorded', timesAsked: times };
+    });
+  }
+
+  /**
+   * Deletes every time an item was asked for, and what the owner decided about it, when it was written by mistake. The
+   * audit log keeps what was deleted.
+   *
+   * @param key the key of the item
+   * @param userId the owner
+   */
+  remove(key: string, userId: string): void {
+    this.#store.transaction(() => {
+      const { times } = this.#timesOf.get(this.#tenantId, key) as unknown as { times: number };
+      this.#deleteRequests.run(this.#tenantId, key);
+      this.#clearStatus.run(this.#tenantId, key);
+      this.#audit.record({ userId, action: 'missing_item.deleted', entity: 'missing_item', entityId: uuidV7(), detail: `${key}: ${String(times)} veces` });
     });
   }
 

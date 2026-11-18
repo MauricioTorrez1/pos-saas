@@ -33,6 +33,13 @@ function optionalText(value: unknown): string | null {
   return value;
 }
 
+function requireKey(value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_FIELD_LENGTH) {
+    throw new TypeError('Expected the key of an item');
+  }
+  return value;
+}
+
 /**
  * Reads what the screen sent to write down a missing item.
  *
@@ -85,6 +92,16 @@ export function registerMissingItemsHandlers(answerSignedIn: AnswerSignedInWithU
       throw new TypeError('Expected the key of an item and pending, added or dismissed');
     }
     log.resolve(key, status as MissingStatus, user.id);
+  });
+  answerSignedIn(MISSING_CHANNELS.editNotes, (value, user): RecordMissingResult => {
+    const { key, notes } = (typeof value === 'object' && value !== null ? value : {}) as Record<string, unknown>;
+    return log.editNotes(requireKey(key), optionalText(notes), user.id);
+  });
+  answerSignedIn(MISSING_CHANNELS.remove, (value, user): void => {
+    if (user.role !== 'owner') {
+      throw refuse('Only the owner deletes a missing item');
+    }
+    log.remove(requireKey(value), user.id);
   });
   answerSignedIn(MISSING_CHANNELS.exportPdf, (value): Promise<MissingExportResult> =>
     exportMissingItems(parseMissingPeriod(value), { ...exporter, report: (period) => log.report(period) }),

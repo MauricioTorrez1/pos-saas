@@ -189,10 +189,39 @@ export function ticketLineWidth(design: Pick<TicketDesign, 'columns' | 'font' | 
 }
 
 export const MAX_TICKET_EXTRA_LINES = 4;
+export const MAX_TICKET_BUSINESS_NAME = 40;
+
+/** How the ticket writes an amount: `$12.50`, `$12.50 MXN` or `MXN 12.50`. The amount is always in pesos. */
+export const TICKET_CURRENCY_CHOICES = ['symbol', 'symbol_code', 'code'] as const;
+export type TicketCurrency = (typeof TICKET_CURRENCY_CHOICES)[number];
+
+const CURRENCY_CODE = 'MXN';
+
+/**
+ * Writes an amount already formatted with the peso sign the way the ticket design asks for.
+ *
+ * @param amount an amount such as `$1,234.50`
+ * @param currency how the owner wants the currency shown
+ * @returns the amount with the sign, the code, or both
+ */
+export function withCurrency(amount: string, currency: TicketCurrency): string {
+  switch (currency) {
+    case 'symbol':
+      return amount;
+    case 'symbol_code':
+      return `${amount} ${CURRENCY_CODE}`;
+    case 'code':
+      return `${CURRENCY_CODE} ${amount.replace(/^\$/u, '')}`;
+  }
+}
 export const MAX_TICKET_COPIES = 3;
 
 /** How the ticket looks. The owner changes it from the settings and sees it before saving. */
 export interface TicketDesign {
+  /** The name printed at the top. Empty means the name of the business as the register knows it. */
+  readonly businessName: string;
+  /** How the amounts show the currency. */
+  readonly currency: TicketCurrency;
   /** Lines under the name of the business: address, phone, RFC. */
   readonly headerLines: readonly string[];
   /** Lines at the foot: thanks, return policy, social networks. */
@@ -214,6 +243,8 @@ export interface TicketDesign {
 
 /** The ticket as it was before it could be designed, so a register that never opened the settings prints the same. */
 export const DEFAULT_TICKET_DESIGN: TicketDesign = {
+  businessName: '',
+  currency: 'symbol',
   headerLines: [],
   footerLines: ['Gracias por su compra'],
   columns: 48,
@@ -243,8 +274,12 @@ export function isTicketDesign(value: unknown): value is TicketDesign {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
-  const { headerLines, footerLines, columns, font, textSize, showUnitPrice, showTaxBreakdown, bigTotal, copies } = value as Record<string, unknown>;
+  const { businessName, currency, headerLines, footerLines, columns, font, textSize, showUnitPrice, showTaxBreakdown, bigTotal, copies } = value as Record<string, unknown>;
   return (
+    typeof businessName === 'string' &&
+    businessName.length <= MAX_TICKET_BUSINESS_NAME &&
+    !/[\u0000-\u001f]/u.test(businessName) &&
+    (TICKET_CURRENCY_CHOICES as readonly unknown[]).includes(currency) &&
     isLineList(headerLines) &&
     isLineList(footerLines) &&
     (TICKET_COLUMN_CHOICES as readonly unknown[]).includes(columns) &&
@@ -291,6 +326,8 @@ export interface SaleSummary {
   readonly refundedCents: number;
   readonly cashierName: string | null;
   readonly lineCount: number;
+  /** The products of the sale that matched a search by name or code, in the order of the ticket. Empty otherwise. */
+  readonly matchedProducts: readonly string[];
 }
 
 export type TestPrintResult = { readonly status: 'printed' } | { readonly status: 'no_printer' } | { readonly status: 'failed'; readonly message: string };
@@ -342,9 +379,9 @@ export interface ToolsApi {
   testPrint(): Promise<TestPrintResult>;
 
   /**
-   * Lists the last completed sales, the newest first.
+   * Lists completed sales, the newest first: by folio, by the name of a product sold, or by its code.
    *
-   * @param text a folio or part of it, or an empty text for the latest
+   * @param text a folio or part of it, part of a product name, a code, or an empty text for the latest
    */
   listRecentSales(text: string): Promise<readonly SaleSummary[]>;
 

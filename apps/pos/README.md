@@ -137,16 +137,20 @@ Since [ADR 0061](../../docs/adr/0061-rediseno-de-la-caja-y-herramientas-del-duen
 | `Shift+F4` | Opens **Ventas**, the completed sales. A past sale is cancelled there as a return of everything that is left, with a reason and the approval of the owner |
 | `Shift+F9` | Opens **Ajustes** (owner only): shortcuts, ticket design with a live sample, and the ticket printer with a test print |
 
-The ticket design also picks the printer font (A, or the narrow B that fits a third more letters per line) and the letter size (normal, tall, or large), and the sample shows how many letters fit per line ([ADR 0063](../../docs/adr/0063-bitacora-de-faltantes-y-letra-del-ticket.md)).
+The ticket design also picks the printer font (A, or the narrow B that fits a third more letters per line) and the letter size (normal, tall, or large), and the sample shows how many letters fit per line ([ADR 0063](../../docs/adr/0063-bitacora-de-faltantes-y-letra-del-ticket.md)). It can also override the business name at the top and write amounts as `$12.50`, `$12.50 MXN` or `MXN 12.50` ([ADR 0067](../../docs/adr/0067-proveedores-en-el-producto-faltantes-editables-y-busqueda-de-ventas.md)).
+
+The search bar of **Resumen** (owner, or with the owner PIN) finds any completed sale by ticket folio, product name or barcode, on every date, and says which products matched.
+
+The product panel lists every supplier of the product, links one more, and has a green «Pedir más» per supplier that adds the product to that supplier's latest draft order (or a new one).
 
 Boxes for amounts, quantities and PINs take digits and one decimal point only (`keepNumeric`). The settings live in `register_setting`, so there is no migration. The catalog import reads `.xlsx` as well as CSV with a reader of its own (`main/import/xlsx-reader.ts`), and shows how to title the columns before the file is chosen.
 
 ## Missing items
 **Faltantes** (`Shift+F2`, or the header button) is the log of what customers ask for and the store does not carry ([ADR 0063](../../docs/adr/0063-bitacora-de-faltantes-y-letra-del-ticket.md)). When a search by name finds nothing, the notice offers «Anotar como faltante» with the text already typed.
 
-- Each time is a row of `missing_item_request` that never changes. Times of the same item are counted together by a key without accents, capitals or extra spaces.
+- Each time is a row of `missing_item_request`; only its notes can change (migration 20). Times of the same item are counted together by a key without accents, capitals or extra spaces.
 - The dialog shows the most asked items, the totals, and charts by week and by day of the week, for 30 days, 3 months, a year, or everything.
-- The owner marks an item as «Ya lo vendemos» or «Descartar», or puts it back to pending. Each decision goes to the audit log.
+- Anyone signed in edits the notes of an item. The owner marks it as «Ya lo vendemos», puts it back to pending, or deletes it with the red «Eliminar» after confirming. Each change goes to the audit log.
 - «Descargar PDF con gráficas» saves the log of the period with three SVG charts and every item.
 
 ## Sale states and recovery
