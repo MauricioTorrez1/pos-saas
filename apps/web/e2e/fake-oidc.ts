@@ -32,7 +32,7 @@ interface Control {
 const defaults = (): Control => ({ persona: 'owner', refresh: 'ok', accessTtl: 300, loginTtl: 300, coreStatus: null });
 
 let control = defaults();
-let stats = { logins: 0, refreshes: 0, logouts: 0, pkceChecks: 0 };
+let stats = { logins: 0, refreshes: 0, logouts: 0, pkceChecks: 0, pagesRead: 0 };
 const codes = new Map<string, { challenge: string; clientId: string }>();
 const refreshTokens = new Set<string>();
 
@@ -136,6 +136,49 @@ async function handleMe(request: IncomingMessage, response: ServerResponse): Pro
   }
 }
 
+/** The analytics service of E1-53: owner only, a photo in, two proposed rows out (one clean, one doubtful). */
+async function handleCatalogPage(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const role = await callerRole(request);
+  if (role === null) {
+    return send(response, 401, { detail: 'invalid_token' });
+  }
+  if (role !== 'owner') {
+    return send(response, 403, { detail: 'owner_only' });
+  }
+  const photo = await readBody(request);
+  if (!['image/jpeg', 'image/png'].includes(request.headers['content-type'] ?? '') || photo.length === 0) {
+    return send(response, 415, { detail: 'photo_type' });
+  }
+  stats.pagesRead += 1;
+  return send(response, 200, {
+    model: 'fake',
+    vat_statement: 'excludes_vat',
+    usage: { input_tokens: 1, output_tokens: 1 },
+    rows: [
+      {
+        supplier_code: 'TB-12',
+        description: 'Tubo PVC 1/2 in',
+        purchase_unit: 'caja',
+        pieces_per_unit: 12,
+        cost_e6: '1234500000',
+        price_text: '$1,234.50',
+        confidence: 'high',
+        issues: [],
+      },
+      {
+        supplier_code: 'CD-9',
+        description: 'Codo PVC 1/2 in',
+        purchase_unit: 'bolsa',
+        pieces_per_unit: 25,
+        cost_e6: null,
+        price_text: null,
+        confidence: 'low',
+        issues: ['price_unreadable', 'low_confidence'],
+      },
+    ],
+  });
+}
+
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', ORIGIN);
   try {
@@ -181,6 +224,9 @@ const server = createServer(async (request, response) => {
     if (url.pathname === '/me') {
       return await handleMe(request, response);
     }
+    if (url.pathname === '/catalog-pages/read' && request.method === 'POST') {
+      return await handleCatalogPage(request, response);
+    }
     const catalogContext = {
       role: await callerRole(request),
       send: (status: number, body?: unknown) => send(response, status, body),
@@ -196,7 +242,7 @@ const server = createServer(async (request, response) => {
       };
       control = reset ? defaults() : { ...control, ...patch };
       if (reset) {
-        stats = { logins: 0, refreshes: 0, logouts: 0, pkceChecks: 0 };
+        stats = { logins: 0, refreshes: 0, logouts: 0, pkceChecks: 0, pagesRead: 0 };
         refreshTokens.clear();
         resetCatalog();
       }

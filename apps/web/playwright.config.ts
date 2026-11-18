@@ -29,6 +29,7 @@ export default defineConfig({
         PANEL_OIDC_CLIENT_ID: 'pos-panel',
         PANEL_BASE_URL: PANEL_URL,
         PANEL_CORE_API_URL: FAKE_URL,
+        PANEL_ANALYTICS_API_URL: FAKE_URL,
         // Throwaway value for tests only.
         PANEL_SESSION_SECRET: 'e2e-only-session-secret-not-used-anywhere-else',
       },

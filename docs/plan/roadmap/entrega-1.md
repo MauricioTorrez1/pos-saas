@@ -575,3 +575,13 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** E1-51 · **Estimación:** 4 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué el proceso principal recalcula los precios del carrito en lugar de usar los de la pantalla? (2) ¿Cómo comparas una caja de 12 contra una pieza suelta sin usar decimales?
+
+### E1-53 · Catálogo de proveedor en papel leído con Claude
+- **Objetivo:** el dueño fotografía las hojas de un catálogo impreso, revisa en el panel las filas que propone Claude (las dudosas en amarillo), aprueba, corrige o elimina cada una y descarga el CSV que importa la lista de precios del proveedor en la caja.
+- **Conceptos:** [Salida estructurada], [Visión con un modelo de lenguaje], [Humano en el ciclo], [Fallar cerrado]
+- **Claude / tú:** Claude escribe el endpoint del servicio de analítica, la pantalla de revisión y las pruebas. Tú pones la llave de la API y lees una hoja real de un proveedor.
+- **Pruebas:** pytest del lector con un cliente falso (filas limpias y dudosas, negativa, respuesta cortada o rota), de la conversión de precios a enteros, del tamaño y tipo de la foto y del acceso solo para el dueño; Vitest de las filas, la aprobación y el CSV; Playwright del flujo de revisión y de que el encargado no entra.
+- **Criterios:** ADR 0069; ninguna fila se guarda en el servidor; ningún precio pasa por `float`; ninguna fila llega al CSV sin aprobar.
+- **Depende de:** F0-21, E1-51 · **Estimación:** 6 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Por qué el modelo copia el precio como texto en lugar de devolver un número? (2) ¿Qué riesgos tiene aprobar en automático las filas que el modelo considera seguras?
