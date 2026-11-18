@@ -571,7 +571,7 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Conceptos:** [Comparar en la unidad base], [No confiar en los precios de la pantalla], [Agrupar en pedidos], [SVG en PDF]
 - **Claude / tú:** Claude escribe la búsqueda, el carrito, la división en pedidos, el PDF y la pantalla. Tú comparas dos listas reales en la tienda y revisas el PDF impreso.
 - **Pruebas:** Vitest para agrupar por producto, marcar solo cuando los precios difieren, diferencia en pesos y porcentaje, un borrador por proveedor con el costo por unidad base, carrito rechazado (vacío, artículo de otro producto, fracción de pieza), PIN del dueño para una cajera, PDF escapado con sus columnas, ahorro y dos gráficas, canales solo para el dueño, y la pantalla; Playwright de importar dos listas, comparar, cambiar de proveedor, sacar el PDF y crear el pedido.
-- **Criterios:** ADR 0068; sin dependencias nuevas; caja 0.2.4.
+- **Criterios:** ADR 0068; sin dependencias nuevas; caja 0.2.5.
 - **Depende de:** E1-51 · **Estimación:** 4 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué el proceso principal recalcula los precios del carrito en lugar de usar los de la pantalla? (2) ¿Cómo comparas una caja de 12 contra una pieza suelta sin usar decimales?
@@ -595,3 +595,13 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** E1-21, E1-23 · **Estimación:** 4 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué el cierre se decide en el proceso principal y no con `beforeunload` en la pantalla? (2) ¿Qué pasa si la pantalla se congela con la caja abierta y alguien cierra la ventana?
+
+### E1-55 · Exportar el catálogo completo
+- **Objetivo:** el dueño saca todo su catálogo, activos y dados de baja, en PDF, Excel o CSV: un renglón por producto con sus códigos, proveedores y su código, costo sin y con IVA, precio con IVA, existencia del libro, margen bruto y margen neto, y al final los totales y una leyenda.
+- **Conceptos:** [Margen bruto y margen neto], [BOM de UTF-8], [Inyección de fórmulas en CSV], [Ceder el ciclo de eventos]
+- **Claude / tú:** Claude escribe el lector, los tres formatos, el canal, la pantalla y las pruebas. Tú abres los tres archivos con el catálogo real de la tienda.
+- **Pruebas:** Vitest del renglón (márgenes con enteros, sin costo, IVA, varios proveedores), del CSV (BOM y escapado), del contenido del `.xlsx`, del escapado del PDF, del canal solo para el dueño con bitácora y de 5,000 productos; Playwright que exporta un CSV desde la caja.
+- **Criterios:** ADR 0071; ningún margen inventado sin costo; ningún `float` en dinero; 5,000 productos sin congelar la caja.
+- **Depende de:** E1-44, E1-45, E1-47 · **Estimación:** 4 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Por qué un CSV para Excel en Windows necesita BOM? (2) ¿Qué es la inyección de fórmulas en CSV y cómo se evita sin romper los números negativos?

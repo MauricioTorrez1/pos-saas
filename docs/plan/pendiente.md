@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 51 de 53 tareas hechas · ⚠️ 2 faltan (9 h)
+✅ 52 de 54 tareas hechas · ⚠️ 2 faltan (9 h)
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -93,6 +93,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-52 · Comparador de proveedores y pedido con PDF** (4 h) _(En revisión)_: el dueño ve qué proveedor da más barato cada producto por unidad, arma un carrito que se vuelve un borrador por proveedor y saca el PDF con el ahorro posible y dos gráficas.
 - ✅ **E1-53 · Catálogo de proveedor en papel leído con Claude** (6 h) _(En revisión)_: el dueño fotografía las hojas de un catálogo impreso, revisa en el panel las filas que propone Claude, aprueba cada una y descarga el CSV para la lista de precios del proveedor en la caja.
 - ✅ **E1-54 · Fondo de caja al entrar y corte al salir** (4 h) _(En revisión)_: al entrar sin caja abierta se pide el fondo inicial (el dueño puede «Solo administrar» sin cobrar); al cerrar la caja con la sesión abierta pregunta si hacer el corte o salir dejándola abierta, y lo anota en la bitácora.
+- ✅ **E1-55 · Exportar el catálogo completo** (4 h) _(En revisión)_: el dueño saca todo su catálogo en PDF, Excel o CSV, con códigos, proveedores, costo, precio, existencia y margen bruto y neto, más los totales y una leyenda.
 
 ## Entrega 2 · Terminal de tarjeta integrada
 
@@ -211,4 +212,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 76 de 169 tareas hechas (321 h de 750 h) · ⚠️ 93 faltan (429 h).
+✅ 77 de 170 tareas hechas (325 h de 754 h) · ⚠️ 93 faltan (429 h).
