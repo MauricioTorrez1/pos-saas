@@ -1,3 +1,4 @@
+import type { CatalogExportApi } from '../shared/catalog-export';
 import type { DashboardApi } from '../shared/dashboard-api';
 import type { MissingItemsApi } from '../shared/missing-items';
 import type { PosApi } from '../shared/pos-api';
@@ -16,5 +17,7 @@ declare global {
     readonly tools: ToolsApi;
     /** Bridge for the log of missing items (E1-49). */
     readonly missing: MissingItemsApi;
+    /** Bridge to save the whole catalog as a file (E1-55). */
+    readonly catalogExport: CatalogExportApi;
   }
 }

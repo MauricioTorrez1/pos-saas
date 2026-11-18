@@ -6,6 +6,7 @@ import type { AuthState, PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
 import { comboLabel, DEFAULT_KEYMAP, type KeyAction, type Keymap, type ToolsApi } from '../shared/register-tools';
+import type { CatalogExportApi } from '../shared/catalog-export';
 import type { MissingItemsApi } from '../shared/missing-items';
 import type { PurchasingApi } from '../shared/supplier-order';
 import { applyAppearance } from './appearance/apply-appearance';
@@ -62,6 +63,8 @@ interface AppProps {
   readonly purchasingApi?: PurchasingApi;
   /** The log of what customers ask for and the store does not carry (E1-49). Without it, the register offers no log. */
   readonly missingApi?: MissingItemsApi;
+  /** Saves the whole catalog as a file (E1-55). Without it, the administration does not offer it. */
+  readonly catalogExportApi?: CatalogExportApi;
   /** The keys, the ticket, the printer and the list of sales. Without it, the register keeps its keys and offers no settings. */
   readonly toolsApi?: ToolsApi;
 }
@@ -76,9 +79,10 @@ interface AppProps {
  * @param props.dashboardApi bridge for the summary of the business, when the register offers it
  * @param props.purchasingApi bridge for the orders to suppliers, when the register offers it
  * @param props.toolsApi bridge for the settings and the list of sales, when the register offers them
+ * @param props.catalogExportApi bridge to export the whole catalog, when the register offers it
  * @returns the screen
  */
-export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi }: AppProps): ReactElement {
+export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi, catalogExportApi }: AppProps): ReactElement {
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [authState, setAuthState] = useState<AuthState | null>(null);
   const [authFailed, setAuthFailed] = useState(false);
@@ -123,6 +127,7 @@ export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingAp
       {...(dashboardApi === undefined ? {} : { dashboardApi })}
       {...(purchasingApi === undefined ? {} : { purchasingApi })}
       {...(missingApi === undefined ? {} : { missingApi })}
+      {...(catalogExportApi === undefined ? {} : { catalogExportApi })}
       {...(toolsApi === undefined ? {} : { toolsApi })}
       user={authState.current}
       appearance={appearance}
@@ -140,6 +145,7 @@ interface RegisterScreenProps {
   readonly purchasingApi?: PurchasingApi;
   /** The log of what customers ask for and the store does not carry (E1-49). Without it, the register offers no log. */
   readonly missingApi?: MissingItemsApi;
+  readonly catalogExportApi?: CatalogExportApi;
   readonly toolsApi?: ToolsApi;
   readonly user: UserSummary;
   readonly appearance: Appearance;
@@ -147,7 +153,7 @@ interface RegisterScreenProps {
   readonly onSignOut: () => void;
 }
 
-function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
+function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, toolsApi, missingApi, catalogExportApi, user, appearance, onAppearanceSaved, onSignOut }: RegisterScreenProps): ReactElement {
   const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
   const [cash, setCash] = useState<CashStatus | null>(null);
@@ -336,7 +342,7 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
         )}
       </footer>
       {isAdministering && !hasPendingSales && (
-        <AdminDialog posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} {...(productApi === undefined ? {} : { productApi })} {...(dashboardApi === undefined ? {} : { onOpenDashboard: openDashboardFromAdmin })} {...(purchasingApi === undefined ? {} : { onOpenSupplierOrder: openOrdersFromAdmin })} onClose={closeAdmin} />
+        <AdminDialog posApi={posApi} {...(pricingApi === undefined ? {} : { pricingApi })} {...(productApi === undefined ? {} : { productApi })} {...(dashboardApi === undefined ? {} : { onOpenDashboard: openDashboardFromAdmin })} {...(purchasingApi === undefined ? {} : { onOpenSupplierOrder: openOrdersFromAdmin })} {...(catalogExportApi === undefined ? {} : { catalogExportApi })} onClose={closeAdmin} />
       )}
       {isViewingDashboard && !hasPendingSales && dashboardApi !== undefined && <DashboardDialog api={dashboardApi} user={user} onClose={closeDashboard} {...(toolsApi === undefined ? {} : { searchSales: (text: string) => toolsApi.listRecentSales(text) })} />}
       {ordering !== null && !hasPendingSales && purchasingApi !== undefined && <SupplierOrderDialog api={purchasingApi} isOwner={isOwner} onClose={closeOrders} />}

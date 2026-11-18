@@ -43,6 +43,9 @@ import { ProductCatalog } from './local-store/product-catalog';
 import { PriceChangeService } from './pricing/price-change-service';
 import { ProductReader } from './products/product-reader';
 import { electronExportPorts } from './purchasing/electron-export-ports';
+import { CatalogExporter } from './catalog-export/catalog-exporter';
+import { CatalogReader } from './catalog-export/catalog-reader';
+import { printLandscapePdf } from './catalog-export/landscape-pdf';
 import { OrderExporter } from './purchasing/order-exporter';
 import { PurchaseOrderService } from './purchasing/purchase-order-service';
 import { SupplierService } from './purchasing/supplier-service';
@@ -222,6 +225,14 @@ async function start(): Promise<void> {
       log: new MissingItemsLog(store, LOCAL_TENANT_ID, new AuditLog(store, LOCAL_TENANT_ID)),
       exporter: { pickSavePath, renderPdf: printHtmlToPdf, businessName: () => appearance.read().businessName || UNNAMED_BUSINESS },
     },
+    catalogExporter: new CatalogExporter({
+      reader: new CatalogReader(store, LOCAL_TENANT_ID),
+      gate: new OwnerGate(auth, new AuditLog(store, LOCAL_TENANT_ID)),
+      audit: new AuditLog(store, LOCAL_TENANT_ID),
+      pickSavePath,
+      renderPdf: printLandscapePdf,
+      businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
+    }),
   });
   await openMainWindow(rendererEntry, PRELOAD_PATH);
 }
