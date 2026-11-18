@@ -277,13 +277,14 @@ describe('the product panel (E1-43)', () => {
     expect((screen.getByRole('combobox', { name: 'Unidad de medida', hidden: true }) as HTMLSelectElement).value).toBe('piece');
   });
 
-  it('gives a product up by unticking it, and explains a product that is already given up', async () => {
+  it('gives a product up with the red button, and explains a product that is already given up', async () => {
     const updateProduct = vi.fn<ProductAdminApi['updateProduct']>(() => Promise.resolve<UpdateProductResult>({ status: 'updated', product: { ...DETAIL, revision: 4, isActive: false } }));
     await renderApp(posApiWith(OWNER), productApiWith({ updateProduct }));
     await openPanel();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /A la venta/, hidden: true }));
-    pressF2();
+    expect(screen.queryByRole('checkbox', { name: /A la venta/, hidden: true })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Dar de baja', hidden: true }));
+    fireEvent.click(await screen.findByRole('button', { name: /Sí, dar de baja/, hidden: true }));
 
     await waitFor(() => expect(updateProduct).toHaveBeenCalledWith(expect.objectContaining({ isActive: false })));
     expect(await screen.findByText(/Este producto está dado de baja: no se vende ni aparece en la venta/)).toBeDefined();

@@ -13,7 +13,9 @@ import { formatQuantity, formatSaleMoment, formatTaxLabel, unitLabel } from '../
 import { Field, Message, useAction } from '../ui/form-parts';
 import { ModalDialog } from '../ui/ModalDialog';
 import { useWindowKeys } from '../ui/use-window-keys';
+import type { PurchasingApi } from '../../shared/supplier-order';
 import { ProductFields } from './ProductFields';
+import { ProductSuppliers } from './ProductSuppliers';
 import { StockAdjustDialog } from './StockAdjustDialog';
 import { formValuesOf, readEditForm, type ProductFormProblems, type ProductFormValues } from './product-form';
 
@@ -65,6 +67,8 @@ interface ProductPanelDialogProps {
   readonly pricingApi?: PricingApi;
   /** The owner needs no PIN, and a cashier has to type the one of an owner to save. */
   readonly isOwner: boolean;
+  /** The suppliers and their orders (E1-50). Without it, the panel shows no suppliers. */
+  readonly purchasingApi?: PurchasingApi;
   /** The product to open. Without it, the panel asks to find one first. */
   readonly initialProduct: { readonly id: string } | null;
   readonly onClose: () => void;
@@ -85,7 +89,7 @@ interface ProductPanelDialogProps {
  * @param props.onClose called when the person closes the panel
  * @returns the dialog
  */
-export function ProductPanelDialog({ posApi, productApi, pricingApi, isOwner, initialProduct, onClose }: ProductPanelDialogProps): ReactElement {
+export function ProductPanelDialog({ posApi, productApi, pricingApi, purchasingApi, isOwner, initialProduct, onClose }: ProductPanelDialogProps): ReactElement {
   const [product, setProduct] = useState<ProductPanelDetail | null>(null);
   const [values, setValues] = useState<ProductFormValues | null>(null);
   const [problems, setProblems] = useState<ProductFormProblems>({});
@@ -258,7 +262,7 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, isOwner, in
         <>
           {!product.isActive && (
             <p className="notice" role="status">
-              Este producto está dado de baja: no se vende ni aparece en la venta. Márcalo «A la venta» y guarda para activarlo otra vez.
+              Este producto está dado de baja: no se vende ni aparece en la venta. Usa «Reactivar producto» para venderlo otra vez.
             </p>
           )}
           <dl className="product-summary" aria-label="Resumen del producto">
@@ -313,10 +317,12 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, isOwner, in
             showStock={false}
             unitLockedReason={product.movementCount > 0 ? 'No se puede cambiar: el producto ya tiene movimientos de existencia.' : undefined}
             currentTaxRate={product.taxRate}
-            activeLabel={product.isActive ? 'A la venta (quita la marca para darlo de baja)' : 'A la venta (márcalo para activarlo otra vez)'}
             currentPrice={unitCostText(product.unitPriceE4 * 100)}
           />
           {!isOwner && <Field label="PIN del dueño" numeric="integer" value={pin} onChange={setPin} type="password" maxLength={8} />}
+          {purchasingApi !== undefined && (
+            <ProductSuppliers key={product.id} api={purchasingApi} productId={product.id} unit={product.unit} barcode={product.barcodes[0] ?? null} isOwner={isOwner} ownerPin={pin} />
+          )}
         </>
       )}
       {note !== null && (

@@ -124,6 +124,22 @@ describe('the list of sales', () => {
     expect(history.list('2').map((sale) => sale.folio)).toEqual(['T1-000002']);
     expect(history.list('999')).toEqual([]);
   });
+
+  it('finds a sale by the name or the code of a product sold, and says which products matched (E1-50)', () => {
+    store.transaction((connection) => {
+      connection.prepare('INSERT INTO product_barcode (tenant_id, code, product_id) VALUES (?, ?, ?)').run(TENANT, '7501031311309', hammerId);
+    });
+    const sold = sellHammer(undefined, 10_000);
+    const history = new SalesHistory(store, TENANT, new ProductCatalog(store, TENANT));
+
+    expect(history.list('martillo')).toMatchObject([{ saleId: sold, folio: 'T1-000001', matchedProducts: ['Martillo'] }]);
+    expect(history.list('7501031311309')).toMatchObject([{ saleId: sold, matchedProducts: ['Martillo'] }]);
+    expect(history.list('T1-000001')).toMatchObject([{ saleId: sold, matchedProducts: [] }]);
+    expect(history.list('serrucho')).toEqual([]);
+    // A % or a _ is only text to look for, never a wildcard that matches every sale.
+    expect(history.list('%')).toEqual([]);
+    expect(history.list('_')).toEqual([]);
+  });
 });
 
 describe('the settings the owner keeps', () => {

@@ -13,6 +13,7 @@ import {
   type MissingStatus,
 } from '../../shared/missing-items';
 import { BarChart, type Bar } from '../dashboard/BarChart';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Field, Message, SelectField, useAction } from '../ui/form-parts';
 import { Modal } from '../ui/Modal';
 
@@ -55,6 +56,9 @@ export function MissingItemsDialog({ api, isOwner, initialDescription = '', onCl
   const [period, setPeriod] = useState<MissingPeriod>(30);
   const [report, setReport] = useState<MissingItemsReport | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  // The item whose notes are being edited, with the text typed so far.
+  const [editing, setEditing] = useState<{ readonly key: string; readonly notes: string } | null>(null);
+  const [removing, setRemoving] = useState<MissingItemGroup | null>(null);
   const { isBusy, message, setMessage, run } = useAction();
 
   const refresh = useCallback(() => {
@@ -81,6 +85,31 @@ export function MissingItemsDialog({ api, isOwner, initialDescription = '', onCl
   const decide = (group: MissingItemGroup, status: MissingStatus): void => {
     run(async () => {
       await api.resolve({ key: group.key, status });
+      refresh();
+    });
+  };
+
+  const saveNotes = (): void => {
+    if (editing === null) {
+      return;
+    }
+    run(async () => {
+      const result = await api.editNotes({ key: editing.key, notes: editing.notes.trim() === '' ? null : editing.notes });
+      if (result.status === 'invalid') {
+        setMessage(result.message);
+        return;
+      }
+      setEditing(null);
+      setInfo('Notas guardadas.');
+      refresh();
+    });
+  };
+
+  const remove = (group: MissingItemGroup): void => {
+    setRemoving(null);
+    run(async () => {
+      await api.remove(group.key);
+      setInfo(`Se eliminó «${group.description}» de la bitácora.`);
       refresh();
     });
   };
@@ -162,26 +191,40 @@ export function MissingItemsDialog({ api, isOwner, initialDescription = '', onCl
                         <span className="missing-meter" aria-hidden="true">
                           <span style={{ width: `${String(Math.round((group.timesAsked / peak) * 100))}%` }} />
                         </span>
+                        {editing?.key === group.key && (
+                          <span className="missing-notes-editor">
+                            <Field label={`Notas de ${group.description}`} value={editing.notes} onChange={(notes) => setEditing({ key: group.key, notes })} autoFocus maxLength={MAX_MISSING_NOTES} onEnter={saveNotes} />
+                            <button type="button" className="button button-primary" disabled={isBusy} onClick={saveNotes}>
+                              Guardar notas
+                            </button>
+                            <button type="button" className="button" disabled={isBusy} onClick={() => setEditing(null)}>
+                              Cancelar
+                            </button>
+                          </span>
+                        )}
                       </div>
-                      {isOwner && (
-                        <div className="missing-row-actions">
-                          {group.status !== 'added' && (
-                            <button type="button" className="button" disabled={isBusy} onClick={() => decide(group, 'added')}>
-                              Ya lo vendemos
-                            </button>
-                          )}
-                          {group.status !== 'dismissed' && (
-                            <button type="button" className="button" disabled={isBusy} onClick={() => decide(group, 'dismissed')}>
-                              Descartar
-                            </button>
-                          )}
-                          {group.status !== 'pending' && (
-                            <button type="button" className="button" disabled={isBusy} onClick={() => decide(group, 'pending')}>
-                              Volver a pendiente
-                            </button>
-                          )}
-                        </div>
-                      )}
+                      <div className="missing-row-actions">
+                        {editing?.key !== group.key && (
+                          <button type="button" className="button" disabled={isBusy} onClick={() => setEditing({ key: group.key, notes: group.notes.join('; ') })}>
+                            Editar notas
+                          </button>
+                        )}
+                        {isOwner && group.status !== 'added' && (
+                          <button type="button" className="button" disabled={isBusy} onClick={() => decide(group, 'added')}>
+                            Ya lo vendemos
+                          </button>
+                        )}
+                        {isOwner && group.status !== 'pending' && (
+                          <button type="button" className="button" disabled={isBusy} onClick={() => decide(group, 'pending')}>
+                            Volver a pendiente
+                          </button>
+                        )}
+                        {isOwner && (
+                          <button type="button" className="button button-danger" disabled={isBusy} onClick={() => setRemoving(group)}>
+                            Eliminar
+                          </button>
+                        )}
+                      </div>
                     </li>
                   ))}
                 </ol>
@@ -192,6 +235,11 @@ export function MissingItemsDialog({ api, isOwner, initialDescription = '', onCl
           </>
         )}
       </section>
+      {removing !== null && (
+        <ConfirmDialog title={`¿Eliminar «${removing.description}»?`} confirmLabel="Sí, eliminar" isDangerous onConfirm={() => remove(removing)} onCancel={() => setRemoving(null)}>
+          <p>Se borran las {removing.timesAsked} veces que lo anotaron. Úsalo para lo que se anotó por error; si ya lo vendes, mejor marca «Ya lo vendemos».</p>
+        </ConfirmDialog>
+      )}
     </Modal>
   );
 }

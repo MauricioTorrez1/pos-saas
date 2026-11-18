@@ -102,7 +102,23 @@ describe('MissingItemsLog', () => {
     expect(entries.count).toBe(2);
   });
 
-  it('never changes a request once written', () => {
+  it('replaces the notes of an item and deletes one written by mistake, each in the audit log', () => {
+    ask('Cinta de aislar', 2, null, 'negra');
+    ask('Cinta de aislar', 1, null, 'roja');
+
+    expect(log.editNotes('cinta de aislar', '3M, 19 mm', OWNER.id)).toEqual({ status: 'recorded', timesAsked: 2 });
+    expect(log.report(30).groups[0]).toMatchObject({ timesAsked: 2, notes: ['3M, 19 mm'] });
+    expect(log.editNotes('no existe', 'x', OWNER.id).status).toBe('invalid');
+
+    log.resolve('cinta de aislar', 'added', OWNER.id);
+    log.remove('cinta de aislar', OWNER.id);
+
+    expect(log.report(0).groups).toEqual([]);
+    const actions = store.prepare("SELECT action FROM audit_log WHERE action LIKE 'missing_item.%' ORDER BY rowid").all() as { action: string }[];
+    expect(actions.map((row) => row.action)).toEqual(['missing_item.notes_edited', 'missing_item.resolved', 'missing_item.deleted']);
+  });
+
+  it('never changes what was asked for once written, only its notes', () => {
     ask('Cinta de aislar');
 
     expect(() => store.prepare("UPDATE missing_item_request SET description = 'otra cosa'").run()).toThrow(/never changes/u);
@@ -162,6 +178,8 @@ describe('the channels of the log', () => {
     expect(call(MISSING_CHANNELS.record, { description: 'Bisagra de 3"', quantity: 4, notes: null }, CASHIER)).toEqual({ status: 'recorded', timesAsked: 1 });
     expect((call(MISSING_CHANNELS.report, 30, CASHIER) as MissingItemsReport).totalRequests).toBe(1);
     expect(() => call(MISSING_CHANNELS.resolve, { key: 'bisagra de 3"', status: 'added' }, CASHIER)).toThrow(/owner/u);
+    expect(() => call(MISSING_CHANNELS.remove, 'bisagra de 3"', CASHIER)).toThrow(/owner/u);
+    expect(call(MISSING_CHANNELS.editNotes, { key: 'bisagra de 3"', notes: 'acero inoxidable' }, CASHIER)).toEqual({ status: 'recorded', timesAsked: 1 });
     call(MISSING_CHANNELS.resolve, { key: 'bisagra de 3"', status: 'dismissed' }, OWNER);
     expect((call(MISSING_CHANNELS.report, 30, OWNER) as MissingItemsReport).groups[0]?.status).toBe('dismissed');
   });

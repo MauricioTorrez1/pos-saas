@@ -102,6 +102,39 @@ function apiWith(answer: (request: DashboardRequest) => DashboardResult, exportA
 
 const ok = (summary: DashboardSummary): DashboardResult => ({ status: 'ok', summary });
 
+describe('the search bar of «Resumen» (E1-50)', () => {
+  it('finds sales by ticket, product or code and shows which products matched', async () => {
+    const { api } = apiWith(() => ok(summaryOf()));
+    const searchSales = vi.fn((text: string) =>
+      Promise.resolve(
+        text === 'cinta'
+          ? [{ saleId: 'sale-9', folio: 'T1-000009', completedAt: '2026-11-15T18:00:00.000Z', totalCents: 4_500, refundedCents: 0, cashierName: 'Ana', lineCount: 3, matchedProducts: ['Cinta de aislar 3M'] }]
+          : [],
+      ),
+    );
+    render(<DashboardDialog api={api} user={OWNER} onClose={() => undefined} searchSales={searchSales} />);
+    await screen.findByLabelText('Indicadores del periodo');
+
+    fireEvent.change(screen.getByLabelText('Buscar ticket, producto o código'), { target: { value: 'cinta' } });
+    const results = await screen.findByRole('table', { name: 'Ventas encontradas', hidden: true });
+    expect(results.textContent).toContain('T1-000009');
+    expect(results.textContent).toContain('Cinta de aislar 3M');
+    expect(results.textContent).toContain('$45.00');
+
+    fireEvent.change(screen.getByLabelText('Buscar ticket, producto o código'), { target: { value: 'serrucho' } });
+    expect(await screen.findByText('Ninguna venta tiene ese ticket, producto o código.')).toBeTruthy();
+    expect(searchSales).toHaveBeenLastCalledWith('serrucho');
+  });
+
+  it('is not offered to a cashier who only sees the shift', async () => {
+    const { api } = apiWith(() => ok(summaryOf({ scope: 'shift' })));
+    render(<DashboardDialog api={api} user={CASHIER} onClose={() => undefined} searchSales={() => Promise.resolve([])} />);
+    await screen.findByLabelText('Indicadores del periodo');
+
+    expect(screen.queryByLabelText('Buscar ticket, producto o código')).toBeNull();
+  });
+});
+
 describe('the summary for the owner', () => {
   it('shows the indicators with their comparison, costs and the note about products without a cost', async () => {
     const { api } = apiWith(() => ok(summaryOf()));
