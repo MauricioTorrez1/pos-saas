@@ -1,6 +1,6 @@
 # Owner panel
 
-Web panel of the business, built with Next.js (App Router), React, and TypeScript in strict mode. For now the owner signs in through Keycloak, sees the business of the token and the role the core returns, and the panel proves the chain by calling `GET /me` on the core. Catalog screens arrive in F0-21. The decisions are in [ADR 0044](../../docs/adr/0044-panel-next-con-login-oidc.md).
+Web panel of the business, built with Next.js (App Router), React, and TypeScript in strict mode. The owner signs in through Keycloak, sees the business of the token and the role the core returns, and manages the catalog: search, create, edit, import from CSV and change prices in bulk. The decisions are in [ADR 0044](../../docs/adr/0044-panel-next-con-login-oidc.md) (sign-in) and [ADR 0064](../../docs/adr/0064-pantallas-de-catalogo-del-panel.md) (catalog).
 
 ## Run it
 1. Start the stack with the realm: `docker compose --profile core up -d` (see [Compose](../../infra/compose/README.md)).
@@ -20,14 +20,25 @@ Web panel of the business, built with Next.js (App Router), React, and TypeScrip
 
 The tokens live only inside an encrypted (AES-256-GCM), `HttpOnly`, `SameSite=Lax` cookie, split in chunks when it is large. Scripts cannot read it, and nothing goes to `localStorage`.
 
+## Catalog screens
+| Route | Who | What it does | Core endpoint |
+| --- | --- | --- | --- |
+| `/catalog?q=&page=` | owner, manager | Searches by name or exact code, 50 products per page | `GET /products` |
+| `/catalog/new` | owner, manager | Creates a product; only the owner sees the price field | `POST /products` with `Idempotency-Key` |
+| `/catalog/{id}` | owner, manager | Edits a product and deletes it; only the owner changes its price | `PATCH /products/{id}`, `PATCH /products/{id}/price`, `DELETE /products/{id}` |
+| `/catalog/import` | owner, manager | Checks a CSV file (`dryRun`), shows the report, then loads it | `POST /imports/catalog` |
+| `/catalog/price-changes` | owner | Bulk price change by percentage with a preview; a stale preview (409) shows a fresh one | `POST /price-changes` |
+
+Pages read with Server Components and write with Server Actions, so the access token never reaches the browser. Prices and quantities stay as text (`"12.3450"`) from the core to the screen; the panel never turns them into a `number`.
+
 ## Layout
 | Path | Contents |
 | --- | --- |
-| `src/app/` | Pages and Route Handlers (`auth/login`, `auth/callback`, `auth/logout`) |
+| `src/app/` | Pages and Route Handlers (`auth/login`, `auth/callback`, `auth/logout`), and the catalog pages and Server Actions (`catalog/`) |
 | `src/proxy.ts` | Session check, role check, and token renewal for every protected route |
-| `src/lib/` | Settings, session sealing, cookies, OIDC calls, identity of the token, route rules, and the core client |
-| `src/components/` | Small presentational components |
-| `e2e/` | Playwright tests and the fake identity provider they run against |
+| `src/lib/` | Settings, session sealing, cookies, OIDC calls, identity of the token, route rules, and the core client; `catalog/` holds the catalog client, form checks and decimal text helpers |
+| `src/components/` | Small presentational components; `catalog/` holds the table, forms, import and price change panels |
+| `e2e/` | Playwright tests, the fake identity provider and the in-memory fake core (`fake-core.ts`) they run against |
 
 ## Tests
 ```bash
@@ -38,4 +49,4 @@ pnpm --filter @pos-saas/web test:e2e   # Playwright: builds the panel and signs 
 
 The first time, install the browser with `pnpm --filter @pos-saas/web exec playwright install chromium`.
 
-The Playwright tests do not use Keycloak: they run against `e2e/fake-oidc.ts`, a small server that speaks the OIDC flow (and checks the PKCE verifier like Keycloak does) and also answers `/me`. It keeps CI fast and free of a one-minute container start. The real realm is covered by the Testcontainers tests of the core and by the manual check above.
+The Playwright tests do not use Keycloak: they run against `e2e/fake-oidc.ts`, a small server that speaks the OIDC flow (and checks the PKCE verifier like Keycloak does), answers `/me`, and serves the catalog endpoints from memory (`e2e/fake-core.ts`). A change to a catalog contract of the core must update `fake-core.ts` in the same PR. It keeps CI fast and free of a one-minute container start. The real realm is covered by the Testcontainers tests of the core and by the manual check above.

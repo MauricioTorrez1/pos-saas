@@ -66,3 +66,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0061](0061-rediseno-de-la-caja-y-herramientas-del-dueno.md) | Rediseño de la caja y herramientas del dueño | Aceptada |
 | [0062](0062-importacion-de-catalogo-y-cambio-masivo-de-precios.md) | Importación de catálogo y cambio masivo de precios en el núcleo | Aceptada |
 | [0063](0063-bitacora-de-faltantes-y-letra-del-ticket.md) | Bitácora de faltantes con PDF y gráficas, y fuente y tamaño de letra del ticket | Aceptada |
+| [0064](0064-pantallas-de-catalogo-del-panel.md) | Pantallas de catálogo del panel: Server Components y Server Actions, paginación por desplazamiento, importación en dos pasos y cambio masivo con vista previa | Aceptada |

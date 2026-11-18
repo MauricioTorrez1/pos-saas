@@ -6,10 +6,12 @@ interface RouteRule {
 }
 
 /**
- * Routes that need a role. A path that matches no rule needs only a valid session.
- * Catalog and settings arrive in F0-21; the rules are here so they are born protected.
+ * Routes that need a role, the most specific first. A path that matches no rule needs only a valid session.
+ * They mirror the permission table of the core (ADR 0042): the manager edits the catalog and imports it, only the
+ * owner changes prices in bulk. Hiding a screen is a courtesy; the core still answers 403.
  */
 const ROUTE_RULES: readonly RouteRule[] = [
+  { prefix: '/catalog/price-changes', roles: ['owner'] },
   { prefix: '/catalog', roles: ['owner', 'manager'] },
   { prefix: '/settings', roles: ['owner'] },
 ];
