@@ -52,6 +52,9 @@ import { ProductService } from './products/product-service';
 import { seedSampleCatalogIfEmpty } from './local-store/sample-catalog';
 import { SaleStore } from './local-store/sale-store';
 import { openMainWindow } from './main-window';
+import { ExitGuard } from './exit/exit-guard';
+import { guardWindowClose } from './exit/exit-ipc';
+import { EXIT_CHANNELS } from '../shared/exit-api';
 import { startSyncIfConfigured } from './sync/start-sync';
 
 const PRELOAD_PATH = join(import.meta.dirname, '../preload/index.cjs');
@@ -149,7 +152,7 @@ async function start(): Promise<void> {
   const appearance = new AppearanceStore(store, LOCAL_TENANT_ID);
   const auth = new AuthService(new UserStore(store, LOCAL_TENANT_ID));
   const cashStore = new CashSessionStore(store, LOCAL_TENANT_ID);
-  const cash = new CashService(cashStore, auth);
+  const cash = new CashService(cashStore, auth, new AuditLog(store, LOCAL_TENANT_ID));
   const admin = new AdminActions({
     store,
     importer: new CatalogImporter(store, LOCAL_TENANT_ID, new StockStore(store, LOCAL_TENANT_ID)),
@@ -230,7 +233,22 @@ async function start(): Promise<void> {
       exporter: { pickSavePath, renderPdf: printHtmlToPdf, businessName: () => appearance.read().businessName || UNNAMED_BUSINESS },
     },
   });
-  await openMainWindow(rendererEntry, PRELOAD_PATH);
+  const registerWindow = await openMainWindow(rendererEntry, PRELOAD_PATH);
+  // Closing with the cash open asks first, and the main process decides it (E1-54, ADR 0070).
+  guardWindowClose(
+    registerWindow,
+    new ExitGuard({
+      openSession: () => cashStore.findOpen(),
+      currentUserId: () => auth.currentUser()?.id ?? null,
+      audit: new AuditLog(store, LOCAL_TENANT_ID),
+      askScreen: () => {
+        registerWindow.show();
+        registerWindow.focus();
+        registerWindow.webContents.send(EXIT_CHANNELS.requested);
+      },
+      closeWindow: () => registerWindow.close(),
+    }),
+  );
 }
 
 start().catch((error: unknown) => {

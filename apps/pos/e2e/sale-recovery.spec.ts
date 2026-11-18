@@ -9,6 +9,7 @@ import {
   removeTemporaryUserData,
   signInWindow,
   testSalePaths,
+  quitRegister,
 } from './register-harness.ts';
 
 /** The sample products the register starts with. Written out here so a change in the list breaks these tests. */
@@ -135,7 +136,7 @@ test('keeps the sale cancelled, and does not ask again after another restart', a
   await expect(question(page)).toBeVisible();
   await page.keyboard.press('F4');
   await expect(question(page)).toHaveCount(0);
-  await reopened.close();
+  await quitRegister(reopened);
 
   const thirdOpening = await launch();
   const thirdPage = await signInWindow(thirdOpening);

@@ -9,6 +9,8 @@ import { uuidV7 } from '../uuid-v7';
 /** A session that is open, as the database has it. */
 export interface OpenSessionRow {
   readonly id: string;
+  /** Who opened it, by id. */
+  readonly openedById: string;
   readonly openedByName: string;
   readonly openedAt: string;
   readonly openingFloatCents: number;
@@ -27,6 +29,7 @@ interface SessionRowSql {
   readonly id: string;
   readonly opened_at: string;
   readonly opening_float_cents: number;
+  readonly opened_by: string;
   readonly opened_by_name: string;
 }
 
@@ -76,7 +79,7 @@ export class CashSessionStore {
     this.#tenantId = tenantId;
     this.#outbox = new SyncOutbox(store, tenantId);
     this.#findOpen = store.prepare(`
-      SELECT s.id, s.opened_at, s.opening_float_cents, u.name AS opened_by_name
+      SELECT s.id, s.opened_at, s.opening_float_cents, s.opened_by, u.name AS opened_by_name
       FROM cash_session s JOIN app_user u ON u.id = s.opened_by
       WHERE s.tenant_id = ? AND s.closed_at IS NULL
     `);
@@ -134,7 +137,7 @@ export class CashSessionStore {
     const row = this.#findOpen.get(this.#tenantId) as unknown as SessionRowSql | undefined;
     return row === undefined
       ? null
-      : { id: row.id, openedByName: row.opened_by_name, openedAt: row.opened_at, openingFloatCents: row.opening_float_cents };
+      : { id: row.id, openedById: row.opened_by, openedByName: row.opened_by_name, openedAt: row.opened_at, openingFloatCents: row.opening_float_cents };
   }
 
   /**
@@ -142,15 +145,17 @@ export class CashSessionStore {
    *
    * @param userId who opens it
    * @param openingFloatCents the cash they put in the drawer to start
+   * @param alongWith work that must commit or roll back with the opening, such as its line in the audit log
    * @returns the id of the new session
    * @throws Error from SQLite if a session is already open, because there is only one at a time
    */
-  open(userId: string, openingFloatCents: number): string {
+  open(userId: string, openingFloatCents: number, alongWith?: (sessionId: string) => void): string {
     const id = uuidV7();
     this.#store.transaction(() => {
       const openedAt = new Date().toISOString();
       this.#insertSession.run(id, this.#tenantId, userId, openedAt, openingFloatCents);
       this.#outbox.enqueue('cash_session.opened', { sessionId: id, openedBy: userId, openingFloatCents }, openedAt);
+      alongWith?.(id);
     });
     return id;
   }
