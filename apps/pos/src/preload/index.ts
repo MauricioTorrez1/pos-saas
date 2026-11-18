@@ -7,6 +7,7 @@ import { IPC_CHANNELS, type PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
 import { TOOLS_CHANNELS, type ToolsApi } from '../shared/register-tools';
+import { SUPPLIER_CATALOG_CHANNELS, type SupplierCatalogApi } from '../shared/supplier-catalog';
 import { PURCHASING_CHANNELS, type PurchasingApi } from '../shared/supplier-order';
 
 const posApi: PosApi & PricingApi & ProductAdminApi & DashboardApi = {
@@ -95,6 +96,14 @@ const toolsApi: ToolsApi = {
   recordSaleCancelled: (request) => ipcRenderer.invoke(TOOLS_CHANNELS.recordSaleCancelled, request),
 };
 
+const supplierCatalogApi: SupplierCatalogApi = {
+  pickPriceList: (supplierId) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.pickPriceList, supplierId),
+  importPriceList: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.importPriceList, request),
+  priceListSummary: (supplierId) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.priceListSummary, supplierId),
+  listCatalogItems: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.listCatalogItems, request),
+  linkCatalogItem: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.linkCatalogItem, request),
+};
+
 /** Closing the register with the cash still open (E1-54). The screen only hears about it and answers; main decides. */
 const exitApi: ExitApi = {
   onExitRequested: (listener) => {
@@ -108,6 +117,7 @@ const exitApi: ExitApi = {
 };
 
 contextBridge.exposeInMainWorld('pos', posApi);
+contextBridge.exposeInMainWorld('supplierCatalog', supplierCatalogApi);
 contextBridge.exposeInMainWorld('exit', exitApi);
 contextBridge.exposeInMainWorld('tools', toolsApi);
 contextBridge.exposeInMainWorld('purchasing', purchasingApi);

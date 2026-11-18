@@ -127,6 +127,17 @@ Money is kept in whole cents and costs in millionths of a peso, with no floating
 | Who | The owner. A cashier sees everything and types the PIN of an owner to save, send, discard, export or set a minimum. Every refusal is written in the audit log |
 | One transaction | Each change, its audit entry and, when it travels, its operation in `sync_outbox` (`supplier.upserted`, `supplier_product.upserted`, `purchase_order.sent`) are written together or not at all. Drafts and minimums do not travel. The core receives them in F2-11 and F2-12 |
 
+
+## Supplier price lists
+In the suppliers, the owner picks a supplier and presses **F5** "Lista de precios" ([ADR 0068](../../docs/adr/0068-listas-de-precios-de-proveedores-y-comparador.md)). Cashiers do not see it, and its channels refuse them.
+
+| Rule | How it works |
+| --- | --- |
+| File | Excel `.xlsx` or CSV, up to 20 MB and 20,000 items. The header is found in the first 15 rows. The CSV of a paper catalog (E1-53, `supplier_code,description,purchase_unit,pieces_per_unit,cost`) is recognized without choosing columns. |
+| Columns | Code, description and cost are required; presentation, pieces per presentation and barcode are optional. The choice is remembered per supplier. |
+| Money | Costs in pesos with up to 6 decimals ("$1,234.50" works). The screen asks whether they include VAT (default no); if yes, 16 % is taken out. The cost per base unit is the cost of the presentation divided by its pieces, with integers. |
+| Replace | Importing replaces the supplier's whole list in one transaction and keeps the date of the list. A file with no readable row keeps the previous list. |
+| Links | By the code the product already has with that supplier, then by barcode. The rest are "Sin ligar" and the owner links each one once; the next list remembers it. Imports and links are in the audit log. |
 ## Settings, sales list and price for one sale
 Since [ADR 0061](../../docs/adr/0061-rediseno-de-la-caja-y-herramientas-del-dueno.md) the register has three more things on the sale screen. The keys below are the defaults; the owner changes them in the settings.
 

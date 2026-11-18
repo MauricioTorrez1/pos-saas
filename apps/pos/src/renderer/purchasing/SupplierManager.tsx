@@ -2,9 +2,11 @@ import { useEffect, useState, type ReactElement } from 'react';
 
 import { readUnitCost, unitCostText } from '../../shared/product-admin';
 import { MAX_CODES_PER_SUPPLIER_PRODUCT, type OrderCandidate, type PurchasingApi, type Supplier, type SupplierCode, type SupplierProductLink } from '../../shared/supplier-order';
+import type { SupplierCatalogApi } from '../../shared/supplier-catalog';
 import { CheckField, Field, Message, useAction } from '../ui/form-parts';
 import { useWindowKeys } from '../ui/use-window-keys';
 import { describeRefusal, isOwnerRefusal } from './order-form';
+import { PriceListScreen } from './PriceListScreen';
 
 /** What is typed in the boxes of one code. */
 interface CodeBoxes {
@@ -15,6 +17,8 @@ interface CodeBoxes {
 
 interface SupplierManagerProps {
   readonly api: PurchasingApi;
+  /** The price lists of the suppliers, which only the owner opens. */
+  readonly catalogApi?: SupplierCatalogApi;
   /** The owner needs no PIN, and a cashier has to type the one of an owner to save. */
   readonly isOwner: boolean;
   /** Called when the suppliers changed, so the screen that opened this one reads them again. */
@@ -22,7 +26,7 @@ interface SupplierManagerProps {
   readonly onBack: () => void;
 }
 
-type View = { readonly kind: 'suppliers' } | { readonly kind: 'codes'; readonly supplier: Supplier };
+type View = { readonly kind: 'suppliers' } | { readonly kind: 'codes'; readonly supplier: Supplier } | { readonly kind: 'prices'; readonly supplier: Supplier };
 
 /**
  * The suppliers of the business and the codes they give to the products (E1-44): add, edit and give up a supplier (it is
@@ -30,24 +34,39 @@ type View = { readonly kind: 'suppliers' } | { readonly kind: 'codes'; readonly 
  * with the cost of its list and how it sells it. Saving needs the owner, or the PIN of an owner for a cashier.
  *
  * @param props.api bridge of the purchase order
+ * @param props.catalogApi bridge of the supplier price lists, when the register offers it
  * @param props.isOwner whether the person at the register is the owner
  * @param props.onChanged called after a supplier was saved
  * @param props.onBack called to go back to the orders
  * @returns the screen, to put inside a dialog
  */
-export function SupplierManager({ api, isOwner, onChanged, onBack }: SupplierManagerProps): ReactElement {
+export function SupplierManager({ api, catalogApi, isOwner, onChanged, onBack }: SupplierManagerProps): ReactElement {
   const [view, setView] = useState<View>({ kind: 'suppliers' });
+  if (view.kind === 'prices' && catalogApi !== undefined) {
+    return <PriceListScreen api={api} catalogApi={catalogApi} supplier={view.supplier} onBack={() => setView({ kind: 'suppliers' })} />;
+  }
   if (view.kind === 'codes') {
     return <SupplierCodes api={api} isOwner={isOwner} supplier={view.supplier} onBack={() => setView({ kind: 'suppliers' })} />;
   }
-  return <SupplierList api={api} isOwner={isOwner} onChanged={onChanged} onBack={onBack} onCodes={(supplier) => setView({ kind: 'codes', supplier })} />;
+  return (
+    <SupplierList
+      api={api}
+      isOwner={isOwner}
+      onChanged={onChanged}
+      onBack={onBack}
+      onCodes={(supplier) => setView({ kind: 'codes', supplier })}
+      {...(isOwner && catalogApi !== undefined ? { onPrices: (supplier: Supplier) => setView({ kind: 'prices', supplier }) } : {})}
+    />
+  );
 }
 
 interface SupplierListProps extends SupplierManagerProps {
   readonly onCodes: (supplier: Supplier) => void;
+  /** Opens the price list of a supplier; absent for a cashier. */
+  readonly onPrices?: (supplier: Supplier) => void;
 }
 
-function SupplierList({ api, isOwner, onChanged, onBack, onCodes }: SupplierListProps): ReactElement {
+function SupplierList({ api, isOwner, onChanged, onBack, onCodes, onPrices }: SupplierListProps): ReactElement {
   const [suppliers, setSuppliers] = useState<readonly Supplier[] | null>(null);
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [name, setName] = useState('');
@@ -113,7 +132,7 @@ function SupplierList({ api, isOwner, onChanged, onBack, onCodes }: SupplierList
     });
   };
 
-  useWindowKeys({ F2: save, F3: () => fill(null), F4: editing === null ? undefined : () => onCodes(editing), Escape: onBack }, isBusy);
+  useWindowKeys({ F2: save, F3: () => fill(null), F4: editing === null ? undefined : () => onCodes(editing), F5: editing === null || onPrices === undefined ? undefined : () => onPrices(editing), Escape: onBack }, isBusy);
 
   return (
     <>
@@ -153,6 +172,11 @@ function SupplierList({ api, isOwner, onChanged, onBack, onCodes }: SupplierList
         {editing !== null && (
           <button type="button" className="button" tabIndex={-1} disabled={isBusy} onClick={() => onCodes(editing)}>
             Códigos de productos <kbd>F4</kbd>
+          </button>
+        )}
+        {editing !== null && onPrices !== undefined && (
+          <button type="button" className="button" tabIndex={-1} disabled={isBusy} onClick={() => onPrices(editing)}>
+            Lista de precios <kbd>F5</kbd>
           </button>
         )}
         <button type="button" className="button button-primary" tabIndex={-1} disabled={isBusy} onClick={save}>
