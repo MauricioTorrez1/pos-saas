@@ -118,6 +118,17 @@ export function suggestMapping(headers: readonly string[], remembered: ColumnMap
 }
 
 /**
+ * Tells whether a file has the header agreed with E1-53, which only the CSV of a paper catalog has.
+ *
+ * @param headers the header of the file
+ * @returns true when every agreed header is there
+ */
+export function hasAgreedHeaders(headers: readonly string[]): boolean {
+  const present = new Set(headers.map(normalizeHeader));
+  return Object.values(AGREED_PRICE_LIST_HEADERS).every((header) => present.has(header));
+}
+
+/**
  * Tells which required fields a mapping leaves out, or points at a header the file does not have.
  *
  * @param headers the header of the file

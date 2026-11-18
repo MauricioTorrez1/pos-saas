@@ -555,3 +555,13 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** E1-49 · **Estimación:** 4 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué un disparador `BEFORE UPDATE OF` columnas y no quitar la protección completa? (2) ¿Qué pasa si no escapas `%` en una búsqueda con `LIKE`?
+
+### E1-51 · Listas de precios de proveedores
+- **Objetivo:** el dueño importa la lista de precios de cada proveedor desde Excel o CSV (incluido el CSV del catálogo en papel de E1-53), elige las columnas una sola vez y liga los artículos a sus productos.
+- **Conceptos:** [Reemplazo atómico], [Mapeo de columnas], [FTS5 sin acentos], [Costo por unidad base]
+- **Claude / tú:** Claude escribe la migración, el lector, el servicio, los canales y la pantalla. Tú importas la lista real de un proveedor y ligas lo que quede sin ligar.
+- **Pruebas:** Vitest para costo por unidad base e IVA con enteros, encabezado bajo el título, renglones rechazados con su razón, reemplazo completo con auditoría, lista anterior intacta si el archivo no sirve, columnas e IVA recordados, CSV acordado, ligado por código, barras y a mano recordado, búsqueda sin acentos y canales solo para el dueño; Playwright de importar, ligar a mano y reimportar.
+- **Criterios:** ADR 0068; sin dependencias nuevas; migración local 21.
+- **Depende de:** E1-50 · **Estimación:** 4 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Por qué reemplazar la lista completa en una transacción y no actualizar renglón por renglón? (2) ¿Por qué calcular el costo por unidad base en lugar de guardarlo?

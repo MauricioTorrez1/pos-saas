@@ -21,7 +21,7 @@ import type { AuditLog } from '../audit/audit-log';
 import type { LocalStore } from '../local-store/local-store';
 import { toPrefixQuery } from '../local-store/product-catalog';
 import { uuidV7 } from '../uuid-v7';
-import { locateHeader, missingFields, readPriceListRows, suggestMapping, type PriceListTable } from './price-list-reader';
+import { hasAgreedHeaders, locateHeader, missingFields, readPriceListRows, suggestMapping, type PriceListTable } from './price-list-reader';
 import type { SupplierService } from './supplier-service';
 
 /** The rows of a file the preview shows. */
@@ -200,7 +200,7 @@ export class SupplierCatalogService {
       mapping,
       mappingOrigin: origin,
       costsIncludeVat: settings?.costs_include_vat === 1,
-      source: origin === 'agreed' ? 'paper' : 'file',
+      source: hasAgreedHeaders(table.headers) ? 'paper' : 'file',
     };
   }
 
