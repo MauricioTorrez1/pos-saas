@@ -78,6 +78,11 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         </div>
       ) : (
         <>
+          {query && (
+            <p>
+              <Link href={`/catalog/labels?q=${encodeURIComponent(query)}`}>Imprimir etiquetas de esta búsqueda</Link>
+            </p>
+          )}
           <ProductTable products={result.data.items} />
           <Pagination page={result.data.page} pageSize={result.data.size} total={result.data.total} query={query} />
         </>
