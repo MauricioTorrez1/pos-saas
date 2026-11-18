@@ -3,12 +3,13 @@
  *
  * It speaks enough OpenID Connect for the panel: discovery, authorization code with PKCE (it checks
  * the verifier, like Keycloak), refresh tokens, RP-initiated logout, and signed JWTs. It also serves
- * `GET /me` like the core. The tests steer it through `POST /__control` and read what happened from
+ * `GET /me` like the core, and the catalog endpoints of the core from `fake-core.ts`. The tests steer it through `POST /__control` and read what happened from
  * `GET /__stats`. The real realm is covered by the manual check in apps/web/README.md.
  */
 import { createHash, randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { SignJWT, exportJWK, generateKeyPair, jwtVerify } from 'jose';
+import { handleCatalog, resetCatalog, seedProducts } from './fake-core.ts';
 
 const PORT = Number(process.env.FAKE_OIDC_PORT ?? 4017);
 const ORIGIN = `http://127.0.0.1:${PORT}`;
@@ -108,6 +109,17 @@ async function handleToken(request: IncomingMessage, response: ServerResponse): 
   return send(response, 400, { error: 'unsupported_grant_type' });
 }
 
+/** The role of the caller of a core endpoint, or `null` when its token is not valid. */
+async function callerRole(request: IncomingMessage): Promise<string | null> {
+  const bearer = request.headers.authorization?.replace(/^Bearer /, '');
+  try {
+    await jwtVerify(bearer ?? '', publicKey, { issuer: ISSUER, audience: 'pos-core' });
+    return roleOf(control.persona) ?? 'none';
+  } catch {
+    return null;
+  }
+}
+
 async function handleMe(request: IncomingMessage, response: ServerResponse): Promise<void> {
   if (control.coreStatus) {
     return send(response, control.coreStatus);
@@ -169,12 +181,27 @@ const server = createServer(async (request, response) => {
     if (url.pathname === '/me') {
       return await handleMe(request, response);
     }
+    const catalogContext = {
+      role: await callerRole(request),
+      send: (status: number, body?: unknown) => send(response, status, body),
+      readBody: () => readBody(request),
+    };
+    if (await handleCatalog(request, url, catalogContext)) {
+      return;
+    }
     if (url.pathname === '/__control' && request.method === 'POST') {
-      const patch = JSON.parse(await readBody(request)) as Partial<Control> & { reset?: boolean };
-      control = patch.reset ? defaults() : { ...control, ...patch };
-      if (patch.reset) {
+      const { reset, seed, ...patch } = JSON.parse(await readBody(request)) as Partial<Control> & {
+        reset?: boolean;
+        seed?: { count: number; prefix: string; price: string };
+      };
+      control = reset ? defaults() : { ...control, ...patch };
+      if (reset) {
         stats = { logins: 0, refreshes: 0, logouts: 0, pkceChecks: 0 };
         refreshTokens.clear();
+        resetCatalog();
+      }
+      if (seed) {
+        seedProducts(seed.count, seed.prefix, seed.price);
       }
       return send(response, 200, control);
     }
