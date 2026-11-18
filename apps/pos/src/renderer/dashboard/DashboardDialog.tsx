@@ -188,6 +188,37 @@ export function DashboardDialog({ api, user, onClose, searchSales, expensesApi }
     );
   };
 
+  /** Saves the illustrated report of the whole business for the period above (E1-57). Only with full access. */
+  const exportReport = (): void => {
+    if (isExporting || summary === null || !hasFullAccess || dayProblem) {
+      return;
+    }
+    setIsExporting(true);
+    setNote(null);
+    setMessage(null);
+    api
+      .exportBusinessReport({ period, date, ...(period === 'custom' ? { endDate } : {}), ...(ownerPin === null ? {} : { ownerPin }) })
+      .then(
+        (result) => {
+          setIsExporting(false);
+          if (result.status === 'saved') {
+            setNote(`Listo. El reporte quedó en ${result.path}`);
+          } else if (result.status === 'failed') {
+            setMessage(result.message);
+          } else if (result.status === 'wrong_pin' || result.status === 'locked') {
+            setOwnerPin(null);
+            setPinMessage(refusalText(result));
+          } else if (result.status === 'authorization_required') {
+            setMessage('El reporte del negocio es solo para el dueño.');
+          }
+        },
+        () => {
+          setIsExporting(false);
+          setMessage('No se pudo guardar el reporte.');
+        },
+      );
+  };
+
   const submitPin = (): void => {
     if (pinText.trim() === '') {
       return;
@@ -218,6 +249,7 @@ export function DashboardDialog({ api, user, onClose, searchSales, expensesApi }
       F2: reload,
       F3: () => exportAs('xlsx'),
       F4: () => exportAs('pdf'),
+      F5: exportReport,
       Escape: isAskingPin ? () => setIsAskingPin(false) : onClose,
     },
     isExporting,
@@ -340,6 +372,11 @@ export function DashboardDialog({ api, user, onClose, searchSales, expensesApi }
         <button type="button" className="button button-primary" disabled={isExporting || summary === null} onClick={() => exportAs('pdf')}>
           PDF <kbd>F4</kbd>
         </button>
+        {hasFullAccess && (
+          <button type="button" className="button" disabled={isExporting || summary === null || dayProblem} onClick={exportReport}>
+            Reporte ilustrado <kbd>F5</kbd>
+          </button>
+        )}
       </div>
     </ModalDialog>
   );

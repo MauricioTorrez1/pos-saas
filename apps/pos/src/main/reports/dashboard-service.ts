@@ -22,7 +22,7 @@ import type {
   WeekdayBucket,
 } from '../../shared/dashboard-api';
 import type { UserSummary } from '../../shared/auth';
-import type { StatementRequest, StatementResult } from '../../shared/income-statement';
+import type { IncomeStatement, StatementRequest, StatementResult } from '../../shared/income-statement';
 import { MISC_PRODUCT_ID } from '../../shared/miscellaneous';
 import { isRefusal, type OwnerGate } from '../auth/owner-gate';
 import type { LocalStore } from '../local-store/local-store';
@@ -269,6 +269,26 @@ export class DashboardService {
     if (isRefusal(approval)) {
       return approval;
     }
+    return { status: 'ok', statement: this.#statementOf(request) };
+  }
+
+  /**
+   * Builds the summary of the whole business and its income statement for the same period, with no gate of its own. Only
+   * for a caller that already holds the approval of an owner, such as the illustrated report (E1-57, ADR 0073), so the PIN
+   * of a cashier is checked, and counted, once.
+   *
+   * @param request the period and the order of «Más vendidos»
+   * @returns the summary of the business and the statement
+   * @throws RangeError if a day does not exist or the range is not valid
+   */
+  businessView(request: DashboardRequest): { readonly summary: DashboardSummary; readonly statement: IncomeStatement } {
+    return {
+      summary: this.#business(request),
+      statement: this.#statementOf({ period: request.period, date: request.date, ...(request.endDate === undefined ? {} : { endDate: request.endDate }) }),
+    };
+  }
+
+  #statementOf(request: StatementRequest): IncomeStatement {
     const period =
       request.period === 'all' ? sinceStart(this.#firstActiveDay(), localDayOf(this.#now().getTime())) : resolvePeriod(request.period, request.date, request.endDate);
     const [from, to] = [new Date(period.fromMs).toISOString(), new Date(period.toMs).toISOString()];
@@ -281,16 +301,13 @@ export class DashboardService {
       returnedSubtotalCents: aggregate.returnedSubtotalCents,
       costE6: costs.get(aggregate.productId)?.costE6 ?? null,
     }));
-    return {
-      status: 'ok',
-      statement: buildIncomeStatement({
-        period: { kind: request.period, fromDay: period.fromDay, toDay: period.toDay, dayCount: period.dayCount },
-        generatedAt: this.#now().toISOString(),
-        rates: this.#salesByRate(from, to),
-        products,
-        expenses: this.#expensesBetween(period.fromDay, period.toDay),
-      }),
-    };
+    return buildIncomeStatement({
+      period: { kind: request.period, fromDay: period.fromDay, toDay: period.toDay, dayCount: period.dayCount },
+      generatedAt: this.#now().toISOString(),
+      rates: this.#salesByRate(from, to),
+      products,
+      expenses: this.#expensesBetween(period.fromDay, period.toDay),
+    });
   }
 
   /** The first local day with a completed sale, a return or an expense; today when the register has none yet. */

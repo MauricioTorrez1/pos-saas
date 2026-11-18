@@ -36,8 +36,9 @@ import type { PriceChangeService } from './pricing/price-change-service';
 import type { StatementResult } from '../shared/income-statement';
 import type { ExpenseBook } from './expenses/expense-book';
 import { registerExpenseHandlers } from './expenses/expenses-ipc';
-import { parseDashboardRequest, parseExportFormat, parseStatementRequest } from './reports/dashboard-request';
+import { parseBusinessReportRequest, parseDashboardRequest, parseExportFormat, parseStatementRequest } from './reports/dashboard-request';
 import type { DashboardExporter } from './reports/dashboard-exporter';
+import type { ReportExporter } from './business-report/report-exporter';
 import type { DashboardService } from './reports/dashboard-service';
 import { requireDayText } from './reports/report-request';
 import type { ReportService } from './reports/report-service';
@@ -85,6 +86,8 @@ export interface IpcServices {
   readonly catalogExporter: Pick<CatalogExporter, 'export'>;
   /** The operating expenses of the business (E1-56). */
   readonly expenses: ExpenseBook;
+  /** Saves the illustrated report of the business as a PDF (E1-57). */
+  readonly reportExporter: Pick<ReportExporter, 'export'>;
 }
 
 /** Nobody is signed in, or the person signed in may not do this. The screen should have shown the sign-in first. */
@@ -114,7 +117,7 @@ function requireLookupText(value: unknown): string {
  */
 export function registerIpcHandlers(
   rendererEntry: string,
-  { auth, cash, returns, admin, inventory, reports, dashboard, dashboardExporter, catalog, prices, products, appearance, pendingSales, salePayments, purchasing, tools, missingItems, supplierCatalog, catalogExporter, expenses }: IpcServices,
+  { auth, cash, returns, admin, inventory, reports, dashboard, dashboardExporter, catalog, prices, products, appearance, pendingSales, salePayments, purchasing, tools, missingItems, supplierCatalog, catalogExporter, expenses, reportExporter }: IpcServices,
 ): void {
   const answerScreen = <Result>(channel: string, respond: (argument: unknown) => Result): void => {
     ipcMain.handle(channel, (event, argument: unknown) => {
@@ -188,6 +191,8 @@ export function registerIpcHandlers(
     const format = parseExportFormat((request as { format?: unknown } | null)?.format);
     return dashboardExporter.exportStatement(parseStatementRequest((request as { request?: unknown } | null)?.request), format, user);
   });
+  // A cashier may ask with the PIN of an owner; the exporter writes down every refusal and every file.
+  answerSignedIn(DASHBOARD_CHANNELS.exportBusinessReport, (request, user): Promise<ExportResult> => reportExporter.export(parseBusinessReportRequest(request), user));
   registerExpenseHandlers(answerSignedIn, expenses);
 
   answerOwner(IPC_CHANNELS.importCatalog, (): Promise<ImportOutcome> => admin.importCatalog());

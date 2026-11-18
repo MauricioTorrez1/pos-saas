@@ -615,3 +615,13 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** E1-45, E1-50 · **Estimación:** 6 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué el IVA cobrado no es ingreso y dónde se muestra? (2) ¿Cómo evitas contar dos veces un gasto que también es un movimiento de caja?
+
+### E1-57 · Reporte ilustrado del negocio en PDF
+- **Objetivo:** el dueño guarda desde el tablero (F11, F5) un solo PDF del periodo con portada, cifras clave contra el periodo anterior, estado de resultados en cascada, ventas por día, hora y forma de pago, productos y costos, gastos, caja y cortes por cajero, inventario, devoluciones y proveedores, cada gráfica con una frase de «qué significa».
+- **Conceptos:** [SVG en línea], [Gráfica de cascada], [Puntos base], [Residuo mayor], [Política de seguridad de contenido]
+- **Claude / tú:** Claude escribe el lector, las gráficas, las frases, el HTML, el exportador, la tecla y las pruebas. Tú sacas el reporte de un mes real y lo lees como lo leería el dueño.
+- **Pruebas:** Vitest de la escala entera, las participaciones, el escapado, los ceros y la pérdida en las gráficas; del lector de cortes y pedidos; del reporte de un periodo vacío y de uno con devoluciones, producto sin costo, gasto de la caja y corte descuadrado; del permiso con bitácora, la cancelación, el canal y la pantalla; Playwright que guarda el PDF después de una venta.
+- **Criterios:** ADR 0073; dinero solo en enteros y porcentajes en puntos base; sin red ni librerías; solo el dueño o una cajera con su PIN, contado una vez.
+- **Depende de:** E1-56 · **Estimación:** 5 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Por qué dibujar las gráficas como SVG escrito a mano y no con una librería? (2) ¿Cómo garantizas que los porcentajes de una dona sumen exactamente 100 %?

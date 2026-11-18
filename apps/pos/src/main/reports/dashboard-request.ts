@@ -3,6 +3,7 @@ import {
   PERIOD_KINDS,
   TOP_LIMITS,
   TOP_METRICS,
+  type BusinessReportRequest,
   type DashboardRequest,
   type ExportFormat,
   type PeriodKind,
@@ -79,6 +80,32 @@ export function parseStatementRequest(value: unknown): StatementRequest {
     throw new TypeError('Expected the PIN as text');
   }
   const period: StatementPeriodKind = oneOf(record.period, STATEMENT_PERIOD_KINDS, 'a period');
+  return { period, date, ...(endDate === undefined ? {} : { endDate }), ...(ownerPin === undefined ? {} : { ownerPin }) };
+}
+
+/**
+ * Checks a request for the illustrated report that came over the bridge (E1-57). The service checks that the days exist.
+ *
+ * @param value what the screen sent
+ * @returns the request, with only the fields it knows
+ * @throws TypeError if a field is missing or is not one of its allowed values
+ */
+export function parseBusinessReportRequest(value: unknown): BusinessReportRequest {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new TypeError('Expected a business report request');
+  }
+  const record = value as Record<string, unknown>;
+  const { date, endDate, ownerPin } = record;
+  if (typeof date !== 'string' || date.length !== 10) {
+    throw new TypeError('Expected a day as YYYY-MM-DD');
+  }
+  if (endDate !== undefined && (typeof endDate !== 'string' || endDate.length !== 10)) {
+    throw new TypeError('Expected the last day as YYYY-MM-DD');
+  }
+  if (ownerPin !== undefined && (typeof ownerPin !== 'string' || ownerPin.length > MAX_PIN_LENGTH)) {
+    throw new TypeError('Expected the PIN as text');
+  }
+  const period: PeriodKind = oneOf(record.period, PERIOD_KINDS, 'a period');
   return { period, date, ...(endDate === undefined ? {} : { endDate }), ...(ownerPin === undefined ? {} : { ownerPin }) };
 }
 
