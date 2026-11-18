@@ -630,3 +630,60 @@ textarea[aria-invalid='true'] {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Paper catalog review (E1-53): the photo next to its rows, doubtful rows in yellow. */
+.paper-page {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.paper-page__photo {
+  margin: 0;
+  position: sticky;
+  top: 1rem;
+}
+
+.paper-page__photo img {
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.paper-row {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+
+.paper-row--doubtful {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.paper-row--approved {
+  background: var(--ok-bg);
+}
+
+.paper-row__fields {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr 0.7fr 1fr;
+  gap: 0.5rem;
+}
+
+.paper-row__issues {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+
+@media (max-width: 760px) {
+  .paper-page,
+  .paper-row__fields {
+    grid-template-columns: 1fr;
+  }
+
+  .paper-page__photo {
+    position: static;
+  }
+}
