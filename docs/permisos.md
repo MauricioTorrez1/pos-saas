@@ -36,6 +36,7 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 | `PATCH /products/{id}/price` | `price.change` | Sí | — | — |
 | `POST /imports/catalog` | `catalog.import` | Sí | Sí | — |
 | `POST /price-changes` | `price.change` | Sí | — | — |
+| `POST /labels` | `product.read` | Sí | Sí | Sí |
 | `GET /discrepancies` | `discrepancy.view` | Sí | Sí | — |
 | `GET /discrepancies/{id}` | `discrepancy.view` | Sí | Sí | — |
 | `POST /discrepancies/{id}/resolution` | `discrepancy.resolve` | Sí | Sí | — |

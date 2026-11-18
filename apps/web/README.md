@@ -34,7 +34,7 @@ Pages read with Server Components and write with Server Actions, so the access t
 ## Layout
 | Path | Contents |
 | --- | --- |
-| `src/app/` | Pages and Route Handlers (`auth/login`, `auth/callback`, `auth/logout`), and the catalog pages and Server Actions (`catalog/`) |
+| `src/app/` | Pages and Route Handlers (`auth/login`, `auth/callback`, `auth/logout`), the catalog pages and Server Actions (`catalog/`), and shelf labels (`catalog/labels`, which downloads a PDF through `catalog/labels/pdf`) |
 | `src/proxy.ts` | Session check, role check, and token renewal for every protected route |
 | `src/lib/` | Settings, session sealing, cookies, OIDC calls, identity of the token, route rules, and the core client; `catalog/` holds the catalog client, form checks and decimal text helpers |
 | `src/components/` | Small presentational components; `catalog/` holds the table, forms, import and price change panels |

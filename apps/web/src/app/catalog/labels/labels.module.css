@@ -1,0 +1,63 @@
+.search {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.input {
+  flex: 1 1 18rem;
+  min-width: 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  font: inherit;
+  background: transparent;
+  color: inherit;
+}
+
+.copies {
+  width: 5rem;
+  padding: 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  font: inherit;
+  background: transparent;
+  color: inherit;
+}
+
+.count {
+  margin: 0;
+  opacity: 0.75;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  text-align: left;
+}
+
+.price {
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
