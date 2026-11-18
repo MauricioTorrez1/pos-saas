@@ -59,7 +59,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-17 · Recepción en el núcleo** (6 h) _(En revisión)_: el servidor recibe lotes de forma idempotente.
 - ✅ **E1-18 · Cambios hacia la caja** (5 h) _(En revisión)_: catálogo, precios y permisos llegan con cursor.
 - ✅ **E1-19 · Discrepancias y cuarentena** (4 h) _(En revisión)_: el dueño revisa diferencias sin perder ventas.
-- ⚠️ **E1-20 · Prueba de punta a punta sin internet** (4 h): se demuestra que no se duplican ni pierden ventas.
+- ✅ **E1-20 · Prueba de punta a punta sin internet** (4 h) _(En revisión)_: se demuestra que no se duplican ni pierden ventas.
 - ✅ **E1-21 · Sesión de caja** (5 h): se abre con fondo y se registran entradas y salidas.
 - ✅ **E1-22 · Aviso de retiro parcial** (2 h): la caja avisa al pasar el límite de efectivo, sin frenar la venta.
 - ✅ **E1-23 · Corte con arqueo** (5 h): el corte diario compara lo esperado con lo contado.

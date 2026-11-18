@@ -56,6 +56,8 @@ Connection settings come from environment variables; passwords have no default:
 
 Tests start their own PostgreSQL 16.15 with Testcontainers, so they need Docker running.
 
+`OfflineSyncEndToEndTest` (E1-20, [ADR 0066](../../docs/adr/0066-prueba-de-punta-a-punta-sin-internet.md)) also runs the register's own sync code with Node against the core on a free port, so it only runs with `POS_OFFLINE_E2E=true` and the dependencies of `apps/pos` installed. CI sets it in the Java job; locally, `bash scripts/run-offline-sync-e2e.sh` does both.
+
 ## Authentication
 The core is an OAuth2 resource server of the Keycloak realm `pos` ([ADR 0039](../../docs/adr/0039-keycloak-oidc-y-tenant-en-el-token.md)). Every request needs `Authorization: Bearer <JWT>` except `GET /actuator/health`. The core checks the signature, expiry, issuer and the audience `pos-core`; a missing or invalid token gets **401**. `TenantFromTokenFilter` then pins the `tenant_id` claim in `TenantContext` for the whole request, so row-level security and the logs receive it; a valid token without a usable `tenant_id` gets **403**. `GET /me` returns the token `subject` and the `tenantId` (ids only, no personal data).
 

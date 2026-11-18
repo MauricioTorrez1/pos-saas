@@ -266,6 +266,12 @@ Every sale, return, cash movement, cut, stock adjustment, and price change is al
 
 The tests use `FakeSyncTransport`, a core in memory that can drop the network before a batch arrives or after it was stored but before the answer comes back.
 
+**End-to-end test without internet (E1-20, [ADR 0066](../../docs/adr/0066-prueba-de-punta-a-punta-sin-internet.md)).** `src/main/sync/offline-sync.e2e.ts` runs the real outbox, synchronizer and HTTP transport against a real core over PostgreSQL. It sells 1,000 times in cash with no network, then pushes through `FlakyNetworkProxy`, a TCP proxy that cuts one request halfway and loses the answer of a batch the core stored, and finally replays two delivered batches. `OfflineSyncEndToEndTest` in `services/core` starts the core, enrolls the register, runs this file and compares counts, sale ids and totals in cents with PostgreSQL. `pnpm test` does not include it; CI runs it in the Java job. To run it locally (Docker, Java 21 and Node 24):
+
+```bash
+bash scripts/run-offline-sync-e2e.sh
+```
+
 ### Changes from the core
 A second loop downloads what changed in the core: products with their prices and barcodes, and the permissions of each staff member ([ADR 0048](../../docs/adr/0048-cambios-hacia-la-caja-con-cursor.md), RF-023). It never touches a sale or the outbox.
 
