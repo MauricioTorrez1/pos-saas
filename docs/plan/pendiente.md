@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 47 de 49 tareas hechas · ⚠️ 2 faltan (9 h)
+✅ 48 de 50 tareas hechas · ⚠️ 2 faltan (9 h)
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -89,6 +89,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-48 · Rediseño de la caja y herramientas del dueño** (10 h) _(En revisión)_: la caja se ve actual y clara, y el dueño ajusta lo que antes pedía un programador: teclas, ticket e impresora; la cajera cobra un precio distinto solo en esa venta y cancela ventas sin perder rastro.
 - ✅ **E1-49 · Bitácora de faltantes y letra del ticket** (4 h) _(En revisión)_: la cajera anota lo que un cliente pidió y no hay, el dueño ve qué se pide más y lo descarga en PDF con gráficas; el ticket se imprime con la fuente y el tamaño de letra elegidos.
 - ✅ **E1-50 · Proveedores en el producto, faltantes editables y búsqueda de ventas** (4 h) _(En revisión)_: desde el producto se ven todos sus proveedores y «Pedir más» lo agrega al pedido; los faltantes se corrigen o se eliminan; el ticket lleva el nombre y la moneda elegidos; «Resumen» encuentra una venta por ticket, producto o código.
+- ✅ **E1-53 · Catálogo de proveedor en papel leído con Claude** (6 h) _(En revisión)_: el dueño fotografía las hojas de un catálogo impreso, revisa en el panel las filas que propone Claude, aprueba cada una y descarga el CSV para la lista de precios del proveedor en la caja.
 
 ## Entrega 2 · Terminal de tarjeta integrada
 
@@ -207,4 +208,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 71 de 165 tareas hechas (300 h de 732 h) · ⚠️ 94 faltan (432 h).
+✅ 72 de 166 tareas hechas (306 h de 738 h) · ⚠️ 94 faltan (432 h).

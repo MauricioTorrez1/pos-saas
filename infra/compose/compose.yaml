@@ -257,6 +257,14 @@ services:
     profiles: [analytics]
     ports:
       - "127.0.0.1:8000:8000"
+    # Paper catalog reader (E1-53, ADR 0069). Without the key the endpoint answers 503; /health still works.
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CATALOG_READER_MODEL: ${CATALOG_READER_MODEL:-}
+      # The core runs on the host during development; the reader asks it who the token belongs to.
+      ANALYTICS_CORE_API_URL: ${ANALYTICS_CORE_API_URL:-http://host.docker.internal:8080}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       # The image has no curl or wget. urlopen raises an error unless the answer is successful.
       test:
