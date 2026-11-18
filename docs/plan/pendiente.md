@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 44 de 49 tareas hechas · ⚠️ 5 faltan (21 h)
+✅ 45 de 49 tareas hechas · ⚠️ 4 faltan (17 h)
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -207,4 +207,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 68 de 165 tareas hechas (288 h de 732 h) · ⚠️ 97 faltan (444 h).
+✅ 69 de 165 tareas hechas (292 h de 732 h) · ⚠️ 96 faltan (440 h).
