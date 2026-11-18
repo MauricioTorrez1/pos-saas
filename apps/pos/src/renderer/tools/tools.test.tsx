@@ -34,7 +34,7 @@ const OPEN_CASH: CashStatus = {
   withdrawalLimitCents: 500_000,
   shouldWithdraw: false,
 };
-const SALE: SaleSummary = { saleId: 'sale-1', folio: 'T1-000012', completedAt: '2026-11-10T18:30:00.000Z', totalCents: 23_200, refundedCents: 0, cashierName: 'Ana', lineCount: 2 };
+const SALE: SaleSummary = { saleId: 'sale-1', folio: 'T1-000012', completedAt: '2026-11-10T18:30:00.000Z', totalCents: 23_200, refundedCents: 0, cashierName: 'Ana', lineCount: 2, matchedProducts: [] };
 const RETURNABLE: ReturnableSale = {
   saleId: 'sale-1',
   folio: 'T1-000012',
@@ -249,6 +249,8 @@ describe('the settings of the register', () => {
     const preview = await screen.findByLabelText('Vista previa del ticket');
     await waitFor(() => expect(preview.textContent).toContain('ancho 48'));
 
+    fireEvent.change(screen.getByLabelText('Nombre del negocio'), { target: { value: 'Ferretería Don Mau' } });
+    fireEvent.change(screen.getByLabelText('Moneda'), { target: { value: 'symbol_code' } });
     fireEvent.change(screen.getByLabelText('Encabezado del ticket'), { target: { value: 'Av. Juárez 12\nTel. 555 123' } });
     fireEvent.change(screen.getByLabelText('Ancho del papel'), { target: { value: '32' } });
     fireEvent.click(screen.getByLabelText('Total en letra grande'));
@@ -259,7 +261,7 @@ describe('the settings of the register', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Guardar diseño', hidden: true }));
 
     await waitFor(() =>
-      expect(saveTicketDesign).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_TICKET_DESIGN, headerLines: ['Av. Juárez 12', 'Tel. 555 123'], columns: 32, bigTotal: true, font: 'b', textSize: 'tall' }),
+      expect(saveTicketDesign).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_TICKET_DESIGN, businessName: 'Ferretería Don Mau', currency: 'symbol_code', headerLines: ['Av. Juárez 12', 'Tel. 555 123'], columns: 32, bigTotal: true, font: 'b', textSize: 'tall' }),
     );
   });
 

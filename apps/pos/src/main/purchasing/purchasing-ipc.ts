@@ -3,6 +3,7 @@ import {
   type DiscardOrderResult,
   type ExportOrderResult,
   type MarkOrderSentResult,
+  type OrderMoreResult,
   type OrderCandidate,
   type PurchaseOrder,
   type PurchaseOrderSummary,
@@ -19,6 +20,7 @@ import type { PurchaseOrderService } from './purchase-order-service';
 import {
   parseExportOrderRequest,
   parseOrderActionRequest,
+  parseOrderMoreRequest,
   parsePath,
   parseSaveOrderRequest,
   parseSaveSupplierRequest,
@@ -60,5 +62,6 @@ export function registerPurchasingHandlers(answerSignedIn: AnswerSignedIn, { sup
   answerSignedIn(PURCHASING_CHANNELS.markOrderSent, (request): MarkOrderSentResult => orders.markSent(parseOrderActionRequest(request)));
   answerSignedIn(PURCHASING_CHANNELS.discardOrder, (request): DiscardOrderResult => orders.discard(parseOrderActionRequest(request)));
   answerSignedIn(PURCHASING_CHANNELS.exportOrder, (request): Promise<ExportOrderResult> => exporter.export(parseExportOrderRequest(request)));
+  answerSignedIn(PURCHASING_CHANNELS.orderMore, (request): OrderMoreResult => orders.orderMore(parseOrderMoreRequest(request)));
   answerSignedIn(PURCHASING_CHANNELS.revealFile, (path): void => exporter.reveal(parsePath(path)));
 }

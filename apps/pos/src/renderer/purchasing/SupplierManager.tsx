@@ -120,7 +120,7 @@ function SupplierList({ api, isOwner, onChanged, onBack, onCodes }: SupplierList
       <h2 id="order-title">Proveedores</h2>
       {suppliers !== null && suppliers.length === 0 && <p>Todavía no hay proveedores. Escribe el primero abajo.</p>}
       {suppliers !== null && suppliers.length > 0 && (
-        <ul className="cash-actions" aria-label="Proveedores">
+        <ul className="cash-actions supplier-list scroll-area" aria-label="Proveedores">
           {suppliers.map((supplier) => (
             <li key={supplier.id}>
               <button type="button" className="button" disabled={isBusy} onClick={() => fill(supplier)}>

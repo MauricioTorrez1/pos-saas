@@ -293,6 +293,23 @@ export type ExportOrderResult =
   | OwnerRefusalResult;
 
 /** What the screens of the purchase order reach in the main process (E1-44, ADR 0059). */
+/** Adds one product to the draft order of a supplier, from the product panel («Pedir más»). */
+export interface OrderMoreRequest {
+  readonly productId: string;
+  readonly supplierId: string;
+  readonly ownerPin?: string;
+}
+
+export type OrderMoreResult =
+  | { readonly status: 'added'; readonly order: PurchaseOrder; readonly quantityMilli: number }
+  | { readonly status: 'already_in_order'; readonly order: PurchaseOrder }
+  | { readonly status: 'not_found' }
+  | { readonly status: 'supplier_not_found' }
+  | { readonly status: 'product_not_found'; readonly productId: string }
+  | { readonly status: 'full' }
+  | { readonly status: 'stale'; readonly order: PurchaseOrder }
+  | OwnerRefusalResult;
+
 export interface PurchasingApi {
   listSuppliers(includeInactive: boolean): Promise<Supplier[]>;
   saveSupplier(request: SaveSupplierRequest): Promise<SaveSupplierResult>;
@@ -308,6 +325,11 @@ export interface PurchasingApi {
   discardOrder(request: OrderActionRequest): Promise<DiscardOrderResult>;
   exportOrder(request: ExportOrderRequest): Promise<ExportOrderResult>;
   revealFile(path: string): Promise<void>;
+  /**
+   * Adds a product to the draft order of a supplier, or starts one. The quantity fills the product up to its maximum,
+   * or is one unit when it has no reorder level, and the cost is the list cost of that supplier.
+   */
+  orderMore(request: OrderMoreRequest): Promise<OrderMoreResult>;
 }
 
 /** The names of the channels of the purchase order bridge. */
@@ -326,6 +348,7 @@ export const PURCHASING_CHANNELS = {
   discardOrder: 'purchasing:discard-order',
   exportOrder: 'purchasing:export-order',
   revealFile: 'purchasing:reveal-file',
+  orderMore: 'purchasing:order-more',
 } as const;
 
 /**

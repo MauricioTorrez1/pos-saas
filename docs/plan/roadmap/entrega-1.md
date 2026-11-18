@@ -545,3 +545,13 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** E1-48 · **Estimación:** 4 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué guardar cada vez que se pide en lugar de un contador? (2) ¿Cómo dibujas una gráfica en un PDF que se genera sin JavaScript?
+
+### E1-50 · Proveedores en el producto, faltantes editables y búsqueda de ventas
+- **Objetivo:** desde el panel del producto se ven todos sus proveedores y «Pedir más» lo agrega al pedido del proveedor; los faltantes se corrigen o se eliminan; el ticket lleva el nombre del negocio y la moneda que elija el dueño; «Resumen» encuentra una venta por ticket, nombre de producto o código.
+- **Conceptos:** [Disparador por columna], [Escapar comodines de LIKE], [FTS5], [Compatibilidad de configuración guardada]
+- **Claude / tú:** Claude escribe el canal «Pedir más», la migración, la búsqueda y las pantallas. Tú pruebas «Pedir más» y la moneda en la caja de la tienda.
+- **Pruebas:** Vitest para agregar al borrador (nuevo, existente, ya incluido, lleno), editar notas sin tocar lo pedido, eliminar con auditoría y permiso del dueño, nombre y moneda del ticket dentro del ancho, búsqueda por folio, nombre, código y comodines; Playwright del panel con «Dar de baja».
+- **Criterios:** ADR 0067; sin dependencias nuevas; el ticket por defecto sale con los mismos bytes; un diseño viejo se lee con nombre vacío y signo de pesos.
+- **Depende de:** E1-49 · **Estimación:** 4 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Por qué un disparador `BEFORE UPDATE OF` columnas y no quitar la protección completa? (2) ¿Qué pasa si no escapas `%` en una búsqueda con `LIKE`?

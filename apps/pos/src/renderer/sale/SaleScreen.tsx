@@ -3,6 +3,7 @@ import { useCallback, useEffect, useReducer, useRef, useState, type KeyboardEven
 
 import { isMiscLineId, MISC_LINE_ID_PREFIX, MISC_TAX_RATE_BP } from '../../shared/miscellaneous';
 import { MAX_LOOKUP_TEXT_LENGTH, type CatalogProduct, type PendingSale, type PosApi, type SavePendingSaleResult } from '../../shared/pos-api';
+import type { PurchasingApi } from '../../shared/supplier-order';
 import type { PricingApi } from '../../shared/pricing';
 import { actionOf, comboLabel, DEFAULT_KEYMAP, type KeyAction, type Keymap, type ToolsApi } from '../../shared/register-tools';
 import type { ProductAdminApi, ProductDetail } from '../../shared/product-admin';
@@ -75,6 +76,8 @@ interface SaleScreenProps {
   readonly onOpenDashboard?: () => void;
   /** Opens the orders to suppliers (E1-44) with Shift+F11. Without it, Shift+F11 does nothing. */
   readonly onOpenSupplierOrder?: () => void;
+  /** The suppliers and their orders, for «Pedir más» in the product panel (E1-50). */
+  readonly purchasingApi?: PurchasingApi;
   /** Called after a sale was collected, so the cash of the register is read again. */
   readonly onCashChanged: () => void;
   /** The keys of each action. Without it, the register answers to the keys it was born with. */
@@ -107,7 +110,7 @@ interface SaleScreenProps {
  * @param props.onCashChanged called after a sale was collected
  * @returns the screen
  */
-export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onOpenDashboard, onOpenSupplierOrder, onCashChanged, keymap = DEFAULT_KEYMAP, toolsApi, onOpenSettings, onOpenSalesHistory, onOpenMissingItems }: SaleScreenProps): ReactElement {
+export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onOpenDashboard, onOpenSupplierOrder, onCashChanged, keymap = DEFAULT_KEYMAP, toolsApi, onOpenSettings, onOpenSalesHistory, onOpenMissingItems, purchasingApi }: SaleScreenProps): ReactElement {
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
@@ -621,6 +624,7 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
           posApi={posApi}
           productApi={productApi}
           {...(pricingApi === undefined ? {} : { pricingApi })}
+          {...(purchasingApi === undefined ? {} : { purchasingApi })}
           isOwner={isOwner}
           initialProduct={productPanel.product}
           onClose={() => {

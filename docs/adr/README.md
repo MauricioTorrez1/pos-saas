@@ -68,3 +68,4 @@ Un ADR (Architecture Decision Record, registro de decisión de arquitectura) exp
 | [0063](0063-bitacora-de-faltantes-y-letra-del-ticket.md) | Bitácora de faltantes con PDF y gráficas, y fuente y tamaño de letra del ticket | Aceptada |
 | [0064](0064-pantallas-de-catalogo-del-panel.md) | Pantallas de catálogo del panel: Server Components y Server Actions, paginación por desplazamiento, importación en dos pasos y cambio masivo con vista previa | Aceptada |
 | [0066](0066-prueba-de-punta-a-punta-sin-internet.md) | Prueba de punta a punta sin internet: Java levanta el núcleo con PostgreSQL, Node ejecuta la sincronización real de la caja con cortes de red y reenvíos | Aceptada |
+| [0067](0067-proveedores-en-el-producto-faltantes-editables-y-busqueda-de-ventas.md) | Proveedores y «Pedir más» en el producto, faltantes editables, nombre y moneda del ticket, y búsqueda de ventas en «Resumen» | Aceptada |

@@ -65,6 +65,26 @@ describe('layoutTicket', () => {
     expect(lines.join('\n')).toMatch(/2026/);
   });
 
+  it('prints the name of the business the owner typed, and the register name when it is left empty (E1-50)', () => {
+    expect(layoutTicket(aTicket(), { ...DEFAULT_TICKET_DESIGN, businessName: '  Ferretería Don Mau ' })[0]?.trim()).toBe('Ferretería Don Mau');
+    expect(layoutTicket(aTicket(), { ...DEFAULT_TICKET_DESIGN, businessName: '   ' })[0]?.trim()).toBe('Tlapalería Torres');
+  });
+
+  it('writes every amount with the currency the owner chose, and the peso sign by default (E1-50)', () => {
+    const plain = layoutTicket(aTicket()).join('\n');
+    const withCode = layoutTicket(aTicket(), { ...DEFAULT_TICKET_DESIGN, currency: 'symbol_code' }).join('\n');
+    const codeOnly = layoutTicket(aTicket(), { ...DEFAULT_TICKET_DESIGN, currency: 'code' }).join('\n');
+
+    expect(plain).not.toContain('MXN');
+    expect(withCode).toMatch(/TOTAL +\$[\d,]+\.\d\d MXN/u);
+    expect(withCode).toContain('$12.50 MXN');
+    expect(codeOnly).toMatch(/TOTAL +MXN [\d,]+\.\d\d/u);
+    expect(codeOnly).not.toContain('$');
+    for (const line of codeOnly.split('\n')) {
+      expect(line.length).toBeLessThanOrEqual(TICKET_COLUMNS);
+    }
+  });
+
   it('shows each product with its quantity, its unit price, and its amount', () => {
     const text = layoutTicket(aTicket()).join('\n');
 

@@ -382,6 +382,8 @@ describe('writing down a missing item from the sale screen (E1-49)', () => {
       record: vi.fn(() => Promise.resolve({ status: 'recorded' as const, timesAsked: 1 })),
       report: () => Promise.resolve({ period: 30, groups: [], byWeek: [], byWeekday: [], totalRequests: 0, generatedAt: '2026-11-18T18:00:00.000Z' }),
       resolve: () => Promise.resolve(),
+      editNotes: () => Promise.resolve({ status: 'recorded' as const, timesAsked: 1 }),
+      remove: () => Promise.resolve(),
       exportPdf: () => Promise.resolve({ status: 'cancelled' as const }),
     };
     render(<App posApi={posApiWith(CASHIER)} productApi={productApiWith(vi.fn())} missingApi={missingApi} />);

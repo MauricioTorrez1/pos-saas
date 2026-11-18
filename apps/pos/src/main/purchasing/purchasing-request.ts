@@ -3,6 +3,7 @@ import {
   MAX_CODES_PER_SUPPLIER_PRODUCT,
   type ExportOrderRequest,
   type OrderActionRequest,
+  type OrderMoreRequest,
   type OrderLineRequest,
   type SaveOrderRequest,
   type SaveSupplierRequest,
@@ -199,6 +200,23 @@ export function parseOrderActionRequest(value: unknown): OrderActionRequest {
   return {
     orderId: parseUuid(request.orderId, 'an order'),
     expectedRevision: requireInteger(request.expectedRevision, 'the revision'),
+    ...(ownerPin === undefined ? {} : { ownerPin }),
+  };
+}
+
+/**
+ * Checks the request to add a product to the draft order of a supplier that came over the bridge.
+ *
+ * @param value what the screen sent
+ * @returns the request
+ * @throws TypeError if it is not shaped as one
+ */
+export function parseOrderMoreRequest(value: unknown): OrderMoreRequest {
+  const request = asRecord(value, 'a request to order more');
+  const ownerPin = parseOwnerPin(request.ownerPin);
+  return {
+    productId: parseProductId(request.productId),
+    supplierId: parseUuid(request.supplierId, 'a supplier'),
     ...(ownerPin === undefined ? {} : { ownerPin }),
   };
 }
