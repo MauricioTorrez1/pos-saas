@@ -21,13 +21,30 @@ type View =
   | { readonly kind: 'cut'; readonly cut: CashCut }
   | { readonly kind: 'limit' };
 
+/**
+ * Why the dialog is open.
+ *
+ * - `normal`: the cashier asked for it (F3).
+ * - `opening`: somebody just signed in and the cash is closed. A cashier cannot leave without the opening float; the owner
+ *   may choose «Solo administrar» instead, which closes the dialog (E1-54).
+ * - `exit_cut`: the register is closing and the person chose to make the cut first. It starts on the cut, and going back
+ *   gives up closing.
+ */
+export type CashDialogMode = 'normal' | 'opening' | 'exit_cut';
+
 interface CashDialogProps {
   readonly posApi: PosApi;
   readonly user: UserSummary;
   readonly status: CashStatus;
   /** Called with the new status after anything changed. */
   readonly onStatusChange: (status: CashStatus) => void;
+  /** Called when the dialog is done. In `opening` it means «Solo administrar»; in `exit_cut`, that closing was given up. */
   readonly onClose: () => void;
+  readonly mode?: CashDialogMode;
+  /** In `opening`, lets a cashier who is not the one opening the shift hand the register to somebody else. */
+  readonly onSignOut?: () => void;
+  /** In `exit_cut`, called once the cut was made and seen. */
+  readonly onCutDone?: () => void;
 }
 
 /**
@@ -40,22 +57,34 @@ interface CashDialogProps {
  * @param props.status how the cash stands
  * @param props.onStatusChange called with the status after a change
  * @param props.onClose called when the dialog is done
+ * @param props.mode why the dialog is open
+ * @param props.onSignOut in `opening`, signs the person out instead of opening the cash
+ * @param props.onCutDone in `exit_cut`, called after the cut
  * @returns the dialog
  */
-export function CashDialog({ posApi, user, status, onStatusChange, onClose }: CashDialogProps): ReactElement {
-  const [view, setView] = useState<View>({ kind: 'summary' });
-  const back = (): void => setView({ kind: 'summary' });
+export function CashDialog({ posApi, user, status, onStatusChange, onClose, mode = 'normal', onSignOut, onCutDone }: CashDialogProps): ReactElement {
+  const [view, setView] = useState<View>(mode === 'exit_cut' ? { kind: 'close' } : { kind: 'summary' });
+  const back = (): void => (mode === 'exit_cut' ? onClose() : setView({ kind: 'summary' }));
 
   return (
     <ModalDialog titleId="cash-title" className="cash">
       {view.kind === 'summary' && (
-        <SummaryView posApi={posApi} user={user} status={status} onStatusChange={onStatusChange} onClose={onClose} onGo={setView} />
+        <SummaryView
+          posApi={posApi}
+          user={user}
+          status={status}
+          onStatusChange={onStatusChange}
+          onClose={onClose}
+          onGo={setView}
+          isOpeningShift={mode === 'opening'}
+          {...(onSignOut === undefined ? {} : { onSignOut })}
+        />
       )}
       {view.kind === 'movement' && (
         <MovementView posApi={posApi} user={user} movement={view.movement} onStatusChange={onStatusChange} onBack={back} />
       )}
       {view.kind === 'close' && <CloseView posApi={posApi} onStatusChange={onStatusChange} onBack={back} onCut={(cut) => setView({ kind: 'cut', cut })} />}
-      {view.kind === 'cut' && <CutView cut={view.cut} onDone={onClose} />}
+      {view.kind === 'cut' && <CutView cut={view.cut} onDone={mode === 'exit_cut' && onCutDone !== undefined ? onCutDone : onClose} />}
       {view.kind === 'limit' && <LimitView posApi={posApi} onStatusChange={onStatusChange} onBack={back} current={status.withdrawalLimitCents} />}
     </ModalDialog>
   );
@@ -68,13 +97,18 @@ interface SummaryViewProps {
   readonly onStatusChange: (status: CashStatus) => void;
   readonly onClose: () => void;
   readonly onGo: (view: View) => void;
+  /** True right after signing in: the float cannot be skipped by a cashier. */
+  readonly isOpeningShift: boolean;
+  readonly onSignOut?: () => void;
 }
 
-function SummaryView({ posApi, user, status, onStatusChange, onClose, onGo }: SummaryViewProps): ReactElement {
+function SummaryView({ posApi, user, status, onStatusChange, onClose, onGo, isOpeningShift, onSignOut }: SummaryViewProps): ReactElement {
   const [floatText, setFloatText] = useState('');
   const { isBusy, message, setMessage, run } = useAction();
   const isOwner = user.role === 'owner';
   const session = status.session;
+  // A cashier who just signed in sells only with the cash open, so Esc does nothing until the float is in.
+  const canSkip = !isOpeningShift || isOwner;
 
   const open = (): void => {
     const floatCents = readTypedCents(floatText);
@@ -91,7 +125,7 @@ function SummaryView({ posApi, user, status, onStatusChange, onClose, onGo }: Su
 
   useWindowKeys(
     session === null
-      ? { F2: open, Escape: onClose }
+      ? { F2: open, Escape: canSkip ? onClose : undefined }
       : {
           F5: () => onGo({ kind: 'movement', movement: 'in' }),
           F6: () => onGo({ kind: 'movement', movement: 'out' }),
@@ -106,13 +140,27 @@ function SummaryView({ posApi, user, status, onStatusChange, onClose, onGo }: Su
     return (
       <>
         <h2 id="cash-title">Abrir la caja</h2>
-        <p>La caja está cerrada y no se puede cobrar. Cuenta el efectivo que dejas en el cajón para empezar.</p>
+        {isOpeningShift ? (
+          <p>
+            Hola, {user.name}. Antes de vender, cuenta el fondo de caja inicial: el efectivo que dejas en el cajón para dar cambio.
+            {isOwner && ' Si hoy solo vas a administrar, puedes entrar sin abrir la caja.'}
+          </p>
+        ) : (
+          <p>La caja está cerrada y no se puede cobrar. Cuenta el efectivo que dejas en el cajón para empezar.</p>
+        )}
         <Field label="Fondo de caja" numeric="decimal" value={floatText} onChange={setFloatText} autoFocus hint="Puede ser 0" />
         <Message text={message} />
         <div className="payment-actions">
-          <button type="button" className="button" tabIndex={-1} onClick={onClose}>
-            Cerrar <kbd>Esc</kbd>
-          </button>
+          {!canSkip && onSignOut !== undefined && (
+            <button type="button" className="button" tabIndex={-1} onClick={onSignOut}>
+              Cambiar de persona
+            </button>
+          )}
+          {canSkip && (
+            <button type="button" className="button" tabIndex={-1} onClick={onClose}>
+              {isOpeningShift ? 'Solo administrar' : 'Cerrar'} <kbd>Esc</kbd>
+            </button>
+          )}
           <button type="button" className="button button-primary" tabIndex={-1} disabled={isBusy} onClick={open}>
             Abrir caja <kbd>F2</kbd>
           </button>

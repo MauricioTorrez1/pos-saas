@@ -71,6 +71,6 @@ Se eligió la 2 porque `LocalStore` no anida transacciones y duplicar la lógica
 
 ## Consecuencias
 - Comparar proveedores ya no necesita capturar costos producto por producto.
-- La caja pasa a la versión 0.2.3.
+- La caja pasa a la versión 0.2.4.
 - La lista no viaja al núcleo: es local, como los mínimos de reorden, hasta que F2-11 la reciba.
 - Un artículo ligado a un producto que se borra queda sin ligar (`ON DELETE SET NULL`).

@@ -571,7 +571,7 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Conceptos:** [Comparar en la unidad base], [No confiar en los precios de la pantalla], [Agrupar en pedidos], [SVG en PDF]
 - **Claude / tú:** Claude escribe la búsqueda, el carrito, la división en pedidos, el PDF y la pantalla. Tú comparas dos listas reales en la tienda y revisas el PDF impreso.
 - **Pruebas:** Vitest para agrupar por producto, marcar solo cuando los precios difieren, diferencia en pesos y porcentaje, un borrador por proveedor con el costo por unidad base, carrito rechazado (vacío, artículo de otro producto, fracción de pieza), PIN del dueño para una cajera, PDF escapado con sus columnas, ahorro y dos gráficas, canales solo para el dueño, y la pantalla; Playwright de importar dos listas, comparar, cambiar de proveedor, sacar el PDF y crear el pedido.
-- **Criterios:** ADR 0068; sin dependencias nuevas; caja 0.2.3.
+- **Criterios:** ADR 0068; sin dependencias nuevas; caja 0.2.4.
 - **Depende de:** E1-51 · **Estimación:** 4 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué el proceso principal recalcula los precios del carrito en lugar de usar los de la pantalla? (2) ¿Cómo comparas una caja de 12 contra una pieza suelta sin usar decimales?
@@ -585,3 +585,13 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** F0-21, E1-51 · **Estimación:** 6 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué el modelo copia el precio como texto en lugar de devolver un número? (2) ¿Qué riesgos tiene aprobar en automático las filas que el modelo considera seguras?
+
+### E1-54 · Fondo de caja al entrar y corte al salir
+- **Objetivo:** al entrar sin caja abierta se pide el fondo de caja inicial; una cajera no vende sin él y el dueño puede «Solo administrar». Al cerrar la caja con la sesión abierta se pregunta si hacer el corte o salir dejándola abierta, y queda en la bitácora.
+- **Conceptos:** [Guardia de cierre en el proceso principal], [Fallar abierto ante un cierre forzado], [Bitácora de auditoría]
+- **Claude / tú:** Claude escribe el guardia, los diálogos y las pruebas. Tú pruebas en la tienda la entrada de una cajera y el cierre con Alt+F4.
+- **Pruebas:** Vitest del guardia de cierre (sin caja, preguntar, salir sin corte, corte hecho, cancelar, pantalla congelada o caída, apagado de Windows), de la apertura con su línea en la bitácora y de la pantalla (cajera sin salida, «Solo administrar» sin cobro, turno ya abierto, diálogo de salida); Playwright de entrar → fondo → venta, de «Solo administrar» y de las dos salidas.
+- **Criterios:** ADR 0070; un cierre forzado nunca se bloquea ni pierde datos; las ventas pendientes conservan su guardia.
+- **Depende de:** E1-21, E1-23 · **Estimación:** 4 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Por qué el cierre se decide en el proceso principal y no con `beforeunload` en la pantalla? (2) ¿Qué pasa si la pantalla se congela con la caja abierta y alguien cierra la ventana?

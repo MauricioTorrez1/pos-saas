@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+import { EXIT_CHANNELS, type ExitApi } from '../shared/exit-api';
 import { DASHBOARD_CHANNELS, type DashboardApi } from '../shared/dashboard-api';
 import { MISSING_CHANNELS, type MissingItemsApi } from '../shared/missing-items';
 import { IPC_CHANNELS, type PosApi } from '../shared/pos-api';
@@ -106,8 +107,21 @@ const supplierCatalogApi: SupplierCatalogApi = {
   exportCartPdf: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.exportCartPdf, request),
 };
 
+/** Closing the register with the cash still open (E1-54). The screen only hears about it and answers; main decides. */
+const exitApi: ExitApi = {
+  onExitRequested: (listener) => {
+    const handler = (): void => listener();
+    ipcRenderer.on(EXIT_CHANNELS.requested, handler);
+    return () => {
+      ipcRenderer.removeListener(EXIT_CHANNELS.requested, handler);
+    };
+  },
+  answerExit: (answer) => ipcRenderer.invoke(EXIT_CHANNELS.answer, answer),
+};
+
 contextBridge.exposeInMainWorld('pos', posApi);
 contextBridge.exposeInMainWorld('supplierCatalog', supplierCatalogApi);
+contextBridge.exposeInMainWorld('exit', exitApi);
 contextBridge.exposeInMainWorld('tools', toolsApi);
 contextBridge.exposeInMainWorld('purchasing', purchasingApi);
 contextBridge.exposeInMainWorld('missing', missingApi);

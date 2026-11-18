@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { test as base, expect, type ElectronApplication, type Page } from '@playwright/test';
 
-import { createTemporaryUserData, launchRegister, recordStartupOptions, removeTemporaryUserData, signInWindow } from './register-harness.ts';
+import { createTemporaryUserData, launchRegister, recordStartupOptions, removeTemporaryUserData, signInWindow, quitRegister } from './register-harness.ts';
 
 const APP_ROOT = join(import.meta.dirname, '..');
 const OUTSIDE_URL = 'https://example.com/';
@@ -19,7 +19,7 @@ const test = base.extend<{ electronApp: ElectronApplication; appWindow: Page }>(
     const userDataDir = createTemporaryUserData();
     const electronApp = await launchRegister(userDataDir, recordStartupOptions(userDataDir));
     await use(electronApp);
-    await electronApp.close();
+    await quitRegister(electronApp);
     await removeTemporaryUserData(userDataDir);
   },
   appWindow: async ({ electronApp }, use) => {

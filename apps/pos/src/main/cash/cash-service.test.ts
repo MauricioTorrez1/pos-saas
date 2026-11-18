@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DEFAULT_WITHDRAWAL_LIMIT_CENTS } from '../../shared/cash';
 import type { UserSummary } from '../../shared/auth';
+import { AuditLog } from '../audit/audit-log';
 import { AuthService } from '../auth/auth-service';
 import { UserStore } from '../auth/user-store';
 import type { SalePayment, SaleToSave } from '../checkout/sale-recorder';
@@ -30,7 +31,7 @@ beforeEach(() => {
   directory = mkdtempSync(join(tmpdir(), 'cash-'));
   store = LocalStore.open({ path: join(directory, 'pos.db'), appVersion: '1.0.0' });
   auth = new AuthService(new UserStore(store, TENANT));
-  cash = new CashService(new CashSessionStore(store, TENANT), auth);
+  cash = new CashService(new CashSessionStore(store, TENANT), auth, new AuditLog(store, TENANT));
   sales = new SaleStore(store, TENANT);
   owner = auth.setupOwner('Mauricio', '4321');
   auth.login(owner.id, '4321');
@@ -91,6 +92,22 @@ describe('opening the register (RF-024)', () => {
       session: { openedBy: 'Mauricio', openingFloatCents: 50000 },
       expected: { cashCents: 50000 },
     });
+  });
+
+  it('writes the opening of the shift in the audit log, with who and how much, in the same transaction (E1-54)', () => {
+    const result = cash.open(75000);
+
+    const rows = store.prepare("SELECT user_id, action, entity_id, detail FROM audit_log WHERE action = 'cash_session.opened'").all();
+    expect(rows).toEqual([
+      { user_id: owner.id, action: 'cash_session.opened', entity_id: result.cash.session?.id, detail: 'Mauricio abrió la caja con un fondo de 75000 centavos' },
+    ]);
+  });
+
+  it('writes nothing in the audit log when the cash was already open', () => {
+    cash.open(100);
+    cash.open(200);
+
+    expect(store.prepare("SELECT count(*) AS total FROM audit_log WHERE action = 'cash_session.opened'").get()).toEqual({ total: 1 });
   });
 
   it('accepts a float of zero', () => {
