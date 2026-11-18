@@ -147,9 +147,9 @@ export function PriceComparator({ catalogApi, onBack }: PriceComparatorProps): R
         const done = new Set(result.orders.map((order) => order.supplierName));
         setCart((previous) => previous.filter((line) => !done.has(chosenOf(line)?.item.supplierName ?? '')));
         const folios = result.orders.map((order) => `${formatFolio(order.folio)} para ${order.supplierName} (${formatCents(order.totalCents)})`).join(', ');
-        setNote(`Listo. Quedaron como borrador: ${folios}. Los ves en «Pedido al proveedor».`);
+        setNote(result.orders.length === 0 ? null : `Listo. Quedaron como borrador: ${folios}. Los ves en «Pedido al proveedor».`);
         if (result.status === 'partial') {
-          setMessage(`No se pudo guardar el pedido de ${result.failedSupplier}; sus productos siguen en el carrito.`);
+          setMessage(`No se pudo guardar el pedido de ${result.failedSupplier} (revisa que siga activo); sus productos siguen en el carrito.`);
         }
       } else {
         setMessage(describeProblem(result));
