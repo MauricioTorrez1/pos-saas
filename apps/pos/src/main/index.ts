@@ -47,6 +47,9 @@ import { electronExportPorts } from './purchasing/electron-export-ports';
 import { CatalogExporter } from './catalog-export/catalog-exporter';
 import { CatalogReader } from './catalog-export/catalog-reader';
 import { printLandscapePdf } from './catalog-export/landscape-pdf';
+import { ReportExporter } from './business-report/report-exporter';
+import { ReportReader } from './business-report/report-reader';
+import { printPagedPdf } from './reports/paged-pdf';
 import { OrderExporter } from './purchasing/order-exporter';
 import { PurchaseOrderService } from './purchasing/purchase-order-service';
 import { SupplierCatalogService } from './purchasing/supplier-catalog-service';
@@ -246,6 +249,16 @@ async function start(): Promise<void> {
       pickSavePath,
       renderPdf: printLandscapePdf,
       businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
+    }),
+    reportExporter: new ReportExporter({
+      view: dashboard,
+      reader: new ReportReader(store, LOCAL_TENANT_ID),
+      gate: new OwnerGate(auth, new AuditLog(store, LOCAL_TENANT_ID)),
+      audit: new AuditLog(store, LOCAL_TENANT_ID),
+      pickSavePath,
+      renderPdf: (html, footerText) => printPagedPdf(html, { landscape: false, footerText }),
+      businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
+      accent: () => appearance.read().accent,
     }),
   });
   const registerWindow = await openMainWindow(rendererEntry, PRELOAD_PATH);

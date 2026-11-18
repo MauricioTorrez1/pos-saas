@@ -106,6 +106,7 @@ test('exposes only the agreed functions through the bridge', async ({ appWindow 
     'exportDashboard',
     'getIncomeStatement',
     'exportIncomeStatement',
+    'exportBusinessReport',
     'getAppearance',
     'saveAppearance',
     'savePendingSale',

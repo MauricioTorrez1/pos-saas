@@ -47,6 +47,7 @@ const posApi: PosApi & PricingApi & ProductAdminApi & DashboardApi = {
   exportDashboard: (request, format) => ipcRenderer.invoke(DASHBOARD_CHANNELS.exportDashboard, { request, format }),
   getIncomeStatement: (request) => ipcRenderer.invoke(DASHBOARD_CHANNELS.getIncomeStatement, request),
   exportIncomeStatement: (request, format) => ipcRenderer.invoke(DASHBOARD_CHANNELS.exportIncomeStatement, { request, format }),
+  exportBusinessReport: (request) => ipcRenderer.invoke(DASHBOARD_CHANNELS.exportBusinessReport, request),
   getAppearance: () => ipcRenderer.invoke(IPC_CHANNELS.getAppearance),
   saveAppearance: (appearance) => ipcRenderer.invoke(IPC_CHANNELS.saveAppearance, appearance),
   savePendingSale: (request) => ipcRenderer.invoke(IPC_CHANNELS.savePendingSale, request),

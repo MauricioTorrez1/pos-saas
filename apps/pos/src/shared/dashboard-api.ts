@@ -236,7 +236,19 @@ export const DASHBOARD_CHANNELS = {
   exportDashboard: 'dashboard:export',
   getIncomeStatement: 'dashboard:income-statement',
   exportIncomeStatement: 'dashboard:export-income-statement',
+  exportBusinessReport: 'dashboard:export-business-report',
 } as const;
+
+/** What the illustrated report of the business is asked for (E1-57, ADR 0073): a period of the summary, never a shift. */
+export interface BusinessReportRequest {
+  readonly period: PeriodKind;
+  /** A day of the period as `YYYY-MM-DD`; for a custom range, the first day. */
+  readonly date: string;
+  /** For a custom range only: the last day, included. */
+  readonly endDate?: string;
+  /** The PIN of an owner, when a cashier asks (ADR 0047). */
+  readonly ownerPin?: string;
+}
 
 /** What the screen can ask of the dashboard. */
 export interface DashboardApi {
@@ -274,4 +286,13 @@ export interface DashboardApi {
    * @returns where it was saved, or why not
    */
   exportIncomeStatement(request: StatementRequest, format: ExportFormat): Promise<ExportResult>;
+
+  /**
+   * Saves the illustrated report of the whole business as one PDF, with charts and a plain reading of each section, asking
+   * where (E1-57, ADR 0073). Only an owner, or a cashier with the PIN of an owner.
+   *
+   * @param request the period and, for a cashier, the PIN of an owner
+   * @returns where it was saved, or why not
+   */
+  exportBusinessReport(request: BusinessReportRequest): Promise<ExportResult>;
 }

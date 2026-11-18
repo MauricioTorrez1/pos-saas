@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { UserSummary } from '../../shared/auth';
-import type { DashboardApi, DashboardRequest, DashboardResult, DashboardSummary, ExportResult, PeriodTotals } from '../../shared/dashboard-api';
+import type { BusinessReportRequest, DashboardApi, DashboardRequest, DashboardResult, DashboardSummary, ExportResult, PeriodTotals } from '../../shared/dashboard-api';
 import type {
   Expense,
   ExpenseListResult,
@@ -110,8 +110,9 @@ function apiWith(answer: (request: DashboardRequest) => DashboardResult, exportA
   const exportDashboard = vi.fn(() => Promise.resolve(exportAnswer));
   const getIncomeStatement = vi.fn(() => Promise.resolve<StatementResult>({ status: 'ok', statement: STATEMENT }));
   const exportIncomeStatement = vi.fn(() => Promise.resolve(exportAnswer));
-  const api: DashboardApi = { getDashboard, exportDashboard, getIncomeStatement, exportIncomeStatement };
-  return { api, getDashboard, exportDashboard, getIncomeStatement, exportIncomeStatement };
+  const exportBusinessReport = vi.fn((_request: BusinessReportRequest) => Promise.resolve(exportAnswer));
+  const api: DashboardApi = { getDashboard, exportDashboard, getIncomeStatement, exportIncomeStatement, exportBusinessReport };
+  return { api, getDashboard, exportDashboard, getIncomeStatement, exportIncomeStatement, exportBusinessReport };
 }
 
 const ok = (summary: DashboardSummary): DashboardResult => ({ status: 'ok', summary });
@@ -285,9 +286,32 @@ describe('the summary for the owner', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('saves the illustrated report with F5 for the period above, and says where (E1-57)', async () => {
+    const { api, exportBusinessReport } = apiWith(() => ok(summaryOf()), { status: 'saved', path: 'C:\Documentos\reporte.pdf' });
+    render(<DashboardDialog api={api} user={OWNER} onClose={() => undefined} />);
+    await screen.findByLabelText('Indicadores del periodo');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mes' }));
+    fireEvent.keyDown(window, { key: 'F5' });
+
+    expect((await screen.findByRole('status')).textContent).toContain('C:\Documentos\reporte.pdf');
+    expect(exportBusinessReport).toHaveBeenCalledWith(expect.objectContaining({ period: 'month' }));
+    expect(exportBusinessReport.mock.calls[0]?.[0]).not.toHaveProperty('ownerPin');
+  });
+
+  it('says it when the illustrated report could not be saved', async () => {
+    const { api } = apiWith(() => ok(summaryOf()), { status: 'failed', message: 'No se pudo guardar el archivo.' });
+    render(<DashboardDialog api={api} user={OWNER} onClose={() => undefined} />);
+    await screen.findByLabelText('Indicadores del periodo');
+
+    fireEvent.click(screen.getByRole('button', { name: /Reporte ilustrado/ }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('No se pudo guardar el archivo.');
+  });
+
   it('tells the person when the summary could not be read', async () => {
     const getDashboard = vi.fn(() => Promise.reject(new Error('boom')));
-    render(<DashboardDialog api={{ getDashboard, exportDashboard: vi.fn(), getIncomeStatement: vi.fn(), exportIncomeStatement: vi.fn() }} user={OWNER} onClose={() => undefined} />);
+    render(<DashboardDialog api={{ getDashboard, exportDashboard: vi.fn(), getIncomeStatement: vi.fn(), exportIncomeStatement: vi.fn(), exportBusinessReport: vi.fn() }} user={OWNER} onClose={() => undefined} />);
 
     expect((await screen.findByRole('alert')).textContent).toContain('No se pudo leer el resumen');
   });
@@ -335,6 +359,26 @@ describe('the summary for a cashier', () => {
     expect(screen.getByRole('group', { name: 'Periodo' })).toBeTruthy();
     expect(getDashboard).toHaveBeenLastCalledWith(expect.objectContaining({ ownerPin: '4321' }));
     expect(screen.queryByText(/Te quedan/)).toBeNull();
+  });
+
+  it('offers the illustrated report only with the PIN of an owner, and sends that PIN (E1-57)', async () => {
+    const answer = (request: DashboardRequest): DashboardResult => (request.ownerPin === '4321' ? ok(summaryOf()) : ok(SHIFT_SUMMARY));
+    const { api, exportBusinessReport } = apiWith(answer);
+    render(<DashboardDialog api={api} user={CASHIER} onClose={() => undefined} />);
+    await screen.findByText('Mi turno');
+
+    expect(screen.queryByRole('button', { name: /Reporte ilustrado/ })).toBeNull();
+    fireEvent.keyDown(window, { key: 'F5' });
+    expect(exportBusinessReport).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Ver el resumen completo/ }));
+    const pin = screen.getByLabelText('PIN del dueño');
+    fireEvent.change(pin, { target: { value: '4321' } });
+    fireEvent.keyDown(pin, { key: 'Enter' });
+    await screen.findByRole('heading', { name: 'Resumen del negocio' });
+
+    fireEvent.click(screen.getByRole('button', { name: /Reporte ilustrado/ }));
+    await waitFor(() => expect(exportBusinessReport).toHaveBeenCalledWith(expect.objectContaining({ ownerPin: '4321', period: 'day' })));
   });
 });
 

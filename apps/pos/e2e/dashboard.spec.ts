@@ -115,3 +115,33 @@ test('opens the income statement and counts an expense the owner writes down (E1
   await dashboard.getByRole('button', { name: 'Detallado' }).click();
   await expect(dashboard.getByRole('table', { name: 'Gastos de operación por concepto' })).toContainText('Luz');
 });
+
+test('saves the illustrated report of the business as one PDF after a sale (E1-57)', async ({ userDataDir, launch }) => {
+  const register = await launch();
+  const page = await signInWindow(register);
+
+  await page.keyboard.type(HAMMER_CODE);
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('status', { name: 'Total', exact: true })).toHaveText('$116.00');
+  await page.keyboard.press('F12');
+  await expect(page.getByRole('textbox', { name: 'Efectivo recibido' })).toBeFocused();
+  await page.keyboard.type('116');
+  await page.keyboard.press('F2');
+  await expect(page.getByRole('status', { name: 'Cambio a entregar' })).toHaveText('Sin cambio');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await page.keyboard.press('F11');
+  const dashboard = page.locator('dialog[aria-labelledby="dashboard-title"]');
+  await expect(dashboard.getByRole('heading', { name: 'Resumen del negocio' })).toBeVisible();
+
+  // The window to choose where to save is the one of Windows, so the test answers it with a path.
+  const reportPath = join(userDataDir, 'reporte-del-negocio.pdf');
+  await register.evaluate(({ dialog }, path) => {
+    dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: path });
+  }, reportPath);
+  await page.keyboard.press('F5');
+  await expect(dashboard.getByRole('status')).toContainText(reportPath, { timeout: 30_000 });
+  // The sections and their charts are checked in Vitest; here, that Electron printed a real PDF of them.
+  expect(readFileSync(reportPath).subarray(0, 5).toString()).toBe('%PDF-');
+});
