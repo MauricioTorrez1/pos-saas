@@ -46,6 +46,7 @@ import { ProductReader } from './products/product-reader';
 import { electronExportPorts } from './purchasing/electron-export-ports';
 import { OrderExporter } from './purchasing/order-exporter';
 import { PurchaseOrderService } from './purchasing/purchase-order-service';
+import { SupplierCatalogService } from './purchasing/supplier-catalog-service';
 import { SupplierService } from './purchasing/supplier-service';
 import { ProductService } from './products/product-service';
 import { seedSampleCatalogIfEmpty } from './local-store/sample-catalog';
@@ -218,6 +219,10 @@ async function start(): Promise<void> {
       printer,
       audit: new AuditLog(store, LOCAL_TENANT_ID),
       businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
+    },
+    supplierCatalog: {
+      catalog: new SupplierCatalogService(store, LOCAL_TENANT_ID, new AuditLog(store, LOCAL_TENANT_ID), suppliers),
+      pickFile: (title) => pickPath(['openFile'], title),
     },
     expenses: new ExpenseBook(store, LOCAL_TENANT_ID, cashStore, new OwnerGate(auth, new AuditLog(store, LOCAL_TENANT_ID)), new AuditLog(store, LOCAL_TENANT_ID)),
     missingItems: {

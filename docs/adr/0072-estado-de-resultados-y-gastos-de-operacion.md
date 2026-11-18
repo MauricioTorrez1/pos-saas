@@ -10,7 +10,7 @@ El «Resumen del negocio» ya calcula ventas con y sin IVA, devoluciones, costo 
 
 ## Decisiones
 
-**Gastos en su propia tabla.** La migración local 21 crea `expense`:
+**Gastos en su propia tabla.** La migración local 22 crea `expense`:
 - concepto (texto), monto en centavos (entero mayor que cero), día local `YYYY-MM-DD`, nota opcional;
 - `paid_from_drawer` y, si se pagó de la caja, `cash_movement_id`;
 - quién lo anotó y quién lo autorizó;

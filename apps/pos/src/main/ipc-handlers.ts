@@ -50,6 +50,7 @@ import type { AppearanceStore } from './local-store/appearance-store';
 import type { ProductCatalog } from './local-store/product-catalog';
 import { registerMissingItemsHandlers, type MissingItemsServices } from './missing/missing-items-ipc';
 import { registerPurchasingHandlers, type PurchasingServices } from './purchasing/purchasing-ipc';
+import { registerSupplierCatalogHandlers, type SupplierCatalogServices } from './purchasing/supplier-catalog-ipc';
 import { registerToolsHandlers, type ToolsServices } from './tools/tools-ipc';
 import { assertTrustedSender } from './trusted-url';
 
@@ -77,6 +78,7 @@ export interface IpcServices {
   readonly tools: ToolsServices;
   /** The log of what customers ask for and the store does not carry (E1-49). */
   readonly missingItems: MissingItemsServices;
+  readonly supplierCatalog: SupplierCatalogServices;
   /** The operating expenses of the business (E1-56). */
   readonly expenses: ExpenseBook;
 }
@@ -108,7 +110,7 @@ function requireLookupText(value: unknown): string {
  */
 export function registerIpcHandlers(
   rendererEntry: string,
-  { auth, cash, returns, admin, inventory, reports, dashboard, dashboardExporter, catalog, prices, products, appearance, pendingSales, salePayments, purchasing, tools, missingItems, expenses }: IpcServices,
+  { auth, cash, returns, admin, inventory, reports, dashboard, dashboardExporter, catalog, prices, products, appearance, pendingSales, salePayments, purchasing, tools, missingItems, supplierCatalog, expenses }: IpcServices,
 ): void {
   const answerScreen = <Result>(channel: string, respond: (argument: unknown) => Result): void => {
     ipcMain.handle(channel, (event, argument: unknown) => {
@@ -207,4 +209,5 @@ export function registerIpcHandlers(
   registerPurchasingHandlers(answerSignedIn, purchasing);
   registerToolsHandlers(answerSignedIn, (message) => new NotAllowedError(message), tools);
   registerMissingItemsHandlers(answerSignedIn, (message) => new NotAllowedError(message), missingItems);
+  registerSupplierCatalogHandlers(answerSignedIn, (message) => new NotAllowedError(message), supplierCatalog);
 }

@@ -112,7 +112,7 @@ When a customer brings something that is not in the catalog imported from Eleven
 - **Export:** **F3** saves an Excel file (`.xlsx`, written without a library) and **F4** a PDF (printed by Electron's `webContents.printToPDF`). The window to choose where to save is the one of Windows, and a file never has more than the screen had. For the owner, both carry the income statement of the same period.
 - **Groups (E1-56):** «Resumen» reads in labeled groups: Ventas, Clientes y tickets, Rentabilidad, Devoluciones y cancelaciones, Formas de pago, Caja (cash in, cash out and the expenses paid from the drawer, sales by cashier) and Cuándo se vende (the charts).
 - **Estado de resultados (E1-56, [ADR 0072](../../docs/adr/0072-estado-de-resultados-y-gastos-de-operacion.md)):** owner or owner PIN only. Net sales, cost of goods sold, gross profit, operating expenses, operating profit and net profit before income tax, each with its share of net sales and a plain sentence under it; a detailed view by VAT rate, returns and discounts, the ten products that cost the most and the expenses by concept. For the chosen period or «Desde el inicio». Everything is without VAT: the VAT charged is shown apart, because it belongs to the tax office. Products sold without a cost are counted in the sales, left out of the cost and flagged. From this tab, F3 and F4 save the statement alone.
-- **Gastos (E1-56):** the owner (or a cashier with the owner PIN) writes down an expense: a concept from a short list the owner edits, the amount, the day, a note, and whether the cash came out of the drawer. An expense never changes; a mistake is voided with a reason, and everything is in the audit log. One paid from the drawer writes its cash exit in the same transaction (migration 21), so the cut subtracts it once and the statement counts it once; voiding it while that session is open puts the cash back.
+- **Gastos (E1-56):** the owner (or a cashier with the owner PIN) writes down an expense: a concept from a short list the owner edits, the amount, the day, a note, and whether the cash came out of the drawer. An expense never changes; a mistake is voided with a reason, and everything is in the audit log. One paid from the drawer writes its cash exit in the same transaction (migration 22), so the cut subtracts it once and the statement counts it once; voiding it while that session is open puts the cash back.
 
 Money is kept in whole cents and costs in millionths of a peso, with no floating point; the rounding of each figure is written in the ADR. The queries are aggregates in SQLite over three indexes added by migration 17: with 5,000 sales and 15,000 lines in a year, the year answers in about 100 ms.
 
@@ -130,6 +130,17 @@ Money is kept in whole cents and costs in millionths of a peso, with no floating
 | Who | The owner. A cashier sees everything and types the PIN of an owner to save, send, discard, export or set a minimum. Every refusal is written in the audit log |
 | One transaction | Each change, its audit entry and, when it travels, its operation in `sync_outbox` (`supplier.upserted`, `supplier_product.upserted`, `purchase_order.sent`) are written together or not at all. Drafts and minimums do not travel. The core receives them in F2-11 and F2-12 |
 
+
+## Supplier price lists
+In the suppliers, the owner picks a supplier and presses **F5** "Lista de precios" ([ADR 0068](../../docs/adr/0068-listas-de-precios-de-proveedores-y-comparador.md)). Cashiers do not see it, and its channels refuse them.
+
+| Rule | How it works |
+| --- | --- |
+| File | Excel `.xlsx` or CSV, up to 20 MB and 20,000 items. The header is found in the first 15 rows. The CSV of a paper catalog (E1-53, `supplier_code,description,purchase_unit,pieces_per_unit,cost`) is recognized without choosing columns. |
+| Columns | Code, description and cost are required; presentation, pieces per presentation and barcode are optional. The choice is remembered per supplier. |
+| Money | Costs in pesos with up to 6 decimals ("$1,234.50" works). The screen asks whether they include VAT (default no); if yes, 16 % is taken out. The cost per base unit is the cost of the presentation divided by its pieces, with integers. |
+| Replace | Importing replaces the supplier's whole list in one transaction and keeps the date of the list. A file with no readable row keeps the previous list. |
+| Links | By the code the product already has with that supplier, then by barcode. The rest are "Sin ligar" and the owner links each one once; the next list remembers it. Imports and links are in the audit log. |
 ## Settings, sales list and price for one sale
 Since [ADR 0061](../../docs/adr/0061-rediseno-de-la-caja-y-herramientas-del-dueno.md) the register has three more things on the sale screen. The keys below are the defaults; the owner changes them in the settings.
 

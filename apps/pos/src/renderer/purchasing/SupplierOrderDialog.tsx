@@ -1,6 +1,7 @@
 import { formatCents } from '@pos-saas/money';
 import { useEffect, useState, type ReactElement } from 'react';
 
+import type { SupplierCatalogApi } from '../../shared/supplier-catalog';
 import { formatFolio, type PurchaseOrderSummary, type PurchasingApi, type Supplier } from '../../shared/supplier-order';
 import { formatSaleMoment } from '../sale/format';
 import { Message, useAction } from '../ui/form-parts';
@@ -16,6 +17,8 @@ type View =
 
 interface SupplierOrderDialogProps {
   readonly api: PurchasingApi;
+  /** The price lists of the suppliers; the owner reaches them from the suppliers. */
+  readonly catalogApi?: SupplierCatalogApi;
   /** The owner needs no PIN, and a cashier has to type the one of an owner to save, send or export. */
   readonly isOwner: boolean;
   readonly onClose: () => void;
@@ -27,11 +30,12 @@ interface SupplierOrderDialogProps {
  * it works with no internet.
  *
  * @param props.api bridge of the purchase order
+ * @param props.catalogApi bridge of the supplier price lists, when the register offers it
  * @param props.isOwner whether the person at the register is the owner
  * @param props.onClose called when the person closes the dialog
  * @returns the dialog
  */
-export function SupplierOrderDialog({ api, isOwner, onClose }: SupplierOrderDialogProps): ReactElement {
+export function SupplierOrderDialog({ api, catalogApi, isOwner, onClose }: SupplierOrderDialogProps): ReactElement {
   const [view, setView] = useState<View>({ kind: 'list' });
   const [orders, setOrders] = useState<readonly PurchaseOrderSummary[] | null>(null);
   const [suppliers, setSuppliers] = useState<readonly Supplier[] | null>(null);
@@ -74,7 +78,7 @@ export function SupplierOrderDialog({ api, isOwner, onClose }: SupplierOrderDial
           onBack={backToList}
         />
       ) : view.kind === 'suppliers' ? (
-        <SupplierManager api={api} isOwner={isOwner} onChanged={() => void api.listSuppliers(false).then(setSuppliers)} onBack={backToList} />
+        <SupplierManager api={api} {...(catalogApi === undefined ? {} : { catalogApi })} isOwner={isOwner} onChanged={() => void api.listSuppliers(false).then(setSuppliers)} onBack={backToList} />
       ) : (
         <>
           <h2 id="order-title">Pedido al proveedor</h2>

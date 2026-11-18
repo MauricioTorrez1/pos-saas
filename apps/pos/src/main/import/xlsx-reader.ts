@@ -18,7 +18,7 @@ const DEFLATED = 8;
 /** A list of products never unpacks to more than this, and a file that claims to is refused instead of filling the memory. */
 const MAX_UNPACKED_BYTES = 64 * 1024 * 1024;
 /** Excel keeps numbers as binary fractions, so 19.99 may come as 19.989999999999998. Prices carry four decimals at most. */
-const DECIMALS_KEPT = 4;
+const DEFAULT_DECIMALS_KEPT = 4;
 
 interface ZipEntry {
   readonly name: string;
@@ -33,10 +33,11 @@ interface ZipEntry {
  * files, and Node unpacks them. Formulas give their last saved value, and dates come as the number Excel keeps.
  *
  * @param bytes the whole file
+ * @param decimalsKept the decimals a number is rounded to when Excel stored it with noise: 4 for prices, 6 for costs
  * @returns the rows of the first sheet, each one a list of cells; a missing cell is an empty text
  * @throws WorkbookError if the file is not a workbook, is damaged, or is too large
  */
-export function readXlsxTable(bytes: Uint8Array): string[][] {
+export function readXlsxTable(bytes: Uint8Array, decimalsKept: number = DEFAULT_DECIMALS_KEPT): string[][] {
   const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const entries = readDirectory(buffer);
   const sheet = pickFirstSheet(entries);
@@ -45,7 +46,7 @@ export function readXlsxTable(bytes: Uint8Array): string[][] {
   }
   const sharedEntry = entries.find((entry) => entry.name === 'xl/sharedStrings.xml');
   const shared = sharedEntry === undefined ? [] : readSharedStrings(unpack(buffer, sharedEntry).toString('utf8'));
-  return readSheet(unpack(buffer, sheet).toString('utf8'), shared);
+  return readSheet(unpack(buffer, sheet).toString('utf8'), shared, decimalsKept);
 }
 
 function readDirectory(buffer: Buffer): ZipEntry[] {
@@ -122,7 +123,7 @@ function textOf(xml: string): string {
   return [...visible.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/gu)].map(([, text]) => unescapeXml(text ?? '')).join('');
 }
 
-function readSheet(xml: string, shared: readonly string[]): string[][] {
+function readSheet(xml: string, shared: readonly string[], decimalsKept: number): string[][] {
   const table: string[][] = [];
   for (const [, rowXml] of xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/gu)) {
     const row: string[] = [];
@@ -134,14 +135,14 @@ function readSheet(xml: string, shared: readonly string[]): string[][] {
       while (row.length < column) {
         row.push('');
       }
-      row[column] = cellText(attributes ?? '', body ?? '', shared);
+      row[column] = cellText(attributes ?? '', body ?? '', shared, decimalsKept);
     }
     table.push(row);
   }
   return table.filter((fields) => fields.some((value) => value.trim() !== ''));
 }
 
-function cellText(attributes: string, body: string, shared: readonly string[]): string {
+function cellText(attributes: string, body: string, shared: readonly string[], decimalsKept: number): string {
   const type = /\bt="([^"]+)"/u.exec(attributes)?.[1];
   if (type === 'inlineStr') {
     return textOf(body);
@@ -156,22 +157,22 @@ function cellText(attributes: string, body: string, shared: readonly string[]): 
   if (type === 'str' || type === 'b' || type === 'e') {
     return unescapeXml(value);
   }
-  return tidyNumber(value);
+  return tidyNumber(value, decimalsKept);
 }
 
 /**
  * Cleans a number as Excel stores it. 19.989999999999998 and 1.5E2 become 19.99 and 150, which is what the owner typed.
  * Text that is not a number is returned untouched.
  */
-function tidyNumber(text: string): string {
+function tidyNumber(text: string, decimalsKept: number): string {
   const trimmed = text.trim();
   if (!/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/u.test(trimmed)) {
     return trimmed;
   }
-  if (/^-?\d+(\.\d{1,4})?$/u.test(trimmed)) {
+  if (/^-?\d+(\.\d+)?$/u.test(trimmed) && (trimmed.split('.')[1] ?? '').length <= decimalsKept) {
     return trimmed;
   }
-  const rounded = Number(trimmed).toFixed(DECIMALS_KEPT);
+  const rounded = Number(trimmed).toFixed(decimalsKept);
   return rounded.includes('.') ? rounded.replace(/0+$/u, '').replace(/\.$/u, '') : rounded;
 }
 
