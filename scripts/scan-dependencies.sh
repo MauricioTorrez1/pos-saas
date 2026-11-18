@@ -46,7 +46,7 @@ scan_log="$(mktemp)"
 trap 'rm -f "$scan_log"' EXIT
 
 status=0
-osv-scanner scan source "${lockfile_flags[@]}" 2>&1 | tee "$scan_log" || status="${PIPESTATUS[0]}"
+osv-scanner scan source --config=osv-scanner.toml "${lockfile_flags[@]}" 2>&1 | tee "$scan_log" || status="${PIPESTATUS[0]}"
 
 # OSV-Scanner skips a package it cannot look up and still reports a clean result.
 if grep --quiet "local/unscannable" "$scan_log"; then
