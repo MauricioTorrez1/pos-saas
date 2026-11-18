@@ -53,6 +53,24 @@ function withCookies(response: NextResponse, pending: PendingCookies): NextRespo
 }
 
 /**
+ * Builds the headers that go on to the page or the Server Action, with the renewed session cookie in place of the
+ * old one. Without this, a POST (a Server Action) renewed here would still carry the old token, and the action could
+ * not renew it again because the refresh token was already spent.
+ */
+function forwardedHeaders(request: NextRequest, pending: PendingCookies): Headers {
+  const jar = new Map(request.cookies.getAll().map((cookie) => [cookie.name, cookie.value] as const));
+  for (const name of pending.deletes) {
+    jar.delete(name);
+  }
+  for (const [name, { value }] of pending.sets) {
+    jar.set(name, value);
+  }
+  const headers = new Headers(request.headers);
+  headers.set('cookie', [...jar].map(([name, value]) => `${name}=${value}`).join('; '));
+  return headers;
+}
+
+/**
  * Guards every page except the home and `/auth/*`.
  *
  * Without a session the visitor goes to the home page. An access token that is about to expire is
@@ -103,7 +121,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
       return withCookies(NextResponse.rewrite(new URL('/forbidden', request.url)), pending);
     }
   }
-  return withCookies(NextResponse.next(), pending);
+  const next = renewed ? NextResponse.next({ request: { headers: forwardedHeaders(request, pending) } }) : NextResponse.next();
+  return withCookies(next, pending);
 }
 
 export const config = {

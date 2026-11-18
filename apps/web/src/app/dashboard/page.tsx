@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Brand } from '@/components/brand';
 import { CoreStatus } from '@/components/core-status';
@@ -36,6 +37,13 @@ export default async function DashboardPage() {
           <h1>Hola, bienvenido</h1>
           <p>Esto es lo que el sistema sabe de tu sesión.</p>
         </div>
+        {me.status === 'ok' && (me.role === 'owner' || me.role === 'manager') && (
+          <p className="shell__heading">
+            <Link className="button" href="/catalog">
+              Abrir el catálogo
+            </Link>
+          </p>
+        )}
         <div className="grid">
           <section className="panel" aria-labelledby="tenant-label">
             <h2 id="tenant-label" className="panel__label">
