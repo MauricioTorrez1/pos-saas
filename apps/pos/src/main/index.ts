@@ -48,6 +48,7 @@ import { CatalogReader } from './catalog-export/catalog-reader';
 import { printLandscapePdf } from './catalog-export/landscape-pdf';
 import { OrderExporter } from './purchasing/order-exporter';
 import { PurchaseOrderService } from './purchasing/purchase-order-service';
+import { SupplierCatalogService } from './purchasing/supplier-catalog-service';
 import { SupplierService } from './purchasing/supplier-service';
 import { ProductService } from './products/product-service';
 import { seedSampleCatalogIfEmpty } from './local-store/sample-catalog';
@@ -220,6 +221,10 @@ async function start(): Promise<void> {
       printer,
       audit: new AuditLog(store, LOCAL_TENANT_ID),
       businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
+    },
+    supplierCatalog: {
+      catalog: new SupplierCatalogService(store, LOCAL_TENANT_ID, new AuditLog(store, LOCAL_TENANT_ID), suppliers),
+      pickFile: (title) => pickPath(['openFile'], title),
     },
     missingItems: {
       log: new MissingItemsLog(store, LOCAL_TENANT_ID, new AuditLog(store, LOCAL_TENANT_ID)),

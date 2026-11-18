@@ -781,4 +781,76 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'what was asked for never changes, only the notes'); END;
     `,
   },
+  {
+    version: 21,
+    name: 'create_supplier_price_lists',
+    // The price lists of the suppliers (E1-51, ADR 0068). Importing a list replaces every item of that supplier in one
+    // transaction, so supplier_catalog_item only ever holds the latest list. list_cost_e6 is the cost of one purchase unit
+    // before VAT, and pieces_per_unit_milli says how many base units of the product come in it, so two suppliers that sell
+    // by the box and by the piece compare per piece. product_id stays null until the item is linked ("sin ligar"); the
+    // links the owner makes by hand live in supplier_catalog_link, so a new list of the same supplier finds them again.
+    // supplier_price_list_settings remembers how each supplier's file maps to the columns. The search index ignores
+    // accents like the one of the products, so «cinta de aislar» finds «CINTA DE AISLAR 3/4"».
+    sql: `
+      CREATE TABLE supplier_catalog_item (
+        local_rowid INTEGER PRIMARY KEY,
+        id TEXT NOT NULL UNIQUE,
+        tenant_id TEXT NOT NULL,
+        supplier_id TEXT NOT NULL REFERENCES supplier (id),
+        supplier_code TEXT NOT NULL COLLATE NOCASE CHECK (length(trim(supplier_code)) BETWEEN 1 AND 64),
+        description TEXT NOT NULL CHECK (length(trim(description)) BETWEEN 1 AND 200),
+        purchase_unit TEXT CHECK (purchase_unit IS NULL OR length(purchase_unit) <= 60),
+        pieces_per_unit_milli INTEGER NOT NULL CHECK (pieces_per_unit_milli BETWEEN 1 AND 100000000),
+        list_cost_e6 INTEGER NOT NULL CHECK (list_cost_e6 BETWEEN 0 AND 1000000000000),
+        product_id TEXT REFERENCES product (id) ON DELETE SET NULL,
+        link_origin TEXT CHECK (link_origin IS NULL OR link_origin IN ('supplier_code', 'barcode', 'manual')),
+        list_date TEXT NOT NULL CHECK (length(list_date) = 10),
+        source TEXT NOT NULL CHECK (source IN ('file', 'paper')),
+        UNIQUE (tenant_id, supplier_id, supplier_code)
+      ) STRICT;
+
+      CREATE INDEX supplier_catalog_item_by_product ON supplier_catalog_item (tenant_id, product_id);
+
+      CREATE VIRTUAL TABLE supplier_catalog_search USING fts5(
+        description,
+        supplier_code,
+        content = 'supplier_catalog_item',
+        content_rowid = 'local_rowid',
+        tokenize = 'unicode61 remove_diacritics 2',
+        prefix = '2 3'
+      );
+
+      CREATE TRIGGER supplier_catalog_search_after_insert AFTER INSERT ON supplier_catalog_item BEGIN
+        INSERT INTO supplier_catalog_search (rowid, description, supplier_code) VALUES (new.local_rowid, new.description, new.supplier_code);
+      END;
+
+      CREATE TRIGGER supplier_catalog_search_after_delete AFTER DELETE ON supplier_catalog_item BEGIN
+        INSERT INTO supplier_catalog_search (supplier_catalog_search, rowid, description, supplier_code) VALUES ('delete', old.local_rowid, old.description, old.supplier_code);
+      END;
+
+      CREATE TRIGGER supplier_catalog_search_after_update AFTER UPDATE OF description, supplier_code ON supplier_catalog_item BEGIN
+        INSERT INTO supplier_catalog_search (supplier_catalog_search, rowid, description, supplier_code) VALUES ('delete', old.local_rowid, old.description, old.supplier_code);
+        INSERT INTO supplier_catalog_search (rowid, description, supplier_code) VALUES (new.local_rowid, new.description, new.supplier_code);
+      END;
+
+      CREATE TABLE supplier_catalog_link (
+        tenant_id TEXT NOT NULL,
+        supplier_id TEXT NOT NULL REFERENCES supplier (id),
+        supplier_code TEXT NOT NULL COLLATE NOCASE,
+        product_id TEXT NOT NULL REFERENCES product (id) ON DELETE CASCADE,
+        linked_by TEXT NOT NULL,
+        linked_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, supplier_id, supplier_code)
+      ) STRICT, WITHOUT ROWID;
+
+      CREATE TABLE supplier_price_list_settings (
+        tenant_id TEXT NOT NULL,
+        supplier_id TEXT NOT NULL REFERENCES supplier (id),
+        column_mapping TEXT NOT NULL CHECK (json_valid(column_mapping)),
+        costs_include_vat INTEGER NOT NULL CHECK (costs_include_vat IN (0, 1)),
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, supplier_id)
+      ) STRICT, WITHOUT ROWID;
+    `,
+  },
 ];
