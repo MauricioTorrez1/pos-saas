@@ -316,8 +316,17 @@ describe('the reports of a backdated sale', () => {
   });
 
   it('count it in the daily report of its day', () => {
-    expect(reports.daily(yesterday)).toMatchObject({ salesCount: 1, totalCents: 11_600 });
-    expect(reports.daily(today)).toMatchObject({ salesCount: 0 });
+    // The daily report cuts days in the time zone of the process, which is the zone of the register in the store but UTC on
+    // CI, so the days are read in that same zone from the moments of the sale.
+    const { business_at: businessAt, resolved_at: resolvedAt } = store
+      .prepare("SELECT business_at, resolved_at FROM sale WHERE status = 'completed'")
+      .get() as unknown as { business_at: string; resolved_at: string };
+    const processDayOf = (moment: string) => {
+      const at = new Date(moment);
+      return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+    };
+    expect(reports.daily(processDayOf(businessAt))).toMatchObject({ salesCount: 1, totalCents: 11_600 });
+    expect(reports.daily(processDayOf(resolvedAt))).toMatchObject({ salesCount: 0 });
   });
 });
 
