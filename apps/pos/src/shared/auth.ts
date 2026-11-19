@@ -1,3 +1,5 @@
+import type { CaptureDayRefusal } from './capture-day';
+
 /** What a person can do at the register. The owner can do everything, and a cashier cannot authorize or manage people. */
 export const USER_ROLES = ['owner', 'cashier'] as const;
 
@@ -18,7 +20,9 @@ export type LoginResult =
   | { readonly status: 'wrong_pin'; readonly attemptsLeft: number }
   /** Too many wrong PINs. Even the right one is refused until this moment, in ISO 8601. */
   | { readonly status: 'locked'; readonly until: string }
-  | { readonly status: 'unknown_user' };
+  | { readonly status: 'unknown_user' }
+  /** A past day to capture was refused (E1-60). */
+  | CaptureDayRefusal;
 
 /** The longest name a person can have at the register. */
 export const MAX_USER_NAME_LENGTH = 40;

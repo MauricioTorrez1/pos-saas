@@ -98,6 +98,7 @@ export class SalePayments {
     const ticket = toTicketData(this.#reprint.businessName(), last.sale, {
       folio: last.folio,
       completedAt: last.completedAt,
+      businessDay: last.businessDay ?? null,
       payments: last.payments,
       changeCents: null,
       isReprint: true,

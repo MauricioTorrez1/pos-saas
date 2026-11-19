@@ -77,11 +77,12 @@ test('says how many tries are left, and locks the person after five wrong PINs, 
   await pin.fill('0000');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('alert')).toContainText('Te quedan 4 intentos');
-  for (let attempt = 0; attempt < 4; attempt += 1) {
+  // Each answer is awaited: a PIN typed before the last one came back would be wiped by it and never sent.
+  for (const answer of ['Te quedan 3 intentos', 'Te quedan 2 intentos', 'Te quedan 1 intento', 'Se bloqueó']) {
     await pin.fill('0000');
     await page.keyboard.press('Enter');
+    await expect(page.getByRole('alert')).toContainText(answer);
   }
-  await expect(page.getByRole('alert')).toContainText('Se bloqueó');
   await pin.fill(TEST_OWNER.pin);
   await page.keyboard.press('Enter');
   await expect(page.getByRole('alert')).toContainText('Demasiados intentos');

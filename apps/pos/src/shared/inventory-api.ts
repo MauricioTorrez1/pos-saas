@@ -10,6 +10,8 @@ export interface KardexRow {
   readonly quantityMilli: number;
   /** The stock after this movement. */
   readonly balanceMilli: number;
+  /** The past day of a backdated sale, or null when it counts on the day it happened (E1-60). */
+  readonly businessDay?: string | null;
 }
 
 /** The history of a product and its stock, which always agree (RF-031). */

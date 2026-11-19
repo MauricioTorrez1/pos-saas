@@ -14,6 +14,7 @@ import { StockStore } from './inventory/stock-store';
 
 import { AuthService } from './auth/auth-service';
 import { CashService } from './cash/cash-service';
+import { CaptureDays } from './cash/capture-days';
 import { CashSessionStore } from './cash/cash-session-store';
 import { UserStore } from './auth/user-store';
 import { PendingSales } from './checkout/pending-sales';
@@ -156,7 +157,11 @@ async function start(): Promise<void> {
   const catalog = new ProductCatalog(store, LOCAL_TENANT_ID);
   const sales = new SaleStore(store, LOCAL_TENANT_ID);
   const appearance = new AppearanceStore(store, LOCAL_TENANT_ID);
-  const auth = new AuthService(new UserStore(store, LOCAL_TENANT_ID));
+  // A session may capture the sales of a recent past day with the approval of an owner (E1-60, ADR 0074).
+  const auth = new AuthService(new UserStore(store, LOCAL_TENANT_ID), undefined, {
+    captureDays: new CaptureDays(store, LOCAL_TENANT_ID),
+    audit: new AuditLog(store, LOCAL_TENANT_ID),
+  });
   const cashStore = new CashSessionStore(store, LOCAL_TENANT_ID);
   const cash = new CashService(cashStore, auth, new AuditLog(store, LOCAL_TENANT_ID));
   const admin = new AdminActions({
@@ -206,7 +211,8 @@ async function start(): Promise<void> {
     cash,
     prices,
     products,
-    returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, cash),
+    // A return happens today, so its refund always leaves today's drawer, even during a backdated capture (E1-60).
+    returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, { openSessionId: () => cashStore.findOpen()?.id ?? null }),
     admin,
     inventory,
     reports: new ReportService(store, LOCAL_TENANT_ID, auth),
@@ -266,7 +272,7 @@ async function start(): Promise<void> {
   guardWindowClose(
     registerWindow,
     new ExitGuard({
-      openSession: () => cashStore.findOpen(),
+      openSession: () => cashStore.findOpen(auth.captureDay()),
       currentUserId: () => auth.currentUser()?.id ?? null,
       audit: new AuditLog(store, LOCAL_TENANT_ID),
       askScreen: () => {

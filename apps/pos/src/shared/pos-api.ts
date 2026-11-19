@@ -1,6 +1,7 @@
 import type { Quantity, TaxRate, Unit } from '@pos-saas/money';
 
 import type { Appearance } from './appearance';
+import type { CaptureDayRequest } from './capture-day';
 import type { BackupOutcome, BackupStatus, ImportOutcome, RestoreOutcome } from './admin-api';
 import type { LoginResult, UserRole, UserSummary } from './auth';
 import type { AdjustStockRequest, AdjustStockResult, Kardex, LedgerCheck } from './inventory-api';
@@ -199,6 +200,10 @@ export interface AuthState {
   readonly needsSetup: boolean;
   readonly users: readonly UserSummary[];
   readonly current: UserSummary | null;
+  /** The past day the session captures, or null when it sells today (E1-60). */
+  readonly captureDay?: string | null;
+  /** The days the sign-in offers, today first. Empty when only today can be sold. */
+  readonly captureDays?: readonly string[];
 }
 
 /** Everything the screen can ask of the main process. */
@@ -353,10 +358,10 @@ ecorded with the new status, or why not
   /**
    * Signs a person in with their PIN. It works without internet.
    *
-   * @param request the person and their PIN
-   * @returns ok, or why not: a wrong PIN with the tries left, or a lock after five wrong ones
+   * @param request the person and their PIN, and the past day to capture with the PIN of an owner when one was chosen
+   * @returns ok, or why not: a wrong PIN with the tries left, a lock after five wrong ones, or a refused day (E1-60)
    */
-  login(request: { readonly userId: string; readonly pin: string }): Promise<LoginResult>;
+  login(request: { readonly userId: string; readonly pin: string; readonly capture?: CaptureDayRequest }): Promise<LoginResult>;
 
   /**
    * Signs out whoever is signed in.

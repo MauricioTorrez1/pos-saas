@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactElement } from 'react';
 
 import { MAX_USER_NAME_LENGTH, type UserSummary } from '../../shared/auth';
+import { captureDayLabel, type CaptureDayRequest } from '../../shared/capture-day';
 import type { AuthState, PosApi } from '../../shared/pos-api';
 
 const ROLE_LABELS = { owner: 'Dueño', cashier: 'Cajero' } as const;
@@ -31,7 +32,7 @@ export function LoginScreen({ posApi, authState, onSignedIn }: LoginScreenProps)
         {authState.needsSetup ? (
           <OwnerSetup posApi={posApi} onSignedIn={onSignedIn} />
         ) : (
-          <SignIn posApi={posApi} users={authState.users} onSignedIn={onSignedIn} />
+          <SignIn posApi={posApi} users={authState.users} captureDays={authState.captureDays ?? []} onSignedIn={onSignedIn} />
         )}
       </section>
     </main>
@@ -41,12 +42,19 @@ export function LoginScreen({ posApi, authState, onSignedIn }: LoginScreenProps)
 interface SignInProps {
   readonly posApi: PosApi;
   readonly users: readonly UserSummary[];
+  /** The days a session may capture, today first (E1-60). With one or none, the screen does not ask. */
+  readonly captureDays: readonly string[];
   readonly onSignedIn: (user: UserSummary) => void;
 }
 
-function SignIn({ posApi, users, onSignedIn }: SignInProps): ReactElement {
+function SignIn({ posApi, users, captureDays, onSignedIn }: SignInProps): ReactElement {
   const [selectedId, setSelectedId] = useState(users[0]?.id ?? '');
   const [pin, setPin] = useState('');
+  const today = captureDays[0] ?? '';
+  const [captureDay, setCaptureDay] = useState(today);
+  const [ownerPin, setOwnerPin] = useState('');
+  const isPastDay = captureDay !== today;
+  const needsOwnerPin = isPastDay && users.find(({ id }) => id === selectedId)?.role !== 'owner';
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const pinRef = useRef<HTMLInputElement>(null);
@@ -78,12 +86,14 @@ function SignIn({ posApi, users, onSignedIn }: SignInProps): ReactElement {
     }
     setIsBusy(true);
     try {
-      const result = await posApi.login({ userId: selectedId, pin });
+      const capture: CaptureDayRequest | undefined = isPastDay ? { day: captureDay, ...(needsOwnerPin ? { ownerPin } : {}) } : undefined;
+      const result = await posApi.login({ userId: selectedId, pin, ...(capture === undefined ? {} : { capture }) });
       if (result.status === 'ok') {
         onSignedIn(result.user);
         return;
       }
       setPin('');
+      setOwnerPin('');
       pinRef.current?.focus();
       setMessage(describeRefusal(result));
     } catch {
@@ -129,13 +139,44 @@ function SignIn({ posApi, users, onSignedIn }: SignInProps): ReactElement {
           onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))}
         />
       </label>
+      {captureDays.length > 1 && (
+        <label className="text-field">
+          <span>Día de captura</span>
+          <select aria-label="Día de captura" value={captureDay} onChange={(event) => setCaptureDay(event.target.value)}>
+            {captureDays.map((day, index) => (
+              <option key={day} value={day}>
+                {index === 0 ? `Hoy, ${captureDayLabel(day)}` : index === 1 ? `Ayer, ${captureDayLabel(day)}` : captureDayLabel(day)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {isPastDay && (
+        <p className="notice login-backdated" role="status">
+          Vas a capturar ventas atrasadas del {captureDayLabel(captureDay)}: cada venta de esta sesión cuenta en ese día, con su propio fondo y corte. Lo autoriza un dueño.
+        </p>
+      )}
+      {needsOwnerPin && (
+        <label className="text-field">
+          <span>PIN del dueño</span>
+          <input
+            aria-label="PIN del dueño"
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={8}
+            value={ownerPin}
+            onChange={(event) => setOwnerPin(event.target.value.replace(/\D/g, ''))}
+          />
+        </label>
+      )}
       {message !== null && (
         <p className="notice" role="alert">
           {message}
         </p>
       )}
       <button type="submit" className="button button-primary" disabled={isBusy}>
-        Entrar <kbd>Enter</kbd>
+        {isPastDay ? 'Entrar a capturar' : 'Entrar'} <kbd>Enter</kbd>
       </button>
       <p className="login-hint">Cambia de persona con ↑ ↓.</p>
     </form>
@@ -152,6 +193,16 @@ function describeRefusal(result: Exclude<Awaited<ReturnType<PosApi['login']>>, {
       return `Demasiados intentos. Podrás entrar a las ${LOCK_TIME.format(new Date(result.until))}.`;
     case 'unknown_user':
       return 'Esa persona ya no está en la caja. Reinicia la caja e intenta de nuevo.';
+    case 'day_out_of_range':
+      return 'Ese día ya no se puede capturar. Elige uno de la lista.';
+    case 'owner_pin_required':
+      return 'Para capturar un día atrasado, un dueño escribe su PIN.';
+    case 'owner_wrong_pin':
+      return result.attemptsLeft === 0
+        ? 'El PIN del dueño es incorrecto y se bloqueó por unos minutos.'
+        : `El PIN del dueño es incorrecto. Le quedan ${result.attemptsLeft} ${result.attemptsLeft === 1 ? 'intento' : 'intentos'}.`;
+    case 'owner_locked':
+      return `El PIN del dueño está bloqueado hasta las ${LOCK_TIME.format(new Date(result.until))}.`;
   }
 }
 

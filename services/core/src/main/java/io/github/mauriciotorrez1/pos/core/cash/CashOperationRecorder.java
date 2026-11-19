@@ -61,12 +61,12 @@ class CashOperationRecorder implements OperationRecorder {
     private void recordOpening(RegisterOperation operation) {
         JsonNode payload = operation.payload();
         jdbc.update("""
-                INSERT INTO cash_session (id, op_id, register_id, opened_by, opening_float_cents, opened_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO cash_session (id, op_id, register_id, opened_by, opening_float_cents, opened_at, business_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 Payload.uuid(payload, "sessionId"), operation.opId(), operation.registerId(),
                 Payload.uuid(payload, "openedBy"), Payload.number(payload, "openingFloatCents"),
-                Payload.at(operation.occurredAt()));
+                Payload.at(operation.occurredAt()), Payload.nullableDate(payload, "businessDate"));
     }
 
     private void recordMovement(RegisterOperation operation) {

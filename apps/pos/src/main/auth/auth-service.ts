@@ -1,4 +1,6 @@
 import { MAX_USER_NAME_LENGTH, type LoginResult, type UserRole, type UserSummary } from '../../shared/auth';
+import { captureDayLabel, type CaptureDayRequest } from '../../shared/capture-day';
+import type { AuditEntry } from '../audit/audit-log';
 import { hashPin, verifyPin } from './pin-hasher';
 import type { UserCredentials, UserStore } from './user-store';
 
@@ -16,6 +18,20 @@ export type OwnerAuthorization =
   | { readonly status: 'wrong_pin'; readonly attemptsLeft: number }
   | { readonly status: 'locked'; readonly until: string };
 
+/** Which days a session may capture (E1-60). */
+export interface CaptureDayPolicy {
+  /** @returns the days a session may capture, today first */
+  allowed(): string[];
+}
+
+/** What else the sign-in needs besides the people. */
+export interface AuthOptions {
+  /** The days a session may capture. Without it, every session sells today. */
+  readonly captureDays?: CaptureDayPolicy;
+  /** Where a sign-in to a past day is written down, with who approved it. */
+  readonly audit?: { record(entry: AuditEntry): void };
+}
+
 /**
  * Who is signed in at this register. People enter with a PIN checked against a hash kept in the local database, so it
  * works without internet (ADR 0006). The person who is signed in lives in memory only: closing the register signs them
@@ -24,15 +40,21 @@ export type OwnerAuthorization =
 export class AuthService {
   readonly #users: UserStore;
   readonly #now: () => Date;
+  readonly #captureDays: CaptureDayPolicy | null;
+  readonly #audit: { record(entry: AuditEntry): void } | null;
   #current: UserSummary | null = null;
+  #captureDay: string | null = null;
 
   /**
    * @param users where the people and their hashes are kept
    * @param now the clock, so a test can move time
+   * @param options the days a session may capture and the audit log
    */
-  constructor(users: UserStore, now: () => Date = () => new Date()) {
+  constructor(users: UserStore, now: () => Date = () => new Date(), options: AuthOptions = {}) {
     this.#users = users;
     this.#now = now;
+    this.#captureDays = options.captureDays ?? null;
+    this.#audit = options.audit ?? null;
   }
 
   /** @returns true when nobody has been registered yet, so the first person must become the owner */
@@ -48,6 +70,16 @@ export class AuthService {
   /** @returns who is signed in, or null */
   currentUser(): UserSummary | null {
     return this.#current;
+  }
+
+  /** @returns the past day this session captures, or null when it sells today (E1-60) */
+  captureDay(): string | null {
+    return this.#current === null ? null : this.#captureDay;
+  }
+
+  /** @returns the days the sign-in offers, today first; none when the register has no policy, so it only sells today */
+  captureDayOptions(): string[] {
+    return this.#captureDays?.allowed() ?? [];
   }
 
   /**
@@ -84,28 +116,81 @@ export class AuthService {
   }
 
   /**
-   * Signs a person in.
+   * Signs a person in, to sell today or to capture the sales of a recent past day (E1-60, ADR 0074). A past day must be
+   * one the policy offers, and needs the approval of an owner: the owner who signs in gives it, and a cashier types the PIN
+   * of one. Nobody is signed in when anything is refused.
    *
    * @param userId the person
    * @param pin what they typed
-   * @returns `ok`, or why not: a wrong PIN with the tries left, a lock, or a person that does not exist
+   * @param capture the day to capture and the PIN of an owner, when it is not today
+   * @returns `ok`, or why not: a wrong PIN with the tries left, a lock, a person that does not exist, or a refused day
    */
-  login(userId: string, pin: string): LoginResult {
+  login(userId: string, pin: string, capture?: CaptureDayRequest): LoginResult {
     const credentials = this.#users.find(userId);
     if (credentials === null) {
       return { status: 'unknown_user' };
+    }
+    const pastDay = this.#pastDayOf(capture);
+    if (pastDay === undefined) {
+      return { status: 'day_out_of_range' };
     }
     const attempt = this.#check(credentials, pin);
     if (attempt.status !== 'ok') {
       return attempt;
     }
+    let approvedBy = credentials.id;
+    if (pastDay !== null && credentials.role !== 'owner') {
+      const approval = this.#approvePastDay(capture?.ownerPin);
+      if (approval.status !== 'ok') {
+        return approval;
+      }
+      approvedBy = approval.ownerId;
+    }
     this.#current = { id: credentials.id, name: credentials.name, role: credentials.role };
+    this.#captureDay = pastDay;
+    if (pastDay !== null) {
+      this.#audit?.record({
+        userId: credentials.id,
+        action: 'session.backdated_capture',
+        entity: 'business_day',
+        entityId: pastDay,
+        detail: `${credentials.name} entró a capturar las ventas del ${captureDayLabel(pastDay)}; autorizó ${approvedBy}`,
+      });
+    }
     return { status: 'ok', user: this.#current };
+  }
+
+  /** The past day asked for: null for today, undefined for a day the policy does not offer. */
+  #pastDayOf(capture: CaptureDayRequest | undefined): string | null | undefined {
+    if (capture === undefined) {
+      return null;
+    }
+    const days = this.#captureDays?.allowed() ?? [];
+    if (capture.day === days[0]) {
+      return null;
+    }
+    return days.slice(1).includes(capture.day) ? capture.day : undefined;
+  }
+
+  #approvePastDay(ownerPin: string | undefined): { readonly status: 'ok'; readonly ownerId: string } | Exclude<LoginResult, { status: 'ok' }> {
+    if (ownerPin === undefined || ownerPin === '') {
+      return { status: 'owner_pin_required' };
+    }
+    const authorization = this.authorizeWithOwnerPin(ownerPin);
+    switch (authorization.status) {
+      case 'ok':
+        return { status: 'ok', ownerId: authorization.owner.id };
+      case 'wrong_pin':
+        return { status: 'owner_wrong_pin', attemptsLeft: authorization.attemptsLeft };
+      case 'locked':
+        return { status: 'owner_locked', until: authorization.until };
+    }
   }
 
   /** Signs out whoever is signed in. */
   logout(): void {
     this.#current = null;
+    this.#captureDay = null;
   }
 
   /**

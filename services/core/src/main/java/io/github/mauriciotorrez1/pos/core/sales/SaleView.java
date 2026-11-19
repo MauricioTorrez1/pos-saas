@@ -1,5 +1,6 @@
 package io.github.mauriciotorrez1.pos.core.sales;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -9,10 +10,11 @@ import java.util.UUID;
  * @param id sale id
  * @param folio the ticket number printed by the register
  * @param totalCents total with VAT, in cents
+ * @param businessDate the day the sale counts on: the day a backdated capture chose, or else its local day (E1-60)
  * @param lines the lines sold, in ticket order
  * @param payments how the sale was paid, the largest payment first
  */
-public record SaleView(UUID id, long folio, long totalCents, List<Line> lines, List<Payment> payments) {
+public record SaleView(UUID id, long folio, long totalCents, LocalDate businessDate, List<Line> lines, List<Payment> payments) {
 
     /**
      * One line of a sale.

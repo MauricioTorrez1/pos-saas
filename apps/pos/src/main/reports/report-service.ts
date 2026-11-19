@@ -91,7 +91,7 @@ export class ReportService {
       notSelling: this.#alerts(
         `level.total > 0 AND NOT EXISTS (
            SELECT 1 FROM sale_line JOIN sale ON sale.id = sale_line.sale_id
-           WHERE sale_line.product_id = product.id AND sale.status = 'completed' AND sale.resolved_at >= ? AND sale.resolved_at < ?
+           WHERE sale_line.product_id = product.id AND sale.status = 'completed' AND coalesce(sale.business_at, sale.resolved_at) >= ? AND coalesce(sale.business_at, sale.resolved_at) < ?
          )`,
         [notSellingStart, end],
         'ORDER BY product.name',
@@ -102,9 +102,9 @@ export class ReportService {
   #sales(start: string, end: string): SaleRow[] {
     return this.#store
       .prepare(
-        `SELECT sale.total_cents, sale.resolved_at, app_user.name
+        `SELECT sale.total_cents, coalesce(sale.business_at, sale.resolved_at) AS resolved_at, app_user.name
          FROM sale LEFT JOIN app_user ON app_user.id = sale.cashier_id
-         WHERE sale.tenant_id = ? AND sale.status = 'completed' AND sale.resolved_at >= ? AND sale.resolved_at < ?`,
+         WHERE sale.tenant_id = ? AND sale.status = 'completed' AND coalesce(sale.business_at, sale.resolved_at) >= ? AND coalesce(sale.business_at, sale.resolved_at) < ?`,
       )
       .all(this.#tenantId, start, end) as unknown as SaleRow[];
   }
@@ -122,7 +122,7 @@ export class ReportService {
       .prepare(
         `SELECT sale_line.product_id, sale_line.quantity_milli, sale_line.subtotal_cents
          FROM sale_line JOIN sale ON sale.id = sale_line.sale_id
-         WHERE sale.tenant_id = ? AND sale.status = 'completed' AND sale.resolved_at >= ? AND sale.resolved_at < ?`,
+         WHERE sale.tenant_id = ? AND sale.status = 'completed' AND coalesce(sale.business_at, sale.resolved_at) >= ? AND coalesce(sale.business_at, sale.resolved_at) < ?`,
       )
       .all(this.#tenantId, start, end) as unknown as LineRow[];
     const costs = new Map(

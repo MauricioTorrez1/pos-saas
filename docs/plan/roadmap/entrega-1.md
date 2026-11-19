@@ -625,3 +625,13 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** E1-56 · **Estimación:** 5 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué dibujar las gráficas como SVG escrito a mano y no con una librería? (2) ¿Cómo garantizas que los porcentajes de una dona sumen exactamente 100 %?
+
+### E1-60 · Capturar las ventas de un día atrasado
+- **Objetivo:** al entrar, la cajera elige «Día de captura»; con la autorización de un dueño captura las ventas que no alcanzó a registrar en un día reciente, y cada venta cuenta en ese día (resumen, estado de resultados, más vendidos, inventario) con su propio fondo y corte, sin mezclarse con la caja de hoy.
+- **Conceptos:** [Fecha de negocio contra fecha de registro], [Corte suplementario], [Campo opcional en un contrato], [Índice de expresión], [Fecha de emisión del CFDI]
+- **Claude / tú:** Claude escribe la migración, la regla de entrada, la sesión de caja por día, el día en la venta, el inventario y los reportes, el ticket, el contrato, el núcleo y las pruebas. Tú pruebas en la tienda capturar las ventas de ayer y cuadrar el corte suplementario.
+- **Pruebas:** Vitest de la ventana de días, del PIN del dueño y del rechazo, de la sesión aparte con su corte y su bitácora, del día en la venta, el inventario y el evento, de los reportes, el estado de resultados y el reporte diario, del ticket y de la pantalla (selector y franja); Java de `businessDate` guardado, del respaldo al día local, de la cuarentena y de la idempotencia; Playwright de entrar a ayer y ver la venta en el resumen de ayer.
+- **Criterios:** ADR 0074; la venta conserva el momento real; nada se edita; campo opcional sin cambiar `schemaVersion`; la caja vende en efectivo sin internet.
+- **Depende de:** E1-54, E1-56 · **Estimación:** 6 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Por qué guardar dos fechas en una venta en lugar de corregir la que tiene? (2) ¿Cómo agregas un campo a un contrato de sincronización sin romper a los clientes que ya existen?

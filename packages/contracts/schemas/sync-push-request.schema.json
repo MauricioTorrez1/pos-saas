@@ -27,6 +27,11 @@
       "type": "string",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$"
     },
+    "business_date": {
+      "description": "The local day a backdated capture puts a record on (E1-60, ADR 0074), as YYYY-MM-DD. Absent when the record counts on the local day of its own moment.",
+      "type": "string",
+      "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+    },
     "text": { "type": "string", "minLength": 1, "maxLength": 500 },
     "payment_method": { "enum": ["cash", "transfer", "card", "card_manual"] },
     "cents": { "$ref": "values.schema.json#/$defs/amount_cents", "minimum": 0 },
@@ -69,7 +74,7 @@
     },
 
     "sale_completed": {
-      "description": "A sale that was charged. The totals are what the register showed the customer.",
+      "description": "A sale that was charged. The totals are what the register showed the customer. businessDate is only sent by a backdated capture.",
       "type": "object",
       "additionalProperties": false,
       "required": ["saleId", "folio", "cashSessionId", "cashierId", "completedAt", "subtotalCents", "taxCents", "totalCents", "lines", "payments"],
@@ -79,6 +84,7 @@
         "cashSessionId": { "$ref": "#/$defs/nullable_uuid_v7" },
         "cashierId": { "$ref": "#/$defs/nullable_uuid_v7" },
         "completedAt": { "$ref": "#/$defs/timestamp" },
+        "businessDate": { "$ref": "#/$defs/business_date" },
         "subtotalCents": { "$ref": "#/$defs/cents" },
         "taxCents": { "$ref": "#/$defs/cents" },
         "totalCents": { "$ref": "#/$defs/positive_cents" },
@@ -157,7 +163,8 @@
       "properties": {
         "sessionId": { "$ref": "#/$defs/uuid_v7" },
         "openedBy": { "$ref": "#/$defs/uuid_v7" },
-        "openingFloatCents": { "$ref": "#/$defs/cents" }
+        "openingFloatCents": { "$ref": "#/$defs/cents" },
+        "businessDate": { "$ref": "#/$defs/business_date" }
       }
     },
 
@@ -212,7 +219,8 @@
           "propertyNames": { "pattern": "^[1-9][0-9]*$" },
           "additionalProperties": { "$ref": "#/$defs/cents" }
         },
-        "reason": { "type": ["string", "null"], "maxLength": 500 }
+        "reason": { "type": ["string", "null"], "maxLength": 500 },
+        "businessDate": { "$ref": "#/$defs/business_date" }
       }
     },
 

@@ -68,9 +68,9 @@ export class InventoryService {
     this.#outbox = new SyncOutbox(store, tenantId);
     // The balance is summed over the whole history and only then cut, so the rows shown always add up to the stock.
     this.#kardexRows = store.prepare(`
-      SELECT occurred_at AS occurredAt, type, quantity_milli AS quantityMilli, balance AS balanceMilli
+      SELECT occurred_at AS occurredAt, type, quantity_milli AS quantityMilli, balance AS balanceMilli, business_day AS businessDay
       FROM (
-        SELECT rowid AS position, occurred_at, type, quantity_milli, sum(quantity_milli) OVER (ORDER BY rowid) AS balance
+        SELECT rowid AS position, occurred_at, type, quantity_milli, business_day, sum(quantity_milli) OVER (ORDER BY rowid) AS balance
         FROM stock_movement
         WHERE tenant_id = ? AND product_id = ?
       )

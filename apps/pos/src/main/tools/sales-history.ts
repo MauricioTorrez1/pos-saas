@@ -15,6 +15,7 @@ interface SaleRow {
   readonly id: string;
   readonly folio: number;
   readonly resolved_at: string;
+  readonly business_day: string | null;
   readonly total_cents: number;
   readonly refunded_cents: number;
   readonly line_count: number;
@@ -28,7 +29,7 @@ export interface ProductLookup {
 }
 
 const COLUMNS = `
-  s.id, s.folio, s.resolved_at, s.total_cents,
+  s.id, s.folio, s.resolved_at, s.business_day, s.total_cents,
   (SELECT COALESCE(SUM(r.total_cents), 0) FROM sale_return r WHERE r.sale_id = s.id) AS refunded_cents,
   (SELECT COUNT(*) FROM sale_line l WHERE l.sale_id = s.id) AS line_count,
   (SELECT u.name FROM app_user u WHERE u.id = s.cashier_id) AS cashier_name
@@ -107,6 +108,7 @@ function toSummary(row: SaleRow, matchedProducts: readonly string[]): SaleSummar
     saleId: row.id,
     folio: formatFolio(row.folio),
     completedAt: row.resolved_at,
+    businessDay: row.business_day,
     totalCents: row.total_cents,
     refundedCents: row.refunded_cents,
     cashierName: row.cashier_name,

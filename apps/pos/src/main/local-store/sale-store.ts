@@ -14,6 +14,7 @@ import {
 } from '../checkout/sale-recorder';
 import { assertSaleTransition, InvalidSaleTransitionError, type SaleStatus } from '../checkout/sale-state-machine';
 import { INSERT_STOCK_MOVEMENT_SQL, postWith } from '../inventory/stock-store';
+import { momentOnDay } from '../reports/period';
 import { SyncOutbox } from '../sync/sync-outbox';
 import { uuidV7 } from '../uuid-v7';
 import type { LocalStore } from './local-store';
@@ -49,6 +50,7 @@ interface SaleRow {
 interface CompletedRow extends SaleRow {
   readonly folio: number;
   readonly resolved_at: string;
+  readonly business_day: string | null;
 }
 
 interface PaymentRow {
@@ -104,6 +106,7 @@ export class SaleStore implements SaleRecorder {
   readonly #paymentsOf: StatementSync;
   readonly #sessionOf: StatementSync;
   readonly #findTotals: StatementSync;
+  readonly #sessionDay: StatementSync;
   readonly #outbox: SyncOutbox;
 
   /**
@@ -115,7 +118,8 @@ export class SaleStore implements SaleRecorder {
     this.#tenantId = tenantId;
     this.#outbox = new SyncOutbox(store, tenantId);
     this.#findTotals = store.prepare('SELECT id, idempotency_key, subtotal_cents, tax_cents, total_cents FROM sale WHERE tenant_id = ? AND id = ?');
-    this.#sessionOf = store.prepare('SELECT cash_session_id, cashier_id FROM sale WHERE tenant_id = ? AND id = ?');
+    this.#sessionOf = store.prepare('SELECT cash_session_id, cashier_id, business_day FROM sale WHERE tenant_id = ? AND id = ?');
+    this.#sessionDay = store.prepare('SELECT business_day FROM cash_session WHERE tenant_id = ? AND id = ?');
     this.#findState = store.prepare('SELECT status, total_cents FROM sale WHERE tenant_id = ? AND id = ?');
     this.#listPending = store.prepare(`
       SELECT id, occurred_at, total_cents FROM sale WHERE tenant_id = ? AND status = 'pending_payment' ORDER BY id
@@ -139,8 +143,8 @@ export class SaleStore implements SaleRecorder {
     `);
     this.#insertSale = store.prepare(`
       INSERT INTO sale (id, tenant_id, idempotency_key, status, subtotal_cents, tax_cents, total_cents, occurred_at,
-        cash_session_id, cashier_id)
-      VALUES (?, ?, ?, 'pending_payment', ?, ?, ?, ?, ?, ?)
+        cash_session_id, cashier_id, business_day, business_at)
+      VALUES (?, ?, ?, 'pending_payment', ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     this.#insertLine = store.prepare(`
       INSERT INTO sale_line (id, tenant_id, sale_id, line_number, product_id, product_name, unit, quantity_milli,
@@ -159,7 +163,7 @@ export class SaleStore implements SaleRecorder {
     this.#stockLines = store.prepare('SELECT id, product_id, quantity_milli FROM sale_line WHERE tenant_id = ? AND sale_id = ?');
     this.#nextFolio = store.prepare('SELECT coalesce(max(folio), 0) + 1 AS next FROM sale WHERE tenant_id = ?');
     this.#findLastCompleted = store.prepare(`
-      SELECT id, idempotency_key, subtotal_cents, tax_cents, total_cents, folio, resolved_at FROM sale
+      SELECT id, idempotency_key, subtotal_cents, tax_cents, total_cents, folio, resolved_at, business_day FROM sale
       WHERE tenant_id = ? AND status = 'completed' ORDER BY folio DESC LIMIT 1
     `);
     this.#paymentsOf = store.prepare(`
@@ -205,20 +209,32 @@ export class SaleStore implements SaleRecorder {
       this.#complete.run(completedAt, folio, this.#tenantId, saleId);
       // The sale takes its products out of the stock in the same transaction, so one never exists without the other.
       const lines = this.#stockLines.all(this.#tenantId, saleId) as unknown as { id: string; product_id: string; quantity_milli: number }[];
+      const { business_day: businessDay } = this.#sessionOf.get(this.#tenantId, saleId) as unknown as { business_day: string | null };
       postWith(
         this.#insertStock,
         this.#tenantId,
-        lines.map((line) => ({ productId: line.product_id, type: 'sale', quantityMilli: -line.quantity_milli, source: 'sale_line', sourceId: line.id })),
+        lines.map((line) => ({
+          productId: line.product_id,
+          type: 'sale',
+          quantityMilli: -line.quantity_milli,
+          source: 'sale_line',
+          sourceId: line.id,
+          ...(businessDay === null ? {} : { businessDay }),
+        })),
       );
       // The core hears about the sale in the same transaction, so a completed sale is never left out of the outbox.
       this.#queueCompletedSale(saleId, folio, completedAt, payments, paymentIds);
-      return { folio, completedAt };
+      return { folio, completedAt, businessDay };
     });
   }
 
   #queueCompletedSale(saleId: string, folio: number, completedAt: string, payments: readonly SalePayment[], paymentIds: readonly string[]): void {
     const sale = this.#findTotals.get(this.#tenantId, saleId) as unknown as SaleRow;
-    const origin = this.#sessionOf.get(this.#tenantId, saleId) as unknown as { cash_session_id: string | null; cashier_id: string | null };
+    const origin = this.#sessionOf.get(this.#tenantId, saleId) as unknown as {
+      cash_session_id: string | null;
+      cashier_id: string | null;
+      business_day: string | null;
+    };
     const lines = this.#fullLinesOf.all(this.#tenantId, saleId) as unknown as SavedLineRow[];
     this.#outbox.enqueue(
       'sale.completed',
@@ -228,6 +244,8 @@ export class SaleStore implements SaleRecorder {
         cashSessionId: origin.cash_session_id,
         cashierId: origin.cashier_id,
         completedAt,
+        // Only a backdated capture sends the day it belongs to; without it the core takes the local day of completedAt.
+        ...(origin.business_day === null ? {} : { businessDate: origin.business_day }),
         subtotalCents: sale.subtotal_cents,
         taxCents: sale.tax_cents,
         totalCents: sale.total_cents,
@@ -294,6 +312,7 @@ export class SaleStore implements SaleRecorder {
     return {
       folio: row.folio,
       completedAt: row.resolved_at,
+      businessDay: row.business_day,
       sale: this.#toSaleToSave(row),
       payments: payments.map(({ method, amount_cents: amountCents, reference }) => ({ method, amountCents, reference })),
     };
@@ -334,6 +353,10 @@ export class SaleStore implements SaleRecorder {
 
   #insert(sale: SaleToSave): void {
     const { saleId, idempotencyKey, subtotalCents, taxCents, totalCents } = sale;
+    const occurredAt = new Date();
+    // A sale takes the day of its session: a backdated capture puts it on its day, at the hour it was rung up (E1-60).
+    const session = sale.cashSessionId === undefined ? undefined : (this.#sessionDay.get(this.#tenantId, sale.cashSessionId) as unknown as { business_day: string | null } | undefined);
+    const businessDay = session?.business_day ?? null;
     this.#insertSale.run(
       saleId,
       this.#tenantId,
@@ -341,9 +364,11 @@ export class SaleStore implements SaleRecorder {
       subtotalCents,
       taxCents,
       totalCents,
-      new Date().toISOString(),
+      occurredAt.toISOString(),
       sale.cashSessionId ?? null,
       sale.cashierId ?? null,
+      businessDay,
+      businessDay === null ? null : new Date(momentOnDay(occurredAt.getTime(), businessDay)).toISOString(),
     );
     sale.lines.forEach((line, index) => this.#insertSaleLine(saleId, line, index + 1));
   }

@@ -75,6 +75,8 @@ export interface CompletedSale {
   readonly folio: number;
   /** When it was completed, in ISO 8601. */
   readonly completedAt: string;
+  /** The past day a backdated capture put it on, or null (or absent) when it was sold that same day (E1-60). */
+  readonly businessDay?: string | null;
 }
 
 /** A completed sale read back from the database, with everything a ticket needs. */

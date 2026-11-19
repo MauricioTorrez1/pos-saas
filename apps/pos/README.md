@@ -241,6 +241,18 @@ Signing in with the cash closed opens "Abrir la caja" for the opening float ([AD
 
 Closing the window with the cash open (the X, Alt+F4 or the menu) asks first: **Hacer corte de caja** (F2) opens the cut and closes the register after it, **No hacer corte y salir** (F4) leaves the session open and writes it to the audit log, and Esc goes back to work. The main process decides it in the `close` event, so a frozen or crashed screen, or Windows shutting down, never blocks the close; every sale is already committed to SQLite, and the audit log records why the session stayed open.
 
+### Capture a past day
+Some days not every sale gets rung up. The next morning, the sign-in screen offers **Día de captura**: today first, then up to 7 days back, never a future day and never before the first cash session ([ADR 0074](../../docs/adr/0074-captura-de-ventas-de-un-dia-atrasado.md)).
+
+| Rule | How it works |
+| --- | --- |
+| Who | A past day needs an owner: the owner who signs in approves it, and a cashier types the PIN of an owner too. A refusal signs nobody in. The sign-in is in the audit log (`session.backdated_capture`) |
+| Banner | The whole session shows «Capturando ventas del martes 17 de noviembre» in the warning color, so nobody rings up today's sales into it |
+| Cash | The capture opens a cash session of its own for that day, with its float and its **supplementary cut**, apart from today's drawer (both can be open). Returns and expenses paid from the drawer always use today's drawer |
+| Sales | A sale keeps the real moment it was recorded and adds `business_day` and `business_at` (the same local hour on that day). The summary, top sellers, hours, income statement and daily report count it on its day; its stock movements and the kardex carry the day too |
+| Ticket | Prints «Captura atrasada del …» under the folio, also on a reprint |
+| Sync | `sale.completed`, `cash_session.opened` and `cash_session.closed` carry an optional `businessDate`; the core stores it and falls back to the local day when it is absent |
+
 ## Cash
 F3 opens everything about the cash of the register. A closed register cannot sell: it opens with a float. Entries and exits of cash need a reason, and a cashier needs the PIN of an owner to take cash out. The register warns, without stopping any sale, when the drawer passes the limit the owner set (,000 at first). The cut counts bills and coins by denomination plus the card and transfer vouchers, shows the difference of each form of payment, asks for a reason when it does not balance, and closes the session. Only the owner sees what the drawer should hold.
 

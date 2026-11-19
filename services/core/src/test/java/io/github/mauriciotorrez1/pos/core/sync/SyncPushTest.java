@@ -13,12 +13,15 @@ import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
 import com.zaxxer.hikari.HikariDataSource;
 import io.github.mauriciotorrez1.pos.core.CoreApplication;
+import io.github.mauriciotorrez1.pos.core.sales.DailySales;
+import io.github.mauriciotorrez1.pos.core.sales.SaleLookup;
 import io.github.mauriciotorrez1.pos.db.PostgresTestConfiguration;
 import io.github.mauriciotorrez1.pos.id.Uuid7;
 import io.github.mauriciotorrez1.pos.ingest.OperationRecorder;
 import io.github.mauriciotorrez1.pos.security.DeviceFixtures;
 import io.github.mauriciotorrez1.pos.ingest.RegisterOperation;
 import io.github.mauriciotorrez1.pos.tenant.TenantContext;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -86,6 +89,9 @@ class SyncPushTest {
     @Autowired
     private TransactionTemplate transaction;
 
+    @Autowired
+    private SaleLookup sales;
+
     private FailingStock failingStock;
 
     @Autowired
@@ -133,6 +139,51 @@ class SyncPushTest {
         assertThat(RESPONSE_SCHEMA.validate(second)).isEmpty();
         assertThat(count("sale", tenant)).isEqualTo(2);
         assertThat(count("sync_operation", tenant)).isEqualTo(2);
+    }
+
+    @Test
+    void aBackdatedSaleCountsOnItsBusinessDateWhileItKeepsTheMomentItWasRecorded() throws Exception {
+        UUID backdatedId = Uuid7.next();
+        UUID sameDayId = Uuid7.next();
+        ObjectNode session = SyncFixtures.cashSessionOpened(Uuid7.next(), Uuid7.next());
+        ((ObjectNode) session.get("payload")).put("businessDate", "2026-12-09");
+        ObjectNode backdated = SyncFixtures.sale(Uuid7.next(), backdatedId, Uuid7.next());
+        ((ObjectNode) backdated.get("payload")).put("businessDate", "2026-12-09");
+        ObjectNode sameDay = SyncFixtures.sale(Uuid7.next(), sameDayId, Uuid7.next());
+
+        assertThat(statuses(push(tenant, batch(register, session, backdated, sameDay)))).containsExactly("accepted", "accepted", "accepted");
+
+        assertThat(admin.queryForObject("SELECT business_date::text FROM sale WHERE id = ?", String.class, backdatedId)).isEqualTo("2026-12-09");
+        assertThat(admin.queryForObject("SELECT completed_at = ?::timestamptz FROM sale WHERE id = ?", Boolean.class,
+                SyncFixtures.OCCURRED_AT, backdatedId)).as("the real moment stays for the audit trail").isTrue();
+        assertThat(admin.queryForObject("SELECT business_date::text FROM sale WHERE id = ?", String.class, sameDayId))
+                .as("without a business date, a sale counts on its local day in Mexico City").isEqualTo("2026-12-10");
+        assertThat(admin.queryForObject("SELECT count(*) FROM cash_session WHERE tenant_id = ? AND business_date = DATE '2026-12-09'",
+                Integer.class, tenant)).isOne();
+        List<DailySales> days = TenantContext.callAs(tenant, () -> sales.dailySales(LocalDate.parse("2026-12-08"), LocalDate.parse("2026-12-10")));
+        assertThat(days).containsExactly(new DailySales(LocalDate.parse("2026-12-09"), 1, 11600), new DailySales(LocalDate.parse("2026-12-10"), 1, 11600));
+        assertThat(TenantContext.callAs(tenant, () -> sales.find(backdatedId)).orElseThrow().businessDate()).isEqualTo(LocalDate.parse("2026-12-09"));
+    }
+
+    @Test
+    void aBackdatedSaleSentTwiceIsStoredOnce() throws Exception {
+        ObjectNode backdated = SyncFixtures.sale(Uuid7.next());
+        ((ObjectNode) backdated.get("payload")).put("businessDate", "2026-12-09");
+
+        assertThat(statuses(push(tenant, batch(register, backdated)))).containsExactly("accepted");
+        assertThat(statuses(push(tenant, batch(register, backdated)))).containsExactly("duplicate");
+        assertThat(count("sale", tenant)).isOne();
+    }
+
+    @Test
+    void aSaleThatCountsOnADayAfterItWasRecordedIsQuarantined() throws Exception {
+        ObjectNode fromTheFuture = SyncFixtures.sale(Uuid7.next());
+        ((ObjectNode) fromTheFuture.get("payload")).put("businessDate", "2026-12-11");
+        ObjectNode notADay = SyncFixtures.sale(Uuid7.next());
+        ((ObjectNode) notADay.get("payload")).put("businessDate", "2026-02-30");
+
+        assertThat(statuses(push(tenant, batch(register, fromTheFuture, notADay)))).containsExactly("quarantined", "quarantined");
+        assertThat(count("sale", tenant)).isZero();
     }
 
     @Test

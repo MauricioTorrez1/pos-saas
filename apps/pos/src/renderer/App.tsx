@@ -13,6 +13,7 @@ import type { SupplierCatalogApi } from '../shared/supplier-catalog';
 import type { PurchasingApi } from '../shared/supplier-order';
 import { applyAppearance } from './appearance/apply-appearance';
 import { AppearanceDialog } from './appearance/AppearanceDialog';
+import { captureDayLabel } from '../shared/capture-day';
 import type { CashStatus } from '../shared/cash-api';
 import type { DashboardApi } from '../shared/dashboard-api';
 import type { ExitApi } from '../shared/exit-api';
@@ -199,6 +200,7 @@ export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingAp
       {...(toolsApi === undefined ? {} : { toolsApi })}
       {...(expensesApi === undefined ? {} : { expensesApi })}
       user={authState.current}
+      captureDay={authState.captureDay ?? null}
       appearance={appearance}
       onAppearanceSaved={setAppearance}
       onSignOut={signOut}
@@ -224,6 +226,8 @@ interface RegisterScreenProps {
   readonly toolsApi?: ToolsApi;
   readonly expensesApi?: ExpensesApi;
   readonly user: UserSummary;
+  /** The past day this session captures, or null when it sells today (E1-60). */
+  readonly captureDay: string | null;
   readonly appearance: Appearance;
   readonly onAppearanceSaved: (appearance: Appearance) => void;
   readonly onSignOut: () => void;
@@ -233,7 +237,7 @@ interface RegisterScreenProps {
   readonly exitCut?: { readonly onDone: () => void; readonly onCancel: () => void };
 }
 
-function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, catalogApi, toolsApi, missingApi, catalogExportApi, expensesApi, user, appearance, onAppearanceSaved, onSignOut, isExiting, exitCut }: RegisterScreenProps): ReactElement {
+function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, catalogApi, toolsApi, missingApi, catalogExportApi, expensesApi, user, captureDay, appearance, onAppearanceSaved, onSignOut, isExiting, exitCut }: RegisterScreenProps): ReactElement {
   const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
   const [cash, setCash] = useState<CashStatus | null>(null);
@@ -385,6 +389,11 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
           Salir <kbd>{key('signOut')}</kbd>
         </button>
       </header>
+      {captureDay !== null && (
+        <p className="register-backdated" role="status" aria-label="Captura atrasada">
+          Capturando ventas del {captureDayLabel(captureDay)}. No cobres aquí las ventas de hoy: sal y entra con «Hoy».
+        </p>
+      )}
       {cash !== null && cash.session === null && !isEditingCash && exitCut === undefined && (
         <p className="notice register-banner" role="status" aria-label="Caja sin abrir">
           {isOwner ? 'Solo administrar: l' : 'L'}a caja no está abierta y no se puede cobrar.{' '}
@@ -458,10 +467,10 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
       )}
       {isReturning && !hasPendingSales && <ReturnDialog posApi={posApi} user={user} onReturned={refreshCash} onClose={closeReturns} />}
       {exitCut !== undefined && !hasPendingSales && cash !== null && (
-        <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} mode="exit_cut" onClose={exitCut.onCancel} onCutDone={exitCut.onDone} />
+        <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} mode="exit_cut" onClose={exitCut.onCancel} onCutDone={exitCut.onDone} captureDay={captureDay} />
       )}
       {isEditingCash && exitCut === undefined && !hasPendingSales && cash !== null && (
-        <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} onClose={closeCash} mode={cashMode} onSignOut={onSignOut} />
+        <CashDialog posApi={posApi} user={user} status={cash} onStatusChange={setCash} onClose={closeCash} mode={cashMode} onSignOut={onSignOut} captureDay={captureDay} />
       )}
       {isEditingAppearance && !hasPendingSales && (
         <AppearanceDialog saved={appearance} onPreview={applyAppearance} onSave={saveAppearance} onClose={closeAppearance} />

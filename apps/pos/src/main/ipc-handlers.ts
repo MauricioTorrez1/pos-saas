@@ -145,14 +145,23 @@ export function registerIpcHandlers(
 
   answerScreen(IPC_CHANNELS.getAppInfo, (): AppInfo => ({ version: app.getVersion() }));
   answerScreen(IPC_CHANNELS.getAppearance, () => appearance.read());
-  answerScreen(IPC_CHANNELS.getAuthState, (): AuthState => ({ needsSetup: auth.needsSetup(), users: auth.listUsers(), current: auth.currentUser() }));
+  answerScreen(
+    IPC_CHANNELS.getAuthState,
+    (): AuthState => ({
+      needsSetup: auth.needsSetup(),
+      users: auth.listUsers(),
+      current: auth.currentUser(),
+      captureDay: auth.captureDay(),
+      captureDays: auth.captureDayOptions(),
+    }),
+  );
   answerScreen(IPC_CHANNELS.setupOwner, (request): UserSummary => {
     const { name, pin } = parseSetupRequest(request);
     return auth.setupOwner(name, pin);
   });
   answerScreen(IPC_CHANNELS.login, (request): LoginResult => {
-    const { userId, pin } = parseLoginRequest(request);
-    return auth.login(userId, pin);
+    const { userId, pin, capture } = parseLoginRequest(request);
+    return auth.login(userId, pin, capture);
   });
   answerScreen(IPC_CHANNELS.logout, (): void => auth.logout());
   answerOwner(IPC_CHANNELS.createUser, (request): UserSummary => {

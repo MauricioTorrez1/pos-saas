@@ -1,6 +1,7 @@
 import { formatUnitPriceE4, MoneyError, parseQuantity } from '@pos-saas/money';
 import { useState, type ReactElement } from 'react';
 
+import { captureDayLabel } from '../../shared/capture-day';
 import type { Kardex } from '../../shared/inventory-api';
 import type { CatalogProduct, PosApi } from '../../shared/pos-api';
 import type { PricingApi } from '../../shared/pricing';
@@ -198,7 +199,10 @@ function KardexView({ posApi, pricingApi, productApi, isChangingPrice, setIsChan
           {kardex.rows.map((row, index) => (
             <tr key={`${row.occurredAt}-${index}`}>
               <td>{MOMENT.format(new Date(row.occurredAt))}</td>
-              <td>{MOVEMENT_LABELS[row.type] ?? row.type}</td>
+              <td>
+                {MOVEMENT_LABELS[row.type] ?? row.type}
+                {row.businessDay != null && ` · del ${captureDayLabel(row.businessDay)}`}
+              </td>
               <td>{signed(row.quantityMilli, kardex.unit)}</td>
               <td>{signed(row.balanceMilli, kardex.unit)}</td>
             </tr>

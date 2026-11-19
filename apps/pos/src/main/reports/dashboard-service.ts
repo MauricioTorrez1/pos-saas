@@ -314,7 +314,7 @@ export class DashboardService {
   #firstActiveDay(): string {
     const row = this.#store
       .prepare(
-        `SELECT (SELECT min(resolved_at) FROM sale WHERE tenant_id = ? AND status = 'completed') AS sale,
+        `SELECT (SELECT min(coalesce(business_at, resolved_at)) FROM sale WHERE tenant_id = ? AND status = 'completed') AS sale,
                 (SELECT min(occurred_at) FROM sale_return WHERE tenant_id = ?) AS refund,
                 (SELECT min(expense_day) FROM expense WHERE tenant_id = ? AND voided_at IS NULL) AS expense`,
       )
@@ -332,7 +332,7 @@ export class DashboardService {
       .prepare(
         `SELECT l.tax_factor AS factor, l.tax_rate_bp AS rateBp, sum(l.subtotal_cents) AS subtotal, sum(l.tax_cents) AS tax
          FROM sale s JOIN sale_line l ON l.sale_id = s.id
-         WHERE s.tenant_id = ? AND s.status = 'completed' AND s.resolved_at >= ? AND s.resolved_at < ?
+         WHERE s.tenant_id = ? AND s.status = 'completed' AND coalesce(s.business_at, s.resolved_at) >= ? AND coalesce(s.business_at, s.resolved_at) < ?
          GROUP BY l.tax_factor, l.tax_rate_bp`,
       )
       .all(this.#tenantId, from, to) as unknown as RateRow[];
@@ -405,7 +405,7 @@ export class DashboardService {
     const sales = this.#store
       .prepare(
         `SELECT count(*) AS count, coalesce(sum(total_cents), 0) AS total, coalesce(sum(subtotal_cents), 0) AS subtotal, coalesce(sum(tax_cents), 0) AS tax
-         FROM sale s WHERE s.tenant_id = ? AND s.status = 'completed' AND s.resolved_at >= ? AND s.resolved_at < ? ${scope.sales}`,
+         FROM sale s WHERE s.tenant_id = ? AND s.status = 'completed' AND coalesce(s.business_at, s.resolved_at) >= ? AND coalesce(s.business_at, s.resolved_at) < ? ${scope.sales}`,
       )
       .get(this.#tenantId, from, to, ...scope.params) as unknown as { count: number; total: number; subtotal: number; tax: number };
     const returns = this.#store
@@ -451,7 +451,7 @@ export class DashboardService {
         `SELECT l.product_id AS productId, coalesce(p.name, max(l.product_name)) AS name, max(l.unit) AS unit,
                 sum(l.quantity_milli) AS soldMilli, sum(l.subtotal_cents) AS soldSubtotal, sum(l.line_total_cents) AS soldTotal, count(*) AS lines
          FROM sale s JOIN sale_line l ON l.sale_id = s.id LEFT JOIN product p ON p.id = l.product_id
-         WHERE s.tenant_id = ? AND s.status = 'completed' AND s.resolved_at >= ? AND s.resolved_at < ? ${scope.sales}
+         WHERE s.tenant_id = ? AND s.status = 'completed' AND coalesce(s.business_at, s.resolved_at) >= ? AND coalesce(s.business_at, s.resolved_at) < ? ${scope.sales}
          GROUP BY l.product_id`,
       )
       .all(this.#tenantId, from, to, ...scope.params) as unknown as {
@@ -524,9 +524,9 @@ export class DashboardService {
     const hours = Array.from({ length: 24 }, (_, hour): HourBucket => ({ hour, salesCount: 0, totalCents: 0 }));
     const weekdays = Array.from({ length: 7 }, (_, weekday): WeekdayBucket => ({ weekday, salesCount: 0, totalCents: 0 }));
     const statement = this.#store.prepare(
-      `SELECT strftime('%Y-%m-%d', s.resolved_at, ?) AS day, CAST(strftime('%H', s.resolved_at, ?) AS INTEGER) AS hour,
+      `SELECT strftime('%Y-%m-%d', coalesce(s.business_at, s.resolved_at), ?) AS day, CAST(strftime('%H', coalesce(s.business_at, s.resolved_at), ?) AS INTEGER) AS hour,
               count(*) AS count, sum(s.total_cents) AS total
-       FROM sale s WHERE s.tenant_id = ? AND s.status = 'completed' AND s.resolved_at >= ? AND s.resolved_at < ? ${scope.sales}
+       FROM sale s WHERE s.tenant_id = ? AND s.status = 'completed' AND coalesce(s.business_at, s.resolved_at) >= ? AND coalesce(s.business_at, s.resolved_at) < ? ${scope.sales}
        GROUP BY day, hour`,
     );
     for (const segment of offsetSegments(period.fromMs, period.toMs)) {
@@ -556,7 +556,7 @@ export class DashboardService {
     const row = this.#store
       .prepare(
         `SELECT count(*) AS count, coalesce(sum(s.total_cents), 0) AS total FROM sale s
-         WHERE s.tenant_id = ? AND s.status = 'cancelled' AND coalesce(s.resolved_at, s.occurred_at) >= ? AND coalesce(s.resolved_at, s.occurred_at) < ? ${scope.sales}`,
+         WHERE s.tenant_id = ? AND s.status = 'cancelled' AND coalesce(s.business_at, s.resolved_at, s.occurred_at) >= ? AND coalesce(s.business_at, s.resolved_at, s.occurred_at) < ? ${scope.sales}`,
       )
       .get(this.#tenantId, new Date(period.fromMs).toISOString(), new Date(period.toMs).toISOString(), ...scope.params) as unknown as { count: number; total: number };
     return { count: row.count, totalCents: row.total };
@@ -570,7 +570,7 @@ export class DashboardService {
                   CASE WHEN count(DISTINCT CASE p.method WHEN 'card_manual' THEN 'card' ELSE p.method END) > 1 THEN 'mixed'
                        ELSE min(CASE p.method WHEN 'card_manual' THEN 'card' ELSE p.method END) END AS kind
            FROM sale s JOIN payment p ON p.sale_id = s.id
-           WHERE s.tenant_id = ? AND s.status = 'completed' AND s.resolved_at >= ? AND s.resolved_at < ? ${scope.sales}
+           WHERE s.tenant_id = ? AND s.status = 'completed' AND coalesce(s.business_at, s.resolved_at) >= ? AND coalesce(s.business_at, s.resolved_at) < ? ${scope.sales}
            GROUP BY s.id
          ) GROUP BY kind`,
       )
@@ -591,7 +591,7 @@ export class DashboardService {
       .prepare(
         `SELECT CASE p.method WHEN 'card_manual' THEN 'card' ELSE p.method END AS method, sum(p.amount_cents) AS amount
          FROM sale s JOIN payment p ON p.sale_id = s.id
-         WHERE s.tenant_id = ? AND s.status = 'completed' AND s.resolved_at >= ? AND s.resolved_at < ? ${scope.sales}
+         WHERE s.tenant_id = ? AND s.status = 'completed' AND coalesce(s.business_at, s.resolved_at) >= ? AND coalesce(s.business_at, s.resolved_at) < ? ${scope.sales}
          GROUP BY 1`,
       )
       .all(this.#tenantId, new Date(period.fromMs).toISOString(), new Date(period.toMs).toISOString(), ...scope.params) as unknown as {
@@ -607,7 +607,7 @@ export class DashboardService {
       .prepare(
         `SELECT coalesce(u.name, ?) AS name, count(*) AS count, sum(s.total_cents) AS total
          FROM sale s LEFT JOIN app_user u ON u.id = s.cashier_id
-         WHERE s.tenant_id = ? AND s.status = 'completed' AND s.resolved_at >= ? AND s.resolved_at < ? ${scope.sales}
+         WHERE s.tenant_id = ? AND s.status = 'completed' AND coalesce(s.business_at, s.resolved_at) >= ? AND coalesce(s.business_at, s.resolved_at) < ? ${scope.sales}
          GROUP BY s.cashier_id ORDER BY name`,
       )
       .all(NO_CASHIER, this.#tenantId, new Date(period.fromMs).toISOString(), new Date(period.toMs).toISOString(), ...scope.params) as unknown as {

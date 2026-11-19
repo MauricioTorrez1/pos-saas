@@ -22,12 +22,14 @@ export interface StockMovementToPost {
   readonly source: string;
   /** Which one of that source, so the same one is never posted twice. */
   readonly sourceId: string;
+  /** The past day of a backdated sale, so the ledger says which day the stock left on (E1-60). */
+  readonly businessDay?: string;
 }
 
 /** Posts a movement, and does nothing if its source already posted it. Sales and returns prepare it too. */
 export const INSERT_STOCK_MOVEMENT_SQL = `
-  INSERT INTO stock_movement (id, tenant_id, product_id, type, quantity_milli, unit_cost_e6, source, source_id, occurred_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO stock_movement (id, tenant_id, product_id, type, quantity_milli, unit_cost_e6, source, source_id, occurred_at, business_day)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT (tenant_id, source, source_id, product_id) DO NOTHING
 `;
 
@@ -111,6 +113,7 @@ export function postWith(insert: StatementSync, tenantId: string, movements: rea
       movement.source,
       movement.sourceId,
       occurredAt,
+      movement.businessDay ?? null,
     );
     created += Number(result.changes);
   }
