@@ -14,6 +14,8 @@ export interface OpenSessionRow {
   readonly openedByName: string;
   readonly openedAt: string;
   readonly openingFloatCents: number;
+  /** The past day it captures, or null when it sells today (E1-60). */
+  readonly businessDay: string | null;
 }
 
 /** What a cut saves. */
@@ -31,6 +33,7 @@ interface SessionRowSql {
   readonly opening_float_cents: number;
   readonly opened_by: string;
   readonly opened_by_name: string;
+  readonly business_day: string | null;
 }
 
 interface TotalsRowSql {
@@ -79,12 +82,12 @@ export class CashSessionStore {
     this.#tenantId = tenantId;
     this.#outbox = new SyncOutbox(store, tenantId);
     this.#findOpen = store.prepare(`
-      SELECT s.id, s.opened_at, s.opening_float_cents, s.opened_by, u.name AS opened_by_name
+      SELECT s.id, s.opened_at, s.opening_float_cents, s.opened_by, u.name AS opened_by_name, s.business_day
       FROM cash_session s JOIN app_user u ON u.id = s.opened_by
-      WHERE s.tenant_id = ? AND s.closed_at IS NULL
+      WHERE s.tenant_id = ? AND s.closed_at IS NULL AND s.business_day IS ?
     `);
     this.#insertSession = store.prepare(`
-      INSERT INTO cash_session (id, tenant_id, opened_by, opened_at, opening_float_cents) VALUES (?, ?, ?, ?, ?)
+      INSERT INTO cash_session (id, tenant_id, opened_by, opened_at, opening_float_cents, business_day) VALUES (?, ?, ?, ?, ?, ?)
     `);
     this.#salesTotals = store.prepare(`
       SELECT
@@ -129,15 +132,24 @@ export class CashSessionStore {
   }
 
   /**
-   * Finds the session that is open.
+   * Finds the session that is open for a day. Today's drawer and a backdated capture are separate sessions, so each sees
+   * only its own (E1-60).
    *
-   * @returns it, or null when the register is closed
+   * @param businessDay the past day a backdated capture works on, or null for today's drawer
+   * @returns it, or null when that register is closed
    */
-  findOpen(): OpenSessionRow | null {
-    const row = this.#findOpen.get(this.#tenantId) as unknown as SessionRowSql | undefined;
+  findOpen(businessDay: string | null = null): OpenSessionRow | null {
+    const row = this.#findOpen.get(this.#tenantId, businessDay) as unknown as SessionRowSql | undefined;
     return row === undefined
       ? null
-      : { id: row.id, openedById: row.opened_by, openedByName: row.opened_by_name, openedAt: row.opened_at, openingFloatCents: row.opening_float_cents };
+      : {
+          id: row.id,
+          openedById: row.opened_by,
+          openedByName: row.opened_by_name,
+          openedAt: row.opened_at,
+          openingFloatCents: row.opening_float_cents,
+          businessDay: row.business_day,
+        };
   }
 
   /**
@@ -146,15 +158,20 @@ export class CashSessionStore {
    * @param userId who opens it
    * @param openingFloatCents the cash they put in the drawer to start
    * @param alongWith work that must commit or roll back with the opening, such as its line in the audit log
+   * @param businessDay the past day a backdated capture works on, or null for today's drawer (E1-60)
    * @returns the id of the new session
-   * @throws Error from SQLite if a session is already open, because there is only one at a time
+   * @throws Error from SQLite if a session of the same day is already open, because there is only one at a time
    */
-  open(userId: string, openingFloatCents: number, alongWith?: (sessionId: string) => void): string {
+  open(userId: string, openingFloatCents: number, alongWith?: (sessionId: string) => void, businessDay: string | null = null): string {
     const id = uuidV7();
     this.#store.transaction(() => {
       const openedAt = new Date().toISOString();
-      this.#insertSession.run(id, this.#tenantId, userId, openedAt, openingFloatCents);
-      this.#outbox.enqueue('cash_session.opened', { sessionId: id, openedBy: userId, openingFloatCents }, openedAt);
+      this.#insertSession.run(id, this.#tenantId, userId, openedAt, openingFloatCents, businessDay);
+      this.#outbox.enqueue(
+        'cash_session.opened',
+        { sessionId: id, openedBy: userId, openingFloatCents, ...(businessDay === null ? {} : { businessDate: businessDay }) },
+        openedAt,
+      );
       alongWith?.(id);
     });
     return id;
@@ -244,9 +261,11 @@ export class CashSessionStore {
    *
    * @param sessionId the open session
    * @param cut what was found and counted
+   * @param businessDay the past day of a backdated session, which the event carries so the core knows the cut is a
+   *   supplementary one of that day
    * @returns the id and the moment of the cut
    */
-  close(sessionId: string, cut: CutRecord): { id: string; cutAt: string } {
+  close(sessionId: string, cut: CutRecord, businessDay: string | null = null): { id: string; cutAt: string } {
     const id = uuidV7();
     const cutAt = new Date().toISOString();
     this.#store.transaction(() => {
@@ -276,6 +295,7 @@ export class CashSessionStore {
           counted: { cashCents: cut.counted.cashCents, cardCents: cut.counted.cardCents, transferCents: cut.counted.transferCents },
           denominations: cut.denominations,
           reason: cut.reason,
+          ...(businessDay === null ? {} : { businessDate: businessDay }),
         },
         cutAt,
       );

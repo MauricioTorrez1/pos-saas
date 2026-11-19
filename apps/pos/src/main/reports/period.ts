@@ -239,6 +239,19 @@ export function localDayOf(utcMs: number): string {
 }
 
 /**
+ * Moves a moment to another local day, keeping its local time of day. A sale captured the next morning keeps the hour it
+ * was rung up at, on the day it belongs to (E1-60), so the reports that read moments put it on that day.
+ *
+ * @param utcMs the moment
+ * @param day `YYYY-MM-DD`, the local day to move it to
+ * @returns the moment, in UTC, at the same local time on that day
+ */
+export function momentOnDay(utcMs: number, day: string): number {
+  const sinceMidnight = utcMs - startOfLocalDay(parseDay(localDayOf(utcMs)));
+  return startOfLocalDay(parseDay(day)) + sinceMidnight;
+}
+
+/**
  * Counts the days from one day to another, both included.
  *
  * @param fromDay `YYYY-MM-DD`

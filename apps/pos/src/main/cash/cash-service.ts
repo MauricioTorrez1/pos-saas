@@ -16,6 +16,7 @@ import type {
   OpenCashResult,
 } from '../../shared/cash-api';
 import type { UserSummary } from '../../shared/auth';
+import { captureDayLabel } from '../../shared/capture-day';
 import type { AuditEntry } from '../audit/audit-log';
 import type { AuthService } from '../auth/auth-service';
 import type { CashSessionStore } from './cash-session-store';
@@ -43,15 +44,15 @@ function requireReason(reason: string): string {
  */
 export class CashService {
   readonly #store: CashSessionStore;
-  readonly #auth: Pick<AuthService, 'currentUser' | 'authorizeWithOwnerPin'>;
+  readonly #auth: Pick<AuthService, 'currentUser' | 'authorizeWithOwnerPin'> & Partial<Pick<AuthService, 'captureDay'>>;
   readonly #audit: { record(entry: AuditEntry): void } | null;
 
   /**
    * @param store where the sessions are kept
-   * @param auth who is signed in, and the check of an owner's PIN
+   * @param auth who is signed in, the check of an owner's PIN, and the past day the session captures (E1-60)
    * @param audit where the opening of each shift is written, with who and how much (E1-54)
    */
-  constructor(store: CashSessionStore, auth: Pick<AuthService, 'currentUser' | 'authorizeWithOwnerPin'>, audit: { record(entry: AuditEntry): void } | null = null) {
+  constructor(store: CashSessionStore, auth: Pick<AuthService, 'currentUser' | 'authorizeWithOwnerPin'> & Partial<Pick<AuthService, 'captureDay'>>, audit: { record(entry: AuditEntry): void } | null = null) {
     this.#store = store;
     this.#auth = auth;
     this.#audit = audit;
@@ -64,14 +65,20 @@ export class CashService {
    */
   status(): CashStatus {
     const limit = this.#withdrawalLimit();
-    const session = this.#store.findOpen();
+    const session = this.#store.findOpen(this.#captureDay());
     if (session === null) {
       return { session: null, totals: null, expected: null, withdrawalLimitCents: limit, shouldWithdraw: false };
     }
     const totals = this.#store.totals(session);
     const expected = expectedCut(totals);
     return {
-      session: { id: session.id, openedBy: session.openedByName, openedAt: session.openedAt, openingFloatCents: session.openingFloatCents },
+      session: {
+        id: session.id,
+        openedBy: session.openedByName,
+        openedAt: session.openedAt,
+        openingFloatCents: session.openingFloatCents,
+        businessDay: session.businessDay,
+      },
       totals,
       expected,
       withdrawalLimitCents: limit,
@@ -79,13 +86,17 @@ export class CashService {
     };
   }
 
-  /** @returns the id of the open session, or null. Sales are only made while there is one. */
+  /**
+   * @returns the id of the open session of the day this person works on, or null. Sales are only made while there is one,
+   *   so a backdated capture sells into its own session and never into today's drawer (E1-60).
+   */
   openSessionId(): string | null {
-    return this.#store.findOpen()?.id ?? null;
+    return this.#store.findOpen(this.#captureDay())?.id ?? null;
   }
 
   /**
-   * Opens the register with the cash the cashier puts in the drawer (RF-024).
+   * Opens the register with the cash the cashier puts in the drawer (RF-024). A backdated capture opens a session of its
+   * own for its day, with its own float and cut, and the audit log says so (E1-60).
    *
    * @param floatCents the float, which may be zero
    * @returns `opened`, or `already_open` if somebody did already, because there is one session at a time
@@ -95,17 +106,23 @@ export class CashService {
   open(floatCents: number): OpenCashResult {
     const user = this.#requireUser();
     requireCents(floatCents, 'the float', 0);
-    if (this.#store.findOpen() !== null) {
+    const businessDay = this.#captureDay();
+    if (this.#store.findOpen(businessDay) !== null) {
       return { status: 'already_open', cash: this.status() };
     }
-    this.#store.open(user.id, floatCents, (sessionId) =>
-      this.#audit?.record({
-        userId: user.id,
-        action: 'cash_session.opened',
-        entity: 'cash_session',
-        entityId: sessionId,
-        detail: `${user.name} abrió la caja con un fondo de ${floatCents} centavos`,
-      }),
+    const backdated = businessDay === null ? '' : ` para capturar las ventas atrasadas del ${captureDayLabel(businessDay)}`;
+    this.#store.open(
+      user.id,
+      floatCents,
+      (sessionId) =>
+        this.#audit?.record({
+          userId: user.id,
+          action: businessDay === null ? 'cash_session.opened' : 'cash_session.opened_backdated',
+          entity: 'cash_session',
+          entityId: sessionId,
+          detail: `${user.name} abrió la caja con un fondo de ${floatCents} centavos${backdated}`,
+        }),
+      businessDay,
     );
     return { status: 'opened', cash: this.status() };
   }
@@ -122,7 +139,7 @@ export class CashService {
     const user = this.#requireUser();
     requireCents(request.amountCents, 'an amount', 1);
     const reason = requireReason(request.reason);
-    const session = this.#store.findOpen();
+    const session = this.#store.findOpen(this.#captureDay());
     if (session === null) {
       return { status: 'no_session' };
     }
@@ -158,7 +175,7 @@ export class CashService {
       cardCents: request.cardCountedCents,
       transferCents: request.transferCountedCents,
     };
-    const session = this.#store.findOpen();
+    const session = this.#store.findOpen(this.#captureDay());
     if (session === null) {
       return { status: 'no_session' };
     }
@@ -172,14 +189,28 @@ export class CashService {
     if (!comparison.isBalanced && reason === '') {
       return { status: 'reason_required', comparison };
     }
-    const saved = this.#store.close(session.id, {
-      cutBy: user.id,
-      expected,
-      counted,
-      denominations: request.counts,
+    const saved = this.#store.close(
+      session.id,
+      { cutBy: user.id, expected, counted, denominations: request.counts, reason: comparison.isBalanced ? null : reason },
+      session.businessDay,
+    );
+    if (session.businessDay !== null) {
+      this.#audit?.record({
+        userId: user.id,
+        action: 'cash_session.closed_backdated',
+        entity: 'cash_session',
+        entityId: session.id,
+        detail: `${user.name} hizo el corte suplementario de las ventas atrasadas del ${captureDayLabel(session.businessDay)}`,
+      });
+    }
+    const cut: CashCut = {
+      ...comparison,
+      id: saved.id,
+      cutAt: saved.cutAt,
+      cutBy: user.name,
       reason: comparison.isBalanced ? null : reason,
-    });
-    const cut: CashCut = { ...comparison, id: saved.id, cutAt: saved.cutAt, cutBy: user.name, reason: comparison.isBalanced ? null : reason };
+      businessDay: session.businessDay,
+    };
     return { status: 'closed', cut };
   }
 
@@ -204,6 +235,10 @@ export class CashService {
     const saved = this.#store.readSetting(WITHDRAWAL_LIMIT_SETTING);
     const parsed = saved === null ? Number.NaN : Number(saved);
     return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : DEFAULT_WITHDRAWAL_LIMIT_CENTS;
+  }
+
+  #captureDay(): string | null {
+    return this.#auth.captureDay?.() ?? null;
   }
 
   #requireUser(): UserSummary {

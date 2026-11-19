@@ -4,6 +4,9 @@ import io.github.mauriciotorrez1.pos.ingest.OperationRecorder;
 import io.github.mauriciotorrez1.pos.ingest.OperationRejectedException;
 import io.github.mauriciotorrez1.pos.ingest.Payload;
 import io.github.mauriciotorrez1.pos.ingest.RegisterOperation;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -24,6 +27,8 @@ class SalesOperationRecorder implements OperationRecorder {
 
     private static final String SALE_COMPLETED = "sale.completed";
     private static final String RETURN_REGISTERED = "return.registered";
+    /** The zone the register reads its days in (ADR 0060). A sale without a business date counts on its local day. */
+    static final ZoneId REGISTER_ZONE = ZoneId.of("America/Mexico_City");
 
     private final JdbcTemplate jdbc;
 
@@ -53,14 +58,15 @@ class SalesOperationRecorder implements OperationRecorder {
         if (exists("SELECT count(*) FROM sale WHERE id = ?", saleId)) {
             throw new OperationRejectedException("The sale was already recorded by another operation");
         }
+        OffsetDateTime completedAt = Payload.moment(sale, "completedAt");
         jdbc.update("""
-                INSERT INTO sale (id, op_id, register_id, folio, cash_session_id, cashier_id, completed_at,
+                INSERT INTO sale (id, op_id, register_id, folio, cash_session_id, cashier_id, completed_at, business_date,
                                   subtotal_cents, tax_cents, total_cents)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 saleId, operation.opId(), operation.registerId(), Payload.number(sale, "folio"),
                 Payload.nullableUuid(sale, "cashSessionId"), Payload.nullableUuid(sale, "cashierId"),
-                Payload.moment(sale, "completedAt"), Payload.number(sale, "subtotalCents"),
+                completedAt, businessDateOf(sale, completedAt), Payload.number(sale, "subtotalCents"),
                 Payload.number(sale, "taxCents"), Payload.number(sale, "totalCents"));
         for (JsonNode line : sale.get("lines")) {
             jdbc.update("""
@@ -78,6 +84,22 @@ class SalesOperationRecorder implements OperationRecorder {
                     Payload.uuid(payment, "id"), saleId, Payload.text(payment, "method"),
                     Payload.number(payment, "amountCents"), Payload.nullableText(payment, "reference"));
         }
+    }
+
+    /**
+     * The day a sale counts on (E1-60, ADR 0076): the day a backdated capture sent, or else the local day it was
+     * completed. A backdated day after the moment it was recorded cannot happen at a register, so it is refused.
+     */
+    static LocalDate businessDateOf(JsonNode sale, OffsetDateTime completedAt) {
+        LocalDate completedOn = completedAt.atZoneSameInstant(REGISTER_ZONE).toLocalDate();
+        LocalDate businessDate = Payload.nullableDate(sale, "businessDate");
+        if (businessDate == null) {
+            return completedOn;
+        }
+        if (businessDate.isAfter(completedOn)) {
+            throw new OperationRejectedException("A sale cannot count on a day after the one it was recorded on");
+        }
+        return businessDate;
     }
 
     /** The totals, the lines and the payments must agree to the cent; a client that sends otherwise is wrong. */

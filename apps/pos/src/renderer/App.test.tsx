@@ -2118,3 +2118,89 @@ describe('opening the shift and closing the register (E1-54)', () => {
     expect(screen.queryByRole('dialog', { hidden: true })).toBeNull();
   });
 });
+
+describe('capturing the sales of a past day (E1-60)', () => {
+  const ANA: UserSummary = { id: '019a5f2e-7c41-7b1a-9d2e-3f4a5b6c7d8f', name: 'Ana', role: 'cashier' };
+  const DAYS = ['2026-11-18', '2026-11-17', '2026-11-16'];
+
+  function signedOut(): Pick<PosApi, 'getAuthState'> {
+    return { getAuthState: () => Promise.resolve({ needsSetup: false, users: [OWNER, ANA], current: null, captureDay: null, captureDays: DAYS }) };
+  }
+
+  function dayBox(): HTMLSelectElement {
+    return screen.getByRole<HTMLSelectElement>('combobox', { name: 'Día de captura' });
+  }
+
+  function submitWith(pin: string): void {
+    const box = screen.getByLabelText<HTMLInputElement>('PIN');
+    fireEvent.change(box, { target: { value: pin } });
+    fireEvent.submit(box.closest('form')!);
+  }
+
+  it('offers today first, then the past days, and signs in to today without asking more', async () => {
+    const login = vi.fn<PosApi['login']>(() => Promise.resolve({ status: 'wrong_pin', attemptsLeft: 4 }));
+    render(<App posApi={fakePosApi({ ...signedOut(), login })} />);
+    await screen.findByRole('heading', { name: '¿Quién cobra?' });
+
+    expect([...dayBox().options].map((option) => option.textContent)).toEqual([
+      'Hoy, miércoles 18 de noviembre',
+      'Ayer, martes 17 de noviembre',
+      'lunes 16 de noviembre',
+    ]);
+    expect(dayBox().value).toBe('2026-11-18');
+    submitWith('4321');
+
+    await waitFor(() => expect(login).toHaveBeenCalledExactlyOnceWith({ userId: OWNER.id, pin: '4321' }));
+    expect(screen.queryByLabelText('PIN del dueño')).toBeNull();
+  });
+
+  it('sends the past day the owner chose, and warns what the session will do', async () => {
+    const login = vi.fn<PosApi['login']>(() => Promise.resolve({ status: 'wrong_pin', attemptsLeft: 4 }));
+    render(<App posApi={fakePosApi({ ...signedOut(), login })} />);
+    await screen.findByRole('heading', { name: '¿Quién cobra?' });
+
+    fireEvent.change(dayBox(), { target: { value: '2026-11-17' } });
+    expect(screen.getByRole('status').textContent).toContain('ventas atrasadas del martes 17 de noviembre');
+    expect(screen.queryByLabelText('PIN del dueño')).toBeNull();
+    submitWith('4321');
+
+    await waitFor(() => expect(login).toHaveBeenCalledExactlyOnceWith({ userId: OWNER.id, pin: '4321', capture: { day: '2026-11-17' } }));
+  });
+
+  it('asks a cashier for the PIN of an owner, and says when it is wrong', async () => {
+    const login = vi.fn<PosApi['login']>(() => Promise.resolve({ status: 'owner_wrong_pin', attemptsLeft: 3 }));
+    render(<App posApi={fakePosApi({ ...signedOut(), login })} />);
+    await screen.findByRole('heading', { name: '¿Quién cobra?' });
+
+    fireEvent.click(screen.getByRole('radio', { name: /Ana/ }));
+    fireEvent.change(dayBox(), { target: { value: '2026-11-17' } });
+    fireEvent.change(screen.getByLabelText('PIN del dueño'), { target: { value: '4321' } });
+    submitWith('5555');
+
+    await waitFor(() =>
+      expect(login).toHaveBeenCalledExactlyOnceWith({ userId: ANA.id, pin: '5555', capture: { day: '2026-11-17', ownerPin: '4321' } }),
+    );
+    expect((await screen.findByRole('alert')).textContent).toContain('El PIN del dueño es incorrecto');
+  });
+
+  it('hides the choice when only today can be sold', async () => {
+    render(<App posApi={fakePosApi({ getAuthState: () => Promise.resolve({ needsSetup: false, users: [OWNER], current: null, captureDays: ['2026-11-18'] }) })} />);
+    await screen.findByRole('heading', { name: '¿Quién cobra?' });
+
+    expect(screen.queryByRole('combobox', { name: 'Día de captura' })).toBeNull();
+  });
+
+  it('shows on the register, the whole session, which day it captures', async () => {
+    render(<App posApi={fakePosApi({ getAuthState: () => Promise.resolve({ needsSetup: false, users: [OWNER], current: OWNER, captureDay: '2026-11-17', captureDays: DAYS }) })} />);
+
+    const banner = await screen.findByLabelText('Captura atrasada');
+    expect(banner.textContent).toContain('Capturando ventas del martes 17 de noviembre');
+  });
+
+  it('shows no banner when the session sells today', async () => {
+    render(<App posApi={fakePosApi()} />);
+    await screen.findByRole('combobox', { name: 'Buscar producto' });
+
+    expect(screen.queryByLabelText('Captura atrasada')).toBeNull();
+  });
+});

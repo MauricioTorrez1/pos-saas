@@ -893,4 +893,37 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'an expense is never deleted: void it instead'); END;
     `,
   },
+  {
+    version: 23,
+    name: 'add_business_days',
+    // A session may capture the sales of a recent past day (E1-60, ADR 0076). The session, its sales and their stock carry
+    // that business day; a NULL day means the day the record happened, so every row written before stays as it was. A sale
+    // also keeps business_at: the moment it counts in the reports, which is its recording time moved to the business day.
+    // A live session and a backdated one may be open together, but never two of the same day.
+    sql: `
+      ALTER TABLE cash_session ADD COLUMN business_day TEXT
+        CHECK (business_day IS NULL OR business_day GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]');
+
+      DROP INDEX cash_session_one_open;
+      CREATE UNIQUE INDEX cash_session_one_open_per_day ON cash_session (tenant_id, coalesce(business_day, '')) WHERE closed_at IS NULL;
+
+      CREATE TRIGGER cash_session_keeps_its_day BEFORE UPDATE OF business_day ON cash_session
+      BEGIN SELECT RAISE(ABORT, 'the day a cash session captures never changes'); END;
+
+      ALTER TABLE sale ADD COLUMN business_day TEXT;
+      ALTER TABLE sale ADD COLUMN business_at TEXT;
+
+      CREATE TRIGGER sale_takes_the_day_of_its_session BEFORE INSERT ON sale
+      WHEN NEW.business_day IS NOT (SELECT business_day FROM cash_session WHERE id = NEW.cash_session_id)
+        OR (NEW.business_day IS NULL) <> (NEW.business_at IS NULL)
+      BEGIN SELECT RAISE(ABORT, 'a sale captures the day of its cash session'); END;
+
+      CREATE TRIGGER sale_keeps_its_day BEFORE UPDATE OF business_day, business_at ON sale
+      BEGIN SELECT RAISE(ABORT, 'the day a sale counts on never changes'); END;
+
+      CREATE INDEX sale_by_status_and_business_time ON sale (tenant_id, status, coalesce(business_at, resolved_at));
+
+      ALTER TABLE stock_movement ADD COLUMN business_day TEXT;
+    `,
+  },
 ];

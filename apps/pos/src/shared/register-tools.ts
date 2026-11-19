@@ -337,6 +337,8 @@ export interface SaleSummary {
   readonly saleId: string;
   readonly folio: string;
   readonly completedAt: string;
+  /** The past day a backdated capture put it on (E1-60). Absent or null for a sale of the day it was rung up. */
+  readonly businessDay?: string | null;
   readonly totalCents: number;
   /** What already went back to the customer. Equal to the total when the sale was cancelled whole. */
   readonly refundedCents: number;

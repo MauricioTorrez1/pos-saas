@@ -162,6 +162,7 @@ export class SalePayments {
     const ticket = toTicketData(this.#reprint.businessName(), record.sale, {
       folio: record.folio,
       completedAt: record.completedAt,
+      businessDay: record.businessDay ?? null,
       payments: record.payments,
       changeCents: awaiting?.changeCents ?? null,
       isReprint,

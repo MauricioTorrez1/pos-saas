@@ -12,6 +12,8 @@ export interface CashSessionView {
   /** When it opened, in ISO 8601. */
   readonly openedAt: string;
   readonly openingFloatCents: number;
+  /** The past day whose sales it captures, or null when it sells today (E1-60). */
+  readonly businessDay?: string | null;
 }
 
 /** How the cash of the register stands. */
@@ -72,6 +74,8 @@ export interface CashCut extends CutComparison {
   readonly cutAt: string;
   readonly cutBy: string;
   readonly reason: string | null;
+  /** The past day of a backdated session, whose cut is a supplementary one of that day (E1-60). Null for today's. */
+  readonly businessDay?: string | null;
 }
 
 /** How closing the register ended. */

@@ -88,6 +88,57 @@
       }
     },
     {
+      "name": "A backdated capture the next morning: its own cash session and a sale, both on the day before (E1-60)",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000061",
+            "deviceSeq": 1,
+            "type": "cash_session.opened",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T15:02:00Z",
+            "payload": { "sessionId": "0193a5c0-0000-7000-8000-000000000062", "openedBy": "0193a5c0-0000-7000-8000-000000000040", "openingFloatCents": 0, "businessDate": "2026-12-10" }
+          },
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000063",
+            "deviceSeq": 2,
+            "type": "sale.completed",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T15:05:30Z",
+            "payload": {
+              "saleId": "0193a5c0-0000-7000-8000-000000000064",
+              "folio": 2,
+              "cashSessionId": "0193a5c0-0000-7000-8000-000000000062",
+              "cashierId": "0193a5c0-0000-7000-8000-000000000040",
+              "completedAt": "2026-12-11T15:05:30Z",
+              "businessDate": "2026-12-10",
+              "subtotalCents": 100,
+              "taxCents": 0,
+              "totalCents": 100,
+              "lines": [
+                {
+                  "id": "0193a5c0-0000-7000-8000-000000000065",
+                  "lineNumber": 1,
+                  "productId": "0193a5c0-0000-7000-8000-000000000051",
+                  "productName": "Tornillo",
+                  "unit": "piece",
+                  "quantityMilli": 1000,
+                  "unitPriceE4": 1000000,
+                  "taxFactor": "exempt",
+                  "taxRateBp": 0,
+                  "subtotalCents": 100,
+                  "taxCents": 0,
+                  "lineTotalCents": 100
+                }
+              ],
+              "payments": [{ "id": "0193a5c0-0000-7000-8000-000000000066", "method": "cash", "amountCents": 100, "reference": null }]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "A return, a cash entry, a cash exit, a stock write-off, and a cut, in the order they happened",
       "request": {
         "registerId": "0193a5c0-0000-7000-8000-000000000001",
@@ -775,6 +826,23 @@
             "schemaVersion": 1,
             "occurredAt": "2026-12-11T14:00:00Z",
             "payload": { "sessionId": "0193a5c0-0000-7000-8000-000000000031", "openedBy": "0193a5c0-0000-7000-8000-000000000040", "openingFloatCents": 0, "discount": 5 }
+          }
+        ]
+      }
+    },
+    {
+      "name": "A business date that is not a day",
+      "reason": "pattern",
+      "request": {
+        "registerId": "0193a5c0-0000-7000-8000-000000000001",
+        "operations": [
+          {
+            "opId": "0193a5c0-0000-7000-8000-000000000012",
+            "deviceSeq": 1,
+            "type": "cash_session.opened",
+            "schemaVersion": 1,
+            "occurredAt": "2026-12-11T14:00:00Z",
+            "payload": { "sessionId": "0193a5c0-0000-7000-8000-000000000031", "openedBy": "0193a5c0-0000-7000-8000-000000000040", "openingFloatCents": 0, "businessDate": "2026-13-01" }
           }
         ]
       }

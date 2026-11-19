@@ -1,6 +1,7 @@
 import { formatCents, formatUnitPriceE4, type Quantity, type TaxGroup, type TaxRate } from '@pos-saas/money';
 
 import { DEFAULT_TICKET_DESIGN, TEXT_SIZE_SCALE, ticketLineWidth, withCurrency, type TicketDesign } from '../../../shared/register-tools';
+import { backdatedTicketLine, captureDayLabel } from '../../../shared/capture-day';
 import type { SalePayment } from '../sale-recorder';
 import { EscPosBuilder } from './escpos';
 
@@ -44,6 +45,8 @@ export interface TicketData {
   /** Cash given back, or null when it is not known, as in a reprint. */
   readonly changeCents: number | null;
   readonly isReprint: boolean;
+  /** The past day a backdated capture put the sale on, or null (or absent) for a sale of the day it was rung up (E1-60). */
+  readonly backdatedDay?: string | null;
 }
 
 /**
@@ -86,6 +89,12 @@ export function composeTicket(ticket: TicketData, design: TicketDesign = DEFAULT
   const parts: TicketPart[] = [centered(name, true)];
   design.headerLines.filter((line) => line.trim() !== '').forEach((line) => parts.push(centered(line)));
   parts.push(centered(`Folio ${ticket.folio}`), centered(MOMENT_FORMAT.format(new Date(ticket.completedAt))));
+  if (ticket.backdatedDay != null) {
+    // A narrow paper breaks the line before the day, so the day is never cut off.
+    const line = backdatedTicketLine(ticket.backdatedDay);
+    const lines = line.length <= width ? [line] : ['Captura atrasada del', captureDayLabel(ticket.backdatedDay)];
+    lines.forEach((text) => parts.push(centered(text, true)));
+  }
   if (ticket.isReprint) {
     parts.push(centered('REIMPRESIÓN'));
   }

@@ -317,6 +317,20 @@ kbd {
   margin: 0.75rem 1.25rem 0;
 }
 
+/* A backdated capture (E1-60): loud and on every screen of the session, so nobody rings up today's sales into it. */
+.register-backdated {
+  padding: 0.6rem 1.25rem;
+  font-weight: 700;
+  color: var(--warn);
+  background: var(--warn-surface);
+  border-bottom: 3px solid var(--warn);
+}
+
+.login-backdated {
+  color: var(--warn);
+  background: var(--warn-surface);
+}
+
 .register-footer {
   display: flex;
   flex-wrap: wrap;

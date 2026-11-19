@@ -1,4 +1,5 @@
 import { MAX_USER_NAME_LENGTH, USER_ROLES, type UserRole } from '../../shared/auth';
+import type { CaptureDayRequest } from '../../shared/capture-day';
 
 const UUID_V7_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -28,20 +29,34 @@ export function parsePin(value: unknown): string {
   return requireText(value, 'a PIN', 8);
 }
 
+const DAY_TEXT = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseCapture(value: unknown): CaptureDayRequest | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const capture = requireRecord(value, 'the day to capture');
+  if (typeof capture.day !== 'string' || !DAY_TEXT.test(capture.day)) {
+    throw new TypeError('Expected the day to capture as YYYY-MM-DD');
+  }
+  return capture.ownerPin === undefined ? { day: capture.day } : { day: capture.day, ownerPin: parsePin(capture.ownerPin) };
+}
+
 /**
  * Checks a request to sign in.
  *
  * @param value whatever crossed the bridge
- * @returns the user and the PIN
+ * @returns the user, the PIN, and the past day to capture with the PIN of an owner when one was chosen (E1-60)
  * @throws TypeError if any field is missing or malformed
  */
-export function parseLoginRequest(value: unknown): { userId: string; pin: string } {
+export function parseLoginRequest(value: unknown): { userId: string; pin: string; capture?: CaptureDayRequest } {
   const request = requireRecord(value, 'a sign-in request');
   const { userId } = request;
   if (typeof userId !== 'string' || !UUID_V7_TEXT.test(userId)) {
     throw new TypeError('Expected the UUIDv7 of a user');
   }
-  return { userId, pin: parsePin(request.pin) };
+  const capture = parseCapture(request.capture);
+  return capture === undefined ? { userId, pin: parsePin(request.pin) } : { userId, pin: parsePin(request.pin), capture };
 }
 
 /**

@@ -1,6 +1,7 @@
 import { formatCents } from '@pos-saas/money';
 import { useState, type ReactElement } from 'react';
 
+import { captureDayLabel } from '../../shared/capture-day';
 import type { UserSummary } from '../../shared/auth';
 import { countCash, DENOMINATIONS_CENTS } from '../../shared/cash';
 import type { CashCut, CashMovementKind, CashStatus, CutComparisonView } from '../../shared/cash-api';
@@ -45,6 +46,8 @@ interface CashDialogProps {
   readonly onSignOut?: () => void;
   /** In `exit_cut`, called once the cut was made and seen. */
   readonly onCutDone?: () => void;
+  /** The past day of a backdated capture, whose cash is its own (E1-60). Null or absent for today's drawer. */
+  readonly captureDay?: string | null;
 }
 
 /**
@@ -60,9 +63,10 @@ interface CashDialogProps {
  * @param props.mode why the dialog is open
  * @param props.onSignOut in `opening`, signs the person out instead of opening the cash
  * @param props.onCutDone in `exit_cut`, called after the cut
+ * @param props.captureDay the past day of a backdated capture, which the opening and the cut name
  * @returns the dialog
  */
-export function CashDialog({ posApi, user, status, onStatusChange, onClose, mode = 'normal', onSignOut, onCutDone }: CashDialogProps): ReactElement {
+export function CashDialog({ posApi, user, status, onStatusChange, onClose, mode = 'normal', onSignOut, onCutDone, captureDay = null }: CashDialogProps): ReactElement {
   const [view, setView] = useState<View>(mode === 'exit_cut' ? { kind: 'close' } : { kind: 'summary' });
   const back = (): void => (mode === 'exit_cut' ? onClose() : setView({ kind: 'summary' }));
 
@@ -77,13 +81,14 @@ export function CashDialog({ posApi, user, status, onStatusChange, onClose, mode
           onClose={onClose}
           onGo={setView}
           isOpeningShift={mode === 'opening'}
+          captureDay={captureDay}
           {...(onSignOut === undefined ? {} : { onSignOut })}
         />
       )}
       {view.kind === 'movement' && (
         <MovementView posApi={posApi} user={user} movement={view.movement} onStatusChange={onStatusChange} onBack={back} />
       )}
-      {view.kind === 'close' && <CloseView posApi={posApi} onStatusChange={onStatusChange} onBack={back} onCut={(cut) => setView({ kind: 'cut', cut })} />}
+      {view.kind === 'close' && <CloseView posApi={posApi} captureDay={captureDay} onStatusChange={onStatusChange} onBack={back} onCut={(cut) => setView({ kind: 'cut', cut })} />}
       {view.kind === 'cut' && <CutView cut={view.cut} onDone={mode === 'exit_cut' && onCutDone !== undefined ? onCutDone : onClose} />}
       {view.kind === 'limit' && <LimitView posApi={posApi} onStatusChange={onStatusChange} onBack={back} current={status.withdrawalLimitCents} />}
     </ModalDialog>
@@ -99,10 +104,11 @@ interface SummaryViewProps {
   readonly onGo: (view: View) => void;
   /** True right after signing in: the float cannot be skipped by a cashier. */
   readonly isOpeningShift: boolean;
+  readonly captureDay: string | null;
   readonly onSignOut?: () => void;
 }
 
-function SummaryView({ posApi, user, status, onStatusChange, onClose, onGo, isOpeningShift, onSignOut }: SummaryViewProps): ReactElement {
+function SummaryView({ posApi, user, status, onStatusChange, onClose, onGo, isOpeningShift, captureDay, onSignOut }: SummaryViewProps): ReactElement {
   const [floatText, setFloatText] = useState('');
   const { isBusy, message, setMessage, run } = useAction();
   const isOwner = user.role === 'owner';
@@ -140,6 +146,11 @@ function SummaryView({ posApi, user, status, onStatusChange, onClose, onGo, isOp
     return (
       <>
         <h2 id="cash-title">Abrir la caja</h2>
+        {captureDay !== null && (
+          <p className="notice login-backdated">
+            Esta caja es solo para las ventas atrasadas del {captureDayLabel(captureDay)}: lleva su propio fondo y su propio corte, aparte de la caja de hoy.
+          </p>
+        )}
         {isOpeningShift ? (
           <p>
             Hola, {user.name}. Antes de vender, cuenta el fondo de caja inicial: el efectivo que dejas en el cajón para dar cambio.
@@ -299,12 +310,13 @@ function describeMovementRefusal(result: Exclude<Awaited<ReturnType<PosApi['reco
 
 interface CloseViewProps {
   readonly posApi: PosApi;
+  readonly captureDay: string | null;
   readonly onStatusChange: (status: CashStatus) => void;
   readonly onBack: () => void;
   readonly onCut: (cut: CashCut) => void;
 }
 
-function CloseView({ posApi, onStatusChange, onBack, onCut }: CloseViewProps): ReactElement {
+function CloseView({ posApi, captureDay, onStatusChange, onBack, onCut }: CloseViewProps): ReactElement {
   const [counts, setCounts] = useState<Record<number, string>>({});
   const [cardText, setCardText] = useState('');
   const [transferText, setTransferText] = useState('');
@@ -356,7 +368,7 @@ function CloseView({ posApi, onStatusChange, onBack, onCut }: CloseViewProps): R
 
   return (
     <>
-      <h2 id="cash-title">Corte de caja</h2>
+      <h2 id="cash-title">{captureDay === null ? 'Corte de caja' : `Corte suplementario del ${captureDayLabel(captureDay)}`}</h2>
       <p>Cuenta lo que hay en el cajón, billete por billete, y lo que marcan los vouchers.</p>
       <div className="cash-counts">
         {DENOMINATIONS_CENTS.map((denomination) => (

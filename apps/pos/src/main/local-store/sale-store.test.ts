@@ -450,6 +450,7 @@ describe('reading the last completed sale (reprint)', () => {
     expect(sales.findLastCompletedSale()).toEqual({
       folio: 2,
       completedAt: done.completedAt,
+      businessDay: null,
       sale: newer,
       payments: [
         { method: 'transfer', amountCents: 5694, reference: 'SPEI-778812' },

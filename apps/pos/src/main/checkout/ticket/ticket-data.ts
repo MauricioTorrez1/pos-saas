@@ -11,6 +11,8 @@ export interface TicketSource {
   /** Cash given back, or null when it is not known, as in a reprint. */
   readonly changeCents: number | null;
   readonly isReprint: boolean;
+  /** The past day of a backdated capture, which the ticket prints (E1-60). */
+  readonly businessDay?: string | null;
 }
 
 /**
@@ -42,5 +44,6 @@ export function toTicketData(businessName: string, sale: SaleToSave, source: Tic
     payments: source.payments,
     changeCents: source.changeCents,
     isReprint: source.isReprint,
+    backdatedDay: source.businessDay ?? null,
   };
 }

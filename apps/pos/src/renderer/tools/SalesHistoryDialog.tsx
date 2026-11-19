@@ -1,6 +1,7 @@
 import { formatCents } from '@pos-saas/money';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 
+import { captureDayLabel } from '../../shared/capture-day';
 import type { PosApi, PrintTicketResult } from '../../shared/pos-api';
 import type { SaleSummary, ToolsApi } from '../../shared/register-tools';
 import type { ReturnResult } from '../../shared/returns-api';
@@ -196,7 +197,10 @@ export function SalesHistoryDialog({ posApi, toolsApi, isOwner, onCancelled, onC
                     return (
                       <tr key={sale.saleId}>
                         <td>{sale.folio}</td>
-                        <td>{MOMENT.format(new Date(sale.completedAt))}</td>
+                        <td>
+                          {MOMENT.format(new Date(sale.completedAt))}
+                          {sale.businessDay != null && <small className="sale-backdated"> · captura del {captureDayLabel(sale.businessDay)}</small>}
+                        </td>
                         <td>{sale.cashierName ?? '—'}</td>
                         <td className="line-number">{formatCents(sale.totalCents)}</td>
                         <td>
