@@ -5,18 +5,26 @@ productName: Caja
 copyright: AGPL-3.0-only
 directories:
   output: dist
+  # The icon lives in resources/ (build/ is ignored by Git). scripts/make-icon.py draws it.
+  buildResources: resources
 files:
   - out/**/*
   - package.json
 asar: true
 npmRebuild: false
 win:
+  icon: resources/icon.ico
   target:
     - target: nsis
       arch: x64
   # Without a code-signing certificate Windows shows the SmartScreen warning on first install. See docs/instalacion.md.
-  signAndEditExecutable: false
+  # Editing the executable is what puts the icon on Caja.exe, the taskbar and the shortcuts; without a certificate the
+  # signing step is skipped.
+  signAndEditExecutable: true
 nsis:
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  installerHeaderIcon: resources/icon.ico
   # A per-user install needs no administrator, and an update is the same installer run again: it keeps the data.
   oneClick: true
   perMachine: false
