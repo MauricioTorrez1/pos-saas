@@ -217,7 +217,7 @@ export function withCurrency(amount: string, currency: TicketCurrency): string {
 export const MAX_TICKET_COPIES = 3;
 
 /**
- * What the register does with the ticket once a sale is recorded (ADR 0074): ask the cashier, print it every time, or
+ * What the register does with the ticket once a sale is recorded (ADR 0075): ask the cashier, print it every time, or
  * never print it. The sale is saved first whatever the choice, so the answer only decides the paper.
  */
 export const TICKET_PRINT_POLICY_CHOICES = ['ask', 'always', 'never'] as const;

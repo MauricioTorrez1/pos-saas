@@ -3,7 +3,7 @@ import type { StatementSync } from 'node:sqlite';
 import type { AuditLog } from '../audit/audit-log';
 import type { LocalStore } from '../local-store/local-store';
 
-/** The audit action written when a sale is recorded without printing its ticket (E1-59, ADR 0074). */
+/** The audit action written when a sale is recorded without printing its ticket (E1-59, ADR 0075). */
 export const TICKET_NOT_PRINTED_ACTION = 'sale.ticket_not_printed';
 /** The audit action written every time a ticket of a sale reaches the printer. */
 export const TICKET_PRINTED_ACTION = 'sale.ticket_printed';
@@ -42,7 +42,7 @@ export interface TicketPrintLogDependencies {
 const NOBODY = 'register';
 
 /**
- * Remembers whether the ticket of each sale was printed, in the audit log, so a sale never changes for it (ADR 0074).
+ * Remembers whether the ticket of each sale was printed, in the audit log, so a sale never changes for it (ADR 0075).
  * The sale is immutable; whether paper came out is a fact about the sale, written next to it.
  */
 export class TicketPrintLog {

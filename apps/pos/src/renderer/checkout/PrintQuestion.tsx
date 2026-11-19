@@ -15,7 +15,7 @@ interface PrintQuestionProps {
 }
 
 /**
- * Asks whether to print the ticket of a sale that is already recorded (ADR 0074). The change stays on the screen while
+ * Asks whether to print the ticket of a sale that is already recorded (ADR 0075). The change stays on the screen while
  * the cashier answers. Enter prints, which is the button with the focus; Esc or N leaves the sale without paper.
  *
  * @param props.folio the folio of the recorded sale

@@ -1,4 +1,4 @@
-# ADR 0074: Preguntar si imprimir el ticket después de cada venta
+# ADR 0075: Preguntar si imprimir el ticket después de cada venta
 
 Estado: Aceptada · Fecha: 2026-11-18 · Concreta E1-59. Se apoya en los ADR 0010 (orden del cobro: guardar, cobrar, completar, cajón, impresora), 0028 (impresora compartida y cajón colgado de ella), 0061 (diseño del ticket y teclas configurables) y 0067 (búsqueda de ventas).
 

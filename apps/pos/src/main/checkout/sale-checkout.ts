@@ -41,7 +41,7 @@ export interface Receipt extends CompletedSale {
 
 /** How one checkout treats the devices. */
 export interface CheckoutOptions {
-  /** Whether the ticket prints right after the sale is completed. The register may ask the cashier first (ADR 0074). */
+  /** Whether the ticket prints right after the sale is completed. The register may ask the cashier first (ADR 0075). */
   readonly printTicket: boolean;
 }
 
@@ -51,7 +51,7 @@ type Collected =
 
 /**
  * Collects a sale and drives the devices in the order of ADR 0010: save it as pending, charge, mark it
- * completed, open the drawer, and print, unless the caller leaves the ticket for later (ADR 0074). This is what the screen asks for through the bridge, so the
+ * completed, open the drawer, and print, unless the caller leaves the ticket for later (ADR 0075). This is what the screen asks for through the bridge, so the
  * screen never gives orders to a device.
  */
 export class SaleCheckout {

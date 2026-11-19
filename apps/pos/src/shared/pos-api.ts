@@ -182,7 +182,7 @@ export type CheckoutSaleResult =
       /** Cash to give back, in cents. */
       readonly changeCents: number;
       readonly problems: readonly CheckoutProblem[];
-      /** What happened to the ticket: printed, waiting for the cashier to say, or not printed (ADR 0074). */
+      /** What happened to the ticket: printed, waiting for the cashier to say, or not printed (ADR 0075). */
       readonly ticket: SaleTicketState;
     }
   /** What was handed over does not complete the sale (RF-014, RF-015). Nothing was recorded. */
@@ -447,7 +447,7 @@ ecorded with the new status, or why not
 
   /**
    * Prints the ticket of one completed sale: the answer «Imprimir» to the question after a sale, or a ticket asked for
-   * from the history (ADR 0074). Right after the sale it carries the change; a sale that already had its ticket prints
+   * from the history (ADR 0075). Right after the sale it carries the change; a sale that already had its ticket prints
    * one marked as a reprint. The sale does not change; only the audit log records the print.
    *
    * @param saleId the sale

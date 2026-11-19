@@ -459,6 +459,11 @@ kbd {
   background: var(--accent-soft);
 }
 
+.notice-warn {
+  color: var(--warn);
+  background: var(--warn-surface);
+}
+
 .sale-empty {
   display: flex;
   flex: 1;
@@ -689,6 +694,23 @@ kbd {
 
 .button-danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--danger) 86%, #000000);
+}
+
+/* Yellow for what changes something that is there: «Modificar». Dark text on yellow reads in both themes. */
+.button-warning {
+  color: #1c1917;
+  background: #facc15;
+  border-color: transparent;
+}
+
+.button-warning:hover:not(:disabled) {
+  background: color-mix(in srgb, #facc15 86%, #000000);
+}
+
+.button-warning kbd {
+  color: inherit;
+  background: rgb(0 0 0 / 12%);
+  border-color: transparent;
 }
 
 /* Green for what adds: «Pedir más». */
@@ -959,7 +981,7 @@ kbd {
   align-items: stretch;
 }
 
-/* The question after a sale (ADR 0074): big enough to read from where the cashier hands over the change. */
+/* The question after a sale (ADR 0075): big enough to read from where the cashier hands over the change. */
 .print-question {
   margin: 0.4rem 0 0;
   font-size: 1.3rem;
@@ -2224,7 +2246,7 @@ kbd {
   border-bottom: none;
 }
 
-.product-suppliers-list li div {
+.product-suppliers-list li:not(.product-suppliers-edit) > div:first-child {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -2232,6 +2254,25 @@ kbd {
 
 .product-suppliers-list small {
   color: var(--ink-soft);
+}
+
+.product-suppliers-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.product-suppliers-list li.product-suppliers-edit {
+  display: grid;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.product-suppliers-edit-code {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 0.6rem;
 }
 
 .product-suppliers-add {

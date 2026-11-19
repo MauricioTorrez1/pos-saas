@@ -61,7 +61,7 @@ function describeRefusal(result: Exclude<ReturnResult, { status: 'returned' }>):
  * The completed sales, the newest first. From here a past sale is cancelled whole: everything that was sold goes back
  * to the shelf and the money goes back the way it came, as a return of every line (ADR 0025), with the reason and the
  * approval of the owner in the audit log. A cancelled sale is never erased. Its ticket is printed from here too, and a
- * sale recorded without one says so (ADR 0074).
+ * sale recorded without one says so (ADR 0075).
  *
  * @param props.posApi bridge to the main process
  * @param props.toolsApi bridge for the list of sales

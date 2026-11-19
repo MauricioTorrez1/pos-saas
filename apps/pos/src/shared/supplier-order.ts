@@ -120,6 +120,62 @@ export type SetSupplierCodesResult =
   | { readonly status: 'product_not_found' }
   | OwnerRefusalResult;
 
+/**
+ * What the person asks for to change one supplier of a product from the product panel (E1-58): another supplier, other
+ * codes or another list cost. When the supplier changes, the codes move to the new one and the old one loses them, in one
+ * transaction.
+ */
+export interface ChangeSupplierLinkRequest {
+  readonly productId: string;
+  /** The supplier the product has now. */
+  readonly fromSupplierId: string;
+  /** The supplier it will have: the same one to change only the codes or the cost. */
+  readonly toSupplierId: string;
+  /** The codes the product will have with that supplier. At least one: removing them all is {@link UnlinkSupplierRequest}. */
+  readonly codes: readonly SupplierCode[];
+  readonly ownerPin?: string;
+}
+
+/** How changing a supplier of a product ended. */
+export type ChangeSupplierLinkResult =
+  | { readonly status: 'saved'; readonly links: readonly SupplierProductLink[] }
+  | { readonly status: 'unchanged'; readonly links: readonly SupplierProductLink[] }
+  /** The product no longer has codes of the supplier it had: another screen changed it. */
+  | { readonly status: 'not_linked'; readonly links: readonly SupplierProductLink[] }
+  /** The new supplier already has codes for this product: edit that row instead. */
+  | { readonly status: 'already_linked'; readonly supplierName: string }
+  /** The new supplier does not exist or was given up. */
+  | { readonly status: 'supplier_not_found' }
+  | { readonly status: 'product_not_found' }
+  | OwnerRefusalResult;
+
+/** A draft order of a supplier that has a product on it. */
+export interface DraftOrderRef {
+  readonly orderId: string;
+  readonly folio: number;
+}
+
+/** Which product and which supplier, to ask what removing that supplier would leave behind. */
+export interface SupplierProductRef {
+  readonly supplierId: string;
+  readonly productId: string;
+}
+
+/** What the person asks for to remove a supplier from a product (E1-58). Sent orders are never touched. */
+export interface UnlinkSupplierRequest {
+  readonly supplierId: string;
+  readonly productId: string;
+  /** True takes the product off the drafts of that supplier too; false (the default the screen offers) keeps it there. */
+  readonly removeFromDrafts: boolean;
+  readonly ownerPin?: string;
+}
+
+/** How removing a supplier from a product ended. */
+export type UnlinkSupplierResult =
+  | { readonly status: 'removed'; readonly links: readonly SupplierProductLink[]; readonly draftsChanged: number }
+  | { readonly status: 'not_linked'; readonly links: readonly SupplierProductLink[] }
+  | OwnerRefusalResult;
+
 /** What the person asks for to find products to order. */
 export interface SearchOrderProductsRequest {
   /** The supplier the order is for, so its codes are searched and shown. Null looks only at names and barcodes. */
@@ -315,6 +371,12 @@ export interface PurchasingApi {
   saveSupplier(request: SaveSupplierRequest): Promise<SaveSupplierResult>;
   getSupplierLinks(productId: string): Promise<SupplierProductLink[]>;
   setSupplierCodes(request: SetSupplierCodesRequest): Promise<SetSupplierCodesResult>;
+  /** Changes the supplier, the codes or the list cost of one supplier row of a product (E1-58). */
+  changeSupplierLink(request: ChangeSupplierLinkRequest): Promise<ChangeSupplierLinkResult>;
+  /** The draft orders of a supplier that have the product, so the screen can say so before removing the supplier. */
+  findDraftsWithProduct(ref: SupplierProductRef): Promise<DraftOrderRef[]>;
+  /** Removes a supplier from a product (E1-58). */
+  unlinkSupplier(request: UnlinkSupplierRequest): Promise<UnlinkSupplierResult>;
   searchOrderProducts(request: SearchOrderProductsRequest): Promise<OrderCandidate[]>;
   suggestOrderProducts(supplierId: string): Promise<OrderCandidate[]>;
   setReorderLevel(request: SetReorderLevelRequest): Promise<SetReorderLevelResult>;
@@ -338,6 +400,9 @@ export const PURCHASING_CHANNELS = {
   saveSupplier: 'purchasing:save-supplier',
   getSupplierLinks: 'purchasing:get-supplier-links',
   setSupplierCodes: 'purchasing:set-supplier-codes',
+  changeSupplierLink: 'purchasing:change-supplier-link',
+  findDraftsWithProduct: 'purchasing:find-drafts-with-product',
+  unlinkSupplier: 'purchasing:unlink-supplier',
   searchOrderProducts: 'purchasing:search-products',
   suggestOrderProducts: 'purchasing:suggest-products',
   setReorderLevel: 'purchasing:set-reorder-level',

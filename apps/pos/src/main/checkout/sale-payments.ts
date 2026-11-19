@@ -55,7 +55,7 @@ export class SalePayments {
 
   /**
    * Completes a saved sale with what the customer handed over and opens the drawer if there was cash. The ticket prints
-   * now, waits for the cashier to answer, or never prints, as the owner chose (ADR 0074); the sale is saved either way.
+   * now, waits for the cashier to answer, or never prints, as the owner chose (ADR 0075); the sale is saved either way.
    *
    * @param request the sale and what the customer handed over
    * @returns `completed` with the folio, the change and what happened to the ticket, or `payment_refused` with nothing recorded
@@ -137,7 +137,7 @@ export class SalePayments {
 
   /**
    * Prints the ticket of one completed sale: the cashier said «Imprimir» after the sale, or asked for it from the history
-   * (ADR 0074). Right after the sale the ticket carries the change, as if it had printed then.
+   * (ADR 0075). Right after the sale the ticket carries the change, as if it had printed then.
    *
    * @param saleId the sale
    * @returns `printed`, `not_found` if the sale is not completed, or `printer_failed` if the printer did not take it
