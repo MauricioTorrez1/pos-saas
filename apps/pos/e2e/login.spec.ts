@@ -59,11 +59,12 @@ test('refuses sales and the catalog until somebody is signed in', async ({ launc
       window.pos.searchProducts('martillo'),
       window.pos.listPendingSales(),
       window.pos.reprintLastTicket(),
+      window.pos.printSaleTicket('0190f5a2-7c2e-7000-8000-000000000001'),
     ];
     return (await Promise.allSettled(attempts)).map(({ status }) => status);
   });
 
-  expect(refusals).toEqual(['rejected', 'rejected', 'rejected', 'rejected']);
+  expect(refusals).toEqual(['rejected', 'rejected', 'rejected', 'rejected', 'rejected']);
 });
 
 test('says how many tries are left, and locks the person after five wrong PINs, even after a restart', async ({ launch }) => {

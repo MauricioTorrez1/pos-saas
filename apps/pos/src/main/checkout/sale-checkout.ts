@@ -39,13 +39,19 @@ export interface Receipt extends CompletedSale {
   readonly changeCents: number;
 }
 
+/** How one checkout treats the devices. */
+export interface CheckoutOptions {
+  /** Whether the ticket prints right after the sale is completed. The register may ask the cashier first (ADR 0074). */
+  readonly printTicket: boolean;
+}
+
 type Collected =
   | { readonly status: 'paid'; readonly payments: readonly SalePayment[]; readonly changeCents: number }
   | { readonly status: 'declined'; readonly reason: string };
 
 /**
  * Collects a sale and drives the devices in the order of ADR 0010: save it as pending, charge, mark it
- * completed, open the drawer, and print. This is what the screen asks for through the bridge, so the
+ * completed, open the drawer, and print, unless the caller leaves the ticket for later (ADR 0074). This is what the screen asks for through the bridge, so the
  * screen never gives orders to a device.
  */
 export class SaleCheckout {
@@ -60,6 +66,7 @@ export class SaleCheckout {
    * Collects one payment attempt for a sale.
    *
    * @param sale the sale, its attempt key, its total, and how the customer pays
+   * @param options whether the ticket prints now; by default it does
    * @returns `completed` with any device problems after the sale was saved, or `declined` with the sale still pending
    * @throws RangeError if the total is not a positive integer of cents, or the payments do not add up to it. Nothing
    * is saved or charged in that case.
@@ -67,7 +74,7 @@ export class SaleCheckout {
    * @throws DeviceError if the card terminal cannot be reached. The sale stays pending, because the charge may
    * have happened.
    */
-  async checkout(sale: SaleToCheckout): Promise<CheckoutResult> {
+  async checkout(sale: SaleToCheckout, options: CheckoutOptions = { printTicket: true }): Promise<CheckoutResult> {
     assertPositiveCents(sale.totalCents);
     assertPaymentsCoverTotal(sale);
     const { sales } = this.#dependencies;
@@ -85,9 +92,11 @@ export class SaleCheckout {
     if (collected.payments.some(({ method }) => method === 'cash')) {
       await this.#tryDevice('cashDrawer', problems, () => this.#dependencies.hardware.cashDrawer.open());
     }
-    await this.#tryDevice('printer', problems, () =>
-      this.#dependencies.hardware.printer.print(this.#dependencies.renderTicket(sale, { ...completed, payments: collected.payments, changeCents: collected.changeCents })),
-    );
+    if (options.printTicket) {
+      await this.#tryDevice('printer', problems, () =>
+        this.#dependencies.hardware.printer.print(this.#dependencies.renderTicket(sale, { ...completed, payments: collected.payments, changeCents: collected.changeCents })),
+      );
+    }
     return { status: 'completed', payments: collected.payments, folio: completed.folio, changeCents: collected.changeCents, problems };
   }
 

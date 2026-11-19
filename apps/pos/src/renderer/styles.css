@@ -959,6 +959,14 @@ kbd {
   align-items: stretch;
 }
 
+/* The question after a sale (ADR 0074): big enough to read from where the cashier hands over the change. */
+.print-question {
+  margin: 0.4rem 0 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 .payment-actions .button,
 .payment-done .button,
 .recovery-actions .button {

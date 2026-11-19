@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 54 de 56 tareas hechas · ⚠️ 2 faltan (9 h)
+✅ 55 de 57 tareas hechas · ⚠️ 2 faltan (9 h)
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -96,6 +96,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-55 · Exportar el catálogo completo** (4 h) _(En revisión)_: el dueño saca todo su catálogo en PDF, Excel o CSV, con códigos, proveedores, costo, precio, existencia y margen bruto y neto, más los totales y una leyenda.
 - ✅ **E1-56 · «Resumen» por grupos y estado de resultados** (6 h) _(En revisión)_: el dueño lee «Resumen» por grupos, anota sus gastos y ve en el estado de resultados si el negocio gana después de la renta y los sueldos, sin contar dos veces lo que pagó de la caja.
 - ✅ **E1-57 · Reporte ilustrado del negocio en PDF** (5 h) _(En revisión)_: el dueño guarda en un solo PDF el estado del negocio del periodo, con gráficas y una frase sencilla bajo cada una: ventas, estado de resultados, gastos, caja, inventario, devoluciones y proveedores.
+- ✅ **E1-59 · Preguntar si imprimir el ticket** (3 h) _(En revisión)_: después de cobrar, la caja pregunta «¿Imprimir ticket?» (Enter sí, Esc o N no) con el cambio a la vista; el dueño elige preguntar, imprimir siempre o nunca, y una venta sin ticket se imprime después desde «Reimprimir» o «Ventas».
 
 ## Entrega 2 · Terminal de tarjeta integrada
 
@@ -214,4 +215,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 79 de 172 tareas hechas (336 h de 765 h) · ⚠️ 93 faltan (429 h).
+✅ 80 de 173 tareas hechas (339 h de 768 h) · ⚠️ 93 faltan (429 h).

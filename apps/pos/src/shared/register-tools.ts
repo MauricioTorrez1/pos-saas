@@ -216,6 +216,13 @@ export function withCurrency(amount: string, currency: TicketCurrency): string {
 }
 export const MAX_TICKET_COPIES = 3;
 
+/**
+ * What the register does with the ticket once a sale is recorded (ADR 0074): ask the cashier, print it every time, or
+ * never print it. The sale is saved first whatever the choice, so the answer only decides the paper.
+ */
+export const TICKET_PRINT_POLICY_CHOICES = ['ask', 'always', 'never'] as const;
+export type TicketPrintPolicy = (typeof TICKET_PRINT_POLICY_CHOICES)[number];
+
 /** How the ticket looks. The owner changes it from the settings and sees it before saving. */
 export interface TicketDesign {
   /** The name printed at the top. Empty means the name of the business as the register knows it. */
@@ -239,9 +246,15 @@ export interface TicketDesign {
   readonly bigTotal: boolean;
   /** How many tickets come out for each sale. */
   readonly copies: number;
+  /** Whether a sale asks before printing, always prints, or never prints. */
+  readonly printPolicy: TicketPrintPolicy;
 }
 
-/** The ticket as it was before it could be designed, so a register that never opened the settings prints the same. */
+/**
+ * The ticket as it was before it could be designed, so a register that never opened the settings prints the same. The
+ * one exception is the print policy: a sale asks before printing (E1-59), and a design saved before the policy existed
+ * reads as asking too.
+ */
 export const DEFAULT_TICKET_DESIGN: TicketDesign = {
   businessName: '',
   currency: 'symbol',
@@ -254,6 +267,7 @@ export const DEFAULT_TICKET_DESIGN: TicketDesign = {
   showTaxBreakdown: true,
   bigTotal: false,
   copies: 1,
+  printPolicy: 'ask',
 };
 
 function isLineList(value: unknown): value is string[] {
@@ -274,7 +288,8 @@ export function isTicketDesign(value: unknown): value is TicketDesign {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
-  const { businessName, currency, headerLines, footerLines, columns, font, textSize, showUnitPrice, showTaxBreakdown, bigTotal, copies } = value as Record<string, unknown>;
+  const { businessName, currency, headerLines, footerLines, columns, font, textSize, showUnitPrice, showTaxBreakdown, bigTotal, copies, printPolicy } =
+    value as Record<string, unknown>;
   return (
     typeof businessName === 'string' &&
     businessName.length <= MAX_TICKET_BUSINESS_NAME &&
@@ -291,7 +306,8 @@ export function isTicketDesign(value: unknown): value is TicketDesign {
     typeof copies === 'number' &&
     Number.isInteger(copies) &&
     copies >= 1 &&
-    copies <= MAX_TICKET_COPIES
+    copies <= MAX_TICKET_COPIES &&
+    (TICKET_PRINT_POLICY_CHOICES as readonly unknown[]).includes(printPolicy)
   );
 }
 
@@ -328,6 +344,8 @@ export interface SaleSummary {
   readonly lineCount: number;
   /** The products of the sale that matched a search by name or code, in the order of the ticket. Empty otherwise. */
   readonly matchedProducts: readonly string[];
+  /** False when the cashier chose not to print its ticket and it was not printed since (E1-59). */
+  readonly ticketPrinted: boolean;
 }
 
 export type TestPrintResult = { readonly status: 'printed' } | { readonly status: 'no_printer' } | { readonly status: 'failed'; readonly message: string };

@@ -101,6 +101,7 @@ export class SaleStore implements SaleRecorder {
   readonly #stockLines: StatementSync;
   readonly #nextFolio: StatementSync;
   readonly #findLastCompleted: StatementSync;
+  readonly #findCompleted: StatementSync;
   readonly #paymentsOf: StatementSync;
   readonly #sessionOf: StatementSync;
   readonly #findTotals: StatementSync;
@@ -161,6 +162,10 @@ export class SaleStore implements SaleRecorder {
     this.#findLastCompleted = store.prepare(`
       SELECT id, idempotency_key, subtotal_cents, tax_cents, total_cents, folio, resolved_at FROM sale
       WHERE tenant_id = ? AND status = 'completed' ORDER BY folio DESC LIMIT 1
+    `);
+    this.#findCompleted = store.prepare(`
+      SELECT id, idempotency_key, subtotal_cents, tax_cents, total_cents, folio, resolved_at FROM sale
+      WHERE tenant_id = ? AND id = ? AND status = 'completed'
     `);
     this.#paymentsOf = store.prepare(`
       SELECT method, amount_cents, reference FROM payment WHERE tenant_id = ? AND sale_id = ? ORDER BY rowid
@@ -287,9 +292,21 @@ export class SaleStore implements SaleRecorder {
    */
   findLastCompletedSale(): CompletedSaleRecord | null {
     const row = this.#findLastCompleted.get(this.#tenantId) as unknown as CompletedRow | undefined;
-    if (row === undefined) {
-      return null;
-    }
+    return row === undefined ? null : this.#toCompletedRecord(row);
+  }
+
+  /**
+   * Reads one completed sale with its payments, so its ticket can be printed later.
+   *
+   * @param saleId the sale
+   * @returns the sale with its folio and time, or null if it does not exist, is not completed, or belongs to another business
+   */
+  findCompletedSale(saleId: string): CompletedSaleRecord | null {
+    const row = this.#findCompleted.get(this.#tenantId, saleId) as unknown as CompletedRow | undefined;
+    return row === undefined ? null : this.#toCompletedRecord(row);
+  }
+
+  #toCompletedRecord(row: CompletedRow): CompletedSaleRecord {
     const payments = this.#paymentsOf.all(this.#tenantId, row.id) as unknown as PaymentRow[];
     return {
       folio: row.folio,
