@@ -157,7 +157,7 @@ async function start(): Promise<void> {
   const catalog = new ProductCatalog(store, LOCAL_TENANT_ID);
   const sales = new SaleStore(store, LOCAL_TENANT_ID);
   const appearance = new AppearanceStore(store, LOCAL_TENANT_ID);
-  // A session may capture the sales of a recent past day with the approval of an owner (E1-60, ADR 0074).
+  // A session may capture the sales of a recent past day with the approval of an owner (E1-60, ADR 0075).
   const auth = new AuthService(new UserStore(store, LOCAL_TENANT_ID), undefined, {
     captureDays: new CaptureDays(store, LOCAL_TENANT_ID),
     audit: new AuditLog(store, LOCAL_TENANT_ID),

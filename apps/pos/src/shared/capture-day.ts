@@ -1,5 +1,5 @@
 /**
- * The day whose sales a session captures (E1-60, ADR 0074). Most sessions sell today; when the cashier could not ring up
+ * The day whose sales a session captures (E1-60, ADR 0075). Most sessions sell today; when the cashier could not ring up
  * every sale, the owner lets them capture a recent past day the next morning, and every sale of that session counts on it.
  */
 

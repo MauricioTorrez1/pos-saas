@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 55 de 57 tareas hechas · ⚠️ 2 faltan (9 h)
+✅ 56 de 58 tareas hechas · ⚠️ 2 faltan (9 h)
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -96,6 +96,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-55 · Exportar el catálogo completo** (4 h) _(En revisión)_: el dueño saca todo su catálogo en PDF, Excel o CSV, con códigos, proveedores, costo, precio, existencia y margen bruto y neto, más los totales y una leyenda.
 - ✅ **E1-56 · «Resumen» por grupos y estado de resultados** (6 h) _(En revisión)_: el dueño lee «Resumen» por grupos, anota sus gastos y ve en el estado de resultados si el negocio gana después de la renta y los sueldos, sin contar dos veces lo que pagó de la caja.
 - ✅ **E1-57 · Reporte ilustrado del negocio en PDF** (5 h) _(En revisión)_: el dueño guarda en un solo PDF el estado del negocio del periodo, con gráficas y una frase sencilla bajo cada una: ventas, estado de resultados, gastos, caja, inventario, devoluciones y proveedores.
+- ✅ **E1-58 · Modificar y eliminar el proveedor de un producto** (3 h) _(En revisión)_: desde el panel del producto, «Modificar» (amarillo) cambia el proveedor, el código y el costo de lista en un paso, y «Eliminar» (rojo) quita al proveedor después de confirmar, sin tocar los pedidos enviados y avisando si está en un borrador.
 - ✅ **E1-60 · Capturar las ventas de un día atrasado** (6 h) _(En revisión)_: al entrar se elige el día; con la autorización de un dueño, las ventas que no se alcanzaron a registrar ayer cuentan en ayer, con su propio fondo y corte suplementario, y el ticket lo dice.
 
 ## Entrega 2 · Terminal de tarjeta integrada
@@ -215,4 +216,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 80 de 173 tareas hechas (342 h de 771 h) · ⚠️ 93 faltan (429 h).
+✅ 81 de 174 tareas hechas (345 h de 774 h) · ⚠️ 93 faltan (429 h).

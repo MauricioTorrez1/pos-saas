@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  parseChangeSupplierLinkRequest,
   parseExportOrderRequest,
   parseOrderActionRequest,
   parseSaveOrderRequest,
@@ -8,6 +9,7 @@ import {
   parseSearchOrderProductsRequest,
   parseSetReorderLevelRequest,
   parseSetSupplierCodesRequest,
+  parseUnlinkSupplierRequest,
 } from './purchasing-request';
 
 const ID = '0193a5c0-0000-7000-8000-000000000001';
@@ -65,5 +67,27 @@ describe('what crosses the bridge of the purchase order (E1-44)', () => {
     expect(() => parseOrderActionRequest({ orderId: ID })).toThrow(TypeError);
     expect(parseExportOrderRequest({ orderId: ID, format: 'pdf' })).toEqual({ orderId: ID, format: 'pdf' });
     expect(() => parseExportOrderRequest({ orderId: ID, format: 'docx' })).toThrow(TypeError);
+  });
+});
+
+describe('what crosses the bridge to change or remove a supplier of a product (E1-58)', () => {
+  const OTHER = '0193a5c0-0000-7000-8000-000000000002';
+
+  it('reads a change of supplier with both suppliers and the codes, and refuses a wrong id', () => {
+    const codes = [{ supplierCode: 'A-1', listCostE6: 1_000_000, purchaseUnit: null }];
+    expect(parseChangeSupplierLinkRequest({ productId: PRODUCT, fromSupplierId: ID, toSupplierId: OTHER, codes, ownerPin: '4321' })).toEqual({
+      productId: PRODUCT,
+      fromSupplierId: ID,
+      toSupplierId: OTHER,
+      codes,
+      ownerPin: '4321',
+    });
+    expect(() => parseChangeSupplierLinkRequest({ productId: PRODUCT, fromSupplierId: ID, toSupplierId: 'x', codes })).toThrow(TypeError);
+    expect(() => parseChangeSupplierLinkRequest({ productId: PRODUCT, fromSupplierId: ID, toSupplierId: OTHER, codes: [{ supplierCode: 'A', listCostE6: 1.5, purchaseUnit: null }] })).toThrow(TypeError);
+  });
+
+  it('reads a removal only with an explicit answer about the drafts', () => {
+    expect(parseUnlinkSupplierRequest({ supplierId: ID, productId: PRODUCT, removeFromDrafts: true })).toEqual({ supplierId: ID, productId: PRODUCT, removeFromDrafts: true });
+    expect(() => parseUnlinkSupplierRequest({ supplierId: ID, productId: PRODUCT })).toThrow(TypeError);
   });
 });

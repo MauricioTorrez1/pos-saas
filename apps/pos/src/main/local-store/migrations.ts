@@ -896,7 +896,7 @@ export const MIGRATIONS: readonly Migration[] = [
   {
     version: 23,
     name: 'add_business_days',
-    // A session may capture the sales of a recent past day (E1-60, ADR 0074). The session, its sales and their stock carry
+    // A session may capture the sales of a recent past day (E1-60, ADR 0075). The session, its sales and their stock carry
     // that business day; a NULL day means the day the record happened, so every row written before stays as it was. A sale
     // also keeps business_at: the moment it counts in the reports, which is its recording time moved to the business day.
     // A live session and a backdated one may be open together, but never two of the same day.

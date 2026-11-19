@@ -8,6 +8,10 @@ import {
   MAX_SUPPLIER_CODE_LENGTH,
   MAX_SUPPLIER_CONTACT_LENGTH,
   MAX_SUPPLIER_NAME_LENGTH,
+  formatFolio,
+  type ChangeSupplierLinkRequest,
+  type ChangeSupplierLinkResult,
+  type DraftOrderRef,
   type SaveSupplierRequest,
   type SaveSupplierResult,
   type SetSupplierCodesRequest,
@@ -15,6 +19,9 @@ import {
   type Supplier,
   type SupplierCode,
   type SupplierProductLink,
+  type SupplierProductRef,
+  type UnlinkSupplierRequest,
+  type UnlinkSupplierResult,
 } from '../../shared/supplier-order';
 import type { AuditLog } from '../audit/audit-log';
 import type { AuthService } from '../auth/auth-service';
@@ -87,6 +94,11 @@ export class SupplierService {
   readonly #deleteLinks: StatementSync;
   readonly #insertLink: StatementSync;
   readonly #productExists: StatementSync;
+  readonly #draftsWithProduct: StatementSync;
+  readonly #deleteDraftLinesOf: StatementSync;
+  readonly #draftLineIds: StatementSync;
+  readonly #renumberLine: StatementSync;
+  readonly #touchDraft: StatementSync;
 
   /**
    * @param store the open local database
@@ -133,6 +145,18 @@ export class SupplierService {
       INSERT INTO supplier_product_code (tenant_id, supplier_id, product_id, supplier_code, list_cost_e6, purchase_unit) VALUES (?, ?, ?, ?, ?, ?)
     `);
     this.#productExists = store.prepare('SELECT 1 AS found FROM product WHERE tenant_id = ? AND id = ?');
+    this.#draftsWithProduct = store.prepare(`
+      SELECT DISTINCT purchase_order.id AS order_id, purchase_order.folio
+      FROM purchase_order JOIN purchase_order_line AS line ON line.order_id = purchase_order.id
+      WHERE purchase_order.tenant_id = ? AND purchase_order.supplier_id = ? AND purchase_order.status = 'draft' AND line.product_id = ?
+      ORDER BY purchase_order.folio
+    `);
+    this.#deleteDraftLinesOf = store.prepare('DELETE FROM purchase_order_line WHERE tenant_id = ? AND order_id = ? AND product_id = ?');
+    this.#draftLineIds = store.prepare('SELECT id FROM purchase_order_line WHERE tenant_id = ? AND order_id = ? ORDER BY line_number');
+    this.#renumberLine = store.prepare('UPDATE purchase_order_line SET line_number = ? WHERE tenant_id = ? AND id = ?');
+    this.#touchDraft = store.prepare(`
+      UPDATE purchase_order SET updated_at = ?, revision = revision + 1 WHERE tenant_id = ? AND id = ? AND status = 'draft'
+    `);
   }
 
   /**
@@ -311,6 +335,165 @@ export class SupplierService {
     return { status: 'saved', links: this.linksOfProduct(request.productId) };
   }
 
+  /**
+   * Changes one supplier row of a product (E1-58, ADR 0074): to another supplier, other codes or another list cost. When the
+   * supplier changes, the old one loses its codes and the new one gets them in the same transaction, so the product never
+   * has both or neither. Orders are never touched: each line keeps the copy it took when it was written.
+   *
+   * @param request the product, the supplier it has, the one it will have, the codes, and the PIN of an owner for a cashier
+   * @returns `saved` with the codes of the product for every supplier, `unchanged` if nothing differs, or why nothing was
+   *   written: the old supplier no longer has it, the new one already has it, is unknown or was given up, or no approval
+   * @throws Error if nobody is signed in
+   * @throws RangeError if the list of codes is empty, or a code or a cost is wrong (the same rules as {@link setCodes})
+   */
+  changeLink(request: ChangeSupplierLinkRequest): ChangeSupplierLinkResult {
+    const user = this.#auth.currentUser();
+    if (user === null) {
+      throw new Error('Changing a supplier of a product needs a person signed in');
+    }
+    const codes = normalizeCodes(request.codes);
+    if (codes.length === 0) {
+      throw new RangeError('A supplier of a product needs at least one code; removing them all is unlinking it');
+    }
+    if (this.#productExists.get(this.#tenantId, request.productId) === undefined) {
+      return { status: 'product_not_found' };
+    }
+    const previous = this.#codesOf(request.fromSupplierId, request.productId);
+    if (previous.length === 0) {
+      return { status: 'not_linked', links: this.linksOfProduct(request.productId) };
+    }
+    const moves = request.toSupplierId !== request.fromSupplierId;
+    const target = this.find(request.toSupplierId);
+    if (target === null || (moves && !target.isActive)) {
+      return { status: 'supplier_not_found' };
+    }
+    if (moves && this.#codesOf(target.id, request.productId).length > 0) {
+      return { status: 'already_linked', supplierName: target.name };
+    }
+    if (!moves && sameCodes(previous, codes)) {
+      return { status: 'unchanged', links: this.linksOfProduct(request.productId) };
+    }
+    const source = this.find(request.fromSupplierId)!;
+    const approval = this.#gate.authorize({
+      user,
+      ownerPin: request.ownerPin,
+      deniedAction: 'supplier_codes.change_denied',
+      entity: 'product',
+      entityId: request.productId,
+      deniedDetail: moves ? `tried to move the codes from ${source.name} to ${target.name}` : `tried to change the codes of ${source.name}`,
+    });
+    if (isRefusal(approval)) {
+      return approval;
+    }
+
+    const now = new Date().toISOString();
+    this.#store.transaction(() => {
+      this.#deleteLinks.run(this.#tenantId, source.id, request.productId);
+      for (const code of codes) {
+        this.#insertLink.run(this.#tenantId, target.id, request.productId, code.supplierCode, code.listCostE6, code.purchaseUnit);
+      }
+      this.#audit.record({
+        userId: user.id,
+        action: 'supplier_codes.change',
+        entity: 'product',
+        entityId: request.productId,
+        detail: `${source.name} [${describeCodes(previous)}] -> ${target.name} [${describeCodes(codes)}]; approved by ${approval.ownerId}`,
+      });
+      const who = { savedBy: user.id, authorizedBy: approval.ownerId };
+      if (moves) {
+        this.#outbox.enqueue('supplier_product.upserted', { supplierId: source.id, productId: request.productId, codes: [], ...who }, now);
+      }
+      this.#outbox.enqueue('supplier_product.upserted', { supplierId: target.id, productId: request.productId, codes, ...who }, now);
+    });
+    return { status: 'saved', links: this.linksOfProduct(request.productId) };
+  }
+
+  /**
+   * Finds the draft orders of a supplier that have a product, so the screen can tell the owner before removing that
+   * supplier from the product. Sent orders are not listed: they never change.
+   *
+   * @param ref the supplier and the product
+   * @returns the drafts, by folio
+   */
+  draftsWithProduct({ supplierId, productId }: SupplierProductRef): DraftOrderRef[] {
+    const rows = this.#draftsWithProduct.all(this.#tenantId, supplierId, productId) as unknown as { order_id: string; folio: number }[];
+    return rows.map((row) => ({ orderId: row.order_id, folio: row.folio }));
+  }
+
+  /**
+   * Removes a supplier from a product (E1-58, ADR 0074): every code it gives to the product. A sent order keeps its copy and
+   * is never touched. The product stays on the drafts of that supplier unless the person asks to take it off them, and then
+   * the remaining lines are numbered again from 1 and each draft goes up one revision, so an open screen sees it changed.
+   *
+   * @param request the supplier, the product, whether to take it off the drafts, and the PIN of an owner for a cashier
+   * @returns `removed` with the codes left and how many drafts changed, `not_linked` if the supplier no longer had it, or
+   *   the refusal of the approval
+   * @throws Error if nobody is signed in
+   */
+  unlink(request: UnlinkSupplierRequest): UnlinkSupplierResult {
+    const user = this.#auth.currentUser();
+    if (user === null) {
+      throw new Error('Removing a supplier of a product needs a person signed in');
+    }
+    const previous = this.#codesOf(request.supplierId, request.productId);
+    if (previous.length === 0) {
+      return { status: 'not_linked', links: this.linksOfProduct(request.productId) };
+    }
+    const supplier = this.find(request.supplierId)!;
+    const approval = this.#gate.authorize({
+      user,
+      ownerPin: request.ownerPin,
+      deniedAction: 'supplier_codes.remove_denied',
+      entity: 'product',
+      entityId: request.productId,
+      deniedDetail: `tried to remove ${supplier.name} from the product`,
+    });
+    if (isRefusal(approval)) {
+      return approval;
+    }
+
+    const drafts = this.draftsWithProduct(request);
+    const now = new Date().toISOString();
+    this.#store.transaction(() => {
+      this.#deleteLinks.run(this.#tenantId, supplier.id, request.productId);
+      if (request.removeFromDrafts) {
+        for (const draft of drafts) {
+          this.#takeOffDraft(draft.orderId, request.productId, now);
+        }
+      }
+      const folios = drafts.map((draft) => formatFolio(draft.folio)).join(', ');
+      const draftNote = drafts.length === 0 ? 'in no draft' : `${request.removeFromDrafts ? 'taken off' : 'kept in'} ${folios}`;
+      this.#audit.record({
+        userId: user.id,
+        action: 'supplier_codes.remove',
+        entity: 'product',
+        entityId: request.productId,
+        detail: `${supplier.name} [${describeCodes(previous)}] removed, ${draftNote}; approved by ${approval.ownerId}`,
+      });
+      this.#outbox.enqueue(
+        'supplier_product.upserted',
+        { supplierId: supplier.id, productId: request.productId, codes: [], savedBy: user.id, authorizedBy: approval.ownerId },
+        now,
+      );
+    });
+    return { status: 'removed', links: this.linksOfProduct(request.productId), draftsChanged: request.removeFromDrafts ? drafts.length : 0 };
+  }
+
+  /** Takes a product off a draft, numbers the lines left from 1 without gaps, and moves the draft one revision up. */
+  #takeOffDraft(orderId: string, productId: string, now: string): void {
+    this.#deleteDraftLinesOf.run(this.#tenantId, orderId, productId);
+    // Going up in order, each new number is free: it is the one that was removed or the one the previous line just left.
+    const ids = this.#draftLineIds.all(this.#tenantId, orderId) as unknown as { id: string }[];
+    ids.forEach(({ id }, index) => this.#renumberLine.run(index + 1, this.#tenantId, id));
+    if (Number(this.#touchDraft.run(now, this.#tenantId, orderId).changes) !== 1) {
+      throw new Error('The draft was sent while the supplier was being removed');
+    }
+  }
+
+  #codesOf(supplierId: string, productId: string): SupplierCode[] {
+    return toCodes(this.#linksOfSupplierProduct.all(this.#tenantId, supplierId, productId) as unknown as LinkRow[]);
+  }
+
   #readRow(supplierId: string): SupplierRow | undefined {
     return this.#byId.get(this.#tenantId, supplierId) as unknown as SupplierRow | undefined;
   }
@@ -341,6 +524,11 @@ function normalizeCodes(codes: readonly SupplierCode[]): SupplierCode[] {
 
 function toCodes(rows: readonly LinkRow[]): SupplierCode[] {
   return rows.map((row) => ({ supplierCode: row.supplier_code, listCostE6: row.list_cost_e6, purchaseUnit: row.purchase_unit }));
+}
+
+/** Writes codes and their list costs for the audit log, such as "CM-5 50500000e6, CM-5B". */
+function describeCodes(codes: readonly SupplierCode[]): string {
+  return codes.map((code) => (code.listCostE6 === null ? code.supplierCode : `${code.supplierCode} ${code.listCostE6}e6`)).join(', ');
 }
 
 function sameCodes(left: readonly SupplierCode[], right: readonly SupplierCode[]): boolean {

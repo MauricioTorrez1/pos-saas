@@ -116,7 +116,7 @@ export class AuthService {
   }
 
   /**
-   * Signs a person in, to sell today or to capture the sales of a recent past day (E1-60, ADR 0074). A past day must be
+   * Signs a person in, to sell today or to capture the sales of a recent past day (E1-60, ADR 0075). A past day must be
    * one the policy offers, and needs the approval of an owner: the owner who signs in gives it, and a cashier types the PIN
    * of one. Nobody is signed in when anything is refused.
    *

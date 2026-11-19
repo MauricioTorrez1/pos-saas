@@ -626,12 +626,22 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué dibujar las gráficas como SVG escrito a mano y no con una librería? (2) ¿Cómo garantizas que los porcentajes de una dona sumen exactamente 100 %?
 
+### E1-58 · Modificar y eliminar el proveedor de un producto
+- **Objetivo:** desde el panel del producto, junto al «Pedir más» verde, un «Modificar» amarillo cambia en el mismo renglón el proveedor (a otro activo que no lo venda), sus códigos y su costo de lista, y un «Eliminar» rojo quita al proveedor después de confirmar, avisando si el producto está en un borrador de ese proveedor y ofreciendo dejarlo ahí.
+- **Conceptos:** [Una transacción para dos registros], [Edición en línea], [Instantánea en el documento], [Confirmación de acciones destructivas]
+- **Claude / tú:** Claude escribe las dos operaciones, el puente, los botones, el formulario, la confirmación y las pruebas. Tú cambias el proveedor de un producto real y quitas otro que esté en un borrador.
+- **Pruebas:** Vitest del servicio (mover códigos y costo en una transacción, cambiar solo código y costo, rechazos, quitar con bitácora, borradores intactos o sin la línea renumerados, pedidos enviados intactos, PIN de la cajera) y de la pantalla (botón amarillo y rojo, formulario en línea, confirmación con y sin borrador); Playwright del panel que modifica y elimina.
+- **Criterios:** ADR 0074; costos en millonésimas enteras; un pedido enviado nunca cambia; quitar del borrador solo si el dueño lo pide; dueño o cajera con su PIN, con bitácora.
+- **Depende de:** E1-50 · **Estimación:** 3 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Por qué mover los códigos a otro proveedor en una sola transacción y no como «eliminar y agregar»? (2) ¿Por qué un pedido guarda una copia del código y del costo en lugar de leerlos del proveedor?
+
 ### E1-60 · Capturar las ventas de un día atrasado
 - **Objetivo:** al entrar, la cajera elige «Día de captura»; con la autorización de un dueño captura las ventas que no alcanzó a registrar en un día reciente, y cada venta cuenta en ese día (resumen, estado de resultados, más vendidos, inventario) con su propio fondo y corte, sin mezclarse con la caja de hoy.
 - **Conceptos:** [Fecha de negocio contra fecha de registro], [Corte suplementario], [Campo opcional en un contrato], [Índice de expresión], [Fecha de emisión del CFDI]
 - **Claude / tú:** Claude escribe la migración, la regla de entrada, la sesión de caja por día, el día en la venta, el inventario y los reportes, el ticket, el contrato, el núcleo y las pruebas. Tú pruebas en la tienda capturar las ventas de ayer y cuadrar el corte suplementario.
 - **Pruebas:** Vitest de la ventana de días, del PIN del dueño y del rechazo, de la sesión aparte con su corte y su bitácora, del día en la venta, el inventario y el evento, de los reportes, el estado de resultados y el reporte diario, del ticket y de la pantalla (selector y franja); Java de `businessDate` guardado, del respaldo al día local, de la cuarentena y de la idempotencia; Playwright de entrar a ayer y ver la venta en el resumen de ayer.
-- **Criterios:** ADR 0074; la venta conserva el momento real; nada se edita; campo opcional sin cambiar `schemaVersion`; la caja vende en efectivo sin internet.
+- **Criterios:** ADR 0075; la venta conserva el momento real; nada se edita; campo opcional sin cambiar `schemaVersion`; la caja vende en efectivo sin internet.
 - **Depende de:** E1-54, E1-56 · **Estimación:** 6 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué guardar dos fechas en una venta en lugar de corregir la que tiene? (2) ¿Cómo agregas un campo a un contrato de sincronización sin romper a los clientes que ya existen?

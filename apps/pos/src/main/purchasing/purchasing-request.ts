@@ -1,5 +1,6 @@
 import {
   MAX_ORDER_LINES,
+  type ChangeSupplierLinkRequest,
   MAX_CODES_PER_SUPPLIER_PRODUCT,
   type ExportOrderRequest,
   type OrderActionRequest,
@@ -11,6 +12,8 @@ import {
   type SetReorderLevelRequest,
   type SetSupplierCodesRequest,
   type SupplierCode,
+  type SupplierProductRef,
+  type UnlinkSupplierRequest,
 } from '../../shared/supplier-order';
 import { parseProductId } from '../inventory/inventory-request';
 import { parseOwnerPin } from '../products/product-request';
@@ -116,6 +119,57 @@ export function parseSetSupplierCodesRequest(value: unknown): SetSupplierCodesRe
     supplierId: parseUuid(request.supplierId, 'a supplier'),
     productId: parseProductId(request.productId),
     codes: parseCodes(request.codes),
+    ...(ownerPin === undefined ? {} : { ownerPin }),
+  };
+}
+
+/**
+ * Checks a change of one supplier of a product that came over the bridge (E1-58).
+ *
+ * @param value what the screen sent
+ * @returns the request
+ * @throws TypeError if something is missing or has the wrong type
+ */
+export function parseChangeSupplierLinkRequest(value: unknown): ChangeSupplierLinkRequest {
+  const request = asRecord(value, 'a change of a supplier of a product');
+  const ownerPin = parseOwnerPin(request.ownerPin);
+  return {
+    productId: parseProductId(request.productId),
+    fromSupplierId: parseUuid(request.fromSupplierId, 'the supplier the product has'),
+    toSupplierId: parseUuid(request.toSupplierId, 'the supplier the product will have'),
+    codes: parseCodes(request.codes),
+    ...(ownerPin === undefined ? {} : { ownerPin }),
+  };
+}
+
+/**
+ * Checks a supplier and a product that came over the bridge.
+ *
+ * @param value what the screen sent
+ * @returns the supplier and the product
+ * @throws TypeError if something is missing or has the wrong type
+ */
+export function parseSupplierProductRef(value: unknown): SupplierProductRef {
+  const ref = asRecord(value, 'a supplier and a product');
+  return { supplierId: parseUuid(ref.supplierId, 'a supplier'), productId: parseProductId(ref.productId) };
+}
+
+/**
+ * Checks the removal of a supplier from a product that came over the bridge (E1-58).
+ *
+ * @param value what the screen sent
+ * @returns the request
+ * @throws TypeError if something is missing or has the wrong type
+ */
+export function parseUnlinkSupplierRequest(value: unknown): UnlinkSupplierRequest {
+  const request = asRecord(value, 'the removal of a supplier');
+  if (typeof request.removeFromDrafts !== 'boolean') {
+    throw new TypeError('Expected whether to take the product off the drafts');
+  }
+  const ownerPin = parseOwnerPin(request.ownerPin);
+  return {
+    ...parseSupplierProductRef(request),
+    removeFromDrafts: request.removeFromDrafts,
     ...(ownerPin === undefined ? {} : { ownerPin }),
   };
 }
