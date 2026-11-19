@@ -123,7 +123,7 @@ describe('the search bar of «Resumen» (E1-50)', () => {
     const searchSales = vi.fn((text: string) =>
       Promise.resolve(
         text === 'cinta'
-          ? [{ saleId: 'sale-9', folio: 'T1-000009', completedAt: '2026-11-15T18:00:00.000Z', totalCents: 4_500, refundedCents: 0, cashierName: 'Ana', lineCount: 3, matchedProducts: ['Cinta de aislar 3M'] }]
+          ? [{ saleId: 'sale-9', folio: 'T1-000009', completedAt: '2026-11-15T18:00:00.000Z', totalCents: 4_500, refundedCents: 0, cashierName: 'Ana', lineCount: 3, matchedProducts: ['Cinta de aislar 3M'], ticketPrinted: true }]
           : [],
       ),
     );

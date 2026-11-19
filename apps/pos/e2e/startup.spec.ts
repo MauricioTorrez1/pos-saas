@@ -112,6 +112,7 @@ test('exposes only the agreed functions through the bridge', async ({ appWindow 
     'savePendingSale',
     'checkoutSale',
     'reprintLastTicket',
+    'printSaleTicket',
     'listPendingSales',
     'confirmPendingSale',
     'cancelPendingSale',

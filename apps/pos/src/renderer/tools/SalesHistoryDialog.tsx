@@ -1,7 +1,7 @@
 import { formatCents } from '@pos-saas/money';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 
-import type { PosApi } from '../../shared/pos-api';
+import type { PosApi, PrintTicketResult } from '../../shared/pos-api';
 import type { SaleSummary, ToolsApi } from '../../shared/register-tools';
 import type { ReturnResult } from '../../shared/returns-api';
 import { Field, Message, useAction } from '../ui/form-parts';
@@ -24,6 +24,17 @@ function stateOf(sale: SaleSummary): { readonly label: string; readonly tone: 'o
     return { label: 'Cancelada', tone: 'cancelled' };
   }
   return sale.refundedCents > 0 ? { label: 'Devolución parcial', tone: 'partial' } : { label: 'Cobrada', tone: 'ok' };
+}
+
+function describePrint(sale: SaleSummary, result: PrintTicketResult): string {
+  switch (result.status) {
+    case 'printed':
+      return sale.ticketPrinted ? `Ticket ${result.folio} reimpreso.` : `Ticket ${result.folio} impreso.`;
+    case 'not_found':
+      return 'No encontramos esa venta. Cierra la lista y vuelve a abrirla.';
+    case 'printer_failed':
+      return `No se pudo imprimir el ticket ${result.folio}: ${result.message}. La venta no cambió.`;
+  }
 }
 
 function describeRefusal(result: Exclude<ReturnResult, { status: 'returned' }>): string {
@@ -49,7 +60,8 @@ function describeRefusal(result: Exclude<ReturnResult, { status: 'returned' }>):
 /**
  * The completed sales, the newest first. From here a past sale is cancelled whole: everything that was sold goes back
  * to the shelf and the money goes back the way it came, as a return of every line (ADR 0025), with the reason and the
- * approval of the owner in the audit log. A cancelled sale is never erased.
+ * approval of the owner in the audit log. A cancelled sale is never erased. Its ticket is printed from here too, and a
+ * sale recorded without one says so (ADR 0075).
  *
  * @param props.posApi bridge to the main process
  * @param props.toolsApi bridge for the list of sales
@@ -82,6 +94,23 @@ export function SalesHistoryDialog({ posApi, toolsApi, isOwner, onCancelled, onC
     setPin('');
     setMessage(null);
     setDone(null);
+  };
+
+  const printTicket = (sale: SaleSummary): void => {
+    setDone(null);
+    run(async () => {
+      try {
+        const result = await posApi.printSaleTicket(sale.saleId);
+        if (result.status === 'printed') {
+          setDone(describePrint(sale, result));
+          load(search);
+        } else {
+          setMessage(describePrint(sale, result));
+        }
+      } catch {
+        setMessage(`No se pudo imprimir el ticket ${sale.folio}. Intenta de nuevo.`);
+      }
+    });
   };
 
   const cancelChosen = (): void => {
@@ -174,8 +203,25 @@ export function SalesHistoryDialog({ posApi, toolsApi, isOwner, onCancelled, onC
                           <span className="badge" data-tone={state.tone}>
                             {state.label}
                           </span>
+                          {!sale.ticketPrinted && (
+                            <>
+                              {' '}
+                              <span className="badge" data-tone="partial">
+                                Sin ticket
+                              </span>
+                            </>
+                          )}
                         </td>
                         <td className="line-number">
+                          <button
+                            type="button"
+                            className="button button-small"
+                            disabled={isBusy}
+                            aria-label={`${sale.ticketPrinted ? 'Reimprimir' : 'Imprimir'} el ticket de la venta ${sale.folio}`}
+                            onClick={() => printTicket(sale)}
+                          >
+                            {sale.ticketPrinted ? 'Reimprimir' : 'Imprimir ticket'}
+                          </button>{' '}
                           {state.tone !== 'cancelled' && (
                             <button type="button" className="button button-danger button-small" aria-label={`Cancelar la venta ${sale.folio}`} onClick={() => choose(sale)}>
                               Cancelar venta

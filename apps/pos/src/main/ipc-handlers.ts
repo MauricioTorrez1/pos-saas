@@ -18,6 +18,7 @@ import {
   type CatalogProduct,
   type CheckoutSaleResult,
   type PendingSale,
+  type PrintTicketResult,
   type ReprintResult,
   type SavePendingSaleResult,
 } from '../shared/pos-api';
@@ -213,6 +214,7 @@ export function registerIpcHandlers(
   answerSignedIn(IPC_CHANNELS.listPendingSales, (): PendingSale[] => pendingSales.list());
   answerSignedIn(IPC_CHANNELS.checkoutSale, (request): Promise<CheckoutSaleResult> => salePayments.checkout(parsePaymentRequest(request)));
   answerSignedIn(IPC_CHANNELS.reprintLastTicket, (): Promise<ReprintResult> => salePayments.reprintLast());
+  answerSignedIn(IPC_CHANNELS.printSaleTicket, (saleId): Promise<PrintTicketResult> => salePayments.printTicket(parseSaleId(saleId)));
   answerSignedIn(IPC_CHANNELS.confirmPendingSale, (request): CheckoutSaleResult => salePayments.confirm(parsePaymentRequest(request)));
   answerSignedIn(IPC_CHANNELS.cancelPendingSale, (saleId): void => pendingSales.cancel(parseSaleId(saleId)));
   registerPurchasingHandlers(answerSignedIn, purchasing);

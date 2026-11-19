@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { UserSummary } from '../../shared/auth';
-import { DEFAULT_KEYMAP, DEFAULT_TICKET_DESIGN, TOOLS_CHANNELS, type TicketDesign } from '../../shared/register-tools';
+import { DEFAULT_KEYMAP, DEFAULT_TICKET_DESIGN, isTicketDesign, TICKET_PRINT_POLICY_CHOICES, TOOLS_CHANNELS, type TicketDesign } from '../../shared/register-tools';
 import { AuditLog } from '../audit/audit-log';
 import { AuthService } from '../auth/auth-service';
 import { UserStore } from '../auth/user-store';
@@ -13,6 +13,7 @@ import { CashService } from '../cash/cash-service';
 import { CashSessionStore } from '../cash/cash-session-store';
 import { parsePendingSaleRequest } from '../checkout/pending-sale-request';
 import { PendingSales } from '../checkout/pending-sales';
+import { TicketPrintLog } from '../checkout/ticket-print-log';
 import { composeTicket, layoutTicket, renderTicket } from '../checkout/ticket/ticket';
 import { RecordingPrinter } from '../hardware/fakes/recording-printer';
 import { LocalStore } from '../local-store/local-store';
@@ -140,6 +141,23 @@ describe('the list of sales', () => {
     expect(history.list('%')).toEqual([]);
     expect(history.list('_')).toEqual([]);
   });
+
+  it('says which sales were left without their ticket, until one is printed (E1-59)', () => {
+    const old = sellHammer(undefined, 10_000);
+    const skipped = sellHammer(undefined, 10_000);
+    const printedLater = sellHammer(undefined, 10_000);
+    const log = new TicketPrintLog(store, TENANT, { audit: new AuditLog(store, TENANT), currentUserId: () => cashier.id });
+    log.recordNotPrinted(skipped, 'awaiting_answer');
+    log.recordNotPrinted(printedLater, 'policy_never');
+    log.recordPrinted(printedLater, false);
+    const history = new SalesHistory(store, TENANT);
+
+    const printed = Object.fromEntries(history.list('').map((sale) => [sale.saleId, sale.ticketPrinted]));
+
+    // A sale from before E1-59 has no entry, and it printed its ticket right away.
+    expect(printed).toEqual({ [old]: true, [skipped]: false, [printedLater]: true });
+    expect([log.wasPrinted(old), log.wasPrinted(skipped), log.wasPrinted(printedLater)]).toEqual([true, false, true]);
+  });
 });
 
 describe('the settings the owner keeps', () => {
@@ -175,6 +193,25 @@ describe('the settings the owner keeps', () => {
     // A keymap saved by an older version knows only some actions.
     store.transaction(() => write.run(TENANT, 'keymap', JSON.stringify({ checkout: 'Ctrl+K', gone: 'F2' })));
     expect(tools.keymap()).toEqual({ ...DEFAULT_KEYMAP, checkout: 'Ctrl+K' });
+  });
+
+  it('asks before printing by default, and reads a design saved before E1-59 as asking too', () => {
+    expect(DEFAULT_TICKET_DESIGN.printPolicy).toBe('ask');
+    const { printPolicy: _absent, ...savedBefore } = { ...DEFAULT_TICKET_DESIGN, headerLines: ['Av. Juárez 12'], copies: 2 };
+    store.transaction(() =>
+      store.prepare('INSERT INTO register_setting (tenant_id, name, value) VALUES (?, ?, ?)').run(TENANT, 'ticket_design', JSON.stringify(savedBefore)),
+    );
+
+    expect(tools.ticketDesign()).toEqual({ ...savedBefore, printPolicy: 'ask' });
+  });
+
+  it('keeps each print policy the owner chooses, and refuses one it does not know', () => {
+    for (const printPolicy of TICKET_PRINT_POLICY_CHOICES) {
+      tools.saveTicketDesign({ ...DEFAULT_TICKET_DESIGN, printPolicy });
+      expect(new ToolsStore(store, TENANT).ticketDesign().printPolicy).toBe(printPolicy);
+    }
+    expect(isTicketDesign({ ...DEFAULT_TICKET_DESIGN, printPolicy: 'sometimes' })).toBe(false);
+    expect(isTicketDesign({ ...DEFAULT_TICKET_DESIGN, printPolicy: undefined })).toBe(false);
   });
 });
 

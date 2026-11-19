@@ -635,3 +635,12 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** E1-50 · **Estimación:** 3 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué mover los códigos a otro proveedor en una sola transacción y no como «eliminar y agregar»? (2) ¿Por qué un pedido guarda una copia del código y del costo en lugar de leerlos del proveedor?
+### E1-59 · Preguntar si imprimir el ticket después de cada venta
+- **Objetivo:** después de cobrar, la caja pregunta «¿Imprimir ticket?» con el cambio a la vista: Enter imprime, Esc o N no. El dueño elige en el diseño del ticket «Preguntar siempre» (de fábrica), «Imprimir siempre» o «Nunca imprimir». Una venta sin ticket se imprime después desde «Reimprimir» o desde «Ventas», donde lleva la etiqueta «Sin ticket».
+- **Conceptos:** [Registro inmutable y hechos aparte], [Valor de fábrica al leer configuración vieja], [Doble envío con la misma tecla]
+- **Claude / tú:** Claude escribe la preferencia, el cobro sin impresión, la bitácora de impresión, el diálogo, la lista de ventas y las pruebas. Tú cobras ventas de prueba en la tienda contestando las dos opciones y revisas que el papel salga cuando debe.
+- **Pruebas:** Vitest del cobro (no imprime hasta la respuesta, imprime con el cambio y todas las copias al decir que sí, «Imprimir siempre» y «Nunca imprimir», falla de impresora, venta inexistente), de la preferencia (de fábrica, diseño viejo leído como «Preguntar siempre», valores permitidos), de la lista de ventas («Sin ticket» hasta imprimir), de la reimpresión de una venta sin ticket, del diálogo (foco, Enter, Esc, N, cambio a la vista, aviso de impresora) y de «Ventas» y «Ajustes»; Playwright del cobro con la pregunta y de F8 sobre una venta sin ticket.
+- **Criterios:** ADR 0075; la venta se guarda antes de la pregunta y nunca cambia; el ticket de la respuesta lleva el cambio y uno impreso después no lo inventa; sin migración.
+- **Depende de:** E1-48, E1-50 · **Estimación:** 3 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Dónde guardas que una venta salió sin ticket si la venta es inmutable? (2) ¿Cómo evitas que un Enter repetido imprima dos tickets?

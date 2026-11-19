@@ -53,6 +53,7 @@ export const IPC_CHANNELS = {
   savePendingSale: 'sales:save-pending',
   checkoutSale: 'sales:checkout',
   reprintLastTicket: 'sales:reprint-last',
+  printSaleTicket: 'sales:print-ticket',
   listPendingSales: 'sales:list-pending',
   confirmPendingSale: 'sales:confirm-pending',
   cancelPendingSale: 'sales:cancel-pending',
@@ -181,9 +182,25 @@ export type CheckoutSaleResult =
       /** Cash to give back, in cents. */
       readonly changeCents: number;
       readonly problems: readonly CheckoutProblem[];
+      /** What happened to the ticket: printed, waiting for the cashier to say, or not printed (ADR 0075). */
+      readonly ticket: SaleTicketState;
     }
   /** What was handed over does not complete the sale (RF-014, RF-015). Nothing was recorded. */
   | { readonly status: 'payment_refused'; readonly plan: PaymentPlan };
+
+/**
+ * The ticket of a sale once it is recorded. `printed` was sent to the printer (a failure is in the problems), `ask` waits
+ * for the cashier to say whether to print it, and `not_printed` stays without paper until someone prints it later.
+ */
+export type SaleTicketState = 'printed' | 'ask' | 'not_printed';
+
+/** How printing the ticket of one sale ended, after the question or from the history. */
+export type PrintTicketResult =
+  | { readonly status: 'printed'; readonly folio: string }
+  /** The sale does not exist or is not completed. */
+  | { readonly status: 'not_found' }
+  /** The printer did not take the job. The sale is not affected and stays without its ticket. */
+  | { readonly status: 'printer_failed'; readonly folio: string; readonly message: string };
 
 /** How asking to print the last ticket again ended. */
 export type ReprintResult =
@@ -427,6 +444,16 @@ ecorded with the new status, or why not
    * @returns `printed` with the folio, `no_sales` if there is nothing to print, or `printer_failed` with why
    */
   reprintLastTicket(): Promise<ReprintResult>;
+
+  /**
+   * Prints the ticket of one completed sale: the answer «Imprimir» to the question after a sale, or a ticket asked for
+   * from the history (ADR 0075). Right after the sale it carries the change; a sale that already had its ticket prints
+   * one marked as a reprint. The sale does not change; only the audit log records the print.
+   *
+   * @param saleId the sale
+   * @returns `printed` with the folio, `not_found`, or `printer_failed` with why
+   */
+  printSaleTicket(saleId: string): Promise<PrintTicketResult>;
 
   /**
    * Reads the sales that were left without being confirmed or cancelled, as after a power cut (RF-017).

@@ -43,7 +43,7 @@ const OPEN_CASH: CashStatus = {
   shouldWithdraw: false,
 };
 const CLOSED_CASH: CashStatus = { session: null, totals: null, expected: null, withdrawalLimitCents: 500_000, shouldWithdraw: false };
-const COMPLETED: CheckoutSaleResult = { status: 'completed', folio: 'T1-000001', changeCents: 0, problems: [] };
+const COMPLETED: CheckoutSaleResult = { status: 'completed', folio: 'T1-000001', changeCents: 0, problems: [], ticket: 'printed' };
 
 beforeAll(() => {
   // jsdom has no modal dialogs.
@@ -102,6 +102,7 @@ function fakePosApi(overrides: Partial<PosApi> = {}): PosApi {
     savePendingSale: () => Promise.resolve({ status: 'catalog_changed' }),
     checkoutSale: () => Promise.resolve(COMPLETED),
     reprintLastTicket: () => Promise.resolve({ status: 'no_sales' }),
+    printSaleTicket: () => Promise.resolve({ status: 'printed', folio: 'T1-000001' }),
     listPendingSales: () => Promise.resolve([]),
     confirmPendingSale: () => Promise.resolve(COMPLETED),
     cancelPendingSale: () => Promise.resolve(),
@@ -915,7 +916,7 @@ describe('checkout', () => {
   });
 
   it('shows the change while the cashier types the cash, and collects with F2 (RF-014)', async () => {
-    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve({ status: 'completed', folio: 'T1-000001', changeCents: 8400, problems: [] }));
+    const checkoutSale = vi.fn<PosApi['checkoutSale']>(() => Promise.resolve({ status: 'completed', folio: 'T1-000001', changeCents: 8400, problems: [], ticket: 'printed' }));
     await renderApp(posApiThatSaves({ checkoutSale }));
     const dialog = await openCheckout();
     await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('Efectivo recibido'));
@@ -932,7 +933,7 @@ describe('checkout', () => {
   });
 
   it('starts a new sale when the cashier has seen the change', async () => {
-    await renderApp(posApiThatSaves({ checkoutSale: () => Promise.resolve({ status: 'completed', folio: 'T1-000001', changeCents: 8400, problems: [] }) }));
+    await renderApp(posApiThatSaves({ checkoutSale: () => Promise.resolve({ status: 'completed', folio: 'T1-000001', changeCents: 8400, problems: [], ticket: 'printed' }) }));
     await openCheckout();
     typeInto('Efectivo recibido', '200');
     pressKey('F2');
@@ -944,6 +945,76 @@ describe('checkout', () => {
     expect(totalShown()).toBe('$0.00');
     expect(screen.getByText('Aún no hay productos en esta venta')).toBeDefined();
     await waitFor(() => expect(document.activeElement).toBe(lookupBox()));
+  });
+
+  describe('the question after a sale (E1-59)', () => {
+    const ASKING: CheckoutSaleResult = { status: 'completed', folio: 'T1-000001', changeCents: 8400, problems: [], ticket: 'ask' };
+
+    async function collectAndAsk(printSaleTicket: PosApi['printSaleTicket']): Promise<HTMLElement> {
+      await renderApp(posApiThatSaves({ checkoutSale: () => Promise.resolve(ASKING), printSaleTicket }));
+      const dialog = await openCheckout();
+      typeInto('Efectivo recibido', '200');
+      pressKey('F2');
+      await within(dialog).findByText('¿Imprimir ticket?');
+      return dialog;
+    }
+
+    it('asks with the change in sight and the focus on «Imprimir», and prints nothing before the answer', async () => {
+      const printSaleTicket = vi.fn<PosApi['printSaleTicket']>(() => Promise.resolve({ status: 'printed', folio: 'T1-000001' }));
+      const dialog = await collectAndAsk(printSaleTicket);
+
+      expect(within(dialog).getByRole('status', { name: 'Cambio a entregar', hidden: true }).textContent).toBe('Entrega $84.00 de cambio');
+      await waitFor(() => expect(document.activeElement?.textContent).toContain('Imprimir'));
+      expect(document.activeElement?.textContent).not.toContain('No imprimir');
+      expect(within(dialog).getByText('Enter')).toBeDefined();
+      expect(printSaleTicket).not.toHaveBeenCalled();
+    });
+
+    it('prints the ticket of that sale with Enter, once, and starts a new sale', async () => {
+      const printSaleTicket = vi.fn<PosApi['printSaleTicket']>(() => Promise.resolve({ status: 'printed', folio: 'T1-000001' }));
+      await collectAndAsk(printSaleTicket);
+
+      pressKey('Enter');
+      pressKey('Enter');
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull());
+      expect(printSaleTicket).toHaveBeenCalledExactlyOnceWith('saved-sale');
+      expect(totalShown()).toBe('$0.00');
+    });
+
+    it.each(['Escape', 'n', 'N'])('leaves the sale without its ticket with %s and starts a new sale', async (key) => {
+      const printSaleTicket = vi.fn<PosApi['printSaleTicket']>(() => Promise.resolve({ status: 'printed', folio: 'T1-000001' }));
+      await collectAndAsk(printSaleTicket);
+
+      pressKey(key);
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull());
+      expect(printSaleTicket).not.toHaveBeenCalled();
+      expect(totalShown()).toBe('$0.00');
+    });
+
+    it('keeps the notice of today when the printer fails, with the change still in sight', async () => {
+      const dialog = await collectAndAsk(() => Promise.resolve({ status: 'printer_failed', folio: 'T1-000001', message: 'Sin papel' }));
+
+      pressKey('Enter');
+
+      expect((await within(dialog).findByRole('alert', { hidden: true })).textContent).toBe('La venta quedó registrada, pero falló un aparato: Sin papel');
+      expect(within(dialog).getByRole('status', { name: 'Cambio a entregar', hidden: true }).textContent).toBe('Entrega $84.00 de cambio');
+      expect(within(dialog).queryByText('¿Imprimir ticket?')).toBeNull();
+
+      pressKey('Enter');
+      await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull());
+    });
+
+    it('does not ask when the register printed already or never prints', async () => {
+      await renderApp(posApiThatSaves({ checkoutSale: () => Promise.resolve({ ...ASKING, ticket: 'not_printed' }) }));
+      const dialog = await openCheckout();
+      typeInto('Efectivo recibido', '200');
+      pressKey('F2');
+
+      await within(dialog).findByText('Nueva venta');
+      expect(within(dialog).queryByText('¿Imprimir ticket?')).toBeNull();
+    });
   });
 
   it('records cash and a transfer with its reference as two parts of one sale (RF-015)', async () => {
@@ -1105,7 +1176,7 @@ describe('checkout', () => {
   });
 
   it('reports a device that failed after the sale was collected, without calling the sale a failure', async () => {
-    const result: CheckoutSaleResult = { status: 'completed', folio: 'T1-000001', changeCents: 0, problems: [{ device: 'printer', message: 'Sin papel' }] };
+    const result: CheckoutSaleResult = { status: 'completed', folio: 'T1-000001', changeCents: 0, problems: [{ device: 'printer', message: 'Sin papel' }], ticket: 'not_printed' };
     await renderApp(posApiThatSaves({ checkoutSale: () => Promise.resolve(result) }));
     const dialog = await openCheckout();
     typeInto('Efectivo recibido', '116');

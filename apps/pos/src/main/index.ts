@@ -26,6 +26,7 @@ import { ReportService } from './reports/report-service';
 import { ReturnService } from './returns/return-service';
 import { ReturnStore } from './returns/return-store';
 import { SaleCheckout } from './checkout/sale-checkout';
+import { TicketPrintLog } from './checkout/ticket-print-log';
 import { SalePayments } from './checkout/sale-payments';
 import { renderTicket } from './checkout/ticket/ticket';
 import { normalizePrinterShare } from '../shared/register-tools';
@@ -221,6 +222,10 @@ async function start(): Promise<void> {
       printer,
       businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
       ticketDesign: () => tools.ticketDesign(),
+      printLog: new TicketPrintLog(store, LOCAL_TENANT_ID, {
+        audit: new AuditLog(store, LOCAL_TENANT_ID),
+        currentUserId: () => auth.currentUser()?.id ?? null,
+      }),
     }),
     tools: {
       store: tools,

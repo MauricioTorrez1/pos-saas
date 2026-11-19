@@ -52,7 +52,7 @@ function lookupBox(page: Page): Locator {
 }
 
 function payment(page: Page): Locator {
-  return page.getByRole('dialog', { name: /^(Cobrar|Venta cobrada)$/ });
+  return page.getByRole('dialog', { name: /^(Cobrar|Venta registrada|Venta cobrada)$/ });
 }
 
 function status(page: Page): Locator {
@@ -63,7 +63,10 @@ function total(page: Page): Locator {
   return page.getByRole('status', { name: 'Total', exact: true });
 }
 
-/** Enter on the finished sale starts the next one, and the dialog going away is the proof that it did. */
+/**
+ * Enter on the finished sale starts the next one, and the dialog going away is the proof that it did. The register asks
+ * whether to print the ticket by default (E1-59), and Enter answers «Imprimir».
+ */
 async function closeDone(page: Page): Promise<void> {
   await page.keyboard.press('Enter');
   await expect(payment(page)).toHaveCount(0);
@@ -114,6 +117,8 @@ test('charges a sale in cash and shows the change, using only the keyboard (RF-0
 
   await expect(page.getByRole('status', { name: 'Cambio a entregar' })).toHaveText('Entrega $34.00 de cambio');
   await expect(payment(page)).toContainText('Folio T1-000001');
+  await expect(payment(page)).toContainText('¿Imprimir ticket?');
+  await expect(page.getByRole('button', { name: /^Imprimir/ })).toBeFocused();
   await closeDone(page);
   await expect(total(page)).toHaveText('$0.00');
   await expect(lookupBox(page)).toBeFocused();
@@ -242,14 +247,17 @@ test('asks for the payment method of a sale left pending when the register is ki
   });
 });
 
-test('numbers the sales and prints the last ticket again with F8 (RF-018)', async ({ launch }) => {
+test('numbers the sales, asks before each ticket, and prints one that was not printed with F8 (RF-018, E1-59)', async ({ userDataDir, launch }) => {
   const register = await launch();
   const page = await signInWindow(register);
   await expect(lookupBox(page)).toBeFocused();
   await page.keyboard.press('F8');
   await expect(page.getByText('Todavía no hay ventas cobradas para reimprimir.')).toBeVisible();
 
-  for (const folio of ['T1-000001', 'T1-000002']) {
+  for (const [folio, answer] of [
+    ['T1-000001', 'Enter'],
+    ['T1-000002', 'n'],
+  ] as const) {
     await scan(page, HAMMER_CODE);
     await expect(total(page)).toHaveText('$116.00');
     await page.keyboard.press('F12');
@@ -257,16 +265,32 @@ test('numbers the sales and prints the last ticket again with F8 (RF-018)', asyn
     await page.keyboard.type('116');
     await page.keyboard.press('F2');
     await expect(payment(page)).toContainText(`Folio ${folio}`);
-    if (folio === 'T1-000002') {
-      await page.keyboard.press('F8');
-      await expect(payment(page)).toContainText('Ticket T1-000002 reimpreso.');
-    }
-    await closeDone(page);
+    await expect(payment(page)).toContainText('¿Imprimir ticket?');
+    // The sale is recorded before the question: the answer only decides the paper.
+    await page.keyboard.press(answer);
+    await expect(payment(page)).toHaveCount(0);
     await expect(lookupBox(page)).toBeFocused();
   }
   await page.keyboard.press('F8');
 
   await expect(page.getByText('Ticket T1-000002 reimpreso.')).toBeVisible();
+  const entries = await register.evaluate((_electron, path) => {
+    const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
+    const database = new DatabaseSync(path, { readOnly: true });
+    try {
+      return database
+        .prepare("SELECT s.folio, a.action FROM audit_log a JOIN sale s ON s.id = a.entity_id WHERE a.action LIKE 'sale.ticket%' ORDER BY a.rowid")
+        .all();
+    } finally {
+      database.close();
+    }
+  }, testSalePaths(userDataDir).databasePath);
+  expect(entries).toEqual([
+    { folio: 1, action: 'sale.ticket_not_printed' },
+    { folio: 1, action: 'sale.ticket_printed' },
+    { folio: 2, action: 'sale.ticket_not_printed' },
+    { folio: 2, action: 'sale.ticket_printed' },
+  ]);
 });
 
 test('refuses payment requests that do not follow the rules of the bridge', async ({ launch }) => {
@@ -318,7 +342,7 @@ test('sells an item that is not in the catalog with a typed price, writes who ap
     try {
       return {
         sales: database.prepare('SELECT status, total_cents FROM sale').all(),
-        audit: database.prepare("SELECT action FROM audit_log WHERE entity <> 'cash_session'").all(),
+        audit: database.prepare("SELECT action FROM audit_log WHERE entity <> 'cash_session' AND action NOT LIKE 'sale.ticket%'").all(),
         saleMovements: (database.prepare("SELECT count(*) AS total FROM stock_movement WHERE type = 'sale'").get() as { total: number }).total,
       };
     } finally {

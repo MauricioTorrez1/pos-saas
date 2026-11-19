@@ -2,6 +2,7 @@ import type { StatementSync } from 'node:sqlite';
 
 import type { CatalogProduct } from '../../shared/pos-api';
 import type { SaleSummary } from '../../shared/register-tools';
+import { ticketPrintedSql } from '../checkout/ticket-print-log';
 import { formatFolio } from '../checkout/ticket/ticket';
 import type { LocalStore } from '../local-store/local-store';
 
@@ -19,6 +20,7 @@ interface SaleRow {
   readonly refunded_cents: number;
   readonly line_count: number;
   readonly cashier_name: string | null;
+  readonly ticket_printed: number;
 }
 
 /** What the history needs of the catalog to turn a name or a code into products. */
@@ -31,7 +33,8 @@ const COLUMNS = `
   s.id, s.folio, s.resolved_at, s.total_cents,
   (SELECT COALESCE(SUM(r.total_cents), 0) FROM sale_return r WHERE r.sale_id = s.id) AS refunded_cents,
   (SELECT COUNT(*) FROM sale_line l WHERE l.sale_id = s.id) AS line_count,
-  (SELECT u.name FROM app_user u WHERE u.id = s.cashier_id) AS cashier_name
+  (SELECT u.name FROM app_user u WHERE u.id = s.cashier_id) AS cashier_name,
+  ${ticketPrintedSql('s')} AS ticket_printed
 `;
 
 // A line matches when it is one of the products found, or when the name printed on it has the text: a product renamed
@@ -112,5 +115,6 @@ function toSummary(row: SaleRow, matchedProducts: readonly string[]): SaleSummar
     cashierName: row.cashier_name,
     lineCount: row.line_count,
     matchedProducts,
+    ticketPrinted: row.ticket_printed === 1,
   };
 }
