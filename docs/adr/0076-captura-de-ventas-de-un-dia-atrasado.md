@@ -1,4 +1,4 @@
-# ADR 0075: Capturar las ventas de un día atrasado
+# ADR 0076: Capturar las ventas de un día atrasado
 
 Estado: Aceptada · Fecha: 2026-11-18 · Concreta E1-60. Se apoya en los ADR 0011 (dinero en enteros), 0029 (sesión de caja), 0030 (una venta nunca cambia), 0046 (recepción idempotente), 0047 (`OwnerGate`), 0060 (tablero y zona horaria de la caja), 0070 (fondo al entrar y corte al salir) y 0072 (estado de resultados).
 

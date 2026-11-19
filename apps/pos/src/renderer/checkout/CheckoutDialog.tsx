@@ -5,13 +5,19 @@ import type { CheckoutProblem, PendingSale, PosApi } from '../../shared/pos-api'
 import { describePlan } from './amount-input';
 import { describeReprint, REPRINT_FAILED } from './reprint-message';
 import { PaymentForm, type EnteredPayment } from './PaymentForm';
+import { PrintQuestion } from './PrintQuestion';
 
 const SAVE_FAILED = 'No se pudo registrar el cobro. Intenta de nuevo y, si sigue fallando, reinicia la caja.';
+const PRINT_FAILED = 'No se pudo imprimir el ticket. La venta quedó registrada; puedes imprimirlo desde «Reimprimir» o desde Ventas.';
 const CANCEL_FAILED = 'No se pudo cancelar la venta. Intenta de nuevo y, si sigue fallando, reinicia la caja.';
 
-type Phase =
-  | { readonly kind: 'paying' }
-  | { readonly kind: 'done'; readonly folio: string; readonly changeCents: number; readonly problems: readonly CheckoutProblem[] };
+interface Collected {
+  readonly folio: string;
+  readonly changeCents: number;
+  readonly problems: readonly CheckoutProblem[];
+}
+
+type Phase = { readonly kind: 'paying' } | ({ readonly kind: 'asking' } & Collected) | ({ readonly kind: 'done' } & Collected);
 
 interface CheckoutDialogProps {
   readonly posApi: PosApi;
@@ -70,11 +76,32 @@ export function CheckoutDialog({ posApi, sale, onFinished }: CheckoutDialogProps
     run(async () => {
       const result = await posApi.checkoutSale({ saleId: sale.id, ...payment });
       if (result.status === 'completed') {
-        setPhase({ kind: 'done', folio: result.folio, changeCents: result.changeCents, problems: result.problems });
+        const collected = { folio: result.folio, changeCents: result.changeCents, problems: result.problems };
+        setPhase(result.ticket === 'ask' ? { kind: 'asking', ...collected } : { kind: 'done', ...collected });
       } else {
         setMessage(describePlan(result.plan).text);
       }
     }, SAVE_FAILED);
+
+  // The sale is already recorded: whatever happens with the paper, the dialog only ends or shows why it did not print.
+  const printTicket = (collected: Collected): Promise<void> =>
+    run(async () => {
+      try {
+        const result = await posApi.printSaleTicket(sale.id);
+        if (result.status === 'printed') {
+          onFinished(true);
+          return;
+        }
+        const problem = result.status === 'printer_failed' ? { device: 'printer', message: result.message } : null;
+        setPhase({ kind: 'done', ...collected, problems: problem === null ? collected.problems : [...collected.problems, problem] });
+        if (problem === null) {
+          setReprintMessage(PRINT_FAILED);
+        }
+      } catch {
+        setPhase({ kind: 'done', ...collected });
+        setReprintMessage(PRINT_FAILED);
+      }
+    }, PRINT_FAILED);
 
   const reprint = async (): Promise<void> => {
     try {
@@ -92,7 +119,7 @@ export function CheckoutDialog({ posApi, sale, onFinished }: CheckoutDialogProps
 
   return (
     <dialog ref={dialogRef} className="payment" aria-labelledby="payment-title" closedby="none">
-      <h2 id="payment-title">{phase.kind === 'paying' ? 'Cobrar' : 'Venta cobrada'}</h2>
+      <h2 id="payment-title">{phase.kind === 'paying' ? 'Cobrar' : phase.kind === 'asking' ? 'Venta registrada' : 'Venta cobrada'}</h2>
       <p className="payment-total">
         <span>Total</span>
         <output aria-label="Total a cobrar">{formatCents(sale.totalCents)}</output>
@@ -105,6 +132,15 @@ export function CheckoutDialog({ posApi, sale, onFinished }: CheckoutDialogProps
           onBack={() => void cancelSale()}
           submitLabel="Cobrar"
           backLabel="Volver y cancelar la venta"
+        />
+      ) : phase.kind === 'asking' ? (
+        <PrintQuestion
+          folio={phase.folio}
+          changeCents={phase.changeCents}
+          problems={phase.problems}
+          isBusy={isBusy}
+          onPrint={() => void printTicket({ folio: phase.folio, changeCents: phase.changeCents, problems: phase.problems })}
+          onSkip={() => onFinished(true)}
         />
       ) : (
         <DoneView

@@ -34,7 +34,7 @@ const OPEN_CASH: CashStatus = {
   withdrawalLimitCents: 500_000,
   shouldWithdraw: false,
 };
-const SALE: SaleSummary = { saleId: 'sale-1', folio: 'T1-000012', completedAt: '2026-11-10T18:30:00.000Z', totalCents: 23_200, refundedCents: 0, cashierName: 'Ana', lineCount: 2, matchedProducts: [] };
+const SALE: SaleSummary = { saleId: 'sale-1', folio: 'T1-000012', completedAt: '2026-11-10T18:30:00.000Z', totalCents: 23_200, refundedCents: 0, cashierName: 'Ana', lineCount: 2, matchedProducts: [], ticketPrinted: true };
 const RETURNABLE: ReturnableSale = {
   saleId: 'sale-1',
   folio: 'T1-000012',
@@ -265,6 +265,20 @@ describe('the settings of the register', () => {
     );
   });
 
+  it('offers the three ways to print after a sale, starting at asking, and saves the one chosen (E1-59)', async () => {
+    const saveTicketDesign = vi.fn<ToolsApi['saveTicketDesign']>(() => Promise.resolve());
+    renderSettings(toolsWith({ saveTicketDesign }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Diseño del ticket', hidden: true }));
+    const policy = (await screen.findByLabelText('Al cobrar')) as HTMLSelectElement;
+
+    expect(policy.value).toBe('ask');
+    expect([...policy.options].map((option) => option.text)).toEqual(['Preguntar siempre', 'Imprimir siempre', 'Nunca imprimir']);
+    fireEvent.change(policy, { target: { value: 'never' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar diseño', hidden: true }));
+
+    await waitFor(() => expect(saveTicketDesign).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_TICKET_DESIGN, printPolicy: 'never' }));
+  });
+
   it('saves the printer by its shared name, and says when a test print cannot be made', async () => {
     const savePrinter = vi.fn<ToolsApi['savePrinter']>(() => Promise.resolve({ status: 'saved', share: '\\\\localhost\\TM-T20' }));
     renderSettings(toolsWith({ savePrinter, testPrint: () => Promise.resolve({ status: 'failed', message: 'la impresora no responde' }) }));
@@ -276,6 +290,45 @@ describe('the settings of the register', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Imprimir un ticket de prueba', hidden: true }));
     expect((await screen.findByRole('alert', { hidden: true })).textContent).toContain('la impresora no responde');
+  });
+});
+
+describe('printing the ticket of a past sale (E1-59)', () => {
+  it('marks a sale left without its ticket, prints it from the list, and says so', async () => {
+    const unprinted: SaleSummary = { ...SALE, ticketPrinted: false };
+    const printSaleTicket = vi.fn<PosApi['printSaleTicket']>(() => Promise.resolve({ status: 'printed', folio: 'T1-000012' }));
+    render(
+      <SalesHistoryDialog
+        posApi={posApiWith(CASHIER, { printSaleTicket })}
+        toolsApi={toolsWith({ listRecentSales: () => Promise.resolve([unprinted]) })}
+        isOwner={false}
+        onCancelled={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(await screen.findByText('Sin ticket')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Imprimir el ticket de la venta T1-000012', hidden: true }));
+
+    expect((await screen.findByRole('status', { hidden: true })).textContent).toBe('Ticket T1-000012 impreso.');
+    expect(printSaleTicket).toHaveBeenCalledExactlyOnceWith('sale-1');
+  });
+
+  it('offers a reprint for a sale that had its ticket, and says why the printer did not take it', async () => {
+    render(
+      <SalesHistoryDialog
+        posApi={posApiWith(CASHIER, { printSaleTicket: () => Promise.resolve({ status: 'printer_failed', folio: 'T1-000012', message: 'Sin papel' }) })}
+        toolsApi={toolsWith()}
+        isOwner={false}
+        onCancelled={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Reimprimir el ticket de la venta T1-000012', hidden: true }));
+
+    expect((await screen.findByRole('alert', { hidden: true })).textContent).toContain('No se pudo imprimir el ticket T1-000012: Sin papel');
+    expect(screen.queryByText('Sin ticket')).toBeNull();
   });
 });
 

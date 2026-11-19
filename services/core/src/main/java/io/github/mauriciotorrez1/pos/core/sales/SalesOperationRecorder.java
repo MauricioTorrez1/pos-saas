@@ -87,7 +87,7 @@ class SalesOperationRecorder implements OperationRecorder {
     }
 
     /**
-     * The day a sale counts on (E1-60, ADR 0075): the day a backdated capture sent, or else the local day it was
+     * The day a sale counts on (E1-60, ADR 0076): the day a backdated capture sent, or else the local day it was
      * completed. A backdated day after the moment it was recorded cannot happen at a register, so it is refused.
      */
     static LocalDate businessDateOf(JsonNode sale, OffsetDateTime completedAt) {

@@ -635,13 +635,23 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Depende de:** E1-50 · **Estimación:** 3 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué mover los códigos a otro proveedor en una sola transacción y no como «eliminar y agregar»? (2) ¿Por qué un pedido guarda una copia del código y del costo en lugar de leerlos del proveedor?
+### E1-59 · Preguntar si imprimir el ticket después de cada venta
+- **Objetivo:** después de cobrar, la caja pregunta «¿Imprimir ticket?» con el cambio a la vista: Enter imprime, Esc o N no. El dueño elige en el diseño del ticket «Preguntar siempre» (de fábrica), «Imprimir siempre» o «Nunca imprimir». Una venta sin ticket se imprime después desde «Reimprimir» o desde «Ventas», donde lleva la etiqueta «Sin ticket».
+- **Conceptos:** [Registro inmutable y hechos aparte], [Valor de fábrica al leer configuración vieja], [Doble envío con la misma tecla]
+- **Claude / tú:** Claude escribe la preferencia, el cobro sin impresión, la bitácora de impresión, el diálogo, la lista de ventas y las pruebas. Tú cobras ventas de prueba en la tienda contestando las dos opciones y revisas que el papel salga cuando debe.
+- **Pruebas:** Vitest del cobro (no imprime hasta la respuesta, imprime con el cambio y todas las copias al decir que sí, «Imprimir siempre» y «Nunca imprimir», falla de impresora, venta inexistente), de la preferencia (de fábrica, diseño viejo leído como «Preguntar siempre», valores permitidos), de la lista de ventas («Sin ticket» hasta imprimir), de la reimpresión de una venta sin ticket, del diálogo (foco, Enter, Esc, N, cambio a la vista, aviso de impresora) y de «Ventas» y «Ajustes»; Playwright del cobro con la pregunta y de F8 sobre una venta sin ticket.
+- **Criterios:** ADR 0075; la venta se guarda antes de la pregunta y nunca cambia; el ticket de la respuesta lleva el cambio y uno impreso después no lo inventa; sin migración.
+- **Depende de:** E1-48, E1-50 · **Estimación:** 3 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Dónde guardas que una venta salió sin ticket si la venta es inmutable? (2) ¿Cómo evitas que un Enter repetido imprima dos tickets?
+
 
 ### E1-60 · Capturar las ventas de un día atrasado
 - **Objetivo:** al entrar, la cajera elige «Día de captura»; con la autorización de un dueño captura las ventas que no alcanzó a registrar en un día reciente, y cada venta cuenta en ese día (resumen, estado de resultados, más vendidos, inventario) con su propio fondo y corte, sin mezclarse con la caja de hoy.
 - **Conceptos:** [Fecha de negocio contra fecha de registro], [Corte suplementario], [Campo opcional en un contrato], [Índice de expresión], [Fecha de emisión del CFDI]
 - **Claude / tú:** Claude escribe la migración, la regla de entrada, la sesión de caja por día, el día en la venta, el inventario y los reportes, el ticket, el contrato, el núcleo y las pruebas. Tú pruebas en la tienda capturar las ventas de ayer y cuadrar el corte suplementario.
 - **Pruebas:** Vitest de la ventana de días, del PIN del dueño y del rechazo, de la sesión aparte con su corte y su bitácora, del día en la venta, el inventario y el evento, de los reportes, el estado de resultados y el reporte diario, del ticket y de la pantalla (selector y franja); Java de `businessDate` guardado, del respaldo al día local, de la cuarentena y de la idempotencia; Playwright de entrar a ayer y ver la venta en el resumen de ayer.
-- **Criterios:** ADR 0075; la venta conserva el momento real; nada se edita; campo opcional sin cambiar `schemaVersion`; la caja vende en efectivo sin internet.
+- **Criterios:** ADR 0076; la venta conserva el momento real; nada se edita; campo opcional sin cambiar `schemaVersion`; la caja vende en efectivo sin internet.
 - **Depende de:** E1-54, E1-56 · **Estimación:** 6 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué guardar dos fechas en una venta en lugar de corregir la que tiene? (2) ¿Cómo agregas un campo a un contrato de sincronización sin romper a los clientes que ya existen?

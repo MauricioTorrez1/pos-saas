@@ -18,6 +18,8 @@ import {
   MAX_TICKET_BUSINESS_NAME,
   type TicketCurrency,
   TICKET_TEXT_SIZE_CHOICES,
+  TICKET_PRINT_POLICY_CHOICES,
+  type TicketPrintPolicy,
   ticketLineWidth,
   type KeyAction,
   type Keymap,
@@ -53,6 +55,12 @@ const CURRENCY_LABELS: Readonly<Record<TicketCurrency, string>> = {
 const FONT_LABELS: Readonly<Record<TicketFont, string>> = {
   a: 'Normal (fuente A)',
   b: 'Compacta (fuente B, caben más letras)',
+};
+
+const PRINT_POLICY_LABELS: Readonly<Record<TicketPrintPolicy, string>> = {
+  ask: 'Preguntar siempre',
+  always: 'Imprimir siempre',
+  never: 'Nunca imprimir',
 };
 
 const TEXT_SIZE_LABELS: Readonly<Record<TicketTextSize, string>> = {
@@ -348,6 +356,13 @@ function TicketTab({ toolsApi }: { readonly toolsApi: ToolsApi }): ReactElement 
           onChange={(value) => change({ textSize: value as TicketTextSize })}
           options={TICKET_TEXT_SIZE_CHOICES.map((size) => ({ value: size, label: TEXT_SIZE_LABELS[size] }))}
           hint={`Caben ${String(ticketLineWidth(design))} letras por renglón con este papel, fuente y tamaño.`}
+        />
+        <SelectField
+          label="Al cobrar"
+          value={design.printPolicy}
+          onChange={(value) => change({ printPolicy: value as TicketPrintPolicy })}
+          options={TICKET_PRINT_POLICY_CHOICES.map((policy) => ({ value: policy, label: PRINT_POLICY_LABELS[policy] }))}
+          hint="La venta siempre queda registrada. Un ticket que no salió se imprime después desde Reimprimir o desde Ventas."
         />
         <SelectField
           label="Copias por venta"

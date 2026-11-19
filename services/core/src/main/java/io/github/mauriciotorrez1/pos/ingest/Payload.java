@@ -65,7 +65,7 @@ public final class Payload {
     }
 
     /**
-     * Reads the business day of a backdated capture (E1-60, ADR 0075).
+     * Reads the business day of a backdated capture (E1-60, ADR 0076).
      *
      * @param node  the object that holds the field
      * @param field the field name

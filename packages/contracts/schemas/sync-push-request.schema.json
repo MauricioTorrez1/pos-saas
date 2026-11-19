@@ -28,7 +28,7 @@
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$"
     },
     "business_date": {
-      "description": "The local day a backdated capture puts a record on (E1-60, ADR 0075), as YYYY-MM-DD. Absent when the record counts on the local day of its own moment.",
+      "description": "The local day a backdated capture puts a record on (E1-60, ADR 0076), as YYYY-MM-DD. Absent when the record counts on the local day of its own moment.",
       "type": "string",
       "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
     },

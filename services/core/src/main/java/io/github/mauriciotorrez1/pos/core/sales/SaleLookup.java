@@ -38,7 +38,7 @@ public class SaleLookup {
 
     /**
      * Adds up the sales of the current business by the day they count on, so a sale captured the next morning lands on
-     * the day it belongs to (E1-60, ADR 0075).
+     * the day it belongs to (E1-60, ADR 0076).
      *
      * @param from the first day, included
      * @param to the last day, included

@@ -53,6 +53,7 @@ const posApi: PosApi & PricingApi & ProductAdminApi & DashboardApi = {
   savePendingSale: (request) => ipcRenderer.invoke(IPC_CHANNELS.savePendingSale, request),
   checkoutSale: (request) => ipcRenderer.invoke(IPC_CHANNELS.checkoutSale, request),
   reprintLastTicket: () => ipcRenderer.invoke(IPC_CHANNELS.reprintLastTicket),
+  printSaleTicket: (saleId) => ipcRenderer.invoke(IPC_CHANNELS.printSaleTicket, saleId),
   listPendingSales: () => ipcRenderer.invoke(IPC_CHANNELS.listPendingSales),
   confirmPendingSale: (request) => ipcRenderer.invoke(IPC_CHANNELS.confirmPendingSale, request),
   cancelPendingSale: (saleId) => ipcRenderer.invoke(IPC_CHANNELS.cancelPendingSale, saleId),
