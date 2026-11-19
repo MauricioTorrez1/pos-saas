@@ -156,3 +156,73 @@ test('edits a product from the panel, gives it up so the sale cannot find it, an
   await expect(total(page)).toHaveText('$116.00');
   expect(await readRows(register, databasePath, "SELECT count(*) AS total FROM product WHERE name = 'Martillo de bola 16 oz'")).toEqual([{ total: 1 }]);
 });
+
+const CENTRO_ID = '0193a5c0-0000-7000-8000-0000000000a1';
+const NORTE_ID = '0193a5c0-0000-7000-8000-0000000000a2';
+
+/** Adds two active suppliers straight to the local database, as if they had been saved in the supplier screen. */
+async function seedSuppliers(register: ElectronApplication, databasePath: string): Promise<void> {
+  await register.evaluate(
+    (_electron, { path, suppliers }) => {
+      const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
+      const database = new DatabaseSync(path);
+      try {
+        const { tenant_id: tenantId } = database.prepare('SELECT tenant_id FROM product LIMIT 1').get() as { tenant_id: string };
+        const insert = database.prepare('INSERT INTO supplier (id, tenant_id, name, contact, notes, is_active, created_at, updated_at) VALUES (?, ?, ?, NULL, NULL, 1, ?, ?)');
+        const now = new Date().toISOString();
+        for (const [id, name] of suppliers) {
+          insert.run(id, tenantId, name, now, now);
+        }
+      } finally {
+        database.close();
+      }
+    },
+    { path: databasePath, suppliers: [[CENTRO_ID, 'Ferretera del Centro'], [NORTE_ID, 'Distribuidora Norte']] as [string, string][] },
+  );
+}
+
+test('changes the supplier, the code and the cost of a product from its panel, and removes the supplier after asking (E1-58)', async ({ userDataDir, launch }) => {
+  const register = await launch();
+  const page = await signInWindow(register);
+  const { databasePath } = testSalePaths(userDataDir);
+  const suppliers = page.getByRole('region', { name: 'Proveedores del producto' });
+  await seedSuppliers(register, databasePath);
+
+  await page.keyboard.type(HAMMER_CODE);
+  await page.keyboard.press('Enter');
+  await expect(total(page)).toHaveText('$116.00');
+  await page.keyboard.press('F10');
+  await expect(page.getByRole('heading', { name: 'Martillo uña curva 16 oz' })).toBeVisible();
+
+  // The first supplier is linked with the short form under the list.
+  await suppliers.getByLabel('Agregar proveedor').selectOption({ label: 'Distribuidora Norte' });
+  await suppliers.getByRole('textbox', { name: 'Código del proveedor', exact: true }).fill('MAR-16');
+  await suppliers.getByRole('textbox', { name: 'Costo de lista (opcional)' }).fill('55');
+  await suppliers.getByRole('button', { name: 'Agregar proveedor' }).click();
+  await expect(suppliers.getByRole('list', { name: 'Proveedores que lo venden' })).toContainText('MAR-16 · $55.00');
+
+  // «Modificar» turns the row into a form: another supplier, another code and another cost, in one step.
+  await suppliers.getByRole('button', { name: 'Modificar Distribuidora Norte' }).click();
+  await suppliers.getByLabel('Proveedor', { exact: true }).selectOption({ label: 'Ferretera del Centro' });
+  await suppliers.getByRole('textbox', { name: 'Código del proveedor 1' }).fill('FC-16');
+  await suppliers.getByRole('textbox', { name: 'Costo de lista 1 (opcional)' }).fill('54.50');
+  await suppliers.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(suppliers).toContainText('Proveedor del producto actualizado.');
+  await expect(suppliers.getByRole('list', { name: 'Proveedores que lo venden' })).toContainText('Ferretera del Centro');
+  await expect(suppliers.getByRole('list', { name: 'Proveedores que lo venden' })).not.toContainText('Distribuidora Norte');
+  expect(await readRows(register, databasePath, 'SELECT supplier_id, supplier_code, list_cost_e6 FROM supplier_product_code')).toEqual([
+    { supplier_id: CENTRO_ID, supplier_code: 'FC-16', list_cost_e6: 54_500_000 },
+  ]);
+  expect(await readRows(register, databasePath, "SELECT detail FROM audit_log WHERE action = 'supplier_codes.change'")).toEqual([
+    { detail: expect.stringContaining('Distribuidora Norte [MAR-16 55000000e6] -> Ferretera del Centro [FC-16 54500000e6]') },
+  ]);
+
+  // «Eliminar» asks first, in red, and then the product has no supplier.
+  await suppliers.getByRole('button', { name: 'Eliminar Ferretera del Centro' }).click();
+  await expect(page.getByRole('heading', { name: '¿Quitar a Ferretera del Centro de este producto?' })).toBeVisible();
+  await page.getByRole('button', { name: /Sí, quitar proveedor/ }).click();
+  await expect(suppliers).toContainText('Ferretera del Centro quitado del producto.');
+  await expect(suppliers).toContainText('Ningún proveedor tiene este producto todavía.');
+  expect(await readRows(register, databasePath, 'SELECT count(*) AS total FROM supplier_product_code')).toEqual([{ total: 0 }]);
+  expect(await readRows(register, databasePath, "SELECT action FROM audit_log WHERE action = 'supplier_codes.remove'")).toEqual([{ action: 'supplier_codes.remove' }]);
+});

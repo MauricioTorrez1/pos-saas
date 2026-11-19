@@ -165,7 +165,7 @@ The ticket design also picks the printer font (A, or the narrow B that fits a th
 
 The search bar of **Resumen** (owner, or with the owner PIN) finds any completed sale by ticket folio, product name or barcode, on every date, and says which products matched.
 
-The product panel lists every supplier of the product, links one more, and has a green «Pedir más» per supplier that adds the product to that supplier's latest draft order (or a new one).
+The product panel lists every supplier of the product, links one more, and has a green «Pedir más» per supplier that adds the product to that supplier's latest draft order (or a new one). Next to it, a yellow «Modificar» turns the row into a form to change the supplier (to an active one that does not sell it yet), its codes and its list cost, moved in one transaction; a red «Eliminar» removes the supplier after a confirmation that names the draft orders of that supplier with the product, which keep it unless the owner ticks «Quitarlo también del borrador». Sent orders never change. Owner or owner PIN, with audit entries (E1-58, [ADR 0074](../../docs/adr/0074-modificar-y-eliminar-el-proveedor-de-un-producto.md)).
 
 Boxes for amounts, quantities and PINs take digits and one decimal point only (`keepNumeric`). The settings live in `register_setting`, so there is no migration. The catalog import reads `.xlsx` as well as CSV with a reader of its own (`main/import/xlsx-reader.ts`), and shows how to title the columns before the file is chosen.
 

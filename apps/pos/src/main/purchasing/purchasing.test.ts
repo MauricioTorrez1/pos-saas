@@ -653,3 +653,105 @@ describe('ordering more from the product panel (E1-50)', () => {
     expect(orders.orderMore({ productId: '0190f0d0-0000-7000-8000-0000000000ff', supplierId: supplier.id }).status).toBe('product_not_found');
   });
 });
+
+describe('changing and removing a supplier of a product from its panel (E1-58)', () => {
+  const code = (supplierCode: string, listCostE6: number | null = null) => ({ supplierCode, listCostE6, purchaseUnit: null });
+  let other: Supplier;
+
+  beforeEach(() => {
+    other = savedSupplier('Distribuidora Norte');
+    suppliers.setCodes({ supplierId: supplier.id, productId: tapeId, codes: [code('CM-5', 50_500_000)] });
+  });
+
+  function codesOf(supplierId: string): number {
+    return count(`SELECT count(*) AS total FROM supplier_product_code WHERE supplier_id = '${supplierId}' AND product_id = '${tapeId}'`);
+  }
+
+  it('moves the codes and the cost to another supplier in one step, with its audit entry and both operations', () => {
+    const result = suppliers.changeLink({ productId: tapeId, fromSupplierId: supplier.id, toSupplierId: other.id, codes: [code('DN-55', 49_000_000)] });
+
+    expect(result).toEqual({ status: 'saved', links: [{ supplierId: other.id, supplierName: 'Distribuidora Norte', productId: tapeId, codes: [code('DN-55', 49_000_000)] }] });
+    expect(codesOf(supplier.id)).toBe(0);
+    const detail = (store.prepare("SELECT detail FROM audit_log WHERE action = 'supplier_codes.change'").get() as unknown as { detail: string }).detail;
+    expect(detail).toContain('Ferretera del Centro [CM-5 50500000e6] -> Distribuidora Norte [DN-55 49000000e6]');
+    const operations = purchasingOperations().filter(({ type }) => type === 'supplier_product.upserted');
+    expect(operations.slice(-2).map(({ payload }) => [payload.supplierId, (payload.codes as unknown[]).length])).toEqual([
+      [supplier.id, 0],
+      [other.id, 1],
+    ]);
+    expect(contractErrorsOfPushRequest({ registerId: registerIdOf(store, TENANT), operations: purchasingOperations() })).toEqual([]);
+  });
+
+  it('changes only the code and the cost when the supplier stays, and answers unchanged when nothing differs', () => {
+    expect(suppliers.changeLink({ productId: tapeId, fromSupplierId: supplier.id, toSupplierId: supplier.id, codes: [code('CM-5', 50_500_000)] }).status).toBe('unchanged');
+    const result = suppliers.changeLink({ productId: tapeId, fromSupplierId: supplier.id, toSupplierId: supplier.id, codes: [code('CM-5X', 51_000_000)] });
+
+    expect(result).toMatchObject({ status: 'saved', links: [{ supplierId: supplier.id, codes: [code('CM-5X', 51_000_000)] }] });
+    expect(actions('supplier_codes.change')).toEqual(['supplier_codes.change']);
+  });
+
+  it('refuses a supplier that already sells the product, one given up, an empty list and a row that no longer exists', () => {
+    suppliers.setCodes({ supplierId: other.id, productId: tapeId, codes: [code('DN-55')] });
+    expect(suppliers.changeLink({ productId: tapeId, fromSupplierId: supplier.id, toSupplierId: other.id, codes: [code('X')] })).toEqual({
+      status: 'already_linked',
+      supplierName: 'Distribuidora Norte',
+    });
+    const gone = savedSupplier('Proveedor viejo');
+    suppliers.save({ supplierId: gone.id, expectedRevision: gone.revision, name: gone.name, contact: null, notes: null, isActive: false });
+    expect(suppliers.changeLink({ productId: tapeId, fromSupplierId: supplier.id, toSupplierId: gone.id, codes: [code('X')] })).toEqual({ status: 'supplier_not_found' });
+    expect(() => suppliers.changeLink({ productId: tapeId, fromSupplierId: supplier.id, toSupplierId: supplier.id, codes: [] })).toThrow(RangeError);
+    expect(suppliers.changeLink({ productId: nailsId, fromSupplierId: supplier.id, toSupplierId: other.id, codes: [code('X')] }).status).toBe('not_linked');
+    expect(codesOf(supplier.id)).toBe(1);
+  });
+
+  it('removes a supplier from the product with its audit entry and an operation with no codes', () => {
+    const result = suppliers.unlink({ supplierId: supplier.id, productId: tapeId, removeFromDrafts: false });
+
+    expect(result).toEqual({ status: 'removed', links: [], draftsChanged: 0 });
+    expect(actions('supplier_codes.remove')).toEqual(['supplier_codes.remove']);
+    expect(purchasingOperations().at(-1)).toMatchObject({ type: 'supplier_product.upserted', payload: { supplierId: supplier.id, codes: [] } });
+    expect(suppliers.unlink({ supplierId: supplier.id, productId: tapeId, removeFromDrafts: false }).status).toBe('not_linked');
+  });
+
+  it('never touches a sent order, and keeps the product on a draft unless the owner asks to take it off', () => {
+    const sent = saveDraft([line(tapeId, 2_000, 50_500_000, 'CM-5')]);
+    orders.markSent({ orderId: sent.id, expectedRevision: sent.revision });
+    const draft = saveDraft([line(nailsId, 1_000, null), line(tapeId, 1_000, 50_500_000, 'CM-5'), line(cableId, 3_000, null)]);
+    expect(suppliers.draftsWithProduct({ supplierId: supplier.id, productId: tapeId })).toEqual([{ orderId: draft.id, folio: draft.folio }]);
+
+    suppliers.unlink({ supplierId: supplier.id, productId: tapeId, removeFromDrafts: false });
+    expect(orders.get(draft.id)).toEqual(draft);
+    expect(orders.get(sent.id)?.lines.map((entry) => entry.supplierCode)).toEqual(['CM-5']);
+    expect((store.prepare("SELECT detail FROM audit_log WHERE action = 'supplier_codes.remove'").get() as unknown as { detail: string }).detail).toContain(
+      `kept in PED-000${String(draft.folio)}`,
+    );
+  });
+
+  it('takes the product off the drafts when asked, numbering the lines again and moving the draft one revision up', () => {
+    const sent = saveDraft([line(tapeId, 2_000, 50_500_000, 'CM-5')]);
+    orders.markSent({ orderId: sent.id, expectedRevision: sent.revision });
+    const draft = saveDraft([line(nailsId, 1_000, null), line(tapeId, 1_000, 50_500_000, 'CM-5'), line(cableId, 3_000, null)]);
+
+    expect(suppliers.unlink({ supplierId: supplier.id, productId: tapeId, removeFromDrafts: true })).toMatchObject({ status: 'removed', draftsChanged: 1 });
+    const after = orders.get(draft.id)!;
+    expect(after.lines.map((entry) => [entry.lineNumber, entry.productId])).toEqual([
+      [1, nailsId],
+      [2, cableId],
+    ]);
+    expect(after.revision).toBe(draft.revision + 1);
+    expect(orders.get(sent.id)?.lines).toHaveLength(1);
+  });
+
+  it('needs the PIN of an owner from a cashier to change or remove, and writes every refusal in the audit log', () => {
+    asCashier();
+
+    expect(suppliers.changeLink({ productId: tapeId, fromSupplierId: supplier.id, toSupplierId: other.id, codes: [code('X')] })).toEqual({ status: 'authorization_required' });
+    expect(suppliers.unlink({ supplierId: supplier.id, productId: tapeId, removeFromDrafts: false, ownerPin: '0000' })).toMatchObject({ status: 'wrong_pin' });
+    expect(actions('supplier_codes.change_denied')).toHaveLength(1);
+    expect(actions('supplier_codes.remove_denied')).toHaveLength(1);
+    expect(codesOf(supplier.id)).toBe(1);
+
+    expect(suppliers.changeLink({ productId: tapeId, fromSupplierId: supplier.id, toSupplierId: other.id, codes: [code('X')], ownerPin: '4321' }).status).toBe('saved');
+    expect(suppliers.unlink({ supplierId: other.id, productId: tapeId, removeFromDrafts: false, ownerPin: '4321' }).status).toBe('removed');
+  });
+});
