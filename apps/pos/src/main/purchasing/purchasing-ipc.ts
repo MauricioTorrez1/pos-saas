@@ -1,5 +1,7 @@
 import {
   PURCHASING_CHANNELS,
+  type ChangeSupplierLinkResult,
+  type DraftOrderRef,
   type DiscardOrderResult,
   type ExportOrderResult,
   type MarkOrderSentResult,
@@ -13,11 +15,13 @@ import {
   type SetSupplierCodesResult,
   type Supplier,
   type SupplierProductLink,
+  type UnlinkSupplierResult,
 } from '../../shared/supplier-order';
 import { parseProductId } from '../inventory/inventory-request';
 import type { OrderExporter } from './order-exporter';
 import type { PurchaseOrderService } from './purchase-order-service';
 import {
+  parseChangeSupplierLinkRequest,
   parseExportOrderRequest,
   parseOrderActionRequest,
   parseOrderMoreRequest,
@@ -27,6 +31,8 @@ import {
   parseSearchOrderProductsRequest,
   parseSetReorderLevelRequest,
   parseSetSupplierCodesRequest,
+  parseSupplierProductRef,
+  parseUnlinkSupplierRequest,
   parseUuid,
 } from './purchasing-request';
 import type { SupplierService } from './supplier-service';
@@ -53,6 +59,9 @@ export function registerPurchasingHandlers(answerSignedIn: AnswerSignedIn, { sup
   answerSignedIn(PURCHASING_CHANNELS.saveSupplier, (request): SaveSupplierResult => suppliers.save(parseSaveSupplierRequest(request)));
   answerSignedIn(PURCHASING_CHANNELS.getSupplierLinks, (productId): SupplierProductLink[] => suppliers.linksOfProduct(parseProductId(productId)));
   answerSignedIn(PURCHASING_CHANNELS.setSupplierCodes, (request): SetSupplierCodesResult => suppliers.setCodes(parseSetSupplierCodesRequest(request)));
+  answerSignedIn(PURCHASING_CHANNELS.changeSupplierLink, (request): ChangeSupplierLinkResult => suppliers.changeLink(parseChangeSupplierLinkRequest(request)));
+  answerSignedIn(PURCHASING_CHANNELS.findDraftsWithProduct, (ref): DraftOrderRef[] => suppliers.draftsWithProduct(parseSupplierProductRef(ref)));
+  answerSignedIn(PURCHASING_CHANNELS.unlinkSupplier, (request): UnlinkSupplierResult => suppliers.unlink(parseUnlinkSupplierRequest(request)));
   answerSignedIn(PURCHASING_CHANNELS.searchOrderProducts, (request): OrderCandidate[] => orders.search(parseSearchOrderProductsRequest(request)));
   answerSignedIn(PURCHASING_CHANNELS.suggestOrderProducts, (supplierId): OrderCandidate[] => orders.suggest(parseUuid(supplierId, 'a supplier')));
   answerSignedIn(PURCHASING_CHANNELS.setReorderLevel, (request): SetReorderLevelResult => orders.setReorderLevel(parseSetReorderLevelRequest(request)));
