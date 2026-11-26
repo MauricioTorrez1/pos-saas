@@ -4,7 +4,7 @@ Actualizado: 2026-11-26. Estados: Pendiente, En curso, En revisión, Terminada, 
 
 ## Estado actual
 - **Tarea en curso:** ninguna. La caja ya reemplaza a Eleventa en lo diario: venta, cobro, caja con fondo y corte, devoluciones, inventario, proveedores y pedidos, listas de precios, resumen, estado de resultados y reportes, y captura de días atrasados retomando la caja sin corte (E1-60, E1-61), y productos dados de baja que liberan sus códigos (E1-62). Las tareas de E1-48 a E1-63 están en revisión hasta que Mauricio las pruebe en la tienda; lo que falta está en `docs/plan/pendiente.md`.
-- **Siguiente:** instalar en la tienda la versión que junte E1-58 a E1-61 y recorrer la lista de pruebas de abajo; después, el lote que apruebe Mauricio (factura global, cancelación, prueba de punta a punta). Para usar el servidor hace falta F0-24 y F0-25, que necesitan proveedor y dominio.
+- **Siguiente:** instalar en la tienda la caja 0.2.15 (E1-58 a E1-63 y F2-07) y recorrer la lista de pruebas de abajo; revisar con el contador la factura global (E1-32) y los motivos de cancelación (E1-33); crear las cuentas de Google Cloud, Supabase y Cloudflare y correr `terraform apply` según `docs/despliegue-en-la-nube.md` (F0-24 y F0-25 ya están en `main`, sin nada en producción); después, la Entrega 2.
 - **Rellenos temporales:** ninguno. E1-05 quitó `ci-smoke`.
 - **Bloqueos:** exportación de Eleventa sin probar; lista de Issues sin aprobar; E1-01 sin probar en Windows 10, porque la PC de la tienda no está a la mano. Los pendientes de la tienda están en una nota local, fuera de Git.
 
