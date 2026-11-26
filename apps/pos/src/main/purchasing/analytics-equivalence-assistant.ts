@@ -34,7 +34,7 @@ function readGroups(body: unknown): AssistGroup[] | null {
 
 /**
  * Asks the analytics service (`POST /catalog-matching/group`) to group the items the rules of the register could not
- * (E1-63, ADR 0078). The register signs in with its own token, `Authorization: Device`, which never appears in a message or
+ * (E1-63, ADR 0079). The register signs in with its own token, `Authorization: Device`, which never appears in a message or
  * a log. Without internet it answers a failure in Spanish and the owner keeps the proposals of the rules.
  */
 export class AnalyticsEquivalenceAssistant implements EquivalenceAssistant {

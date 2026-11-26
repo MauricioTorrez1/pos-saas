@@ -378,7 +378,7 @@ describe('the cut (RF-027)', () => {
 });
 
 describe('the database refuses what the rules forbid', () => {
-  it('refuses a second open session and a sale in a closed one', () => {
+  it('refuses a second open session of the same day and a sale in a closed one', () => {
     cash.open(0);
     const session = cash.openSessionId()!;
     expect(() =>
@@ -387,7 +387,7 @@ describe('the database refuses what the rules forbid', () => {
           uuidV7(),
           TENANT,
           owner.id,
-          '2026-11-08T00:00:00.000Z',
+          new Date().toISOString(),
         );
       }),
     ).toThrow(/UNIQUE/);

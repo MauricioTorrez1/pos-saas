@@ -7,6 +7,7 @@ import {
   type ExpectedCut,
 } from '../../shared/cash';
 import type {
+  AmendedCut,
   CashCut,
   CashMovementRequest,
   CashMovementResult,
@@ -19,7 +20,17 @@ import type { UserSummary } from '../../shared/auth';
 import { captureDayLabel } from '../../shared/capture-day';
 import type { AuditEntry } from '../audit/audit-log';
 import type { AuthService } from '../auth/auth-service';
-import type { CashSessionStore } from './cash-session-store';
+import type { CashSessionStore, OpenSessionRow } from './cash-session-store';
+
+type CashAuth = Pick<AuthService, 'currentUser' | 'authorizeWithOwnerPin'> & Partial<Pick<AuthService, 'captureDay' | 'workDay'>>;
+
+function addCuts(first: ExpectedCut, second: ExpectedCut): ExpectedCut {
+  return {
+    cashCents: first.cashCents + second.cashCents,
+    cardCents: first.cardCents + second.cardCents,
+    transferCents: first.transferCents + second.transferCents,
+  };
+}
 
 const WITHDRAWAL_LIMIT_SETTING = 'cash_withdrawal_limit_cents';
 
@@ -44,15 +55,16 @@ function requireReason(reason: string): string {
  */
 export class CashService {
   readonly #store: CashSessionStore;
-  readonly #auth: Pick<AuthService, 'currentUser' | 'authorizeWithOwnerPin'> & Partial<Pick<AuthService, 'captureDay'>>;
+  readonly #auth: CashAuth;
   readonly #audit: { record(entry: AuditEntry): void } | null;
 
   /**
    * @param store where the sessions are kept
-   * @param auth who is signed in, the check of an owner's PIN, and the past day the session captures (E1-60)
+   * @param auth who is signed in, the check of an owner's PIN, the past day the session captures (E1-60) and the day whose
+   *   cash the person works on (E1-61)
    * @param audit where the opening of each shift is written, with who and how much (E1-54)
    */
-  constructor(store: CashSessionStore, auth: Pick<AuthService, 'currentUser' | 'authorizeWithOwnerPin'> & Partial<Pick<AuthService, 'captureDay'>>, audit: { record(entry: AuditEntry): void } | null = null) {
+  constructor(store: CashSessionStore, auth: CashAuth, audit: { record(entry: AuditEntry): void } | null = null) {
     this.#store = store;
     this.#auth = auth;
     this.#audit = audit;
@@ -65,7 +77,7 @@ export class CashService {
    */
   status(): CashStatus {
     const limit = this.#withdrawalLimit();
-    const session = this.#store.findOpen(this.#captureDay());
+    const session = this.#store.findOpen(this.#workDay());
     if (session === null) {
       return { session: null, totals: null, expected: null, withdrawalLimitCents: limit, shouldWithdraw: false };
     }
@@ -78,6 +90,8 @@ export class CashService {
         openedAt: session.openedAt,
         openingFloatCents: session.openingFloatCents,
         businessDay: session.businessDay,
+        sessionDay: session.sessionDay,
+        isSupplementary: session.businessDay !== null,
       },
       totals,
       expected,
@@ -88,15 +102,18 @@ export class CashService {
 
   /**
    * @returns the id of the open session of the day this person works on, or null. Sales are only made while there is one,
-   *   so a backdated capture sells into its own session and never into today's drawer (E1-60).
+   *   so a backdated capture sells into its own session and never into today's drawer (E1-60), and a past day that was
+   *   resumed sells into the session it left without a cut (E1-61).
    */
   openSessionId(): string | null {
-    return this.#store.findOpen(this.#captureDay())?.id ?? null;
+    return this.#store.findOpen(this.#workDay())?.id ?? null;
   }
 
   /**
-   * Opens the register with the cash the cashier puts in the drawer (RF-024). A backdated capture opens a session of its
-   * own for its day, with its own float and cut, and the audit log says so (E1-60).
+   * Opens the register with the cash the cashier puts in the drawer (RF-024). A backdated capture of a day with no open
+   * session opens one of its own for that day, with its own float and cut, and the audit log says so (E1-60). When that day
+   * was already cut, the new session is a supplementary capture tied to its last cut, which it amends (E1-61). A past day
+   * that still has its unfinished session never gets a second one: it is resumed instead, so this answers `already_open`.
    *
    * @param floatCents the float, which may be zero
    * @returns `opened`, or `already_open` if somebody did already, because there is one session at a time
@@ -107,10 +124,12 @@ export class CashService {
     const user = this.#requireUser();
     requireCents(floatCents, 'the float', 0);
     const businessDay = this.#captureDay();
-    if (this.#store.findOpen(businessDay) !== null) {
+    if (this.#store.findOpen(this.#workDay()) !== null) {
       return { status: 'already_open', cash: this.status() };
     }
-    const backdated = businessDay === null ? '' : ` para capturar las ventas atrasadas del ${captureDayLabel(businessDay)}`;
+    const amendsCutId = businessDay === null ? null : (this.#store.cutsByDaySince(businessDay).get(businessDay)?.at(-1) ?? null);
+    const supplementary = amendsCutId === null ? '' : ' en una captura suplementaria de un día que ya tenía corte';
+    const backdated = businessDay === null ? '' : ` para capturar las ventas atrasadas del ${captureDayLabel(businessDay)}${supplementary}`;
     this.#store.open(
       user.id,
       floatCents,
@@ -123,6 +142,7 @@ export class CashService {
           detail: `${user.name} abrió la caja con un fondo de ${floatCents} centavos${backdated}`,
         }),
       businessDay,
+      amendsCutId,
     );
     return { status: 'opened', cash: this.status() };
   }
@@ -139,7 +159,7 @@ export class CashService {
     const user = this.#requireUser();
     requireCents(request.amountCents, 'an amount', 1);
     const reason = requireReason(request.reason);
-    const session = this.#store.findOpen(this.#captureDay());
+    const session = this.#store.findOpen(this.#workDay());
     if (session === null) {
       return { status: 'no_session' };
     }
@@ -159,7 +179,9 @@ export class CashService {
   }
 
   /**
-   * Makes the cut with what was counted, and closes the register (RF-027). A cut that does not balance needs a reason.
+   * Makes the cut with what was counted, and closes the register (RF-027). A cut that does not balance needs a reason. A
+   * resumed session of a past day is cut as usual and the audit log says it was finished late; a supplementary capture
+   * answers with the cut it amends and the day added up, and the original cut never changes (E1-61).
    *
    * @param request the bills and coins, the card and transfer vouchers, and the reason if it does not balance
    * @returns `closed` with the cut, or why not
@@ -175,7 +197,7 @@ export class CashService {
       cardCents: request.cardCountedCents,
       transferCents: request.transferCountedCents,
     };
-    const session = this.#store.findOpen(this.#captureDay());
+    const session = this.#store.findOpen(this.#workDay());
     if (session === null) {
       return { status: 'no_session' };
     }
@@ -203,6 +225,16 @@ export class CashService {
         detail: `${user.name} hizo el corte suplementario de las ventas atrasadas del ${captureDayLabel(session.businessDay)}`,
       });
     }
+    const resumedDay = this.#resumedDay(session);
+    if (resumedDay !== null) {
+      this.#audit?.record({
+        userId: user.id,
+        action: 'cash_session.closed_resumed',
+        entity: 'cash_session',
+        entityId: session.id,
+        detail: `${user.name} hizo el corte de la caja del ${captureDayLabel(resumedDay)} que abrió ${session.openedByName} y quedó sin corte`,
+      });
+    }
     const cut: CashCut = {
       ...comparison,
       id: saved.id,
@@ -210,6 +242,8 @@ export class CashService {
       cutBy: user.name,
       reason: comparison.isBalanced ? null : reason,
       businessDay: session.businessDay,
+      resumedDay,
+      amends: this.#amendedCut(session.amendsCutId, expected, counted),
     };
     return { status: 'closed', cut };
   }
@@ -239,6 +273,32 @@ export class CashService {
 
   #captureDay(): string | null {
     return this.#auth.captureDay?.() ?? null;
+  }
+
+  /** The day whose cash the person works on, or null for today by the clock. */
+  #workDay(): string | null {
+    return this.#auth.workDay?.() ?? this.#captureDay();
+  }
+
+  /** The past day of a session that was resumed: one of today's kind that opened on the day being captured. */
+  #resumedDay(session: OpenSessionRow): string | null {
+    const captureDay = this.#captureDay();
+    return session.businessDay === null && captureDay !== null && session.sessionDay === captureDay ? captureDay : null;
+  }
+
+  /** The report of a supplementary cut: the cut it amends, untouched, and both together. */
+  #amendedCut(amendsCutId: string | null, expected: ExpectedCut, counted: ExpectedCut): AmendedCut | null {
+    const original = amendsCutId === null ? null : this.#store.findCut(amendsCutId);
+    if (original === null) {
+      return null;
+    }
+    return {
+      cutId: original.id,
+      cutAt: original.cutAt,
+      cutBy: original.cutByName,
+      original: { expected: original.expected, counted: original.counted },
+      combined: { expected: addCuts(original.expected, expected), counted: addCuts(original.counted, counted) },
+    };
   }
 
   #requireUser(): UserSummary {

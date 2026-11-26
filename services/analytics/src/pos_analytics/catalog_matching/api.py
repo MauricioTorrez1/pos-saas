@@ -1,4 +1,4 @@
-"""HTTP endpoint that groups equivalent products of different supplier catalogs (E1-63, ADR 0078).
+"""HTTP endpoint that groups equivalent products of different supplier catalogs (E1-63, ADR 0079).
 
 Nothing is stored and nothing about the items is logged: they live only for the request.
 """

@@ -4,7 +4,7 @@ import { useState, type ReactElement } from 'react';
 import { captureDayLabel } from '../../shared/capture-day';
 import type { UserSummary } from '../../shared/auth';
 import { countCash, DENOMINATIONS_CENTS } from '../../shared/cash';
-import type { CashCut, CashMovementKind, CashStatus, CutComparisonView } from '../../shared/cash-api';
+import type { AmendedCut, CashCut, CashMovementKind, CashStatus, CutComparisonView } from '../../shared/cash-api';
 import type { PosApi } from '../../shared/pos-api';
 import { readTypedCents } from '../checkout/amount-input';
 import { formatSignedCents } from '../sale/format';
@@ -88,7 +88,16 @@ export function CashDialog({ posApi, user, status, onStatusChange, onClose, mode
       {view.kind === 'movement' && (
         <MovementView posApi={posApi} user={user} movement={view.movement} onStatusChange={onStatusChange} onBack={back} />
       )}
-      {view.kind === 'close' && <CloseView posApi={posApi} captureDay={captureDay} onStatusChange={onStatusChange} onBack={back} onCut={(cut) => setView({ kind: 'cut', cut })} />}
+      {view.kind === 'close' && (
+        <CloseView
+          posApi={posApi}
+          captureDay={captureDay}
+          isSupplementary={status.session?.isSupplementary ?? captureDay !== null}
+          onStatusChange={onStatusChange}
+          onBack={back}
+          onCut={(cut) => setView({ kind: 'cut', cut })}
+        />
+      )}
       {view.kind === 'cut' && <CutView cut={view.cut} onDone={mode === 'exit_cut' && onCutDone !== undefined ? onCutDone : onClose} />}
       {view.kind === 'limit' && <LimitView posApi={posApi} onStatusChange={onStatusChange} onBack={back} current={status.withdrawalLimitCents} />}
     </ModalDialog>
@@ -186,6 +195,12 @@ function SummaryView({ posApi, user, status, onStatusChange, onClose, onGo, isOp
       <p className="quantity-price">
         Abrió {session.openedBy} · {MOMENT.format(new Date(session.openedAt))} · Fondo {formatCents(session.openingFloatCents)}
       </p>
+      {captureDay !== null && session.isSupplementary === false && (
+        <p className="notice login-backdated">
+          Retomaste la caja sin corte del {captureDayLabel(captureDay)}: el mismo fondo y el mismo corte. Las ventas que agregues
+          cuentan en ese día.
+        </p>
+      )}
       {isOwner && totals !== null && expected !== null && (
         <dl className="summary-rows" aria-label="Resumen de la caja">
           <div>
@@ -311,12 +326,21 @@ function describeMovementRefusal(result: Exclude<Awaited<ReturnType<PosApi['reco
 interface CloseViewProps {
   readonly posApi: PosApi;
   readonly captureDay: string | null;
+  /** True for a separate capture of a past day; false for a session of that day that was resumed (E1-61). */
+  readonly isSupplementary: boolean;
   readonly onStatusChange: (status: CashStatus) => void;
   readonly onBack: () => void;
   readonly onCut: (cut: CashCut) => void;
 }
 
-function CloseView({ posApi, captureDay, onStatusChange, onBack, onCut }: CloseViewProps): ReactElement {
+function closeTitle(captureDay: string | null, isSupplementary: boolean): string {
+  if (captureDay === null) {
+    return 'Corte de caja';
+  }
+  return isSupplementary ? `Corte suplementario del ${captureDayLabel(captureDay)}` : `Corte de caja del ${captureDayLabel(captureDay)}`;
+}
+
+function CloseView({ posApi, captureDay, isSupplementary, onStatusChange, onBack, onCut }: CloseViewProps): ReactElement {
   const [counts, setCounts] = useState<Record<number, string>>({});
   const [cardText, setCardText] = useState('');
   const [transferText, setTransferText] = useState('');
@@ -368,7 +392,7 @@ function CloseView({ posApi, captureDay, onStatusChange, onBack, onCut }: CloseV
 
   return (
     <>
-      <h2 id="cash-title">{captureDay === null ? 'Corte de caja' : `Corte suplementario del ${captureDayLabel(captureDay)}`}</h2>
+      <h2 id="cash-title">{closeTitle(captureDay, isSupplementary)}</h2>
       <p>Cuenta lo que hay en el cajón, billete por billete, y lo que marcan los vouchers.</p>
       <div className="cash-counts">
         {DENOMINATIONS_CENTS.map((denomination) => (
@@ -429,6 +453,42 @@ function Differences({ comparison }: { readonly comparison: CutComparisonView })
   );
 }
 
+/** The cut of the day that a supplementary one amends, untouched, and the day added up (E1-61, ADR 0078). */
+function AmendedReport({ amends }: { readonly amends: AmendedCut }): ReactElement {
+  const rows = [
+    ['Efectivo', 'cashCents'],
+    ['Tarjeta', 'cardCents'],
+    ['Transferencias', 'transferCents'],
+  ] as const;
+  return (
+    <section aria-label="Corte corregido del día">
+      <p>
+        Complementa el corte de {amends.cutBy} del {MOMENT.format(new Date(amends.cutAt))}, que no cambia. El día queda así:
+      </p>
+      <table className="cash-differences">
+        <thead>
+          <tr>
+            <th scope="col">Forma de pago</th>
+            <th scope="col">Corte original</th>
+            <th scope="col">Día completo esperado</th>
+            <th scope="col">Día completo contado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([name, key]) => (
+            <tr key={name}>
+              <th scope="row">{name}</th>
+              <td>{formatSignedCents(amends.original.expected[key])}</td>
+              <td>{formatSignedCents(amends.combined.expected[key])}</td>
+              <td>{formatSignedCents(amends.combined.counted[key])}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 function formatDifference(differenceCents: number): string {
   if (differenceCents === 0) {
     return 'Cuadra';
@@ -443,9 +503,11 @@ function CutView({ cut, onDone }: { readonly cut: CashCut; readonly onDone: () =
       <h2 id="cash-title">Caja cerrada</h2>
       <p className="quantity-price">
         Corte de {cut.cutBy} · {MOMENT.format(new Date(cut.cutAt))}
+        {cut.resumedDay != null && ` · Caja del ${captureDayLabel(cut.resumedDay)}`}
       </p>
       <Differences comparison={cut} />
       {cut.reason !== null && <p>Motivo: {cut.reason}</p>}
+      {cut.amends != null && <AmendedReport amends={cut.amends} />}
       <p className="payment-change" role="status" aria-label="Resultado del corte">
         {cut.isBalanced ? 'El corte cuadra' : 'El corte quedó con diferencia'}
       </p>

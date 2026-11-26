@@ -656,13 +656,22 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué guardar dos fechas en una venta en lugar de corregir la que tiene? (2) ¿Cómo agregas un campo a un contrato de sincronización sin romper a los clientes que ya existen?
 
+### E1-61 · Retomar la caja sin corte de un día atrasado
+- **Objetivo:** cuando la cajera o el dueño no alcanzaron a registrar todas las ventas de un día y salieron sin corte, al entrar eligen ese día en «Día de captura» y **retoman esa misma caja** (mismo id, mismo fondo, sin sesión nueva), agregan las ventas que faltaron en ese día y hacen su corte. Un día ya cortado no abre nada en silencio: ofrece una captura suplementaria ligada a su corte, con el corte corregido del día. La caja de hoy nunca se mezcla.
+- **Conceptos:** [Día de la sesión contra día de la venta], [Reanudar en lugar de duplicar], [Corrección por adición (append-only)], [Disparador que completa un valor por defecto], [Índice único parcial]
+- **Claude / tú:** Claude escribe la migración local 25 (`session_day`, `amends_cut_id`, índice y disparadores), la lista de días con su estado, la reanudación en la entrada, el día de la venta, el corte corregido, la pantalla y las pruebas. Tú pruebas en la tienda salir sin corte, retomar ese día al siguiente y cuadrar el corte.
+- **Pruebas:** Vitest de la lista de días (caja sin corte, días cortados, cajas viejas fuera de la ventana), de retomar (mismo id y fondo, sin sesión nueva, día de la venta, vendedor y bitácora), del corte de la sesión retomada, del día cortado (rechazo sin la marca, captura suplementaria ligada al corte, corte original intacto y corte corregido), de una sesión a la vez, de la migración de las sesiones abiertas y de la pantalla de entrada; Playwright de salir sin corte, entrar a ayer, agregar una venta y cortar.
+- **Criterios:** ADR 0078, que reemplaza parte de la 0076; nada se edita ni se borra; la regla del PIN del dueño de E1-60 sigue; la caja vende en efectivo sin internet.
+- **Depende de:** E1-54, E1-60 · **Estimación:** 5 h
+- **Autoevaluación:** (modo automático: no aplica)
+- **Entrevista:** (1) ¿Por qué guardar el día de una sesión en una columna en lugar de calcularlo en cada consulta? (2) ¿Cómo corriges un registro inmutable, como un corte de caja, sin editarlo?
 
 ### E1-63 · Productos equivalentes entre catálogos de proveedores
 - **Objetivo:** el dueño compara el precio de un mismo producto aunque cada proveedor lo escriba distinto y con otro código («BROCAS HSS 1/4"» y «Broca de alta velocidad 6.35 mm»): la caja propone grupos equivalentes sin internet, la IA ayuda si hay conexión, el dueño aprueba cada uno y el comparador los muestra juntos; el lector de catálogos en papel acepta también PDF escaneados.
 - **Conceptos:** [Normalización de texto], [Diccionario de sinónimos], [Extracción de atributos], [IDF y coeficiente de Dice], [Bloqueo para no comparar todo contra todo], [Union-find], [Decisiones de solo agregar], [Humano en el ciclo]
 - **Claude / tú:** Claude escribe las reglas, la migración, el servicio, la pantalla, el comparador, el endpoint de analítica, el PDF y las pruebas. Tú importas dos listas reales, revisas las propuestas y anotas cuáles salieron mal.
 - **Pruebas:** Vitest de la normalización, el singular, los sinónimos, las medidas (1/4" = 6.35 mm, 1/4" ≠ 6 mm, 1/4 ≠ 3/8), los conflictos (HSS contra cobalto, madera contra concreto, phillips contra plano), el puntaje, los grupos, los rechazos y los sinónimos del dueño; del servicio (aprobación inmutable, memoria al reimportar, piezas desde la descripción, veto de la IA, nada de costos ni nombres en lo que se envía) y de la pantalla; pytest del endpoint con Claude simulado, de la llave de dispositivo y del PDF (hojas de más, firma falsa); Playwright de aprobar una propuesta y verla en «Comparar precios», y de subir un PDF en el panel.
-- **Criterios:** ADR 0078; funciona sin internet; nada se edita ni se borra; la IA nunca recibe costos ni nombres de proveedores y nunca aprueba sola; dinero en enteros.
+- **Criterios:** ADR 0079; funciona sin internet; nada se edita ni se borra; la IA nunca recibe costos ni nombres de proveedores y nunca aprueba sola; dinero en enteros.
 - **Depende de:** E1-52, E1-53 · **Estimación:** 8 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Cómo evitas comparar cada artículo contra todos los demás en una lista de 20,000? (2) ¿Por qué guardar la decisión del dueño con el código del proveedor y no con el id del renglón?

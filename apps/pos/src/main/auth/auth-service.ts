@@ -1,5 +1,6 @@
 import { MAX_USER_NAME_LENGTH, type LoginResult, type UserRole, type UserSummary } from '../../shared/auth';
-import { captureDayLabel, type CaptureDayRequest } from '../../shared/capture-day';
+import { captureDayLabel, type CaptureDayRequest, type PastCaptureDay } from '../../shared/capture-day';
+import { formatCents } from '@pos-saas/money';
 import type { AuditEntry } from '../audit/audit-log';
 import { hashPin, verifyPin } from './pin-hasher';
 import type { UserCredentials, UserStore } from './user-store';
@@ -22,6 +23,8 @@ export type OwnerAuthorization =
 export interface CaptureDayPolicy {
   /** @returns the days a session may capture, today first */
   allowed(): string[];
+  /** @returns how each past day stands: its unfinished session and its cuts (E1-61) */
+  pastDays?(): PastCaptureDay[];
 }
 
 /** What else the sign-in needs besides the people. */
@@ -44,6 +47,7 @@ export class AuthService {
   readonly #audit: { record(entry: AuditEntry): void } | null;
   #current: UserSummary | null = null;
   #captureDay: string | null = null;
+  #signInDay: string | null = null;
 
   /**
    * @param users where the people and their hashes are kept
@@ -77,9 +81,22 @@ export class AuthService {
     return this.#current === null ? null : this.#captureDay;
   }
 
+  /**
+   * @returns the day whose cash this person works on: the past day they capture, or the day they signed in, so a shift that
+   *   goes past midnight keeps its drawer (E1-61). Null when nobody is signed in or the register has no policy of days.
+   */
+  workDay(): string | null {
+    return this.#current === null ? null : (this.#captureDay ?? this.#signInDay);
+  }
+
   /** @returns the days the sign-in offers, today first; none when the register has no policy, so it only sells today */
   captureDayOptions(): string[] {
     return this.#captureDays?.allowed() ?? [];
+  }
+
+  /** @returns how each past day the sign-in offers stands, so the screen says what choosing it does (E1-61) */
+  pastCaptureDays(): PastCaptureDay[] {
+    return this.#captureDays?.pastDays?.() ?? [];
   }
 
   /**
@@ -118,7 +135,9 @@ export class AuthService {
   /**
    * Signs a person in, to sell today or to capture the sales of a recent past day (E1-60, ADR 0076). A past day must be
    * one the policy offers, and needs the approval of an owner: the owner who signs in gives it, and a cashier types the PIN
-   * of one. Nobody is signed in when anything is refused.
+   * of one. A past day left without its cut is resumed: the cash works on that very session. A day that was already cut
+   * and has no unfinished session asks first, and only a sign-in that agrees to a supplementary capture goes on (E1-61,
+   * ADR 0078). Nobody is signed in when anything is refused.
    *
    * @param userId the person
    * @param pin what they typed
@@ -134,6 +153,11 @@ export class AuthService {
     if (pastDay === undefined) {
       return { status: 'day_out_of_range' };
     }
+    const dayState = pastDay === null ? undefined : this.pastCaptureDays().find(({ day }) => day === pastDay);
+    const isCutDay = dayState !== undefined && dayState.unfinished === null && dayState.cutCount > 0;
+    if (isCutDay && capture?.supplementary !== true) {
+      return { status: 'day_already_cut' };
+    }
     const attempt = this.#check(credentials, pin);
     if (attempt.status !== 'ok') {
       return attempt;
@@ -148,13 +172,27 @@ export class AuthService {
     }
     this.#current = { id: credentials.id, name: credentials.name, role: credentials.role };
     this.#captureDay = pastDay;
+    this.#signInDay = this.#captureDays?.allowed()[0] ?? null;
     if (pastDay !== null) {
+      const kind = isCutDay ? ' en una captura suplementaria, porque ese día ya tiene corte' : '';
       this.#audit?.record({
         userId: credentials.id,
         action: 'session.backdated_capture',
         entity: 'business_day',
         entityId: pastDay,
-        detail: `${credentials.name} entró a capturar las ventas del ${captureDayLabel(pastDay)}; autorizó ${approvedBy}`,
+        detail: `${credentials.name} entró a capturar las ventas del ${captureDayLabel(pastDay)}${kind}; autorizó ${approvedBy}`,
+      });
+    }
+    const unfinished = dayState?.unfinished ?? null;
+    if (pastDay !== null && unfinished !== null) {
+      this.#audit?.record({
+        userId: credentials.id,
+        action: 'cash_session.resumed',
+        entity: 'cash_session',
+        entityId: unfinished.sessionId,
+        detail:
+          `${credentials.name} retomó la caja sin corte del ${captureDayLabel(pastDay)} que abrió ${unfinished.openedBy} ` +
+          `con un fondo de ${formatCents(unfinished.openingFloatCents)}; autorizó ${approvedBy}`,
       });
     }
     return { status: 'ok', user: this.#current };
@@ -191,6 +229,7 @@ export class AuthService {
   logout(): void {
     this.#current = null;
     this.#captureDay = null;
+    this.#signInDay = null;
   }
 
   /**

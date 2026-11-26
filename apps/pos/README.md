@@ -152,7 +152,7 @@ In the suppliers, the owner picks a supplier and presses **F5** "Lista de precio
 | Orders | **F2** "Crear pedidos" makes one draft per supplier through the usual order save (same owner PIN rules, audit and folio), with the note "Armado en el comparador de precios". |
 | PDF | **F5** saves product code, product, quantity, chosen price and supplier, lowest price and its supplier, the total, the possible savings, and two SVG bar charts: products and spend per supplier. |
 ## Equivalent products
-**F7** "Productos equivalentes" in the suppliers (owner only) finds the items of different suppliers that are the same product even when they are written differently and have other codes: «BROCAS HSS 1/4" P/METAL» and «Broca de alta velocidad 6.35 mm» ([ADR 0078](../../docs/adr/0078-productos-equivalentes-entre-catalogos.md)).
+**F7** "Productos equivalentes" in the suppliers (owner only) finds the items of different suppliers that are the same product even when they are written differently and have other codes: «BROCAS HSS 1/4" P/METAL» and «Broca de alta velocidad 6.35 mm» ([ADR 0079](../../docs/adr/0079-productos-equivalentes-entre-catalogos.md)).
 
 | Rule | How it works |
 | --- | --- |
@@ -257,7 +257,7 @@ Nothing works until a person enters with a PIN of four to eight digits, with or 
 
 ### Opening float and closing the register
 
-Signing in with the cash closed opens "Abrir la caja" for the opening float ([ADR 0070](../../docs/adr/0070-fondo-de-caja-al-entrar-y-corte-al-salir.md)). A cashier cannot skip it. The owner also sees **Solo administrar** (Esc): products, the summary and the suppliers work, but a sale cannot be charged, and a banner with **Abrir caja** stays until the cash opens. A session that is already open, from another shift or from before a restart, is not asked again, and the header says who opened it and when. Every opening goes to the audit log with who and how much.
+Signing in with the cash closed opens "Abrir la caja" for the opening float ([ADR 0070](../../docs/adr/0070-fondo-de-caja-al-entrar-y-corte-al-salir.md)). A cashier cannot skip it. The owner also sees **Solo administrar** (Esc): products, the summary and the suppliers work, but a sale cannot be charged, and a banner with **Abrir caja** stays until the cash opens. A session of today that is already open, from another shift or from before a restart, is not asked again, and the header says who opened it and when. A session left open on a past day is never today's drawer: today gets a new one, and the sign-in says which days still have a cash without its cut. Every opening goes to the audit log with who and how much.
 
 Closing the window with the cash open (the X, Alt+F4 or the menu) asks first: **Hacer corte de caja** (F2) opens the cut and closes the register after it, **No hacer corte y salir** (F4) leaves the session open and writes it to the audit log, and Esc goes back to work. The main process decides it in the `close` event, so a frozen or crashed screen, or Windows shutting down, never blocks the close; every sale is already committed to SQLite, and the audit log records why the session stayed open.
 
@@ -268,7 +268,10 @@ Some days not every sale gets rung up. The next morning, the sign-in screen offe
 | --- | --- |
 | Who | A past day needs an owner: the owner who signs in approves it, and a cashier types the PIN of an owner too. A refusal signs nobody in. The sign-in is in the audit log (`session.backdated_capture`) |
 | Banner | The whole session shows «Capturando ventas del martes 17 de noviembre» in the warning color, so nobody rings up today's sales into it |
-| Cash | The capture opens a cash session of its own for that day, with its float and its **supplementary cut**, apart from today's drawer (both can be open). Returns and expenses paid from the drawer always use today's drawer |
+| Day list | Each past day says «· caja sin corte» when its session was left without a cut, or «· ya tiene corte». A day with a cash without its cut is offered even past the 7 days ([ADR 0078](../../docs/adr/0078-retomar-la-caja-sin-corte-de-un-dia-atrasado.md)) |
+| Resume | Choosing a day with a cash without its cut **resumes that same session**: same id, same float, no new float asked, `cash_session.resumed` in the audit log. Its sales are recorded under the person who rings them up, and finishing is its usual cut («Corte de caja del …»). Leaving again without a cut keeps it waiting |
+| Cut day | A day already cut opens nothing on its own: the sign-in explains it and asks to tick «Agregar una captura suplementaria». That session is tied to the last cut of the day (`amends_cut_id`), and its **supplementary cut** shows the original cut untouched and the whole day added up |
+| No cash that day | The capture opens a session of its own for that day, with its float and its cut, apart from today's drawer (both can be open). Returns and expenses paid from the drawer always use today's drawer |
 | Sales | A sale keeps the real moment it was recorded and adds `business_day` and `business_at` (the same local hour on that day). The summary, top sellers, hours, income statement and daily report count it on its day; its stock movements and the kardex carry the day too |
 | Ticket | Prints «Captura atrasada del …» under the folio, also on a reprint |
 | Sync | `sale.completed`, `cash_session.opened` and `cash_session.closed` carry an optional `businessDate`; the core stores it and falls back to the local day when it is absent |

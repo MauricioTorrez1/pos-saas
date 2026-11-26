@@ -1,4 +1,4 @@
-# ADR 0078: Productos equivalentes entre catálogos de proveedores
+# ADR 0079: Productos equivalentes entre catálogos de proveedores
 
 Estado: Aceptada · Fecha: 2026-11-25 · Concreta E1-63. Se apoya en los ADR 0011 (dinero en enteros), 0047 (`OwnerGate`), 0068 (listas de precios y comparador) y 0069 (catálogos en papel con Claude).
 
@@ -14,7 +14,7 @@ El comparador de E1-52 agrupa por producto: solo compara dos ofertas si las dos 
 4. **Puntaje de 0 a 100:** 70 % palabras en común pesadas por qué tan raras son (IDF, frecuencia inversa) y 30 % medidas en común. Da 0 si hay **conflicto**: una medida distinta (con 1 % de tolerancia, así 1/4" = 6.35 mm pero 1/4" ≠ 6 mm) o dos materiales, usos o puntas distintas (HSS contra cobalto, madera contra concreto, phillips contra plano). Si la primera palabra (la clase de producto) cambia, el puntaje se multiplica por 0.6, para que «llave 1/2» no se junte con «broca 1/2».
 5. **Propuestas:** desde 60 se propone y desde 80 se marca «Muy probable». Se comparan solo pares que comparten una palabra (y se ignoran las que aparecen en más de 1,500 artículos), y se agrupan de mayor a menor puntaje con a lo más un artículo por proveedor. Los grupos aprobados y los artículos del mismo producto empiezan juntos; dos grupos aprobados nunca se funden solos.
 
-**El dueño decide cada propuesta.** «Productos equivalentes» (F7 en proveedores, solo el dueño) muestra cada propuesta con su puntaje, la razón («Coinciden: broca, hss, 1/4" = 6.35 mm»), una casilla por artículo y el nombre del grupo. «Aprobar», «No son iguales» y «Quitar» se guardan en `catalog_match_decision` (migración 25): una tabla **de solo agregar** (disparadores rechazan `UPDATE` y `DELETE`), con `join`, `leave`, `reject` y `name`. El estado actual sale de dos vistas que leen la última decisión de cada artículo. Cada artículo se identifica por **proveedor + código del proveedor**, no por el id del renglón, así que al reimportar la lista del proveedor el grupo y los rechazos siguen valiendo. Cada decisión va también a la bitácora (`catalog_equivalence.approve`, `.reject`, `.remove`, `catalog_synonym.add`, `.remove`).
+**El dueño decide cada propuesta.** «Productos equivalentes» (F7 en proveedores, solo el dueño) muestra cada propuesta con su puntaje, la razón («Coinciden: broca, hss, 1/4" = 6.35 mm»), una casilla por artículo y el nombre del grupo. «Aprobar», «No son iguales» y «Quitar» se guardan en `catalog_match_decision` (migración 26): una tabla **de solo agregar** (disparadores rechazan `UPDATE` y `DELETE`), con `join`, `leave`, `reject` y `name`. El estado actual sale de dos vistas que leen la última decisión de cada artículo. Cada artículo se identifica por **proveedor + código del proveedor**, no por el id del renglón, así que al reimportar la lista del proveedor el grupo y los rechazos siguen valiendo. Cada decisión va también a la bitácora (`catalog_equivalence.approve`, `.reject`, `.remove`, `catalog_synonym.add`, `.remove`).
 
 **La IA es opcional y nunca decide.** Con internet y con `POS_ANALYTICS_URL` y `POS_ANALYTICS_TOKEN` configurados, «Pedir ayuda a la IA» (F4) manda al servicio de analítica hasta 120 artículos que las reglas no agruparon: solo descripción, unidad y piezas, con el proveedor como letra (P1, P2…). **Nunca viajan costos ni nombres de proveedores.** `POST /catalog-matching/group` pregunta a `claude-opus-5-5` con salida JSON estructurada y devuelve grupos con su razón en español; el servicio quita grupos imposibles y la caja **veta** los que las reglas ven en conflicto, los rechazados por el dueño y los que repiten proveedor. Lo que queda se muestra como «Propuesta de la IA» y se aprueba igual que las demás. Sin internet o sin llave, el botón no aparece o dice por qué, y las reglas siguen funcionando.
 
@@ -34,6 +34,6 @@ El comparador de E1-52 agrupa por producto: solo compara dos ofertas si las dos 
 
 ## Consecuencias
 - El comparador muestra juntos productos que nunca se ligaron, con nombre y razón, y lo decidido sobrevive a cada nueva lista.
-- La migración 25 solo agrega tablas, vistas, índices y disparadores; una base vieja se lee igual.
+- La migración 26 solo agrega tablas, vistas, índices y disparadores; una base vieja se lee igual.
 - La ayuda de la IA cuesta unos centavos por petición y solo se usa cuando el dueño la pide.
 - Una descripción sin medida ni palabras raras («tornillo») no se propone: las reglas prefieren callar a equivocarse.

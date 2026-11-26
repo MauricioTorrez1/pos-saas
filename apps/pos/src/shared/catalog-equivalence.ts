@@ -1,4 +1,4 @@
-/** Equivalent products across supplier catalogs (E1-63, ADR 0078): what the screen and the main process exchange. */
+/** Equivalent products across supplier catalogs (E1-63, ADR 0079): what the screen and the main process exchange. */
 
 /** Who proposed a group: the rules of the register, Claude through the analytics service, or the owner by hand. */
 export type EquivalenceOrigin = 'rules' | 'ai' | 'manual';

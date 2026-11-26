@@ -97,7 +97,7 @@ function shortestDescription(items: readonly CatalogItem[]): string {
 }
 
 /**
- * Equivalent products across supplier catalogs (E1-63, ADR 0078). The rules of the register propose groups without
+ * Equivalent products across supplier catalogs (E1-63, ADR 0079). The rules of the register propose groups without
  * internet; Claude, through the analytics service, may propose more for what the rules could not group; the owner approves,
  * rejects or edits each one. Every decision is a new row that is never changed, with its audit entry, and names the item
  * by its supplier and code, so a new list of the same supplier keeps it. Only the owner reaches it, which the bridge checks.
