@@ -151,6 +151,16 @@ In the suppliers, the owner picks a supplier and presses **F5** "Lista de precio
 | Cart | "Agregar" puts the product in the cart with its cheapest supplier; each line can switch supplier and quantity. The screen sends only product, quantity and chosen item; the main process reads the costs again. |
 | Orders | **F2** "Crear pedidos" makes one draft per supplier through the usual order save (same owner PIN rules, audit and folio), with the note "Armado en el comparador de precios". |
 | PDF | **F5** saves product code, product, quantity, chosen price and supplier, lowest price and its supplier, the total, the possible savings, and two SVG bar charts: products and spend per supplier. |
+## Equivalent products
+**F7** "Productos equivalentes" in the suppliers (owner only) finds the items of different suppliers that are the same product even when they are written differently and have other codes: «BROCAS HSS 1/4" P/METAL» and «Broca de alta velocidad 6.35 mm» ([ADR 0079](../../docs/adr/0079-productos-equivalentes-entre-catalogos.md)).
+
+| Rule | How it works |
+| --- | --- |
+| Offline rules | `shared/catalog-matching.ts` normalizes accents and plurals, swaps synonyms (built in, plus the owner's own in **F5** "Sinónimos"), reads measures as integers (1/4" = 6.35 mm, gauges, ml, mg, watts) and pack sizes ("c/100"), and scores each pair from 0 to 100. A different measure, material, use or tip scores 0. From 60 it is proposed, from 80 it says "Muy probable". |
+| Decisions | Approve, reject ("No son iguales"), rename or remove. Each decision is appended to `catalog_match_decision` (never updated nor deleted) by supplier and supplier code, so it survives re-importing the list, and goes to the audit log. |
+| AI help | **F4** "Pedir ayuda a la IA" appears only when `POS_ANALYTICS_URL` and `POS_ANALYTICS_TOKEN` are set. It sends up to 120 ungrouped items with descriptions, units and pieces only, and suppliers as letters: no costs, no supplier names. The rules veto any group they see as a conflict, and the owner still approves each one. |
+| Comparator | "Comparar precios" also searches with the synonyms and shows a group's items side by side per base unit. An unlinked item with no pieces but "c/100" in its description is priced per piece, and the table says so. Only items linked to the group's product go to the cart. |
+
 ## Settings, sales list and price for one sale
 Since [ADR 0061](../../docs/adr/0061-rediseno-de-la-caja-y-herramientas-del-dueno.md) the register has three more things on the sale screen. The keys below are the defaults; the owner changes them in the settings.
 
@@ -165,7 +175,7 @@ The ticket design also picks the printer font (A, or the narrow B that fits a th
 
 The search bar of **Resumen** (owner, or with the owner PIN) finds any completed sale by ticket folio, product name or barcode, on every date, and says which products matched.
 
-Giving a product up releases its barcodes: they move to an append-only history (`product_code_history`) so a new product can take the same code and name at once, while the sales search by code still finds the old sales. **Dados de baja** (F6 in the product panel while it searches; owner or owner PIN) lists the given-up products with when and who, last price and cost, the stock left (warned when not zero) and the released codes. «Reactivar» gets back the codes nobody else uses, never takes one from another product, and asks for a new name when an active product has the same one (E1-62, [ADR 0077](../../docs/adr/0077-productos-dados-de-baja-liberan-nombre-y-codigos.md)).
+Giving a product up releases its barcodes: they move to an append-only history (`product_code_history`) so a new product can take the same code and name at once, while the sales search by code still finds the old sales. **Dados de baja** (F6 in the product panel while it searches; owner or owner PIN) lists the given-up products with when and who, last price and cost, the stock left (warned when not zero) and the released codes. «Reactivar» gets back the codes nobody else uses, never takes one from another product, and asks for a new name when an active product has the same one (E1-62, [ADR 0080](../../docs/adr/0080-productos-dados-de-baja-liberan-nombre-y-codigos.md)).
 
 The product panel lists every supplier of the product, links one more, and has a green «Pedir más» per supplier that adds the product to that supplier's latest draft order (or a new one). Next to it, a yellow «Modificar» turns the row into a form to change the supplier (to an active one that does not sell it yet), its codes and its list cost, moved in one transaction; a red «Eliminar» removes the supplier after a confirmation that names the draft orders of that supplier with the product, which keep it unless the owner ticks «Quitarlo también del borrador». Sent orders never change. Owner or owner PIN, with audit entries (E1-58, [ADR 0074](../../docs/adr/0074-modificar-y-eliminar-el-proveedor-de-un-producto.md)).
 
@@ -178,6 +188,16 @@ Boxes for amounts, quantities and PINs take digits and one decimal point only (`
 - The dialog shows the most asked items, the totals, and charts by week and by day of the week, for 30 days, 3 months, a year, or everything.
 - Anyone signed in edits the notes of an item. The owner marks it as «Ya lo vendemos», puts it back to pending, or deletes it with the red «Eliminar» after confirming. Each change goes to the audit log.
 - «Descargar PDF con gráficas» saves the log of the period with three SVG charts and every item.
+
+## Quotes
+**Cotizaciones** (`Shift+F12`, or the header button) is a panel of its own for quotes ([ADR 0080](../../docs/adr/0077-cotizaciones-en-la-caja.md)). Cashiers and owners create them with an optional customer name and phone, products by barcode or name, quantities in the unit of each product, notes, and a last valid day (15 days by default).
+
+- A quote lives in `quote`, `quote_line`, `quote_status` and `quote_print` (migration 24) and never writes stock, sales, payments or cash: it does not show in cuts, the summary or the inventory. Each line copies the name, unit, price (e4) and VAT rate at the time it was quoted; the price always comes from the catalog in the main process.
+- The status is an append-only history (`draft`, `converted`, `cancelled`) guarded by triggers. «Vencida» is worked out when it is read. An open quote is edited keeping its quoted prices; an expired one that is edited is quoted again at today's prices. «Duplicar» makes a new quote at today's prices.
+- The list searches by folio (`COT-000012`), customer, phone or product, without accents or capitals, and filters by status.
+- «Imprimir» shows a preview and prints on the ticket printer with the owner's ticket design, under «COTIZACIÓN», with its validity and a foot that says it is not a sale or a tax receipt. From the second print it says «REIMPRESIÓN».
+- «Convertir en venta» rings the quote up on an empty sale. While it is valid, each line goes at its quoted price (a «price for this sale only» when today's differs, with a warning); an expired quote goes at today's prices. Once that sale is collected, the quote becomes `converted` with the sale id.
+- Its author or an owner cancels a quote with a reason; a cashier cancels someone else's quote with the owner PIN. Every step goes to the audit log.
 
 ## Export the catalog
 In Administration, **F12 · Exportar catálogo** saves the whole catalog as a PDF (**F2**), an Excel workbook (**F3**) or a CSV (**F4**), one row per product: status, main and other barcodes, name, unit, suppliers with their codes, cost without and with VAT, price with VAT, VAT, stock from the ledger, gross and net margin, and where the cost comes from ([ADR 0071](../../docs/adr/0071-exportacion-del-catalogo-completo.md)). «Solo activos» (**F5**) starts on; turn it off to include the products that were given up.
@@ -239,7 +259,7 @@ Nothing works until a person enters with a PIN of four to eight digits, with or 
 
 ### Opening float and closing the register
 
-Signing in with the cash closed opens "Abrir la caja" for the opening float ([ADR 0070](../../docs/adr/0070-fondo-de-caja-al-entrar-y-corte-al-salir.md)). A cashier cannot skip it. The owner also sees **Solo administrar** (Esc): products, the summary and the suppliers work, but a sale cannot be charged, and a banner with **Abrir caja** stays until the cash opens. A session that is already open, from another shift or from before a restart, is not asked again, and the header says who opened it and when. Every opening goes to the audit log with who and how much.
+Signing in with the cash closed opens "Abrir la caja" for the opening float ([ADR 0070](../../docs/adr/0070-fondo-de-caja-al-entrar-y-corte-al-salir.md)). A cashier cannot skip it. The owner also sees **Solo administrar** (Esc): products, the summary and the suppliers work, but a sale cannot be charged, and a banner with **Abrir caja** stays until the cash opens. A session of today that is already open, from another shift or from before a restart, is not asked again, and the header says who opened it and when. A session left open on a past day is never today's drawer: today gets a new one, and the sign-in says which days still have a cash without its cut. Every opening goes to the audit log with who and how much.
 
 Closing the window with the cash open (the X, Alt+F4 or the menu) asks first: **Hacer corte de caja** (F2) opens the cut and closes the register after it, **No hacer corte y salir** (F4) leaves the session open and writes it to the audit log, and Esc goes back to work. The main process decides it in the `close` event, so a frozen or crashed screen, or Windows shutting down, never blocks the close; every sale is already committed to SQLite, and the audit log records why the session stayed open.
 
@@ -250,7 +270,10 @@ Some days not every sale gets rung up. The next morning, the sign-in screen offe
 | --- | --- |
 | Who | A past day needs an owner: the owner who signs in approves it, and a cashier types the PIN of an owner too. A refusal signs nobody in. The sign-in is in the audit log (`session.backdated_capture`) |
 | Banner | The whole session shows «Capturando ventas del martes 17 de noviembre» in the warning color, so nobody rings up today's sales into it |
-| Cash | The capture opens a cash session of its own for that day, with its float and its **supplementary cut**, apart from today's drawer (both can be open). Returns and expenses paid from the drawer always use today's drawer |
+| Day list | Each past day says «· caja sin corte» when its session was left without a cut, or «· ya tiene corte». A day with a cash without its cut is offered even past the 7 days ([ADR 0078](../../docs/adr/0078-retomar-la-caja-sin-corte-de-un-dia-atrasado.md)) |
+| Resume | Choosing a day with a cash without its cut **resumes that same session**: same id, same float, no new float asked, `cash_session.resumed` in the audit log. Its sales are recorded under the person who rings them up, and finishing is its usual cut («Corte de caja del …»). Leaving again without a cut keeps it waiting |
+| Cut day | A day already cut opens nothing on its own: the sign-in explains it and asks to tick «Agregar una captura suplementaria». That session is tied to the last cut of the day (`amends_cut_id`), and its **supplementary cut** shows the original cut untouched and the whole day added up |
+| No cash that day | The capture opens a session of its own for that day, with its float and its cut, apart from today's drawer (both can be open). Returns and expenses paid from the drawer always use today's drawer |
 | Sales | A sale keeps the real moment it was recorded and adds `business_day` and `business_at` (the same local hour on that day). The summary, top sellers, hours, income statement and daily report count it on its day; its stock movements and the kardex carry the day too |
 | Ticket | Prints «Captura atrasada del …» under the folio, also on a reprint |
 | Sync | `sale.completed`, `cash_session.opened` and `cash_session.closed` carry an optional `businessDate`; the core stores it and falls back to the local day when it is absent |

@@ -64,3 +64,15 @@ test('a manager cannot open the paper catalog reader', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Catálogo en papel' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Catálogo en papel' })).toHaveCount(0);
 });
+
+test('the owner can send a short scanned PDF instead of photos', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/catalog/paper');
+  await page.getByRole('textbox', { name: 'Proveedor' }).fill('Plásticos del Norte');
+  const pdf = Buffer.from('%PDF-1.4\n1 0 obj << /Type /Page >> endobj\n%%EOF\n', 'latin1');
+  await page.getByLabel('Fotos del catálogo').setInputFiles({ name: 'lista.pdf', mimeType: 'application/pdf', buffer: pdf });
+
+  await expect(page.getByTestId('paper-row')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Quitar PDF' })).toBeVisible();
+  await expect(page.getByAltText('Foto lista.pdf')).toHaveCount(0);
+});

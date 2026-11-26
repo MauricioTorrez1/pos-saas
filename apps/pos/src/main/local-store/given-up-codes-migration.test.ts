@@ -8,7 +8,7 @@ import { LocalStore } from './local-store';
 import { MIGRATIONS } from './migrations';
 
 const TENANT = 'tenant-a';
-const RELEASE_MIGRATION = 24;
+const RELEASE_MIGRATION = 27;
 
 let directory: string;
 let databasePath: string;

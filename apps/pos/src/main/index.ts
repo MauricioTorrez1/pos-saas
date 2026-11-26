@@ -21,6 +21,7 @@ import { PendingSales } from './checkout/pending-sales';
 import { DashboardExporter } from './reports/dashboard-exporter';
 import { DashboardService } from './reports/dashboard-service';
 import { MissingItemsLog } from './missing/missing-items-log';
+import { QuoteBook } from './quotes/quote-book';
 import { ExpenseBook } from './expenses/expense-book';
 import { printHtmlToPdf } from './reports/pdf-printer';
 import { ReportService } from './reports/report-service';
@@ -54,6 +55,8 @@ import { ReportReader } from './business-report/report-reader';
 import { printPagedPdf } from './reports/paged-pdf';
 import { OrderExporter } from './purchasing/order-exporter';
 import { PurchaseOrderService } from './purchasing/purchase-order-service';
+import { equivalenceAssistantFromEnvironment } from './purchasing/analytics-equivalence-assistant';
+import { CatalogEquivalenceService } from './purchasing/catalog-equivalence-service';
 import { SupplierCatalogService } from './purchasing/supplier-catalog-service';
 import { SupplierService } from './purchasing/supplier-service';
 import { ProductService } from './products/product-service';
@@ -213,7 +216,9 @@ async function start(): Promise<void> {
     prices,
     products,
     // A return happens today, so its refund always leaves today's drawer, even during a backdated capture (E1-60).
-    returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, { openSessionId: () => cashStore.findOpen()?.id ?? null }),
+    returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, {
+      openSessionId: () => cashStore.findOpen(auth.captureDay() === null ? auth.workDay() : null)?.id ?? null,
+    }),
     admin,
     inventory,
     reports: new ReportService(store, LOCAL_TENANT_ID, auth),
@@ -243,6 +248,13 @@ async function start(): Promise<void> {
     supplierCatalog: {
       catalog: new SupplierCatalogService(store, LOCAL_TENANT_ID, new AuditLog(store, LOCAL_TENANT_ID), suppliers),
       pickFile: (title) => pickPath(['openFile'], title),
+      // Without POS_ANALYTICS_URL and POS_ANALYTICS_TOKEN the matcher works with its rules only, without internet.
+      equivalences: new CatalogEquivalenceService(
+        store,
+        LOCAL_TENANT_ID,
+        new AuditLog(store, LOCAL_TENANT_ID),
+        equivalenceAssistantFromEnvironment(process.env.POS_ANALYTICS_URL, process.env.POS_ANALYTICS_TOKEN),
+      ),
       orders,
       pickSavePath,
       renderPdf: printHtmlToPdf,
@@ -252,6 +264,17 @@ async function start(): Promise<void> {
     missingItems: {
       log: new MissingItemsLog(store, LOCAL_TENANT_ID, new AuditLog(store, LOCAL_TENANT_ID)),
       exporter: { pickSavePath, renderPdf: printHtmlToPdf, businessName: () => appearance.read().businessName || UNNAMED_BUSINESS },
+    },
+    // Quotes never touch stock, sales or the cash; they become a sale only when one is collected from them (F2-07).
+    quotes: {
+      book: new QuoteBook(store, LOCAL_TENANT_ID, {
+        catalog,
+        audit: new AuditLog(store, LOCAL_TENANT_ID),
+        authorizeOwnerPin: (pin) => auth.authorizeWithOwnerPin(pin),
+      }),
+      printer,
+      ticketDesign: () => tools.ticketDesign(),
+      businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
     },
     catalogExporter: new CatalogExporter({
       reader: new CatalogReader(store, LOCAL_TENANT_ID),
@@ -277,7 +300,7 @@ async function start(): Promise<void> {
   guardWindowClose(
     registerWindow,
     new ExitGuard({
-      openSession: () => cashStore.findOpen(auth.captureDay()),
+      openSession: () => cashStore.findOpen(auth.workDay()),
       currentUserId: () => auth.currentUser()?.id ?? null,
       audit: new AuditLog(store, LOCAL_TENANT_ID),
       askScreen: () => {

@@ -9,6 +9,7 @@ import { comboLabel, DEFAULT_KEYMAP, type KeyAction, type Keymap, type ToolsApi 
 import type { CatalogExportApi } from '../shared/catalog-export';
 import type { ExpensesApi } from '../shared/expenses';
 import type { MissingItemsApi } from '../shared/missing-items';
+import type { QuotesApi } from '../shared/quotes';
 import type { SupplierCatalogApi } from '../shared/supplier-catalog';
 import type { PurchasingApi } from '../shared/supplier-order';
 import { applyAppearance } from './appearance/apply-appearance';
@@ -26,6 +27,7 @@ import { ReturnDialog } from './returns/ReturnDialog';
 import { PendingSaleDialog } from './recovery/PendingSaleDialog';
 import { usePendingSales } from './recovery/use-pending-sales';
 import { MissingItemsDialog } from './missing/MissingItemsDialog';
+import { QuotesDialog, type ReadyQuote } from './quotes/QuotesDialog';
 import { SupplierOrderDialog } from './purchasing/SupplierOrderDialog';
 import { SaleScreen } from './sale/SaleScreen';
 import { SalesHistoryDialog } from './tools/SalesHistoryDialog';
@@ -87,6 +89,8 @@ interface AppProps {
   readonly exitApi?: ExitApi;
   /** The operating expenses (E1-56). Without it, the summary has no «Gastos» tab. */
   readonly expensesApi?: ExpensesApi;
+  /** The quotes (F2-07). Without it, the register offers no quotes. */
+  readonly quotesApi?: QuotesApi;
 }
 
 /**
@@ -102,9 +106,10 @@ interface AppProps {
  * @param props.exitApi bridge for closing the register with the cash open
  * @param props.expensesApi bridge for the operating expenses, when the register offers them
  * @param props.catalogExportApi bridge to export the whole catalog, when the register offers it
+ * @param props.quotesApi bridge for the quotes, when the register offers them
  * @returns the screen
  */
-export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, catalogApi, toolsApi, missingApi, exitApi, catalogExportApi, expensesApi }: AppProps): ReactElement {
+export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, catalogApi, toolsApi, missingApi, exitApi, catalogExportApi, expensesApi, quotesApi }: AppProps): ReactElement {
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [authState, setAuthState] = useState<AuthState | null>(null);
   const [authFailed, setAuthFailed] = useState(false);
@@ -199,6 +204,7 @@ export function App({ posApi, pricingApi, productApi, dashboardApi, purchasingAp
       {...(catalogExportApi === undefined ? {} : { catalogExportApi })}
       {...(toolsApi === undefined ? {} : { toolsApi })}
       {...(expensesApi === undefined ? {} : { expensesApi })}
+      {...(quotesApi === undefined ? {} : { quotesApi })}
       user={authState.current}
       captureDay={authState.captureDay ?? null}
       appearance={appearance}
@@ -225,6 +231,7 @@ interface RegisterScreenProps {
   readonly catalogExportApi?: CatalogExportApi;
   readonly toolsApi?: ToolsApi;
   readonly expensesApi?: ExpensesApi;
+  readonly quotesApi?: QuotesApi;
   readonly user: UserSummary;
   /** The past day this session captures, or null when it sells today (E1-60). */
   readonly captureDay: string | null;
@@ -237,7 +244,7 @@ interface RegisterScreenProps {
   readonly exitCut?: { readonly onDone: () => void; readonly onCancel: () => void };
 }
 
-function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, catalogApi, toolsApi, missingApi, catalogExportApi, expensesApi, user, captureDay, appearance, onAppearanceSaved, onSignOut, isExiting, exitCut }: RegisterScreenProps): ReactElement {
+function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasingApi, catalogApi, toolsApi, missingApi, catalogExportApi, expensesApi, quotesApi, user, captureDay, appearance, onAppearanceSaved, onSignOut, isExiting, exitCut }: RegisterScreenProps): ReactElement {
   const [appInfo, setAppInfo] = useState<AppInfoState>({ status: 'loading' });
   const [isEditingAppearance, setIsEditingAppearance] = useState(false);
   const [cash, setCash] = useState<CashStatus | null>(null);
@@ -253,6 +260,9 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
   const [isViewingSales, setIsViewingSales] = useState(false);
   // What the log of missing items opened with: null while it is closed.
   const [missingFor, setMissingFor] = useState<string | null>(null);
+  const [isViewingQuotes, setIsViewingQuotes] = useState(false);
+  // The quote taken to the register, until the sale screen rings it up.
+  const [incomingQuote, setIncomingQuote] = useState<ReadyQuote | null>(null);
   const pendingSales = usePendingSales(posApi);
   const hasPendingSales = pendingSales.sales.length > 0;
   const isOwner = user.role === 'owner';
@@ -319,6 +329,20 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
   const closeSales = useCallback(() => setIsViewingSales(false), []);
   const openMissing = useCallback((text: string) => setMissingFor(missingApi === undefined ? null : text), [missingApi]);
   const closeMissing = useCallback(() => setMissingFor(null), []);
+  const openQuotes = useCallback(() => setIsViewingQuotes(quotesApi !== undefined), [quotesApi]);
+  const closeQuotes = useCallback(() => setIsViewingQuotes(false), []);
+  const convertQuote = useCallback((quote: ReadyQuote) => {
+    setIsViewingQuotes(false);
+    setIncomingQuote(quote);
+  }, []);
+  const takeIncomingQuote = useCallback(() => setIncomingQuote(null), []);
+  const markQuoteSold = useCallback(
+    (quoteId: string, saleId: string) => {
+      // The sale is already collected; a quote left open by a failure here is only a quote to cancel by hand.
+      quotesApi?.markConverted({ quoteId, saleId }).catch((error: unknown) => console.error('Could not mark the quote as sold', error));
+    },
+    [quotesApi],
+  );
   const key = (action: KeyAction): string => comboLabel(keymap[action]);
   const openReturns = useCallback(() => setIsReturning(true), []);
   const closeReturns = useCallback(() => setIsReturning(false), []);
@@ -374,6 +398,11 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
             Ventas <kbd>{key('salesHistory')}</kbd>
           </button>
         )}
+        {quotesApi !== undefined && (
+          <button type="button" className="header-button" tabIndex={-1} onClick={openQuotes}>
+            Cotizaciones <kbd>{key('quotes')}</kbd>
+          </button>
+        )}
         {missingApi !== undefined && (
           <button type="button" className="header-button" tabIndex={-1} onClick={() => openMissing('')}>
             Faltantes <kbd>{key('missingItems')}</kbd>
@@ -411,7 +440,7 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
         posApi={posApi}
         {...(pricingApi === undefined ? {} : { pricingApi })}
         {...(productApi === undefined ? {} : { productApi })}
-        isKeyboardElsewhere={isExiting || exitCut !== undefined || isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering || isViewingDashboard || ordering !== null || isEditingSettings || isViewingSales || missingFor !== null}
+        isKeyboardElsewhere={isExiting || exitCut !== undefined || isEditingAppearance || hasPendingSales || isEditingCash || isReturning || isAdministering || isViewingDashboard || ordering !== null || isEditingSettings || isViewingSales || missingFor !== null || isViewingQuotes}
         isOwner={isOwner}
         onOpenAppearance={openAppearance}
         onSignOut={onSignOut}
@@ -421,6 +450,7 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
         {...(dashboardApi === undefined ? {} : { onOpenDashboard: openDashboard })}
         {...(purchasingApi === undefined ? {} : { onOpenSupplierOrder: openOrders, purchasingApi })}
         {...(missingApi === undefined ? {} : { onOpenMissingItems: openMissing })}
+        {...(quotesApi === undefined ? {} : { onOpenQuotes: openQuotes, incomingQuote, onIncomingQuoteTaken: takeIncomingQuote, onQuoteSold: markQuoteSold })}
         onCashChanged={refreshCash}
         isCashOpen={cash === null || cash.session !== null}
         keymap={keymap}
@@ -464,6 +494,9 @@ function RegisterScreen({ posApi, pricingApi, productApi, dashboardApi, purchasi
       )}
       {missingFor !== null && !hasPendingSales && missingApi !== undefined && (
         <MissingItemsDialog api={missingApi} isOwner={isOwner} initialDescription={missingFor} onClose={closeMissing} />
+      )}
+      {isViewingQuotes && !hasPendingSales && quotesApi !== undefined && (
+        <QuotesDialog posApi={posApi} quotesApi={quotesApi} user={user} onConvert={convertQuote} onClose={closeQuotes} />
       )}
       {isReturning && !hasPendingSales && <ReturnDialog posApi={posApi} user={user} onReturned={refreshCash} onClose={closeReturns} />}
       {exitCut !== undefined && !hasPendingSales && cash !== null && (

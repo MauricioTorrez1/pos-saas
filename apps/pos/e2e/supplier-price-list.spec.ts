@@ -173,3 +173,70 @@ test('compares two suppliers per piece, switches a line, gets the PDF and turns 
     { supplier_code: 'MAR-6', quantity_milli: 12_000, unit_cost_e6: 55_000_000, line_total_cents: 66_000 },
   ]);
 });
+
+test('proposes the same drill bit written two ways, approves it and compares both prices side by side (E1-63)', async ({ userDataDir, launch }) => {
+  const register = await launch();
+  const page = await signInWindow(register);
+  const { databasePath } = testSalePaths(userDataDir);
+  const dialog = page.locator('dialog[aria-labelledby="order-title"]');
+  const firstList = join(userDataDir, 'centro.csv');
+  const secondList = join(userDataDir, 'norte.csv');
+  // Neither the names nor the codes agree: one says HSS and inches, the other «alta velocidad» and millimetres.
+  writeFileSync(firstList, 'codigo,descripcion,costo,piezas\nB-14,"BROCAS HSS 1/4"" P/METAL",30,1\nB-38,"BROCAS HSS 3/8"" P/METAL",45,1\n');
+  writeFileSync(secondList, 'codigo,descripcion,costo,piezas\nAV-635,Broca de alta velocidad 6.35 mm,26,1\nAV-953,Broca de alta velocidad 9.53 mm,50,1\n');
+  await register.evaluate(({ dialog: electronDialog }, paths) => {
+    const opened = [...paths];
+    electronDialog.showOpenDialog = (() => Promise.resolve({ canceled: false, filePaths: [opened.shift() ?? ''] })) as typeof electronDialog.showOpenDialog;
+  }, [firstList, secondList]);
+
+  await page.keyboard.press('Shift+F11');
+  await expect(page.getByRole('heading', { name: 'Pedido al proveedor' })).toBeVisible();
+  await page.getByRole('button', { name: /Proveedores/ }).click();
+  for (const name of ['Ferretera del Centro', 'Eléctrica del Norte']) {
+    await page.getByRole('button', { name: /Proveedor nuevo/ }).click();
+    await page.getByRole('textbox', { name: 'Nombre del proveedor' }).fill(name);
+    await page.getByRole('button', { name: /Guardar/ }).click();
+    await expect(dialog).toContainText('Listo. El proveedor quedó guardado');
+    await page.getByRole('button', { name: /Lista de precios/ }).click();
+    await page.getByRole('button', { name: /Importar lista/ }).click();
+    await page.getByRole('button', { name: /Reemplazar la lista/ }).click();
+    await expect(dialog).toContainText('Entraron 2 artículos');
+    await page.getByRole('button', { name: /Volver/ }).click();
+    await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
+  }
+
+  await page.keyboard.press('F7');
+  await expect(page.getByRole('heading', { name: 'Productos equivalentes' })).toBeVisible();
+  await page.getByRole('button', { name: /Buscar equivalentes/ }).click();
+  await expect(dialog).toContainText('Revisé 4 artículos');
+  const quarter = page.getByRole('region', { name: /^Propuesta/ }).filter({ hasText: 'B-14' });
+  await expect(quarter).toContainText('AV-635');
+  await expect(quarter).not.toContainText('AV-953');
+  await expect(quarter.locator('tr.price-cheapest')).toContainText('Eléctrica del Norte');
+  await quarter.getByRole('textbox', { name: /Nombre del grupo/ }).fill('Broca HSS 1/4"');
+  await quarter.getByRole('button', { name: /Aprobar propuesta/ }).click();
+  await expect(dialog).toContainText('«Broca HSS 1/4"» ya se compara junto');
+  // The other size is not the same product as this one; the owner says so once.
+  await page.getByRole('region', { name: /^Propuesta/ }).filter({ hasText: 'B-38' }).getByRole('button', { name: 'No son iguales' }).click();
+  await expect(dialog).toContainText('no te los volveré a proponer');
+
+  await page.getByRole('button', { name: /Volver/ }).click();
+  await page.getByRole('button', { name: /Comparar precios/ }).click();
+  await page.getByRole('textbox', { name: 'Buscar en las listas' }).fill('broca alta velocidad 6.35');
+  await page.keyboard.press('Enter');
+  const prices = page.getByRole('table', { name: 'Precios de Broca HSS 1/4"' });
+  await expect(prices.locator('tr')).toHaveCount(3);
+  await expect(prices.locator('tr.price-cheapest')).toContainText('Eléctrica del Norte');
+  await expect(prices.locator('tr.price-highest')).toContainText('+$4.00 (+15.4 %)');
+
+  expect(await readRows(register, databasePath, 'SELECT kind, supplier_code, other_supplier_code FROM catalog_match_decision ORDER BY seq')).toEqual([
+    { kind: 'join', supplier_code: 'B-14', other_supplier_code: null },
+    { kind: 'join', supplier_code: 'AV-635', other_supplier_code: null },
+    { kind: 'name', supplier_code: null, other_supplier_code: null },
+    { kind: 'reject', supplier_code: 'B-38', other_supplier_code: 'AV-953' },
+  ]);
+  expect(await readRows(register, databasePath, "SELECT action FROM audit_log WHERE action LIKE 'catalog_equivalence.%' ORDER BY rowid")).toEqual([
+    { action: 'catalog_equivalence.approve' },
+    { action: 'catalog_equivalence.reject' },
+  ]);
+});

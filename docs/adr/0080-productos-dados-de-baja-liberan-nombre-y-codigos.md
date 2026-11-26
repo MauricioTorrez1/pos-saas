@@ -1,4 +1,4 @@
-# ADR 0077: Un producto dado de baja libera su nombre y sus códigos
+# ADR 0080: Un producto dado de baja libera su nombre y sus códigos
 
 Estado: Aceptada · Fecha: 2026-11-25 · Concreta E1-62. Se apoya en los ADR 0003 (inventario como libro de movimientos), 0035 (RLS), 0047 (`OwnerGate`), 0051 (catálogo, códigos y unidades del núcleo), 0057 (alta de productos en la caja), 0058 (panel de modificación) y 0067 (búsqueda de ventas con productos dados de baja).
 
@@ -7,7 +7,7 @@ El dueño dijo: «Cuando se da de baja un producto que quede libre el nombre y l
 
 ## Decisiones
 
-**Dar de baja libera los códigos, que pasan a un historial de solo agregar.** Al dar de baja, los códigos salen de `product_barcode` y se escriben en `product_code_history` (caja, migración 24) con el producto, el momento y quién lo hizo, en la misma transacción que el cambio, la bitácora y la operación para el núcleo. El historial nunca se borra ni cambia lo que dice; solo se le anota una vez cuándo y quién recuperó el código al reactivar (`restored_at`, `restored_by`), y unos disparadores lo exigen. La llave es `(tenant_id, code, released_at, product_id)`, porque un mismo código puede liberarse, recuperarse y liberarse otra vez. Un código liberado queda libre: un producto nuevo, el panel o la importación lo pueden usar.
+**Dar de baja libera los códigos, que pasan a un historial de solo agregar.** Al dar de baja, los códigos salen de `product_barcode` y se escriben en `product_code_history` (caja, migración 27) con el producto, el momento y quién lo hizo, en la misma transacción que el cambio, la bitácora y la operación para el núcleo. El historial nunca se borra ni cambia lo que dice; solo se le anota una vez cuándo y quién recuperó el código al reactivar (`restored_at`, `restored_by`), y unos disparadores lo exigen. La llave es `(tenant_id, code, released_at, product_id)`, porque un mismo código puede liberarse, recuperarse y liberarse otra vez. Un código liberado queda libre: un producto nuevo, el panel o la importación lo pueden usar.
 
 **El historial resuelve lo viejo.** Las líneas de venta guardan el nombre impreso y el `product_id`, nunca el código, así que tickets, reportes y devoluciones no cambian. La búsqueda de ventas por código (ADR 0067) ahora junta **todos** los productos que tuvieron ese código: el que lo tiene hoy y los que lo liberaron (`ProductCatalog.productIdsThatHadCode`). Buscar el código de un martillo dado de baja encuentra sus ventas viejas y las del producto nuevo que hoy lo usa; cada venta muestra el nombre que imprimió.
 

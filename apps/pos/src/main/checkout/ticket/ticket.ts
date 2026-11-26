@@ -151,6 +151,19 @@ export function layoutTicket(ticket: TicketData, design: TicketDesign = DEFAULT_
  * @returns one print job with as many tickets as the design asks for, each one cut
  */
 export function renderTicket(ticket: TicketData, design: TicketDesign = DEFAULT_TICKET_DESIGN): Uint8Array {
+  return renderParts(() => composeTicket(ticket, design), design, design.copies);
+}
+
+/**
+ * Turns laid-out lines into the bytes the printer understands (ESC/POS), with the font and size of the design. A sale
+ * ticket and a quote (F2-07) print the same way.
+ *
+ * @param compose lays out the lines of one copy
+ * @param design how the ticket looks
+ * @param copies how many copies to print, each one cut
+ * @returns one print job
+ */
+export function renderParts(compose: () => readonly TicketPart[], design: TicketDesign, copies: number): Uint8Array {
   const builder = new EscPosBuilder().initialize();
   const base = TEXT_SIZE_SCALE[design.textSize];
   // The big total is twice as wide as the rest, and at least twice as tall as a normal letter.
@@ -161,9 +174,9 @@ export function renderTicket(ticket: TicketData, design: TicketDesign = DEFAULT_
   if (design.textSize !== 'normal') {
     builder.textSize(base.width, base.height);
   }
-  for (let copy = 0; copy < design.copies; copy += 1) {
+  for (let copy = 0; copy < copies; copy += 1) {
     let align: TicketPart['align'] | null = null;
-    for (const part of composeTicket(ticket, design)) {
+    for (const part of compose()) {
       if (part.align !== align) {
         builder.align(part.align);
         align = part.align;
@@ -187,29 +200,34 @@ export function renderTicket(ticket: TicketData, design: TicketDesign = DEFAULT_
   return builder.toBytes();
 }
 
-function rule(width: number): string {
+/** @returns a line of dashes as wide as the paper */
+export function rule(width: number): string {
   return '-'.repeat(width);
 }
 
-function fit(text: string, width: number): string {
+/** @returns the text cut to the width */
+export function fit(text: string, width: number): string {
   const characters = [...text];
   return characters.length <= width ? text : characters.slice(0, width).join('');
 }
 
-function twoColumns(left: string, right: string, width: number): string {
+/** @returns the left text and the right text on one line, the right one flush with the edge */
+export function twoColumns(left: string, right: string, width: number): string {
   const room = Math.max(width - [...right].length - 1, 0);
   const shown = fit(left, room);
   return `${shown}${' '.repeat(Math.max(width - [...shown].length - [...right].length, 1))}${right}`;
 }
 
-function formatQuantity({ milli, unit }: Quantity): string {
+/** @returns a quantity as the ticket prints it, such as `2 pza` or `3.250 m` */
+export function formatQuantity({ milli, unit }: Quantity): string {
   const thousandths = milli % MILLI_PER_UNIT;
   const whole = (milli - thousandths) / MILLI_PER_UNIT;
   const number = unit === 'piece' ? String(whole) : `${whole}.${String(thousandths).padStart(QUANTITY_DECIMALS, '0')}`;
   return `${number} ${UNIT_LABELS[unit]}`;
 }
 
-function taxLabel({ factor, rateBp }: TaxRate): string {
+/** @returns the name of a VAT rate, such as `IVA 16%` */
+export function taxLabel({ factor, rateBp }: TaxRate): string {
   if (factor === 'exempt') {
     return 'Exento';
   }

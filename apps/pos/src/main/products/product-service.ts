@@ -273,7 +273,7 @@ export class ProductService {
     if (current.revision !== request.expectedRevision) {
       return { status: 'stale', product: this.panelDetail(request.productId)! };
     }
-    // A product that is given up holds no codes it did not have (ADR 0077). Giving it up releases the ones it has.
+    // A product that is given up holds no codes it did not have (ADR 0080). Giving it up releases the ones it has.
     if (!request.isActive && asked.some((code) => !current.barcodes.includes(code))) {
       throw new RangeError('A product that is given up cannot get new barcodes');
     }
@@ -353,7 +353,7 @@ export class ProductService {
   }
 
   /**
-   * Lists the products that were given up (E1-62, ADR 0077). Only the owner, or a cashier with the PIN of an owner; a
+   * Lists the products that were given up (E1-62, ADR 0080). Only the owner, or a cashier with the PIN of an owner; a
    * refusal is written in the audit log.
    *
    * @param ownerPin the PIN of an owner, when a cashier asks
@@ -401,7 +401,7 @@ export class ProductService {
   }
 
   /**
-   * Puts a given-up product on sale again with the released codes the owner chose (E1-62, ADR 0077). A code that another
+   * Puts a given-up product on sale again with the released codes the owner chose (E1-62, ADR 0080). A code that another
    * product uses now is never taken from it, and a name that an active product has must change: either answers without
    * writing. The change itself is the one of `update`, so it has the same lock, approval, audit entry and operation.
    *

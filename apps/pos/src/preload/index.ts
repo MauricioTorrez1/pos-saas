@@ -6,9 +6,11 @@ import { DASHBOARD_CHANNELS, type DashboardApi } from '../shared/dashboard-api';
 import { EXPENSE_CHANNELS, type ExpensesApi } from '../shared/expenses';
 import { MISSING_CHANNELS, type MissingItemsApi } from '../shared/missing-items';
 import { IPC_CHANNELS, type PosApi } from '../shared/pos-api';
+import { QUOTE_CHANNELS, type QuotesApi } from '../shared/quotes';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
 import { TOOLS_CHANNELS, type ToolsApi } from '../shared/register-tools';
+import { EQUIVALENCE_CHANNELS, type EquivalenceApi } from '../shared/catalog-equivalence';
 import { SUPPLIER_CATALOG_CHANNELS, type SupplierCatalogApi } from '../shared/supplier-catalog';
 import { PURCHASING_CHANNELS, type PurchasingApi } from '../shared/supplier-order';
 
@@ -94,6 +96,18 @@ const missingApi: MissingItemsApi = {
   exportPdf: (period) => ipcRenderer.invoke(MISSING_CHANNELS.exportPdf, period),
 };
 
+/** The quotes of the store (F2-07). */
+const quotesApi: QuotesApi = {
+  list: (search) => ipcRenderer.invoke(QUOTE_CHANNELS.list, search),
+  get: (quoteId) => ipcRenderer.invoke(QUOTE_CHANNELS.get, quoteId),
+  save: (request) => ipcRenderer.invoke(QUOTE_CHANNELS.save, request),
+  cancel: (request) => ipcRenderer.invoke(QUOTE_CHANNELS.cancel, request),
+  preview: (quoteId) => ipcRenderer.invoke(QUOTE_CHANNELS.preview, quoteId),
+  print: (quoteId) => ipcRenderer.invoke(QUOTE_CHANNELS.print, quoteId),
+  prepareConversion: (quoteId) => ipcRenderer.invoke(QUOTE_CHANNELS.prepareConversion, quoteId),
+  markConverted: (request) => ipcRenderer.invoke(QUOTE_CHANNELS.markConverted, request),
+};
+
 /** The operating expenses of the business (E1-56). */
 const expensesApi: ExpensesApi = {
   record: (request) => ipcRenderer.invoke(EXPENSE_CHANNELS.record, request),
@@ -121,6 +135,20 @@ const catalogExportApi: CatalogExportApi = {
   exportCatalog: (request) => ipcRenderer.invoke(CATALOG_EXPORT_CHANNELS.exportCatalog, request),
 };
 
+/** The equivalent products across supplier catalogs (E1-63), inside the bridge of the price lists. */
+const equivalenceApi: EquivalenceApi = {
+  proposeEquivalences: (text) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.proposeEquivalences, text),
+  askAiForEquivalences: (text) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.askAiForEquivalences, text),
+  aiAvailable: () => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.aiAvailable),
+  approveEquivalence: (request) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.approveEquivalence, request),
+  rejectEquivalence: (itemIds) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.rejectEquivalence, itemIds),
+  listEquivalenceGroups: (text) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.listEquivalenceGroups, text),
+  removeFromEquivalence: (request) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.removeFromEquivalence, request),
+  listSynonyms: () => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.listSynonyms),
+  addSynonym: (synonym) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.addSynonym, synonym),
+  removeSynonym: (term) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.removeSynonym, term),
+};
+
 const supplierCatalogApi: SupplierCatalogApi = {
   pickPriceList: (supplierId) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.pickPriceList, supplierId),
   importPriceList: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.importPriceList, request),
@@ -130,6 +158,7 @@ const supplierCatalogApi: SupplierCatalogApi = {
   compareItems: (text) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.compareItems, text),
   confirmCart: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.confirmCart, request),
   exportCartPdf: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.exportCartPdf, request),
+  equivalences: equivalenceApi,
 };
 
 /** Closing the register with the cash still open (E1-54). The screen only hears about it and answers; main decides. */
@@ -152,3 +181,4 @@ contextBridge.exposeInMainWorld('purchasing', purchasingApi);
 contextBridge.exposeInMainWorld('missing', missingApi);
 contextBridge.exposeInMainWorld('catalogExport', catalogExportApi);
 contextBridge.exposeInMainWorld('expenses', expensesApi);
+contextBridge.exposeInMainWorld('quotes', quotesApi);

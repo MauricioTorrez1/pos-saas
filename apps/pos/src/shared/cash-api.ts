@@ -14,6 +14,10 @@ export interface CashSessionView {
   readonly openingFloatCents: number;
   /** The past day whose sales it captures, or null when it sells today (E1-60). */
   readonly businessDay?: string | null;
+  /** The day the session belongs to: the day it opened, or the day it captures (E1-61). */
+  readonly sessionDay?: string;
+  /** True when it is a supplementary capture of a day that was already cut, so its cut amends that one (E1-61). */
+  readonly isSupplementary?: boolean;
 }
 
 /** How the cash of the register stands. */
@@ -76,6 +80,22 @@ export interface CashCut extends CutComparison {
   readonly reason: string | null;
   /** The past day of a backdated session, whose cut is a supplementary one of that day (E1-60). Null for today's. */
   readonly businessDay?: string | null;
+  /** The past day of a session that was resumed after being left without a cut (E1-61). Null or absent otherwise. */
+  readonly resumedDay?: string | null;
+  /** The cut this supplementary one amends, with the totals of both together (E1-61). The original never changes. */
+  readonly amends?: AmendedCut | null;
+}
+
+/** The report of a supplementary cut: the cut of that day that it amends, and the day added up (E1-61, ADR 0078). */
+export interface AmendedCut {
+  /** UUIDv7 of the original cut. */
+  readonly cutId: string;
+  readonly cutAt: string;
+  readonly cutBy: string;
+  /** What the original cut expected and counted, as it was saved. */
+  readonly original: { readonly expected: ExpectedCut; readonly counted: ExpectedCut };
+  /** The original and the supplementary cut together. */
+  readonly combined: { readonly expected: ExpectedCut; readonly counted: ExpectedCut };
 }
 
 /** How closing the register ended. */

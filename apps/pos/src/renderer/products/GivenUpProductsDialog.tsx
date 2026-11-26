@@ -40,7 +40,7 @@ interface GivenUpProductsDialogProps {
 }
 
 /**
- * The products that were given up (E1-62, ADR 0077): when and by whom, their last price and cost, the stock they left and the
+ * The products that were given up (E1-62, ADR 0080): when and by whom, their last price and cost, the stock they left and the
  * codes they released, with a filter by name or code and «Reactivar» on each one. A stock other than zero is marked, because
  * that merchandise still counts in the inventory. Only the owner, or a cashier with the PIN of an owner, which is asked once.
  *

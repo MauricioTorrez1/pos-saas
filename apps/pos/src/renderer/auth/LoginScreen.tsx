@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactElement } from 'react';
 
 import { MAX_USER_NAME_LENGTH, type UserSummary } from '../../shared/auth';
-import { captureDayLabel, type CaptureDayRequest } from '../../shared/capture-day';
+import { formatCents } from '@pos-saas/money';
+
+import { captureDayLabel, type CaptureDayRequest, type PastCaptureDay } from '../../shared/capture-day';
 import type { AuthState, PosApi } from '../../shared/pos-api';
+import { CheckField } from '../ui/form-parts';
 
 const ROLE_LABELS = { owner: 'Dueño', cashier: 'Cajero' } as const;
 const PIN_HELP = 'El PIN lleva de 4 a 8 números.';
 const SAVE_FAILED = 'No se pudo completar. Intenta de nuevo y, si sigue fallando, reinicia la caja.';
 const LOCK_TIME = new Intl.DateTimeFormat('es-MX', { timeStyle: 'short' });
+const OPENED_AT = new Intl.DateTimeFormat('es-MX', { timeStyle: 'short' });
 
 interface LoginScreenProps {
   readonly posApi: PosApi;
@@ -32,7 +36,13 @@ export function LoginScreen({ posApi, authState, onSignedIn }: LoginScreenProps)
         {authState.needsSetup ? (
           <OwnerSetup posApi={posApi} onSignedIn={onSignedIn} />
         ) : (
-          <SignIn posApi={posApi} users={authState.users} captureDays={authState.captureDays ?? []} onSignedIn={onSignedIn} />
+          <SignIn
+            posApi={posApi}
+            users={authState.users}
+            captureDays={authState.captureDays ?? []}
+            pastDays={authState.pastDays ?? []}
+            onSignedIn={onSignedIn}
+          />
         )}
       </section>
     </main>
@@ -44,16 +54,32 @@ interface SignInProps {
   readonly users: readonly UserSummary[];
   /** The days a session may capture, today first (E1-60). With one or none, the screen does not ask. */
   readonly captureDays: readonly string[];
+  /** How each past day stands: its unfinished session and its cuts (E1-61). */
+  readonly pastDays: readonly PastCaptureDay[];
   readonly onSignedIn: (user: UserSummary) => void;
 }
 
-function SignIn({ posApi, users, captureDays, onSignedIn }: SignInProps): ReactElement {
+/** What choosing a day does, said on its option so the cashier sees it before choosing (E1-61). */
+function dayOptionLabel(day: string, index: number, state: PastCaptureDay | undefined): string {
+  const name = index === 0 ? `Hoy, ${captureDayLabel(day)}` : index === 1 ? `Ayer, ${captureDayLabel(day)}` : captureDayLabel(day);
+  if (state?.unfinished != null) {
+    return `${name} · caja sin corte`;
+  }
+  return state !== undefined && state.cutCount > 0 ? `${name} · ya tiene corte` : name;
+}
+
+function SignIn({ posApi, users, captureDays, pastDays, onSignedIn }: SignInProps): ReactElement {
   const [selectedId, setSelectedId] = useState(users[0]?.id ?? '');
   const [pin, setPin] = useState('');
   const today = captureDays[0] ?? '';
   const [captureDay, setCaptureDay] = useState(today);
   const [ownerPin, setOwnerPin] = useState('');
+  const [supplementary, setSupplementary] = useState(false);
   const isPastDay = captureDay !== today;
+  const dayState = isPastDay ? pastDays.find(({ day }) => day === captureDay) : undefined;
+  const unfinished = dayState?.unfinished ?? null;
+  const isCutDay = dayState !== undefined && unfinished === null && dayState.cutCount > 0;
+  const unfinishedElsewhere = pastDays.filter((state) => state.unfinished !== null && state.day !== captureDay);
   const needsOwnerPin = isPastDay && users.find(({ id }) => id === selectedId)?.role !== 'owner';
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -86,7 +112,9 @@ function SignIn({ posApi, users, captureDays, onSignedIn }: SignInProps): ReactE
     }
     setIsBusy(true);
     try {
-      const capture: CaptureDayRequest | undefined = isPastDay ? { day: captureDay, ...(needsOwnerPin ? { ownerPin } : {}) } : undefined;
+      const capture: CaptureDayRequest | undefined = isPastDay
+        ? { day: captureDay, ...(needsOwnerPin ? { ownerPin } : {}), ...(isCutDay && supplementary ? { supplementary: true } : {}) }
+        : undefined;
       const result = await posApi.login({ userId: selectedId, pin, ...(capture === undefined ? {} : { capture }) });
       if (result.status === 'ok') {
         onSignedIn(result.user);
@@ -142,18 +170,51 @@ function SignIn({ posApi, users, captureDays, onSignedIn }: SignInProps): ReactE
       {captureDays.length > 1 && (
         <label className="text-field">
           <span>Día de captura</span>
-          <select aria-label="Día de captura" value={captureDay} onChange={(event) => setCaptureDay(event.target.value)}>
+          <select
+            aria-label="Día de captura"
+            value={captureDay}
+            onChange={(event) => {
+              setCaptureDay(event.target.value);
+              setSupplementary(false);
+              setMessage(null);
+            }}
+          >
             {captureDays.map((day, index) => (
               <option key={day} value={day}>
-                {index === 0 ? `Hoy, ${captureDayLabel(day)}` : index === 1 ? `Ayer, ${captureDayLabel(day)}` : captureDayLabel(day)}
+                {dayOptionLabel(day, index, pastDays.find((state) => state.day === day))}
               </option>
             ))}
           </select>
         </label>
       )}
-      {isPastDay && (
+      {!isPastDay && unfinishedElsewhere.length > 0 && (
+        <p className="notice" role="note" aria-label="Cajas sin corte">
+          {unfinishedElsewhere.length === 1 ? 'Quedó una caja sin corte' : 'Quedaron cajas sin corte'} del{' '}
+          {unfinishedElsewhere.map(({ day }) => captureDayLabel(day)).join(', del ')}. Hoy se abre una caja nueva; para
+          terminar la otra, elige su día en «Día de captura».
+        </p>
+      )}
+      {isPastDay && unfinished !== null && (
         <p className="notice login-backdated" role="status">
-          Vas a capturar ventas atrasadas del {captureDayLabel(captureDay)}: cada venta de esta sesión cuenta en ese día, con su propio fondo y corte. Lo autoriza un dueño.
+          Vas a retomar la caja sin corte del {captureDayLabel(captureDay)} que abrió {unfinished.openedBy} a las{' '}
+          {OPENED_AT.format(new Date(unfinished.openedAt))} con un fondo de {formatCents(unfinished.openingFloatCents)}. Las ventas
+          que agregues cuentan en ese día y quedan a tu nombre; al terminar haces el corte de esa caja. Lo autoriza un dueño.
+        </p>
+      )}
+      {isCutDay && (
+        <>
+          <p className="notice login-backdated" role="status">
+            El {captureDayLabel(captureDay)} ya tiene corte y ese corte no se cambia. Puedes agregar una captura suplementaria: una
+            caja aparte para ese día, con fondo normalmente de $0 y su propio corte, que se suma al corte original. Lo autoriza un
+            dueño.
+          </p>
+          <CheckField label={`Agregar una captura suplementaria al ${captureDayLabel(captureDay)}`} checked={supplementary} onChange={setSupplementary} />
+        </>
+      )}
+      {isPastDay && unfinished === null && !isCutDay && (
+        <p className="notice login-backdated" role="status">
+          Vas a capturar ventas atrasadas del {captureDayLabel(captureDay)}: ese día no tuvo caja, así que se abre una para él, con
+          su propio fondo y corte. Cada venta de esta sesión cuenta en ese día. Lo autoriza un dueño.
         </p>
       )}
       {needsOwnerPin && (
@@ -176,7 +237,7 @@ function SignIn({ posApi, users, captureDays, onSignedIn }: SignInProps): ReactE
         </p>
       )}
       <button type="submit" className="button button-primary" disabled={isBusy}>
-        {isPastDay ? 'Entrar a capturar' : 'Entrar'} <kbd>Enter</kbd>
+        {!isPastDay ? 'Entrar' : unfinished !== null ? 'Retomar esa caja' : 'Entrar a capturar'} <kbd>Enter</kbd>
       </button>
       <p className="login-hint">Cambia de persona con ↑ ↓.</p>
     </form>
@@ -203,6 +264,8 @@ function describeRefusal(result: Exclude<Awaited<ReturnType<PosApi['login']>>, {
         : `El PIN del dueño es incorrecto. Le quedan ${result.attemptsLeft} ${result.attemptsLeft === 1 ? 'intento' : 'intentos'}.`;
     case 'owner_locked':
       return `El PIN del dueño está bloqueado hasta las ${LOCK_TIME.format(new Date(result.until))}.`;
+    case 'day_already_cut':
+      return 'Ese día ya tiene corte. Para agregarle ventas, marca «Agregar una captura suplementaria».';
   }
 }
 

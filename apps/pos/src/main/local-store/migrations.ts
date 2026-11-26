@@ -928,8 +928,217 @@ export const MIGRATIONS: readonly Migration[] = [
   },
   {
     version: 24,
+    name: 'create_quotes',
+    // Quotes (F2-07, ADR 0077) live apart from sales: no stock_movement, no payment, no cut ever reads them. A quote keeps
+    // a copy of each product's name and price at the time it was quoted. Its lines change only while it is open; its
+    // status is an append-only history, and a sale becomes the sale of one quote at most.
+    sql: `
+      CREATE TABLE quote (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        folio INTEGER NOT NULL CHECK (folio >= 1),
+        idempotency_key TEXT NOT NULL,
+        customer_name TEXT CHECK (customer_name IS NULL OR length(customer_name) BETWEEN 1 AND 80),
+        customer_phone TEXT CHECK (customer_phone IS NULL OR length(customer_phone) BETWEEN 1 AND 20),
+        notes TEXT CHECK (notes IS NULL OR length(notes) BETWEEN 1 AND 300),
+        valid_until TEXT NOT NULL CHECK (valid_until GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (tenant_id, folio),
+        UNIQUE (tenant_id, idempotency_key)
+      ) STRICT;
+
+      CREATE TABLE quote_line (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        quote_id TEXT NOT NULL REFERENCES quote (id),
+        line_number INTEGER NOT NULL CHECK (line_number >= 1),
+        product_id TEXT NOT NULL,
+        product_name TEXT NOT NULL CHECK (length(trim(product_name)) > 0),
+        unit TEXT NOT NULL CHECK (unit IN ('piece', 'meter', 'kilogram', 'liter')),
+        quantity_milli INTEGER NOT NULL CHECK (quantity_milli > 0),
+        unit_price_e4 INTEGER NOT NULL CHECK (unit_price_e4 >= 0),
+        tax_factor TEXT NOT NULL CHECK (tax_factor IN ('rate', 'exempt')),
+        tax_rate_bp INTEGER NOT NULL CHECK (tax_rate_bp >= 0),
+        total_cents INTEGER NOT NULL CHECK (total_cents >= 0),
+        UNIQUE (quote_id, line_number)
+      ) STRICT;
+
+      CREATE TABLE quote_status (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        quote_id TEXT NOT NULL REFERENCES quote (id),
+        sequence INTEGER NOT NULL CHECK (sequence >= 1),
+        status TEXT NOT NULL CHECK (status IN ('draft', 'converted', 'cancelled')),
+        sale_id TEXT UNIQUE REFERENCES sale (id),
+        note TEXT CHECK (note IS NULL OR length(note) <= 120),
+        recorded_by TEXT NOT NULL,
+        recorded_at TEXT NOT NULL,
+        CHECK ((status = 'converted') = (sale_id IS NOT NULL)),
+        UNIQUE (quote_id, sequence)
+      ) STRICT;
+
+      CREATE TABLE quote_print (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        quote_id TEXT NOT NULL REFERENCES quote (id),
+        printed_by TEXT NOT NULL,
+        printed_at TEXT NOT NULL
+      ) STRICT;
+
+      CREATE TRIGGER quote_status_is_never_changed BEFORE UPDATE ON quote_status
+      BEGIN SELECT RAISE(ABORT, 'the history of a quote only grows'); END;
+
+      CREATE TRIGGER quote_status_is_never_deleted BEFORE DELETE ON quote_status
+      BEGIN SELECT RAISE(ABORT, 'the history of a quote only grows'); END;
+
+      CREATE TRIGGER quote_closes_once BEFORE INSERT ON quote_status
+      WHEN (SELECT status FROM quote_status WHERE quote_id = NEW.quote_id ORDER BY sequence DESC LIMIT 1) IN ('converted', 'cancelled')
+      BEGIN SELECT RAISE(ABORT, 'a sold or cancelled quote stays that way'); END;
+
+      CREATE TRIGGER quote_line_added_only_while_open BEFORE INSERT ON quote_line
+      WHEN (SELECT status FROM quote_status WHERE quote_id = NEW.quote_id ORDER BY sequence DESC LIMIT 1) IN ('converted', 'cancelled')
+      BEGIN SELECT RAISE(ABORT, 'only an open quote changes its products'); END;
+
+      CREATE TRIGGER quote_line_removed_only_while_open BEFORE DELETE ON quote_line
+      WHEN (SELECT status FROM quote_status WHERE quote_id = OLD.quote_id ORDER BY sequence DESC LIMIT 1) IN ('converted', 'cancelled')
+      BEGIN SELECT RAISE(ABORT, 'only an open quote changes its products'); END;
+
+      CREATE TRIGGER quote_line_is_replaced_not_changed BEFORE UPDATE ON quote_line
+      BEGIN SELECT RAISE(ABORT, 'a quote line is replaced, never changed'); END;
+
+      CREATE TRIGGER quote_keeps_its_identity BEFORE UPDATE OF id, tenant_id, folio, idempotency_key, created_by, created_at ON quote
+      BEGIN SELECT RAISE(ABORT, 'the folio and author of a quote never change'); END;
+
+      CREATE TRIGGER quote_changes_only_while_open BEFORE UPDATE ON quote
+      WHEN (SELECT status FROM quote_status WHERE quote_id = OLD.id ORDER BY sequence DESC LIMIT 1) IN ('converted', 'cancelled')
+      BEGIN SELECT RAISE(ABORT, 'only an open quote changes'); END;
+
+      CREATE TRIGGER quote_is_never_deleted BEFORE DELETE ON quote
+      BEGIN SELECT RAISE(ABORT, 'a quote is cancelled, never deleted'); END;
+    `,
+  },
+  {
+    version: 25,
+    name: 'resume_unfinished_days',
+    // A session left without its cut belongs to the day it opened, and signing in to that day resumes it instead of opening
+    // another one (E1-61, ADR 0078). session_day keeps that day: the day a backdated session captures, or the local day it
+    // opened. The sessions still open are filled in here; the closed ones stay NULL, because a closed session never changes.
+    // The zone of the register is America/Mexico_City, which keeps UTC-6 all year since 2022, so date(opened_at, '-6 hours')
+    // is its local day for every session that can still be open. Today's drawer and a session of a past day may be open
+    // together, and so may an unfinished session and a supplementary one written before this version, but never two of the
+    // same day and kind. amends_cut_id ties a supplementary capture to the cut of its day, which never changes. The register
+    // always writes the day of a new session; one written without it, such as by an older tool, gets it the same way.
+    // A sale of a session that opened on a past day takes that day, so it counts on it.
+    sql: `
+      ALTER TABLE cash_session ADD COLUMN session_day TEXT
+        CHECK (session_day IS NULL OR session_day GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]');
+      ALTER TABLE cash_session ADD COLUMN amends_cut_id TEXT REFERENCES cash_cut (id);
+
+      UPDATE cash_session SET session_day = coalesce(business_day, date(opened_at, '-6 hours')) WHERE closed_at IS NULL;
+
+      DROP INDEX cash_session_one_open_per_day;
+      CREATE UNIQUE INDEX cash_session_one_open_per_day_and_kind ON cash_session (tenant_id, session_day, business_day IS NULL)
+        WHERE closed_at IS NULL;
+
+      CREATE TRIGGER cash_session_captures_its_own_day BEFORE INSERT ON cash_session
+      WHEN NEW.business_day IS NOT NULL AND NEW.session_day IS NOT NULL AND NEW.session_day IS NOT NEW.business_day
+      BEGIN SELECT RAISE(ABORT, 'a backdated cash session belongs to the day it captures'); END;
+
+      CREATE TRIGGER cash_session_gets_its_day AFTER INSERT ON cash_session
+      WHEN NEW.session_day IS NULL AND NEW.closed_at IS NULL
+      BEGIN
+        UPDATE cash_session SET session_day = coalesce(NEW.business_day, date(NEW.opened_at, '-6 hours')) WHERE id = NEW.id;
+      END;
+
+      CREATE TRIGGER cash_session_keeps_its_session_day BEFORE UPDATE OF session_day, amends_cut_id ON cash_session
+      WHEN OLD.session_day IS NOT NULL OR OLD.amends_cut_id IS NOT NULL OR NEW.amends_cut_id IS NOT OLD.amends_cut_id
+      BEGIN SELECT RAISE(ABORT, 'the day of a cash session and the cut it amends never change'); END;
+
+      DROP TRIGGER sale_takes_the_day_of_its_session;
+      CREATE TRIGGER sale_takes_the_day_of_its_session BEFORE INSERT ON sale
+      WHEN ((SELECT business_day FROM cash_session WHERE id = NEW.cash_session_id) IS NOT NULL
+          AND NEW.business_day IS NOT (SELECT business_day FROM cash_session WHERE id = NEW.cash_session_id))
+        OR (NEW.business_day IS NOT NULL
+          AND NEW.business_day IS NOT (SELECT session_day FROM cash_session WHERE id = NEW.cash_session_id))
+        OR (NEW.business_day IS NULL) <> (NEW.business_at IS NULL)
+      BEGIN SELECT RAISE(ABORT, 'a sale captures the day of its cash session'); END;
+    `,
+  },
+  {
+    version: 26,
+    name: 'create_catalog_equivalences',
+    // Equivalent products across supplier catalogs (E1-63, ADR 0079). Every decision of the owner is a new row and none is
+    // ever changed or deleted: an item joins or leaves a group, a pair is rejected so it is not proposed again, or a group
+    // gets a name. An item is named by its supplier and its code, not by its row, because importing a list replaces the
+    // rows; so the decisions are remembered on every future import. The current state is read from the last decision:
+    // catalog_equivalence_member says which group each item is in now, and catalog_equivalence_name the name of each group.
+    // catalog_synonym holds the words the owner adds to the dictionary of the matcher («alta velocidad» = hss).
+    sql: `
+      CREATE TABLE catalog_match_decision (
+        seq INTEGER PRIMARY KEY,
+        id TEXT NOT NULL UNIQUE,
+        tenant_id TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('join', 'leave', 'reject', 'name')),
+        group_id TEXT,
+        supplier_id TEXT,
+        supplier_code TEXT COLLATE NOCASE,
+        other_supplier_id TEXT,
+        other_supplier_code TEXT COLLATE NOCASE,
+        name TEXT CHECK (name IS NULL OR length(trim(name)) BETWEEN 1 AND 80),
+        origin TEXT NOT NULL CHECK (origin IN ('rules', 'ai', 'manual')),
+        score INTEGER CHECK (score IS NULL OR score BETWEEN 0 AND 100),
+        reason TEXT CHECK (reason IS NULL OR length(reason) <= 300),
+        decided_by TEXT NOT NULL,
+        decided_at TEXT NOT NULL,
+        CHECK (kind NOT IN ('join', 'leave') OR (group_id IS NOT NULL AND supplier_id IS NOT NULL AND supplier_code IS NOT NULL)),
+        CHECK (kind <> 'reject' OR (supplier_id IS NOT NULL AND supplier_code IS NOT NULL AND other_supplier_id IS NOT NULL AND other_supplier_code IS NOT NULL)),
+        CHECK (kind <> 'name' OR (group_id IS NOT NULL AND name IS NOT NULL))
+      ) STRICT;
+
+      CREATE INDEX catalog_match_decision_by_item ON catalog_match_decision (tenant_id, supplier_id, supplier_code, kind);
+      CREATE INDEX catalog_match_decision_by_group ON catalog_match_decision (tenant_id, group_id, kind);
+
+      CREATE TRIGGER catalog_match_decision_never_changes BEFORE UPDATE ON catalog_match_decision
+      BEGIN SELECT RAISE(ABORT, 'a decision about equivalent products never changes: add a new one'); END;
+
+      CREATE TRIGGER catalog_match_decision_never_deleted BEFORE DELETE ON catalog_match_decision
+      BEGIN SELECT RAISE(ABORT, 'a decision about equivalent products is never deleted: add a new one'); END;
+
+      CREATE VIEW catalog_equivalence_member AS
+        SELECT decision.tenant_id, decision.group_id, decision.supplier_id, decision.supplier_code
+        FROM catalog_match_decision AS decision
+        WHERE decision.kind = 'join'
+          AND decision.seq = (
+            SELECT max(later.seq) FROM catalog_match_decision AS later
+            WHERE later.tenant_id = decision.tenant_id AND later.supplier_id = decision.supplier_id
+              AND later.supplier_code = decision.supplier_code AND later.kind IN ('join', 'leave')
+          );
+
+      CREATE VIEW catalog_equivalence_name AS
+        SELECT decision.tenant_id, decision.group_id, decision.name
+        FROM catalog_match_decision AS decision
+        WHERE decision.kind = 'name'
+          AND decision.seq = (
+            SELECT max(later.seq) FROM catalog_match_decision AS later
+            WHERE later.tenant_id = decision.tenant_id AND later.group_id = decision.group_id AND later.kind = 'name'
+          );
+
+      CREATE TABLE catalog_synonym (
+        tenant_id TEXT NOT NULL,
+        term TEXT NOT NULL CHECK (length(trim(term)) BETWEEN 1 AND 60),
+        canonical TEXT NOT NULL CHECK (length(trim(canonical)) BETWEEN 1 AND 60),
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, term)
+      ) STRICT, WITHOUT ROWID;
+    `,
+  },
+  {
+    version: 27,
     name: 'release_codes_of_given_up_products',
-    // A product that is given up frees its barcodes, so a new product can use them (E1-62, ADR 0077). They move to an
+    // A product that is given up frees its barcodes, so a new product can use them (E1-62, ADR 0080). They move to an
     // append-only history that still tells which products ever had a code, for the search of old sales and to reactivate.
     // A code may be released, restored and released again, so the moment is part of the key. Who and when gave the product
     // up lives on the product while it stays given up; the products given up before this migration take it from the audit log.

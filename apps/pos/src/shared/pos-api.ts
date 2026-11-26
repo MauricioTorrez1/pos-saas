@@ -1,7 +1,7 @@
 import type { Quantity, TaxRate, Unit } from '@pos-saas/money';
 
 import type { Appearance } from './appearance';
-import type { CaptureDayRequest } from './capture-day';
+import type { CaptureDayRequest, PastCaptureDay } from './capture-day';
 import type { BackupOutcome, BackupStatus, ImportOutcome, RestoreOutcome } from './admin-api';
 import type { LoginResult, UserRole, UserSummary } from './auth';
 import type { AdjustStockRequest, AdjustStockResult, Kardex, LedgerCheck } from './inventory-api';
@@ -224,6 +224,8 @@ export interface AuthState {
   readonly captureDay?: string | null;
   /** The days the sign-in offers, today first. Empty when only today can be sold. */
   readonly captureDays?: readonly string[];
+  /** How each past day of `captureDays` stands: its unfinished session and its cuts (E1-61). */
+  readonly pastDays?: readonly PastCaptureDay[];
 }
 
 /** Everything the screen can ask of the main process. */

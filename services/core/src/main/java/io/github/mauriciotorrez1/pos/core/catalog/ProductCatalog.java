@@ -124,7 +124,7 @@ public class ProductCatalog {
 
     /**
      * Edits a product. Only the fields present change; a list of codes or presentations replaces the old list. A product
-     * that becomes inactive releases its codes to the history, so another product can use them (ADR 0077), and a code it
+     * that becomes inactive releases its codes to the history, so another product can use them (ADR 0080), and a code it
      * gets back when it is active again is marked as restored there.
      *
      * @param actorId the user who edits it
@@ -188,7 +188,7 @@ public class ProductCatalog {
     /**
      * Deletes a product logically: it stops appearing in searches, but the row stays so sales keep pointing at it and
      * the registers learn of the removal through the change feed. Its codes move to the history, free for another
-     * product (ADR 0077). Deleting twice is allowed.
+     * product (ADR 0080). Deleting twice is allowed.
      *
      * @param actorId the user who deletes it
      * @param id      the product
