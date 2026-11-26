@@ -7,7 +7,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Reads the individual invoices of the business for the panel (ADR 0081). */
+/** Reads the individual invoices of the business for the panel (ADR 0082). */
 @Component
 class InvoiceListing {
 

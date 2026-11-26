@@ -1,0 +1,8 @@
+# The build context is the repository root, because the jar embeds the shared JSON schemas of
+# packages/contracts (ADR 0046). Only what the image needs is sent; everything else stays out.
+*
+!services/core/.mvn
+!services/core/mvnw
+!services/core/pom.xml
+!services/core/src/main
+!packages/contracts/schemas

@@ -19,7 +19,7 @@ const STATUS_LABELS: Record<InvoiceRow['status'], string> = {
 };
 
 /**
- * The latest individual invoices with their cancellation (ADR 0081). A replacement shows which invoice it replaces,
+ * The latest individual invoices with their cancellation (ADR 0082). A replacement shows which invoice it replaces,
  * and the original offers its UUID as the substitute of motive 01.
  */
 export function InvoiceList({ invoices, mayCancel, cancelAction, replaceAction }: InvoiceListProps) {

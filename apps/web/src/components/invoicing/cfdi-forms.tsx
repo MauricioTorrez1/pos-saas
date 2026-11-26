@@ -42,7 +42,7 @@ interface CancelFormProps {
 }
 
 /**
- * Cancels a stamped CFDI with a SAT motive (owner only, ADR 0081). Motive 01 asks for the UUID of the replacement,
+ * Cancels a stamped CFDI with a SAT motive (owner only, ADR 0082). Motive 01 asks for the UUID of the replacement,
  * which must be stamped first. While the cancellation waits for the SAT or the receiver, «Consultar» reads it again.
  */
 export function CancelForm({ action, kind, id, status, substituteFiscalUuid = null, defaultMotive }: CancelFormProps) {

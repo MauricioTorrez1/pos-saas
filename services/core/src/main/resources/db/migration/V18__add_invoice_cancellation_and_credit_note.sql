@@ -1,4 +1,4 @@
--- E1-33: cancelling a CFDI and the credit note of a return (ADR 0081).
+-- E1-33: cancelling a CFDI and the credit note of a return (ADR 0082).
 -- Nothing is deleted: a cancelled CFDI keeps its row with the cancellation state, a replaced invoice is marked
 -- superseded, and the sales of a cancelled global are released so a new global may take them.
 

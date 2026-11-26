@@ -4,7 +4,7 @@ import { CancelForm } from './cfdi-forms';
 
 interface GlobalInvoiceListProps {
   globals: GlobalSummary[];
-  /** Given only to the owner, who holds `invoice.cancel` (ADR 0081): it adds the cancel form to each stamped global. */
+  /** Given only to the owner, who holds `invoice.cancel` (ADR 0082): it adds the cancel form to each stamped global. */
   cancelAction?: (previous: CfdiActionState, data: FormData) => Promise<CfdiActionState>;
 }
 

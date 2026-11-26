@@ -1,0 +1,10 @@
+# Remote state in Cloud Storage. Copy this file to backend.tf, put the name of the bucket created in the
+# runbook (docs/despliegue-en-la-nube.md, step 5), then run `terraform init -migrate-state`.
+# The bucket has versioning and uniform access, and only the owner's account can read it: the state holds
+# the generated database passwords.
+terraform {
+  backend "gcs" {
+    bucket = "REPLACE-WITH-YOUR-PROJECT-ID-tfstate"
+    prefix = "pos-saas/production"
+  }
+}

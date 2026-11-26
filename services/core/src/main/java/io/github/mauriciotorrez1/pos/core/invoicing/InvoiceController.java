@@ -134,7 +134,7 @@ class InvoiceController {
      * @param receiver fiscal data of the customer
      * @param paymentForm optional SAT payment form; derived from the sale when absent
      * @param satProductKeys optional SAT product key per sale line id
-     * @param replacesInvoiceId optional stamped invoice of the same sale this one replaces (motive 01, ADR 0081)
+     * @param replacesInvoiceId optional stamped invoice of the same sale this one replaces (motive 01, ADR 0082)
      */
     record IssueInvoiceRequest(UUID saleId, ReceiverRequest receiver, String paymentForm, Map<UUID, String> satProductKeys,
             UUID replacesInvoiceId) {

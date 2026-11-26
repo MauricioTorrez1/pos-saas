@@ -25,7 +25,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The credit note (CFDI of type E) of a return of an invoiced sale (RF-038, ADR 0081). It relates to the invoice or
+ * The credit note (CFDI of type E) of a return of an invoiced sale (RF-038, ADR 0082). It relates to the invoice or
  * the global that covered the sale with SAT relation 01 and follows the stamping steps of ADR 0050: the attempt is
  * committed before calling, our id goes as {@code external_id}, and a lost answer is looked up before stamping again.
  */

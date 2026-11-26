@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'Facturas' };
 export const dynamic = 'force-dynamic';
 
 /**
- * Individual invoices, their cancellation and the credit notes of returns (RF-037, RF-038, ADR 0081). The proxy lets
+ * Individual invoices, their cancellation and the credit notes of returns (RF-037, RF-038, ADR 0082). The proxy lets
  * in the owner and the manager; only the owner sees the cancel and replace forms, and the core checks it again.
  */
 export default async function InvoicesPage() {

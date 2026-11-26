@@ -112,7 +112,7 @@ public class IndividualInvoiceService {
 
     /**
      * Claims the sale under the invoicing lock (ADR 0080). A sale has one live invoice: the newest one that no accepted
-     * cancellation superseded. A replacement (ADR 0081) is the one exception, claimed by the invoice it replaces.
+     * cancellation superseded. A replacement (ADR 0082) is the one exception, claimed by the invoice it replaces.
      */
     private Claim claim(SaleView sale, Receiver receiver, UUID replacesInvoiceId, UUID actorId) {
         InvoicingLock.acquire(jdbc);

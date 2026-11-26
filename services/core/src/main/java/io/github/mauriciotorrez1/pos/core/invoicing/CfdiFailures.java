@@ -2,7 +2,7 @@ package io.github.mauriciotorrez1.pos.core.invoicing;
 
 import java.util.UUID;
 
-/** The outcomes of a cancellation or a credit note that are not a success (ADR 0081). Messages hold no fiscal data. */
+/** The outcomes of a cancellation or a credit note that are not a success (ADR 0082). Messages hold no fiscal data. */
 public final class CfdiFailures {
 
     private CfdiFailures() {

@@ -23,7 +23,7 @@ function refreshScreens() {
 }
 
 /**
- * Asks to cancel a CFDI, or reads at the provider where its cancellation stands (ADR 0081). Only the owner holds
+ * Asks to cancel a CFDI, or reads at the provider where its cancellation stands (ADR 0082). Only the owner holds
  * `invoice.cancel`; the core answers 403 to anyone else.
  *
  * Fields: `kind` (`invoice` or `global`), `id`, `intent` (`cancel` or `refresh`), `motive` and, for motive 01,

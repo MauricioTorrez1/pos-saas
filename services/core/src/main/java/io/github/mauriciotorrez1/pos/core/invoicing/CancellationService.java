@@ -24,7 +24,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Cancels a stamped CFDI before the SAT and follows the cancellation until it ends (RF-037, ADR 0081).
+ * Cancels a stamped CFDI before the SAT and follows the cancellation until it ends (RF-037, ADR 0082).
  *
  * <p>Cancelling is asynchronous at the SAT: an invoice whose receiver must accept stays {@code pending} until the
  * receiver answers (or the SAT accepts it after 72 hours). The request is recorded as {@code requested} and committed

@@ -39,7 +39,7 @@ export interface GlobalSummary {
   errorCode: string | null;
   /** Sales invoiced on their own after this global; above zero it must be cancelled with motive 04 and reissued. */
   overlappingInvoices: number;
-  /** Where its cancellation stands, or `null` if nobody asked to cancel it (ADR 0081). */
+  /** Where its cancellation stands, or `null` if nobody asked to cancel it (ADR 0082). */
   cancellationStatus: CancellationStatus | null;
   cancellationMotive: string | null;
 }
@@ -77,7 +77,7 @@ export interface GlobalInvoiceState {
 
 export const EMPTY_GLOBAL_STATE: GlobalInvoiceState = { preview: null, issued: null, error: null, providerMessage: null };
 
-// --- cancellation and credit notes (ADR 0081) -----------------------------------------------------------------------
+// --- cancellation and credit notes (ADR 0082) -----------------------------------------------------------------------
 
 /** Where a cancellation stands at the SAT. */
 export type CancellationStatus = 'requested' | 'pending' | 'accepted' | 'rejected' | 'failed';

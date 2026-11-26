@@ -1,4 +1,4 @@
-# ADR 0081: Cancelación de CFDI con estado asíncrono y nota de crédito por devolución
+# ADR 0082: Cancelación de CFDI con estado asíncrono y nota de crédito por devolución
 
 Estado: Aceptada · Fecha: 2026-11-26 · Concreta E1-33 (RF-037, RF-038). Usa los ADR 0012, 0042, 0050 y 0080.
 

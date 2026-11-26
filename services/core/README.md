@@ -208,7 +208,7 @@ The sales nobody asked to invoice go into one CFDI to «Público en general» pe
 `periodicity` is `monthly` (default), `biweekly` or `daily`. The receiver is `XAXX010101000` with regime 616 and the ZIP code of `INVOICING_ISSUER_ZIP_CODE`; each ticket and tax rate is one concept (`01010101`, `ACT`, the folio as identification). A sale is in at most one live global (partial unique index) and a period has at most one live global, so repeating a request after a timeout is safe: the provider is looked up by `external_id` first. A sale invoiced on its own after its global was stamped is still invoiced; the invoice records the global, which must be cancelled with SAT motive 04 and issued again.
 
 ### Cancellation and credit notes
-A stamped CFDI is never deleted: it is cancelled before the SAT with a motive ([ADR 0081](../../docs/adr/0081-cancelacion-y-nota-de-credito.md), RF-037, RF-038). Cancelling needs `invoice.cancel` (owner only); the rest `invoice.issue`.
+A stamped CFDI is never deleted: it is cancelled before the SAT with a motive ([ADR 0082](../../docs/adr/0082-cancelacion-y-nota-de-credito.md), RF-037, RF-038). Cancelling needs `invoice.cancel` (owner only); the rest `invoice.issue`.
 
 | Endpoint | What it does |
 | --- | --- |

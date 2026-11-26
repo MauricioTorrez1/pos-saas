@@ -36,7 +36,7 @@ function cfdiPath(kind: CfdiKind, id: string): string {
 }
 
 /**
- * Creates a client of the invoicing endpoints: the global invoice (ADR 0080), cancellations and credit notes (ADR 0081).
+ * Creates a client of the invoicing endpoints: the global invoice (ADR 0080), cancellations and credit notes (ADR 0082).
  *
  * @param config - Panel settings; only `coreApiUrl` is used.
  * @param accessToken - Access token of the session.

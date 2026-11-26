@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Cancellations (RF-037) and credit notes (RF-038) of ADR 0081, plus the list of individual invoices the panel shows.
+ * Cancellations (RF-037) and credit notes (RF-038) of ADR 0082, plus the list of individual invoices the panel shows.
  * Cancelling needs {@code invoice.cancel} (owner only); the rest {@code invoice.issue} (ADR 0042).
  */
 @RestController
