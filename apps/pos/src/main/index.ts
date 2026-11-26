@@ -21,6 +21,7 @@ import { PendingSales } from './checkout/pending-sales';
 import { DashboardExporter } from './reports/dashboard-exporter';
 import { DashboardService } from './reports/dashboard-service';
 import { MissingItemsLog } from './missing/missing-items-log';
+import { QuoteBook } from './quotes/quote-book';
 import { ExpenseBook } from './expenses/expense-book';
 import { printHtmlToPdf } from './reports/pdf-printer';
 import { ReportService } from './reports/report-service';
@@ -252,6 +253,17 @@ async function start(): Promise<void> {
     missingItems: {
       log: new MissingItemsLog(store, LOCAL_TENANT_ID, new AuditLog(store, LOCAL_TENANT_ID)),
       exporter: { pickSavePath, renderPdf: printHtmlToPdf, businessName: () => appearance.read().businessName || UNNAMED_BUSINESS },
+    },
+    // Quotes never touch stock, sales or the cash; they become a sale only when one is collected from them (F2-07).
+    quotes: {
+      book: new QuoteBook(store, LOCAL_TENANT_ID, {
+        catalog,
+        audit: new AuditLog(store, LOCAL_TENANT_ID),
+        authorizeOwnerPin: (pin) => auth.authorizeWithOwnerPin(pin),
+      }),
+      printer,
+      ticketDesign: () => tools.ticketDesign(),
+      businessName: () => appearance.read().businessName || UNNAMED_BUSINESS,
     },
     catalogExporter: new CatalogExporter({
       reader: new CatalogReader(store, LOCAL_TENANT_ID),
