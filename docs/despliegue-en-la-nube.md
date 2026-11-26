@@ -123,10 +123,10 @@ $env:PGPASSWORD = terraform -chdir=infra/terraform output -raw migrator_db_passw
 $migrator = terraform -chdir=infra/terraform output -raw migrator_db_user
 ```
 
-Primera migración (solo si todavía no corrió el workflow de despliegue):
+Primera migración. Hazla **antes** de activar el despliegue automático: si el primer despliegue migra y `pos_app` todavía no tiene contraseña, la prueba de humo falla y el workflow regresa el tráfico a la versión anterior.
 
 ```powershell
-docker run --rm -v "${PWD}/services/core/src/main/resources/db/migration:/flyway/sql:ro" flyway/flyway:12 -url="jdbc:postgresql://${pooler}:5432/postgres?sslmode=require" -user="$migrator" -password="$env:PGPASSWORD" migrate
+docker run --rm -e FLYWAY_PASSWORD=$env:PGPASSWORD -v "${PWD}/services/core/src/main/resources/db/migration:/flyway/sql:ro" flyway/flyway:12.11.0 -url="jdbc:postgresql://${pooler}:5432/postgres?sslmode=require" -user="$migrator" migrate
 ```
 
 Contraseña de `pos_app` (la variable de psql evita escribirla dentro del SQL):
@@ -150,6 +150,93 @@ Comprueba que `postgres` puede respaldar tablas con RLS forzada (debe responder 
 - Secret Manager muestra `core-db-url` y `core-db-password`, cada uno con una versión.
 - R2 muestra el bucket `pos-saas-backups` con tres reglas de ciclo de vida.
 - Billing > Budgets muestra la alerta “pos-saas: any spend”, si diste la cuenta de facturación.
+
+## 10. Llave de cifrado de los respaldos (`age`)
+Los respaldos se cifran con una llave pública que vive en el repositorio. Solo la llave privada, que **nunca** sube a Git ni a GitHub, puede abrirlos (ADR 0082).
+
+> Analogía: la llave pública es un buzón con ranura: cualquiera puede meter cartas, nadie puede sacarlas. La privada es la única llave del buzón.
+
+1. Instala `age` (`winget install FiloSottile.age`) y crea el par:
+
+```powershell
+age-keygen -o pos-backup.key
+```
+
+2. Guarda `pos-backup.key` en tu gestor de contraseñas **y** en una USB que se quede en la tienda. Sin ella ningún respaldo se puede restaurar.
+3. Copia la línea `Public key: age1...` (solo la parte `age1...`) al final de `infra/backup/age-recipients.txt`, haz commit y PR. Borra `pos-backup.key` de la carpeta del repositorio.
+
+## 11. Token de R2 para el respaldo
+En Cloudflare > R2 > **Manage API tokens** > Create API token: permiso **Object Read & Write**, aplicado **solo** al bucket `pos-saas-backups`. Copia el *Access Key ID* y el *Secret Access Key*; van como secretos de GitHub en el paso 12.
+
+## 12. Configurar GitHub
+1. **Entorno con aprobación manual:** Settings > Environments > New environment `production` > *Required reviewers*: tú. Marca también *Prevent self-review* solo si otra persona puede aprobar.
+2. **Variables del repositorio** (Settings > Secrets and variables > Actions > Variables). Los valores salen de `terraform -chdir=infra/terraform output`:
+
+| Variable | De dónde sale |
+| --- | --- |
+| `GCP_PROJECT_ID` | Tu ID de proyecto |
+| `GCP_REGION` | `output gcp_region` |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `output workload_identity_provider` |
+| `GCP_DEPLOYER_SERVICE_ACCOUNT` | `output deployer_service_account` |
+| `GCP_ARTIFACT_REPOSITORY` | `output artifact_registry_repository` |
+| `GCP_RUN_SERVICE` | `output core_service_name` |
+| `SUPABASE_POOLER_HOST` | `output supabase_pooler_host` |
+| `SUPABASE_PROJECT_REF` | `output supabase_project_ref` |
+| `R2_ACCOUNT_ID` | Tu Account ID de Cloudflare |
+| `R2_BUCKET` | `output backup_bucket` |
+| `CORE_URL` | `output core_url` |
+
+3. **Secretos del repositorio.** El de la base se pasa directo de Terraform a GitHub, sin que lo veas:
+
+```powershell
+terraform -chdir=infra/terraform output -raw migrator_db_password | gh secret set SUPABASE_DB_PASSWORD
+```
+
+```powershell
+gh secret set R2_ACCESS_KEY_ID
+```
+
+```powershell
+gh secret set R2_SECRET_ACCESS_KEY
+```
+
+4. **Primer despliegue:** Actions > **Deploy** > *Run workflow*, y aprueba el entorno `production` cuando lo pida. Al final verás la dirección del núcleo y el job verde.
+5. **Primer respaldo:** Actions > **Backups** > *Run workflow*. En R2 debe aparecer `daily/pos-saas-<fecha>.dump.age`.
+
+Mientras falte algo de esto, los workflows **Deploy**, **Backups** y **Uptime** se saltan solos (aparecen grises o con un aviso), no fallan.
+
+## 13. Simulacro de restauración (cada trimestre)
+Un respaldo que nunca se restauró no es un respaldo. CI ya prueba cada día la ida y vuelta con datos de prueba (job *Backup restore test*); el simulacro prueba **tu** llave con **tu** respaldo real, en tu PC y nunca contra producción.
+
+1. Descarga el respaldo más reciente de R2 (Dashboard > R2 > `pos-saas-backups` > `daily/`) a una carpeta fuera del repositorio, por ejemplo `C:espaldos`.
+2. Copia ahí también `pos-backup.key`.
+3. Levanta un PostgreSQL 17 desechable y restaura con la imagen de herramientas:
+
+```powershell
+docker build -t pos-backup-tools infra/backup
+```
+
+```powershell
+docker network create drill; docker run -d --name drill-db --network drill -e POSTGRES_PASSWORD=solo-simulacro postgres:17
+```
+
+```powershell
+docker run --rm --network drill -v C:espaldos:/work -e PGHOST=drill-db -e PGUSER=postgres -e PGPASSWORD=solo-simulacro -e PGDATABASE=postgres -e AGE_IDENTITY_FILE=/work/pos-backup.key pos-backup-tools restore-backup.sh /work/NOMBRE-DEL-RESPALDO.dump.age
+```
+
+4. Debe imprimir algo como `tables: 32, policies: 30, migrations: 16`. Revisa a mano que estén tus productos y las ventas de ayer:
+
+```powershell
+docker exec drill-db psql -U postgres -c "select count(*) from product"
+```
+
+5. Borra todo al terminar (cierra antes cualquier programa conectado a `drill-db`):
+
+```powershell
+docker rm -f drill-db; docker network rm drill
+```
+
+**RPO** (*Recovery Point Objective*, cuánto puedes perder): hasta un día de datos del servidor; la caja conserva sus ventas en SQLite y las vuelve a sincronizar. **RTO** (*Recovery Time Objective*, cuánto tardas en volver): unos 30 minutos siguiendo este simulacro contra un proyecto nuevo de Supabase.
 
 ## Mantenimiento
 - **Rotar la contraseña de `pos_app`:** `terraform -chdir=infra/terraform apply -replace=random_password.app`, repite el `ALTER ROLE` del paso 8 y despliega una revisión nueva para que Cloud Run lea el secreto nuevo.

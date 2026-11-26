@@ -1,0 +1,28 @@
+name: Uptime
+
+# External monitoring of the core (RNF-04, ADR 0082): every hour GitHub asks the public health of the core.
+# A failed run e-mails the owner, at $0. The health touches the database, so it also keeps Supabase free from
+# pausing after a week without activity. Skipped until the repository variable CORE_URL exists.
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    name: Core health
+    if: vars.CORE_URL != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Ask the core for its health
+        env:
+          HEALTH_ATTEMPTS: "6"
+          CORE_URL: ${{ vars.CORE_URL }}
+        run: bash scripts/check-core-health.sh "$CORE_URL"

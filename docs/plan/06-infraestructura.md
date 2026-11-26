@@ -20,8 +20,8 @@ Tu PC tiene 16 GB de RAM: levanta solo lo que uses. Docker Desktop ve 7.6 GiB de
 
 ## CI/CD con GitHub Actions
 1. **Cada PR:** compila, formatea, corre pruebas (JUnit y Testcontainers, Vitest, pytest), verifica módulos, corre casos compartidos, y escanea secretos y dependencias.
-2. **Merge a `main`:** construye imágenes, las sube a GitHub Container Registry y despliega en staging.
-3. **Etiqueta de versión:** despliega en producción tras aprobación manual, y publica el instalador de la caja.
+2. **Merge a `main` que toque el núcleo:** el workflow `Deploy` construye la imagen, la sube a Artifact Registry, migra con Flyway y despliega en Cloud Run tras la aprobación manual del entorno `production`; si la prueba de humo falla, regresa el tráfico a la revisión anterior ([ADR 0082](../adr/0082-despliegue-automatico-y-respaldos-cifrados.md)).
+3. **Etiqueta de versión:** publica el instalador de la caja.
 4. **Migraciones:** corren con Flyway antes de arrancar la versión nueva y con el rol `app_migrator`.
 
 ## Terraform
@@ -42,12 +42,12 @@ Tu PC tiene 16 GB de RAM: levanta solo lo que uses. Docker Desktop ve 7.6 GiB de
 ## Respaldos
 | Qué | Frecuencia | Retención | Dónde |
 | --- | --- | --- | --- |
-| PostgreSQL | Diario, con cifrado | 30 días | Almacenamiento externo al servidor |
-| Keycloak | Diario, con su base | 30 días | Igual |
+| PostgreSQL (Supabase) | Diario a las 03:17, cifrado con `age` | 30 diarios y 12 mensuales | Cloudflare R2, por reglas de ciclo de vida |
+| Keycloak | Cuando tenga casa en producción | 30 días | Igual |
 | Caja (SQLite) | Cada hora | 7 días | USB u otro dispositivo en la tienda |
 | Terraform | Por versión | Indefinida | Estado remoto |
 
-Se ensaya una restauración cada trimestre, porque un respaldo sin probar no es un respaldo.
+CI prueba a diario la ida y vuelta de un respaldo (job *Backup restore test*) y el dueño ensaya una restauración real cada trimestre (paso 13 de [la guía](../despliegue-en-la-nube.md)), porque un respaldo sin probar no es un respaldo. El monitoreo externo es el workflow `Uptime`, cada hora.
 
 ## Costos mensuales estimados
 Cifras aproximadas en MXN, confirmadas en F0-24 (ADR 0081).

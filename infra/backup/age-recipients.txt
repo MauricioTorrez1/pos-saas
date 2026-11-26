@@ -1,0 +1,4 @@
+# Public keys (age1...) that can decrypt the database backups, one per line (ADR 0082).
+# The owner creates the key pair with `age-keygen -o pos-backup.key`, keeps the private key OFFLINE
+# (password manager and a USB stick in the store), and pastes only the public line here.
+# While no age1 line exists, the backup workflow skips with a notice instead of failing.

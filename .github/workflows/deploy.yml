@@ -1,0 +1,117 @@
+name: Deploy
+
+# A merge to main that touches the core builds its image, migrates Supabase with Flyway and rolls out a new
+# Cloud Run revision, after a manual approval in the production environment (ADR 0082). Until the owner sets
+# the repository variables of docs/despliegue-en-la-nube.md, the job is skipped, not failed.
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/core/**
+      - packages/contracts/schemas/**
+      - .github/workflows/deploy.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time, and a newer one never cancels a deployment half way through a migration.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  FLYWAY_IMAGE: flyway/flyway:12.11.0@sha256:455c23d438811c27415f2c28052d0cc4494665a313b6faa41a7ece5242c24f10
+
+jobs:
+  deploy:
+    name: Deploy the core to production
+    if: >-
+      vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_DEPLOYER_SERVICE_ACCOUNT != '' &&
+      vars.GCP_ARTIFACT_REPOSITORY != '' && vars.GCP_RUN_SERVICE != '' && vars.GCP_REGION != '' &&
+      vars.GCP_PROJECT_ID != '' && vars.SUPABASE_POOLER_HOST != '' && vars.SUPABASE_PROJECT_REF != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Required reviewers on this environment are the manual approval. The Workload Identity binding of
+    # infra/terraform/gcp.tf only trusts jobs of this environment.
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      IMAGE: ${{ vars.GCP_ARTIFACT_REPOSITORY }}/core:${{ github.sha }}
+      SERVICE: ${{ vars.GCP_RUN_SERVICE }}
+      REGION: ${{ vars.GCP_REGION }}
+      PROJECT: ${{ vars.GCP_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the database secret
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          if [ -z "$SUPABASE_DB_PASSWORD" ]; then
+            echo "::error::Set the SUPABASE_DB_PASSWORD secret (docs/despliegue-en-la-nube.md)."
+            exit 1
+          fi
+
+      # A token that lives one hour, issued for this run only. No JSON key exists anywhere.
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+
+      - name: Build and push the image
+        run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          docker build --file services/core/Dockerfile --tag "$IMAGE" .
+          docker push "$IMAGE"
+
+      # Before the new revision, with the role that owns the tables. Migrations only add (ADR 0034), so the
+      # revision still running keeps working against the new schema.
+      - name: Migrate the database
+        env:
+          FLYWAY_URL: jdbc:postgresql://${{ vars.SUPABASE_POOLER_HOST }}:5432/postgres?sslmode=require
+          FLYWAY_USER: postgres.${{ vars.SUPABASE_PROJECT_REF }}
+          FLYWAY_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: >-
+          docker run --rm --env FLYWAY_URL --env FLYWAY_USER --env FLYWAY_PASSWORD
+          --volume "$PWD/services/core/src/main/resources/db/migration:/flyway/sql:ro"
+          "$FLYWAY_IMAGE" migrate
+
+      - name: Remember the revision that serves now
+        id: previous
+        run: |
+          revision="$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT" \
+            --format 'value(status.latestReadyRevisionName)')"
+          echo "revision=${revision}" >>"$GITHUB_OUTPUT"
+
+      # The image is the only change; env, secrets, probes and scaling stay as Terraform declared them.
+      - name: Roll out the new revision
+        id: deploy
+        run: |
+          gcloud run deploy "$SERVICE" --image "$IMAGE" --region "$REGION" --project "$PROJECT" --quiet
+          # A rollback pins traffic to one revision; this puts it back on the newest one.
+          gcloud run services update-traffic "$SERVICE" --to-latest --region "$REGION" --project "$PROJECT" --quiet
+          url="$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT" \
+            --format 'value(status.url)')"
+          echo "url=${url}" >>"$GITHUB_OUTPUT"
+
+      - name: Smoke test the health of the core
+        env:
+          CORE_URL: ${{ steps.deploy.outputs.url }}
+        run: bash scripts/check-core-health.sh "$CORE_URL"
+
+      - name: Send the traffic back to the previous revision
+        if: failure() && steps.deploy.outcome == 'success' && steps.previous.outputs.revision != ''
+        env:
+          PREVIOUS: ${{ steps.previous.outputs.revision }}
+        run: |
+          gcloud run services update-traffic "$SERVICE" --to-revisions "${PREVIOUS}=100" \
+            --region "$REGION" --project "$PROJECT" --quiet
+          echo "::error::The new revision failed its smoke test; traffic is back on ${PREVIOUS}."

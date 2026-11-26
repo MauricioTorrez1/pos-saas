@@ -7,7 +7,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Fase 0 · Cimientos del servidor y del catálogo
 
-✅ 25 de 26 tareas hechas · ⚠️ 1 falta (5 h)
+✅ 26 de 26 tareas hechas
 
 - ✅ **F0-01 · Inicializar repositorio y monorepo** (2 h): el repositorio de GitHub tiene la estructura del monorepo y una licencia AGPL-3.0.
 - ✅ **F0-02 · CI base en GitHub Actions** (3 h): cada PR compila y prueba Java, TypeScript y Python.
@@ -33,7 +33,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **F0-22 · Etiquetas en PDF** (3 h) _(En revisión)_: el dueño imprime etiquetas desde cualquier impresora.
 - ✅ **F0-23 · Contratos y casos compartidos** (4 h): `packages/contracts` contiene esquemas y casos de cálculo en JSON.
 - ✅ **F0-24 · Servidor con Terraform** (5 h) _(En revisión)_: existe un servidor reproducible dentro del presupuesto decidido.
-- ⚠️ **F0-25 · Despliegue automático y respaldos** (5 h): un merge a `main` despliega en staging, con HTTPS y respaldo diario.
+- ✅ **F0-25 · Despliegue automático y respaldos** (5 h) _(En revisión)_: un merge a `main` despliega en staging, con HTTPS y respaldo diario.
 - ✅ **F0-26 · El rol en `GET /me`** (1 h) _(En revisión)_: el panel decide por el rol que guarda el núcleo, no por roles del realm que nadie mantiene.
 
 ## Entrega 1 · Reemplazar a Eleventa
@@ -219,4 +219,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 87 de 177 tareas hechas (376 h de 790 h) · ⚠️ 90 faltan (414 h).
+✅ 88 de 177 tareas hechas (381 h de 790 h) · ⚠️ 89 faltan (409 h).
