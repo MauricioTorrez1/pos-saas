@@ -123,14 +123,17 @@ public class ProductCatalog {
     }
 
     /**
-     * Edits a product. Only the fields present change; a list of codes or presentations replaces the old list.
+     * Edits a product. Only the fields present change; a list of codes or presentations replaces the old list. A product
+     * that becomes inactive releases its codes to the history, so another product can use them (ADR 0084), and a code it
+     * gets back when it is active again is marked as restored there.
      *
      * @param actorId the user who edits it
      * @param id      the product
      * @param changes what to change
      * @return the product after the change
      * @throws ProductNotFoundException if it does not exist or was deleted
-     * @throws InvalidProductException  if the data breaks a rule, or asks to change the base unit
+     * @throws InvalidProductException  if the data breaks a rule, asks to change the base unit, or gives codes to a
+     *                                  product that stays inactive
      * @throws DuplicateCodeException   if a code already belongs to another product of the business
      */
     @Transactional
@@ -148,9 +151,16 @@ public class ProductCatalog {
         TaxRate tax = changes.tax() == null ? before.tax() : ProductRules.tax(changes.tax());
         String satProductKey = keyChange(changes.satProductKey(), before.satProductKey(), sat::requireProductKey);
         String satUnitKey = keyChange(changes.satUnitKey(), before.satUnitKey(), sat::requireUnitKey);
+        if (status == ProductStatus.INACTIVE && codes != null && !codes.isEmpty()) {
+            throw new InvalidProductException("an inactive product holds no codes: they are released when it is given up");
+        }
 
         if (codes != null) {
             replaceCodes(id, codes);
+            markRestored(id, codes);
+        }
+        if (status == ProductStatus.INACTIVE) {
+            releaseCodes(id);
         }
         if (presentations != null) {
             jdbc.update("DELETE FROM product_presentation WHERE product_id = ?", id);
@@ -176,8 +186,9 @@ public class ProductCatalog {
     }
 
     /**
-     * Deletes a product logically: it stops appearing in searches, but the row and its codes stay so sales keep
-     * pointing at it and the registers learn of the removal through the change feed. Deleting twice is allowed.
+     * Deletes a product logically: it stops appearing in searches, but the row stays so sales keep pointing at it and
+     * the registers learn of the removal through the change feed. Its codes move to the history, free for another
+     * product (ADR 0084). Deleting twice is allowed.
      *
      * @param actorId the user who deletes it
      * @param id      the product
@@ -193,6 +204,7 @@ public class ProductCatalog {
         if (before.deleted()) {
             return;
         }
+        releaseCodes(id);
         touch(id, before.name(), before.status(), before.tax(), before.satProductKey(), before.satUnitKey(), true);
         Product after = require(id);
         auditLog.record(new AuditEntry(actorId, "product.deleted", "product", id, snapshot(before), snapshot(after)));
@@ -429,6 +441,32 @@ public class ProductCatalog {
             return statement;
         });
         codes.forEach(code -> insertCode(productId, code));
+    }
+
+    /** Moves every code of the product to the history, in the transaction of the caller, and frees them. */
+    private void releaseCodes(UUID productId) {
+        jdbc.update("""
+                INSERT INTO product_code_history (code, product_id, kind)
+                SELECT code, product_id, kind FROM product_code WHERE product_id = ?
+                """, productId);
+        jdbc.update("DELETE FROM product_code WHERE product_id = ?", productId);
+    }
+
+    /** Marks as restored the released codes that the same product got back. */
+    private void markRestored(UUID productId, List<ProductCode> codes) {
+        if (codes.isEmpty()) {
+            return;
+        }
+        String[] restored = codes.stream().map(ProductCode::code).toArray(String[]::new);
+        jdbc.update(connection -> {
+            var statement = connection.prepareStatement("""
+                    UPDATE product_code_history SET restored_at = now()
+                    WHERE product_id = ? AND code = ANY (?) AND restored_at IS NULL
+                    """);
+            statement.setObject(1, productId);
+            statement.setArray(2, connection.createArrayOf("text", restored));
+            return statement;
+        });
     }
 
     private void insertPresentation(UUID productId, Presentation presentation) {

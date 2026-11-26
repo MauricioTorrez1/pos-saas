@@ -32,6 +32,7 @@ const CREATED: ProductDetail = {
   isActive: true,
   revision: 1,
   barcodes: ['7501234567890'],
+  releasedCodes: [],
   stockMilli: 0,
   movementCount: 0,
 };

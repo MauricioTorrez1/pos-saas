@@ -5,7 +5,15 @@ import type { LoginResult, UserSummary } from '../shared/auth';
 import type { BackupOutcome, BackupStatus, ImportOutcome, RestoreOutcome } from '../shared/admin-api';
 import type { AdjustStockResult, Kardex, LedgerCheck } from '../shared/inventory-api';
 import type { ChangePriceResult, PriceInfo } from '../shared/pricing';
-import type { CreateProductResult, ProductPanelDetail, ProductSummary, UpdateProductResult } from '../shared/product-admin';
+import type {
+  CreateProductResult,
+  GivenUpListResult,
+  ProductPanelDetail,
+  ProductSummary,
+  ReactivateProductResult,
+  ReactivationPreview,
+  UpdateProductResult,
+} from '../shared/product-admin';
 import { DASHBOARD_CHANNELS, type DashboardResult, type ExportResult } from '../shared/dashboard-api';
 import type { DailyReport } from '../shared/report-api';
 import type { FindReturnableResult, ReturnResult } from '../shared/returns-api';
@@ -31,7 +39,7 @@ import type { CashService } from './cash/cash-service';
 import { parseAdjustStockRequest, parseProductId } from './inventory/inventory-request';
 import type { InventoryService } from './inventory/inventory-service';
 import { parseChangePriceRequest } from './pricing/price-request';
-import { parseNewProductRequest, parseUpdateProductRequest } from './products/product-request';
+import { parseNewProductRequest, parseOwnerPin, parseReactivateProductRequest, parseUpdateProductRequest } from './products/product-request';
 import type { ProductService } from './products/product-service';
 import type { PriceChangeService } from './pricing/price-change-service';
 import type { StatementResult } from '../shared/income-statement';
@@ -223,6 +231,9 @@ export function registerIpcHandlers(
   answerSignedIn(IPC_CHANNELS.findProducts, (text): ProductSummary[] => products.find(requireLookupText(text)));
   answerSignedIn(IPC_CHANNELS.getProductDetail, (productId): ProductPanelDetail | null => products.panelDetail(parseProductId(productId)));
   answerSignedIn(IPC_CHANNELS.updateProduct, (request): UpdateProductResult => products.update(parseUpdateProductRequest(request)));
+  answerSignedIn(IPC_CHANNELS.listGivenUpProducts, (ownerPin): GivenUpListResult => products.listGivenUp(parseOwnerPin(ownerPin)));
+  answerSignedIn(IPC_CHANNELS.previewReactivation, (productId): ReactivationPreview | null => products.previewReactivation(parseProductId(productId)));
+  answerSignedIn(IPC_CHANNELS.reactivateProduct, (request): ReactivateProductResult => products.reactivate(parseReactivateProductRequest(request)));
   answerSignedIn(IPC_CHANNELS.savePendingSale, (request): SavePendingSaleResult => pendingSales.save(parsePendingSaleRequest(request)));
   answerSignedIn(IPC_CHANNELS.listPendingSales, (): PendingSale[] => pendingSales.list());
   answerSignedIn(IPC_CHANNELS.checkoutSale, (request): Promise<CheckoutSaleResult> => salePayments.checkout(parsePaymentRequest(request)));

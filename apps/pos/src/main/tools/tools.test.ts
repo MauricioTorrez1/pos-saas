@@ -142,6 +142,35 @@ describe('the list of sales', () => {
     expect(history.list('_')).toEqual([]);
   });
 
+  it('finds by a released code the sales of the given-up product and of the new one that uses the code now (E1-62)', () => {
+    const code = '7501031311309';
+    store.transaction((connection) => {
+      connection.prepare('INSERT INTO product_barcode (tenant_id, code, product_id) VALUES (?, ?, ?)').run(TENANT, code, hammerId);
+    });
+    const oldSale = sellHammer(undefined, 10_000);
+    // The hammer is given up the way ProductService does it: its code moves to the history.
+    const newHammerId = uuidV7();
+    store.transaction((connection) => {
+      connection.prepare('UPDATE product SET is_active = 0 WHERE id = ?').run(hammerId);
+      connection.prepare('DELETE FROM product_barcode WHERE code = ?').run(code);
+      connection
+        .prepare("INSERT INTO product_code_history (tenant_id, code, product_id, released_at, released_by) VALUES (?, ?, ?, '2026-11-20T10:00:00.000Z', ?)")
+        .run(TENANT, code, hammerId, owner.id);
+      connection
+        .prepare("INSERT INTO product (id, tenant_id, name, base_unit, unit_price_e4, tax_factor, tax_rate_bp) VALUES (?, ?, 'Martillo de bola', 'piece', 1000000, 'rate', 1600)")
+        .run(newHammerId, TENANT);
+      connection.prepare('INSERT INTO product_barcode (tenant_id, code, product_id) VALUES (?, ?, ?)').run(TENANT, code, newHammerId);
+    });
+    hammerId = newHammerId;
+    const newSale = sellHammer(undefined, 10_000);
+    const history = new SalesHistory(store, TENANT, new ProductCatalog(store, TENANT));
+
+    expect(history.list(code)).toMatchObject([
+      { saleId: newSale, matchedProducts: ['Martillo de bola'] },
+      { saleId: oldSale, matchedProducts: ['Martillo'] },
+    ]);
+  });
+
   it('says which sales were left without their ticket, until one is printed (E1-59)', () => {
     const old = sellHammer(undefined, 10_000);
     const skipped = sellHammer(undefined, 10_000);

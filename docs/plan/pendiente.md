@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 61 de 61 tareas hechas
+✅ 62 de 62 tareas hechas
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -101,6 +101,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-60 · Capturar las ventas de un día atrasado** (6 h) _(En revisión)_: al entrar se elige el día; con la autorización de un dueño, las ventas que no se alcanzaron a registrar ayer cuentan en ayer, con su propio fondo y corte suplementario, y el ticket lo dice.
 - ✅ **E1-61 · Retomar la caja sin corte de un día atrasado** (5 h) _(En revisión)_: si ayer se salió sin corte, al entrar se elige ayer y se retoma esa misma caja con su fondo para agregar lo que faltó y hacer su corte; un día ya cortado ofrece una captura suplementaria que suma al corte sin cambiarlo.
 - ✅ **E1-63 · Productos equivalentes entre catálogos** (8 h) _(En revisión)_: la caja propone qué artículos de distintos proveedores son el mismo producto aunque se escriban distinto («HSS» y «alta velocidad»), el dueño aprueba cada grupo y «Comparar precios» los muestra juntos por pieza; el lector de catálogos en papel acepta también PDF de hasta 4 hojas.
+- ✅ **E1-62 · Productos dados de baja liberan nombre y códigos** (4 h) _(En revisión)_: al dar de baja, los códigos quedan libres para un producto nuevo y se guardan en un historial; «Dados de baja» (F6 en el panel) lista lo dado de baja con quién, cuándo, precio, costo y existencia, y reactiva sin quitarle el código a nadie.
 
 ## Entrega 2 · Terminal de tarjeta integrada
 
@@ -219,4 +220,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 89 de 177 tareas hechas (385 h de 790 h) · ⚠️ 88 faltan (405 h).
+✅ 90 de 178 tareas hechas (389 h de 794 h) · ⚠️ 88 faltan (405 h).

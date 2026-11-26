@@ -22,6 +22,7 @@ const DETAIL: ProductPanelDetail = {
   isActive: true,
   revision: 3,
   barcodes: [HAMMER_CODE],
+  releasedCodes: [],
   stockMilli: 8_000,
   movementCount: 2,
   recentMovements: [
@@ -76,6 +77,9 @@ function productApiWith(overrides: Partial<ProductAdminApi> = {}): ProductAdminA
     findProducts: () => Promise.resolve([{ id: 'hammer', name: 'Martillo', unit: 'piece', unitPriceE4: 1_160_000, isActive: true }]),
     getProductDetail: () => Promise.resolve(DETAIL),
     updateProduct: () => Promise.resolve({ status: 'updated', product: { ...DETAIL, revision: 4, name: 'Martillo de bola' } }),
+    listGivenUpProducts: () => Promise.resolve({ status: 'listed', products: [] }),
+    previewReactivation: () => Promise.resolve(null),
+    reactivateProduct: vi.fn(),
     ...overrides,
   };
 }
@@ -289,6 +293,46 @@ describe('the product panel (E1-43)', () => {
     await waitFor(() => expect(updateProduct).toHaveBeenCalledWith(expect.objectContaining({ isActive: false })));
     expect(await screen.findByText(/Este producto está dado de baja: no se vende ni aparece en la venta/)).toBeDefined();
     expect(screen.queryByRole('button', { name: /Cambiar precio/, hidden: true })).toBeNull();
+  });
+
+  it('shows the codes a given-up product released instead of the code box, and reactivates it with its own dialog (E1-62)', async () => {
+    const givenUp: ProductPanelDetail = { ...DETAIL, isActive: false, barcodes: [], releasedCodes: [HAMMER_CODE] };
+    const reactivateProduct = vi.fn<ProductAdminApi['reactivateProduct']>(() => Promise.resolve({ status: 'reactivated', product: { ...DETAIL, revision: 5 } }));
+    await renderApp(
+      posApiWith(OWNER),
+      productApiWith({
+        getProductDetail: () => Promise.resolve(givenUp),
+        previewReactivation: () => Promise.resolve({ productId: 'hammer', name: 'Martillo', revision: 3, releasedCodes: [{ code: HAMMER_CODE, takenBy: null }], nameTakenBy: null }),
+        reactivateProduct,
+      }),
+    );
+    await openPanel();
+
+    expect(await screen.findByText(new RegExp(`Sus códigos quedaron libres: ${HAMMER_CODE}`))).toBeDefined();
+    expect(screen.queryByRole('textbox', { name: 'Código de barras', hidden: true })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Reactivar producto', hidden: true }));
+    await screen.findByRole('heading', { name: 'Reactivar Martillo', hidden: true });
+    fireEvent.keyDown(document.body, { key: 'F2' });
+
+    await waitFor(() => expect(reactivateProduct).toHaveBeenCalledWith(expect.objectContaining({ productId: 'hammer', restoreCodes: [HAMMER_CODE] })));
+    expect(await screen.findByText(`Producto reactivado con ${HAMMER_CODE}. Ya se puede vender otra vez.`)).toBeDefined();
+    expect(screen.getByRole('textbox', { name: 'Código de barras', hidden: true })).toBeDefined();
+  });
+
+  it('opens the list of the given-up products with F6 while the panel searches (E1-62)', async () => {
+    const listGivenUpProducts = vi.fn<ProductAdminApi['listGivenUpProducts']>(() => Promise.resolve({ status: 'listed', products: [] }));
+    await renderApp(posApiWith(OWNER), productApiWith({ listGivenUpProducts }));
+    fireEvent.keyDown(lookupBox(), { key: 'F10' });
+    await screen.findByRole('heading', { name: 'Producto', hidden: true });
+
+    fireEvent.keyDown(document.body, { key: 'F6' });
+
+    await screen.findByRole('heading', { name: 'Productos dados de baja', hidden: true });
+    expect(await screen.findByText('No hay productos dados de baja.')).toBeDefined();
+    expect(listGivenUpProducts).toHaveBeenCalledOnce();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Productos dados de baja', hidden: true })).toBeNull());
+    expect(screen.getByRole('heading', { name: 'Producto', hidden: true })).toBeDefined();
   });
 
   it('makes a cashier type the PIN of the owner to save, and keeps the panel open on a wrong one', async () => {

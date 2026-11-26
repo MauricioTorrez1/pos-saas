@@ -1,6 +1,7 @@
 package io.github.mauriciotorrez1.pos.core.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.mauriciotorrez1.pos.core.identity.Role;
 import io.github.mauriciotorrez1.pos.security.SecuredApiTest;
@@ -176,6 +177,69 @@ class ProductCatalogApiTest extends SecuredApiTest {
     }
 
     @Test
+    void givingAProductUpReleasesItsCodesToTheHistoryAndANewProductTakesThem() {
+        String code = unique("BAJA");
+        UUID old = createdId(create(owner, product(unique("Martillo "), "piece", List.of(code(code, "barcode")), List.of())));
+
+        Reply givenUp = call(owner, HttpMethod.PATCH, "/products/" + old, Map.of("status", "inactive"), null);
+
+        assertThat(givenUp.status()).isEqualTo(200);
+        assertThat(givenUp.body().get("codes")).isEmpty();
+        assertThat(admin.queryForObject("SELECT kind FROM product_code_history WHERE product_id = ? AND code = ? AND restored_at IS NULL",
+                String.class, old, code)).isEqualTo("barcode");
+        UUID replacement = createdId(create(owner, product(unique("Martillo nuevo "), "piece", List.of(code(code, "barcode")), List.of())));
+        assertThat(admin.queryForObject("SELECT product_id FROM product_code WHERE tenant_id = ? AND code = ?", UUID.class, tenant, code))
+                .isEqualTo(replacement);
+    }
+
+    @Test
+    void anInactiveProductHoldsNoCodesAndReactivatingNeverStealsATakenCode() {
+        String code = unique("REAC");
+        UUID old = createdId(create(owner, product(unique("Pinza "), "piece", List.of(code(code, "barcode")), List.of())));
+        call(owner, HttpMethod.PATCH, "/products/" + old, Map.of("status", "inactive"), null);
+
+        assertThat(call(owner, HttpMethod.PATCH, "/products/" + old, Map.of("codes", List.of(code(unique("X"), "barcode"))), null).status())
+                .as("a given-up product gets no codes").isEqualTo(400);
+        UUID replacement = createdId(create(owner, product(unique("Pinza nueva "), "piece", List.of(code(code, "barcode")), List.of())));
+
+        Reply stealing = call(owner, HttpMethod.PATCH, "/products/" + old, Map.of("status", "active", "codes", List.of(code(code, "barcode"))), null);
+        assertThat(stealing.status()).isEqualTo(409);
+        assertThat(admin.queryForObject("SELECT status FROM product WHERE id = ?", String.class, old)).isEqualTo("inactive");
+
+        Reply reactivated = call(owner, HttpMethod.PATCH, "/products/" + old, Map.of("status", "active"), null);
+        assertThat(reactivated.status()).isEqualTo(200);
+        assertThat(reactivated.body().get("codes")).isEmpty();
+        assertThat(admin.queryForObject("SELECT product_id FROM product_code WHERE tenant_id = ? AND code = ?", UUID.class, tenant, code))
+                .isEqualTo(replacement);
+    }
+
+    @Test
+    void reactivatingWithAReleasedCodeThatIsStillFreeMarksItRestored() {
+        String code = unique("BACK");
+        UUID id = createdId(create(owner, product(unique("Serrucho "), "piece", List.of(code(code, "barcode")), List.of())));
+        call(owner, HttpMethod.PATCH, "/products/" + id, Map.of("status", "inactive"), null);
+
+        Reply back = call(owner, HttpMethod.PATCH, "/products/" + id, Map.of("status", "active", "codes", List.of(code(code, "barcode"))), null);
+
+        assertThat(back.status()).isEqualTo(200);
+        assertThat(back.body().get("codes").get(0).get("code").asString()).isEqualTo(code);
+        assertThat(admin.queryForObject("SELECT restored_at IS NOT NULL FROM product_code_history WHERE product_id = ? AND code = ?",
+                Boolean.class, id, code)).isTrue();
+    }
+
+    @Test
+    void theHistoryOfTheCodesIsNeverRewrittenNorRemoved() {
+        String code = unique("HIST");
+        UUID id = createdId(create(owner, product(unique("Lima "), "piece", List.of(code(code, "barcode")), List.of())));
+        call(owner, HttpMethod.PATCH, "/products/" + id, Map.of("status", "inactive"), null);
+
+        assertThatThrownBy(() -> admin.update("UPDATE product_code_history SET code = 'OTRO' WHERE product_id = ?", id))
+                .hasMessageContaining("never changes");
+        assertThatThrownBy(() -> admin.update("DELETE FROM product_code_history WHERE product_id = ?", id))
+                .hasMessageContaining("never deleted");
+    }
+
+    @Test
     void whenManyRequestsRaceForTheSameCodeExactlyOneWins() throws Exception {
         String contested = unique("RACE");
         ExecutorService pool = Executors.newFixedThreadPool(6);
@@ -233,7 +297,7 @@ class ProductCatalogApiTest extends SecuredApiTest {
 
         Reply renamed = call(owner, HttpMethod.PATCH, "/products/" + id, Map.of("status", "inactive"), null);
         assertThat(renamed.body().get("status").asString()).isEqualTo("inactive");
-        assertThat(renamed.body().get("codes")).hasSize(1);
+        assertThat(renamed.body().get("codes")).as("an inactive product releases its codes (ADR 0084)").isEmpty();
         assertThat(feedHead(tenant)).isGreaterThan(seq);
         assertThat(admin.queryForObject("SELECT count(*) FROM audit_log WHERE entity_id = ? AND action = 'product.updated'", Long.class, id)).isEqualTo(1L);
     }
@@ -272,7 +336,7 @@ class ProductCatalogApiTest extends SecuredApiTest {
     // -- logical delete ----------------------------------------------------------------------------------------
 
     @Test
-    void aDeletedProductDisappearsFromReadsButItsRowAndCodesStay() {
+    void aDeletedProductDisappearsFromReadsButItsRowStaysAndItsCodesAreReleased() {
         String code = unique("GONE");
         UUID id = createdId(create(owner, product(unique("Descontinuado "), "piece", List.of(code(code, "barcode")), List.of())));
 
@@ -284,8 +348,9 @@ class ProductCatalogApiTest extends SecuredApiTest {
         assertThat(call(owner, HttpMethod.DELETE, "/products/" + id, null, null).status()).as("deleting twice is harmless").isEqualTo(204);
         assertThat(call(owner, HttpMethod.DELETE, "/products/" + UUID.randomUUID(), null, null).status()).isEqualTo(404);
         assertThat(admin.queryForObject("SELECT deleted_at IS NOT NULL FROM product WHERE id = ?", Boolean.class, id)).isTrue();
-        // The code stays with the deleted product, so a sale that already used it keeps its meaning.
-        assertThat(create(owner, product(unique("Otro "), "piece", List.of(code(code, "barcode")), List.of())).status()).isEqualTo(409);
+        // The code is free for another product, and the history still says the deleted one had it (ADR 0084).
+        assertThat(admin.queryForObject("SELECT count(*) FROM product_code_history WHERE product_id = ? AND code = ?", Long.class, id, code)).isEqualTo(1L);
+        createdId(create(owner, product(unique("Otro "), "piece", List.of(code(code, "barcode")), List.of())));
         assertThat(admin.queryForObject("SELECT count(*) FROM audit_log WHERE entity_id = ? AND action = 'product.deleted'", Long.class, id)).isEqualTo(1L);
     }
 

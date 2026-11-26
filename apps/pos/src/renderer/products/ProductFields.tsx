@@ -36,6 +36,8 @@ interface ProductFieldsProps {
   readonly showPrice?: boolean;
   /** Shows the box for the stock the shelf has now. Only a new product has it: afterwards the stock moves with adjustments. */
   readonly showStock?: boolean;
+  /** Shows the barcode box. A product that was given up released its codes and gets them back only by reactivating (ADR 0084). */
+  readonly showBarcodes?: boolean;
   /** Why the unit cannot change, or undefined if it can. */
   readonly unitLockedReason?: string | undefined;
   /** The rate the product already has, offered even if it is not one of the usual ones. */
@@ -62,6 +64,7 @@ export function ProductFields({
   findCodeOwner,
   showPrice = true,
   showStock = true,
+  showBarcodes = true,
   unitLockedReason,
   currentTaxRate,
   currentPrice,
@@ -123,26 +126,30 @@ export function ProductFields({
         costProblem={problems.cost}
         priceProblem={problems.price}
       />
-      <Field
-        label="Código de barras"
-        value={codeText}
-        onChange={(text) => {
-          setCodeText(text);
-          setCodeProblem(undefined);
-        }}
-        maxLength={64}
-        onEnter={() => void addCode()}
-        hint="Escanea el código o escríbelo y oprime Enter. Puedes agregar varios."
-        problem={codeProblem ?? problems.barcodes}
-      />
+      {showBarcodes && (
+        <Field
+          label="Código de barras"
+          value={codeText}
+          onChange={(text) => {
+            setCodeText(text);
+            setCodeProblem(undefined);
+          }}
+          maxLength={64}
+          onEnter={() => void addCode()}
+          hint="Escanea el código o escríbelo y oprime Enter. Puedes agregar varios."
+          problem={codeProblem ?? problems.barcodes}
+        />
+      )}
       {values.barcodes.length > 0 && (
         <ul className="product-codes" aria-label="Códigos del producto">
           {values.barcodes.map((code) => (
             <li key={code}>
               <code>{code}</code>
-              <button type="button" className="product-code-remove" tabIndex={-1} aria-label={`Quitar el código ${code}`} onClick={() => removeCode(code)}>
-                Quitar
-              </button>
+              {showBarcodes && (
+                <button type="button" className="product-code-remove" tabIndex={-1} aria-label={`Quitar el código ${code}`} onClick={() => removeCode(code)}>
+                  Quitar
+                </button>
+              )}
             </li>
           ))}
         </ul>

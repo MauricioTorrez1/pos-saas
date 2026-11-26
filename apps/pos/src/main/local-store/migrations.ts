@@ -1135,4 +1135,65 @@ export const MIGRATIONS: readonly Migration[] = [
       ) STRICT, WITHOUT ROWID;
     `,
   },
+  {
+    version: 27,
+    name: 'release_codes_of_given_up_products',
+    // A product that is given up frees its barcodes, so a new product can use them (E1-62, ADR 0084). They move to an
+    // append-only history that still tells which products ever had a code, for the search of old sales and to reactivate.
+    // A code may be released, restored and released again, so the moment is part of the key. Who and when gave the product
+    // up lives on the product while it stays given up; the products given up before this migration take it from the audit log.
+    sql: `
+      CREATE TABLE product_code_history (
+        tenant_id TEXT NOT NULL,
+        code TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        released_at TEXT NOT NULL,
+        released_by TEXT NOT NULL,
+        restored_at TEXT,
+        restored_by TEXT,
+        CHECK ((restored_at IS NULL) = (restored_by IS NULL)),
+        PRIMARY KEY (tenant_id, code, released_at, product_id)
+      ) STRICT, WITHOUT ROWID;
+
+      CREATE INDEX product_code_history_by_product ON product_code_history (tenant_id, product_id);
+
+      CREATE TRIGGER product_code_history_keeps_its_facts
+      BEFORE UPDATE OF tenant_id, code, product_id, released_at, released_by ON product_code_history
+      BEGIN SELECT RAISE(ABORT, 'a released code never changes what it says'); END;
+
+      CREATE TRIGGER product_code_history_is_restored_once BEFORE UPDATE OF restored_at, restored_by ON product_code_history
+      WHEN OLD.restored_at IS NOT NULL
+      BEGIN SELECT RAISE(ABORT, 'a released code is restored only once'); END;
+
+      CREATE TRIGGER product_code_history_is_never_deleted BEFORE DELETE ON product_code_history
+      BEGIN SELECT RAISE(ABORT, 'the history of the codes is never deleted'); END;
+
+      ALTER TABLE product ADD COLUMN given_up_at TEXT;
+      ALTER TABLE product ADD COLUMN given_up_by TEXT;
+
+      UPDATE product SET
+        given_up_at = (
+          SELECT occurred_at FROM audit_log
+          WHERE audit_log.tenant_id = product.tenant_id AND entity = 'product' AND entity_id = product.id
+            AND ((action = 'product.update' AND detail LIKE '%state active -> inactive%') OR (action = 'product.create' AND detail LIKE '%, inactive; approved by %'))
+          ORDER BY occurred_at DESC LIMIT 1
+        ),
+        given_up_by = (
+          SELECT user_id FROM audit_log
+          WHERE audit_log.tenant_id = product.tenant_id AND entity = 'product' AND entity_id = product.id
+            AND ((action = 'product.update' AND detail LIKE '%state active -> inactive%') OR (action = 'product.create' AND detail LIKE '%, inactive; approved by %'))
+          ORDER BY occurred_at DESC LIMIT 1
+        )
+      WHERE is_active = 0;
+
+      INSERT INTO product_code_history (tenant_id, code, product_id, released_at, released_by)
+      SELECT barcode.tenant_id, barcode.code, barcode.product_id,
+        coalesce(product.given_up_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), coalesce(product.given_up_by, 'migration')
+      FROM product_barcode AS barcode JOIN product ON product.id = barcode.product_id AND product.tenant_id = barcode.tenant_id
+      WHERE product.is_active = 0;
+
+      DELETE FROM product_barcode
+      WHERE product_id IN (SELECT id FROM product WHERE is_active = 0 AND product.tenant_id = product_barcode.tenant_id);
+    `,
+  },
 ];

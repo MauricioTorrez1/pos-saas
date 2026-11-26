@@ -38,6 +38,7 @@ export class ProductCatalog {
   readonly #findByCodeAny: StatementSync;
   readonly #searchByNameAny: StatementSync;
   readonly #updatePrice: StatementSync;
+  readonly #idsThatHadCode: StatementSync;
 
   /**
    * @param store the open local database
@@ -66,6 +67,12 @@ export class ProductCatalog {
     this.#findByCodeAny = store.prepare(byCode);
     this.#searchByName = store.prepare(`${byName} AND product.is_active = 1 ${nameOrder}`);
     this.#searchByNameAny = store.prepare(`${byName} ${nameOrder}`);
+    // The product that has the code now, and every product that released it when it was given up (ADR 0084).
+    this.#idsThatHadCode = store.prepare(`
+      SELECT product_id FROM product_barcode WHERE tenant_id = ?1 AND code = ?2
+      UNION
+      SELECT product_id FROM product_code_history WHERE tenant_id = ?1 AND code = ?2
+    `);
     this.#updatePrice = store.prepare('UPDATE product SET unit_price_e4 = ? WHERE tenant_id = ? AND id = ? AND unit_price_e4 = ?');
   }
 
@@ -107,6 +114,18 @@ export class ProductCatalog {
     const statement = options.includeInactive === true ? this.#findByCodeAny : this.#findByCode;
     const row = statement.get(this.#tenantId, code.trim()) as unknown as ProductRow | undefined;
     return row === undefined ? null : toCatalogProduct(row);
+  }
+
+  /**
+   * Lists every product that has or ever had a barcode: the one that uses it now and the ones that released it when they
+   * were given up, so a code still finds the sales of a product that no longer has it.
+   *
+   * @param code the barcode. Spaces around it are ignored.
+   * @returns the UUIDv7 of each product, in no particular order, or an empty list if no product ever had the code
+   */
+  productIdsThatHadCode(code: string): string[] {
+    const rows = this.#idsThatHadCode.all(this.#tenantId, code.trim()) as unknown as { product_id: string }[];
+    return rows.map((row) => row.product_id);
   }
 
   /**

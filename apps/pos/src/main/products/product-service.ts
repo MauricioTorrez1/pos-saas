@@ -10,10 +10,14 @@ import {
   problemWithBarcodes,
   problemWithName,
   type CreateProductResult,
+  type GivenUpListResult,
   type NewProductRequest,
   type ProductDetail,
   type ProductPanelDetail,
   type ProductSummary,
+  type ReactivateProductRequest,
+  type ReactivateProductResult,
+  type ReactivationPreview,
   type UpdateProductRequest,
   type UpdateProductResult,
 } from '../../shared/product-admin';
@@ -58,6 +62,9 @@ export class ProductService {
   readonly #insertBarcode: StatementSync;
   readonly #deleteBarcode: StatementSync;
   readonly #updateProduct: StatementSync;
+  readonly #releaseCode: StatementSync;
+  readonly #restoreCode: StatementSync;
+  readonly #markGivenUp: StatementSync;
 
   /**
    * @param store the open local database
@@ -100,17 +107,29 @@ export class ProductService {
       SET name = ?, base_unit = ?, tax_factor = ?, tax_rate_bp = ?, unit_cost_e6 = ?, is_active = ?
       WHERE tenant_id = ? AND id = ? AND revision = ?
     `);
+    this.#releaseCode = store.prepare(
+      'INSERT INTO product_code_history (tenant_id, code, product_id, released_at, released_by) VALUES (?, ?, ?, ?, ?)',
+    );
+    this.#restoreCode = store.prepare(`
+      UPDATE product_code_history SET restored_at = ?, restored_by = ?
+      WHERE tenant_id = ? AND product_id = ? AND code = ? AND restored_at IS NULL
+    `);
+    this.#markGivenUp = store.prepare('UPDATE product SET given_up_at = ?, given_up_by = ? WHERE tenant_id = ? AND id = ?');
   }
 
   /**
-   * Finds products by a barcode or by the start of the words of their name, including the ones that were given up.
+   * Finds products by a barcode or by the start of the words of their name, including the ones that were given up. A code
+   * a given-up product released still finds it, next to the product that uses the code now.
    *
    * @param text what was typed or scanned
    * @returns the best matches first, at most 20
    */
   find(text: string): ProductSummary[] {
-    const exact = this.#catalog.findByCode(text, { includeInactive: true });
-    const found = exact === null ? this.#catalog.search(text, PANEL_SEARCH_LIMIT, { includeInactive: true }) : [exact];
+    const byCode = this.#catalog
+      .productIdsThatHadCode(text)
+      .map((id) => this.#catalog.findById(id, { includeInactive: true }))
+      .filter((product) => product !== null);
+    const found = byCode.length === 0 ? this.#catalog.search(text, PANEL_SEARCH_LIMIT, { includeInactive: true }) : byCode;
     return found.map(({ id, name, unit, unitPriceE4 }) => ({ id, name, unit, unitPriceE4, isActive: this.#reader.isActive(id) }));
   }
 
@@ -181,6 +200,9 @@ export class ProductService {
       for (const code of codes) {
         this.#insertBarcode.run(this.#tenantId, code, productId);
       }
+      if (!request.isActive) {
+        this.#markGivenUp.run(occurredAt, user.id, this.#tenantId, productId);
+      }
       // The stock is a movement of the ledger, never a number written on the product (ADR 0031). One product posts it once.
       if (request.initialStockMilli !== null) {
         this.#stock.postWithinTransaction([
@@ -240,8 +262,8 @@ export class ProductService {
     if (user === null) {
       throw new Error('Editing a product needs a person signed in');
     }
-    const codes = request.barcodes.map((code) => code.trim());
-    assertValidEdit(request, codes);
+    const asked = request.barcodes.map((code) => code.trim());
+    assertValidEdit(request, asked);
     const name = request.name.trim();
 
     const current = this.#reader.detail(request.productId);
@@ -251,6 +273,12 @@ export class ProductService {
     if (current.revision !== request.expectedRevision) {
       return { status: 'stale', product: this.panelDetail(request.productId)! };
     }
+    // A product that is given up holds no codes it did not have (ADR 0084). Giving it up releases the ones it has.
+    if (!request.isActive && asked.some((code) => !current.barcodes.includes(code))) {
+      throw new RangeError('A product that is given up cannot get new barcodes');
+    }
+    const givingUp = current.isActive && !request.isActive;
+    const codes = givingUp ? [] : asked;
     const changes = diffProduct(current, { name, unit: request.unit, taxRate: request.taxRate, unitCostE6: request.unitCostE6, isActive: request.isActive, codes });
     if (changes === null) {
       return { status: 'unchanged', product: this.panelDetail(request.productId)! };
@@ -294,9 +322,19 @@ export class ProductService {
       }
       for (const code of changes.barcodesRemoved ?? []) {
         this.#deleteBarcode.run(this.#tenantId, code, current.id);
+        if (givingUp) {
+          this.#releaseCode.run(this.#tenantId, code, current.id, occurredAt, user.id);
+        }
       }
       for (const code of changes.barcodesAdded ?? []) {
         this.#insertBarcode.run(this.#tenantId, code, current.id);
+        // A released code that comes back is marked as restored, so it stops resolving to this product as released.
+        this.#restoreCode.run(occurredAt, user.id, this.#tenantId, current.id, code);
+      }
+      if (givingUp) {
+        this.#markGivenUp.run(occurredAt, user.id, this.#tenantId, current.id);
+      } else if (changes.isActive?.new === true) {
+        this.#markGivenUp.run(null, null, this.#tenantId, current.id);
       }
       this.#audit.record({
         userId: user.id,
@@ -312,6 +350,115 @@ export class ProductService {
       );
     });
     return { status: 'updated', product: this.panelDetail(current.id)! };
+  }
+
+  /**
+   * Lists the products that were given up (E1-62, ADR 0084). Only the owner, or a cashier with the PIN of an owner; a
+   * refusal is written in the audit log.
+   *
+   * @param ownerPin the PIN of an owner, when a cashier asks
+   * @returns the products, the latest given up first, or why they were not listed
+   * @throws Error if nobody is signed in
+   */
+  listGivenUp(ownerPin?: string): GivenUpListResult {
+    const user = this.#auth.currentUser();
+    if (user === null) {
+      throw new Error('Listing the given-up products needs a person signed in');
+    }
+    const approval = this.#gate.authorize({
+      user,
+      ownerPin,
+      deniedAction: 'product.list_given_up_denied',
+      entity: 'product',
+      entityId: 'given_up',
+      deniedDetail: 'tried to open the given-up products',
+    });
+    if (isRefusal(approval)) {
+      return approval;
+    }
+    return { status: 'listed', products: this.#reader.givenUp() };
+  }
+
+  /**
+   * Tells what reactivating a product would run into: which of its released codes another product uses now, and whether an
+   * active product has its name. It only reads.
+   *
+   * @param productId the UUIDv7 of the product
+   * @returns the preview, or null if the product does not exist
+   */
+  previewReactivation(productId: string): ReactivationPreview | null {
+    const current = this.#reader.detail(productId);
+    if (current === null) {
+      return null;
+    }
+    return {
+      productId: current.id,
+      name: current.name,
+      revision: current.revision,
+      releasedCodes: current.releasedCodes.map((code) => ({ code, takenBy: this.#reader.codeOwner(code) })),
+      nameTakenBy: this.#reader.activeNameOwner(current.name, current.id),
+    };
+  }
+
+  /**
+   * Puts a given-up product on sale again with the released codes the owner chose (E1-62, ADR 0084). A code that another
+   * product uses now is never taken from it, and a name that an active product has must change: either answers without
+   * writing. The change itself is the one of `update`, so it has the same lock, approval, audit entry and operation.
+   *
+   * @param request the product, the name it comes back with and the codes it gets back
+   * @returns the product as it is now, or why nothing was written
+   * @throws Error if nobody is signed in
+   * @throws RangeError if a code to restore is not one the product released, or the name is not valid
+   */
+  reactivate(request: ReactivateProductRequest): ReactivateProductResult {
+    const current = this.#reader.detail(request.productId);
+    if (current === null) {
+      return { status: 'not_found' };
+    }
+    if (current.isActive) {
+      return { status: 'already_active', product: this.panelDetail(current.id)! };
+    }
+    if (current.revision !== request.expectedRevision) {
+      return { status: 'stale', product: this.panelDetail(current.id)! };
+    }
+    const restore = request.restoreCodes.map((code) => code.trim());
+    const unknown = restore.find((code) => !current.releasedCodes.includes(code));
+    if (unknown !== undefined) {
+      throw new RangeError(`The code ${unknown} is not one the product released`);
+    }
+    for (const code of restore) {
+      const owner = this.#reader.codeOwner(code);
+      if (owner !== null) {
+        return { status: 'code_taken', code, ...owner };
+      }
+    }
+    const nameOwner = this.#reader.activeNameOwner(request.name, current.id);
+    if (nameOwner !== null) {
+      return { status: 'name_taken', ...nameOwner };
+    }
+    const result = this.update({
+      productId: current.id,
+      expectedRevision: request.expectedRevision,
+      name: request.name,
+      unit: current.unit,
+      taxRate: current.taxRate,
+      unitCostE6: current.unitCostE6,
+      isActive: true,
+      barcodes: [...current.barcodes, ...restore],
+      ...(request.ownerPin === undefined ? {} : { ownerPin: request.ownerPin }),
+    });
+    switch (result.status) {
+      case 'updated':
+        return { status: 'reactivated', product: result.product };
+      case 'duplicate_code':
+        return { status: 'code_taken', code: result.code, productId: result.productId, productName: result.productName };
+      case 'unchanged':
+        return { status: 'already_active', product: result.product };
+      case 'unit_locked':
+        throw new Error('Reactivating a product never changes its unit');
+      default:
+        return result;
+    }
   }
 }
 
