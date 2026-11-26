@@ -95,6 +95,7 @@ async function sellHammerInCash(page: Page): Promise<void> {
   await expect(page.getByRole('textbox', { name: 'Efectivo recibido' })).toBeFocused();
   await page.keyboard.type('116');
   await page.keyboard.press('F2');
+  await expect(page.getByRole('status', { name: 'Cambio a entregar' })).toHaveText('Sin cambio');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
