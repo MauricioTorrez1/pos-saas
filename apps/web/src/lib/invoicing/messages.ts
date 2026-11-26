@@ -1,5 +1,5 @@
 import type { CoreResult } from '../catalog/core-api';
-import { PERIODICITY_LABELS, type Periodicity } from './types';
+import { PERIODICITY_LABELS, type CancellationStatus, type Periodicity } from './types';
 
 const MONEY = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
 const DAY = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
@@ -100,4 +100,100 @@ export function globalFailureMessage(result: Extract<CoreResult<unknown>, { ok: 
     default:
       return 'El sistema central tuvo un problema. Inténtalo en unos minutos.';
   }
+}
+
+const CANCELLATION_LABELS: Record<CancellationStatus, string> = {
+  requested: 'Cancelación enviada; falta la respuesta de Facturapi',
+  pending: 'Cancelación en espera de que el cliente la acepte',
+  accepted: 'Cancelada',
+  rejected: 'El cliente rechazó la cancelación; sigue vigente',
+  failed: 'Facturapi rechazó la cancelación; sigue vigente',
+};
+
+/**
+ * Describes where the cancellation of a CFDI stands.
+ *
+ * @param status - The cancellation status of the core, or `null` if nobody asked to cancel it.
+ */
+export function cancellationLabel(status: CancellationStatus | null): string {
+  return status === null ? 'Vigente' : CANCELLATION_LABELS[status];
+}
+
+/**
+ * Whether the owner may ask to cancel a CFDI in this state: stamped, and not cancelled or waiting for an answer.
+ *
+ * @param stamped - Whether the CFDI is stamped.
+ * @param status - Its cancellation status.
+ */
+export function mayAskToCancel(stamped: boolean, status: CancellationStatus | null): boolean {
+  return stamped && (status === null || status === 'rejected' || status === 'failed' || status === 'requested');
+}
+
+/**
+ * Turns a failed cancellation or credit note call into a sentence for the owner, using the `code` of the core.
+ *
+ * @param result - The failed call.
+ */
+export function cfdiFailureMessage(result: Extract<CoreResult<unknown>, { ok: false }>): string {
+  const code = typeof result.problem.code === 'string' ? result.problem.code : null;
+  switch (code) {
+    case 'motive_unknown':
+    case 'motive_not_allowed':
+      return 'Ese motivo no aplica a este comprobante. Elige otro.';
+    case 'substitute_required':
+      return 'El motivo 01 necesita el UUID de la factura que la sustituye. Emítela primero con «Sustituir».';
+    case 'substitute_not_replacement':
+      return 'Ese UUID no es una factura que sustituya a esta. Usa el UUID de la factura emitida con «Sustituir».';
+    case 'not_stamped':
+      return 'Solo se cancela un comprobante timbrado.';
+    case 'already_cancelled':
+      return 'Ese comprobante ya está cancelado.';
+    case 'awaiting_acceptance':
+      return 'La cancelación espera la respuesta del cliente. Usa «Consultar» para ver si ya respondió.';
+    case 'in_progress':
+      return 'Otra persona está tramitando este comprobante. Espera un momento y vuelve a consultar.';
+    case 'not_requested':
+      return 'Nadie ha pedido cancelar ese comprobante.';
+    case 'not_invoiced':
+      return 'Esa venta no tiene factura que corregir: o no se facturó, o la devolución llegó antes de la global y ya se descontó.';
+    case 'customer_unknown':
+      return 'La factura se emitió antes de guardar al cliente en Facturapi. Emite la nota de crédito desde Facturapi.';
+    case 'already_issued':
+      return 'Esa devolución ya tiene su nota de crédito.';
+    case 'issuer_not_configured':
+      return 'Falta configurar el código postal de expedición (INVOICING_ISSUER_ZIP_CODE) en el sistema central.';
+    case 'provider_rejected':
+      return 'Facturapi rechazó la solicitud. No cambió nada; corrige lo que indica y vuelve a intentarlo.';
+    case 'provider_not_configured':
+      return 'La facturación todavía no está configurada (falta la llave de Facturapi).';
+    case 'outcome_unknown':
+      return 'Facturapi no respondió y no sabemos si se hizo. Vuelve a intentarlo: antes se consulta en Facturapi.';
+    case 'not_found':
+      return 'No encontramos ese comprobante o esa devolución en este negocio.';
+    default:
+      break;
+  }
+  if (result.status === 403) {
+    return 'Tu rol no permite esta acción. Solo el dueño cancela facturas.';
+  }
+  return globalFailureMessage(result);
+}
+
+/**
+ * Turns a failed replacement invoice into a sentence for the owner.
+ *
+ * @param result - The failed call.
+ */
+export function replaceFailureMessage(result: Extract<CoreResult<unknown>, { ok: false }>): string {
+  const code = typeof result.problem.code === 'string' ? result.problem.code : null;
+  if (code === 'not_replaceable') {
+    return 'Solo se sustituye una factura timbrada y vigente de esa venta.';
+  }
+  if (result.problem.errors !== undefined) {
+    return 'Revisa los datos fiscales del cliente: el sistema central no los aceptó.';
+  }
+  if (result.status === 409 && code === null) {
+    return 'Esa factura ya tiene una sustituta, o alguien la está timbrando ahora.';
+  }
+  return cfdiFailureMessage(result);
 }

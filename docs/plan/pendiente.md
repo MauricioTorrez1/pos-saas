@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 60 de 61 tareas hechas · ⚠️ 1 falta (4 h)
+✅ 61 de 61 tareas hechas
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -72,7 +72,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-30 · Cliente de Facturapi** (4 h) _(En revisión)_: el núcleo crea facturas en modo de prueba, con llave cifrada por negocio.
 - ✅ **E1-31 · Factura individual** (6 h) _(En revisión)_: una venta sincronizada se factura y se guardan UUID, XML y PDF.
 - ✅ **E1-32 · Factura global** (5 h) _(En revisión)_: las ventas no facturadas de un periodo van a una global.
-- ⚠️ **E1-33 · Cancelación y nota de crédito** (4 h): se cancela una factura o se emite egreso por una devolución.
+- ✅ **E1-33 · Cancelación y nota de crédito** (4 h) _(En revisión)_: se cancela una factura o se emite egreso por una devolución.
 - ✅ **E1-34 · Reportes básicos** (5 h) _(En revisión)_: el dueño ve ventas, ticket promedio, margen, agotados y productos sin venta.
 - ✅ **E1-35 · Respaldo de la caja** (4 h): la base de la caja se copia cada hora a otro dispositivo.
 - ✅ **E1-36 · Instalador para Windows** (4 h): tu familia instala y actualiza la caja sin ayuda técnica.
@@ -219,4 +219,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 87 de 177 tareas hechas (376 h de 790 h) · ⚠️ 90 faltan (414 h).
+✅ 88 de 177 tareas hechas (380 h de 790 h) · ⚠️ 89 faltan (410 h).

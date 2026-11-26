@@ -42,6 +42,9 @@ export default async function DashboardPage() {
             <Link className="button" href="/catalog">
               Abrir el catálogo
             </Link>{' '}
+            <Link className="button button--quiet" href="/invoices">
+              Facturas
+            </Link>{' '}
             <Link className="button button--quiet" href="/invoices/global">
               Factura global
             </Link>

@@ -165,6 +165,7 @@ public class GlobalInvoiceService {
         List<Map<String, Object>> live = jdbc.queryForList("""
                 SELECT id, status, error_code, (attempt_started_at < now() - make_interval(secs => ?)) AS stale
                 FROM global_invoice WHERE periodicity = ? AND period_start = ? AND status IN ('pending', 'stamped')
+                  AND cancellation_status IS DISTINCT FROM 'accepted'
                 FOR UPDATE
                 """, attemptLease.toSeconds(), period.periodicity().satCode(), Date.valueOf(period.start()));
         if (!live.isEmpty()) {
@@ -349,8 +350,10 @@ public class GlobalInvoiceService {
 
     private static final String SUMMARY_SELECT = """
             SELECT g.id, g.periodicity, g.period_start, g.period_end, g.status, g.sale_count, g.expected_total_cents,
-                   g.total_cents, g.fiscal_uuid, g.provider_invoice_id, g.error_code,
-                   (SELECT count(*) FROM invoice i WHERE i.overlaps_global_invoice_id = g.id) AS overlapping
+                   g.total_cents, g.fiscal_uuid, g.provider_invoice_id, g.error_code, g.cancellation_status,
+                   g.cancellation_motive,
+                   (SELECT count(*) FROM invoice i WHERE i.overlaps_global_invoice_id = g.id AND i.status = 'stamped'
+                      AND i.superseded_at IS NULL) AS overlapping
             FROM global_invoice g""";
 
     private Summary find(UUID globalId) {
@@ -358,7 +361,8 @@ public class GlobalInvoiceService {
     }
 
     private Optional<Summary> live(Period period) {
-        return jdbc.query(SUMMARY_SELECT + " WHERE g.periodicity = ? AND g.period_start = ? AND g.status IN ('pending', 'stamped')",
+        return jdbc.query(SUMMARY_SELECT + " WHERE g.periodicity = ? AND g.period_start = ? AND g.status IN ('pending', 'stamped')"
+                + " AND g.cancellation_status IS DISTINCT FROM 'accepted'",
                 (rs, row) -> summary(rs), period.periodicity().satCode(), Date.valueOf(period.start())).stream().findFirst();
     }
 
@@ -368,7 +372,8 @@ public class GlobalInvoiceService {
                 rs.getObject("period_start", LocalDate.class), rs.getObject("period_end", LocalDate.class),
                 rs.getString("status"), rs.getInt("sale_count"), rs.getLong("expected_total_cents"),
                 rs.wasNull() ? null : total, rs.getObject("fiscal_uuid", UUID.class), rs.getString("provider_invoice_id"),
-                rs.getString("error_code"), rs.getLong("overlapping"));
+                rs.getString("error_code"), rs.getLong("overlapping"), rs.getString("cancellation_status"),
+                rs.getString("cancellation_motive"));
     }
 
     private static String apiName(String satCode) {
