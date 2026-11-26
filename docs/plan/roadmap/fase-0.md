@@ -249,9 +249,10 @@ Duración estimada: 108 horas. Reparto: Claude escribe y explica; tú revisas, p
 ### F0-24 · Servidor con Terraform
 - **Objetivo:** existe un servidor reproducible dentro del presupuesto decidido.
 - **Conceptos:** [Terraform]
-- **Claude / tú:** Claude escribe la infraestructura como código. Tú eliges proveedor, creas la cuenta y compras el dominio.
-- **Pruebas:** `terraform validate` y `terraform plan` en CI.
+- **Claude / tú:** Claude escribe la infraestructura como código. Tú eliges proveedor, creas las cuentas y guardas las llaves.
+- **Pruebas:** `terraform fmt -check` y `terraform validate` en CI, sin credenciales; `terraform plan` lo corre el dueño en su equipo.
 - **Criterios:** ADR 0013 resuelto con precio confirmado, y sin secretos en el repositorio.
+- **Resolución (ADR 0081):** $0 al mes con Cloud Run (mínimo 0 instancias), Supabase Free y Cloudflare R2, en vez de un VPS. Guía del dueño en `docs/despliegue-en-la-nube.md`.
 - **Depende de:** F0-04 · **Estimación:** 5 h
 - **Autoevaluación:** (1) ¿Qué guarda el archivo de estado? (2) ¿Por qué no subirlo a Git? (3) ¿Qué hace `plan`?
 - **Entrevista:** (1) ¿Qué es infraestructura como código? (2) ¿Cómo manejas secretos en Terraform?

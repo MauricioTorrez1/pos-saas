@@ -1,4 +1,4 @@
--- E1-62: a product that is given up (inactive) or deleted frees its codes, so a new product can use them (ADR 0081).
+-- E1-62: a product that is given up (inactive) or deleted frees its codes, so a new product can use them (ADR 0082).
 -- The codes move to an append-only history that still tells which products ever had a code. A code may be released,
 -- restored and released again, so the moment is part of the key. The unique key of product_code now only holds the codes
 -- of live, active products: uniqueness among active products without a partial index.
