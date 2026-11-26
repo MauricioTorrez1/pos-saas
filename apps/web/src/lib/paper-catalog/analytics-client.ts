@@ -1,7 +1,7 @@
 import type { PanelConfig } from '../config';
 import type { ProposedRow } from './rows';
 
-/** What the review screen gets back for one photo. */
+/** What the review screen gets back for one photo or PDF. */
 export type PageReadResult =
   | { status: 'ok'; rows: ProposedRow[]; vatStatement: string }
   | { status: 'error'; httpStatus: number; message: string };
@@ -9,8 +9,10 @@ export type PageReadResult =
 const READ_TIMEOUT_MS = 180_000;
 
 const MESSAGES: Record<string, string> = {
-  photo_type: 'Solo se aceptan fotos JPEG o PNG.',
+  photo_type: 'Solo se aceptan fotos JPEG o PNG, o un PDF de pocas hojas.',
   photo_too_large: 'La foto pesa más de 5 MB. Tómala de nuevo o recórtala.',
+  pdf_too_large: 'El PDF pesa más de 20 MB. Mándalo por partes.',
+  pdf_too_many_pages: 'El PDF tiene más de 4 hojas. Mándalo por partes de hasta 4 hojas.',
   model_refused: 'No se pudo leer esta hoja. Revísala a mano.',
   page_too_long: 'La hoja tiene demasiadas líneas. Toma la foto por mitades.',
   malformed_answer: 'La lectura salió incompleta. Intenta de nuevo.',
@@ -22,13 +24,13 @@ const MESSAGES: Record<string, string> = {
 const GENERIC = 'El lector de catálogos no responde. Intenta de nuevo en un momento.';
 
 /**
- * Sends one photo to the analytics service with the token of the session. Server-side only: the token never reaches
+ * Sends one photo or PDF to the analytics service with the token of the session. Server-side only: the token never reaches
  * the browser and the photo is not stored on the way.
  *
  * @param config - Panel settings; `analyticsApiUrl` must be set.
  * @param accessToken - Access token of the owner's session.
- * @param photo - The image bytes.
- * @param mediaType - `image/jpeg` or `image/png`.
+ * @param photo - The image or PDF bytes.
+ * @param mediaType - `image/jpeg`, `image/png` or `application/pdf`.
  * @param fetcher - HTTP client; tests pass a fake.
  */
 export async function readCatalogPage(

@@ -1,7 +1,7 @@
 name: Infrastructure
 
 # Checks the Terraform code and that the core image builds. Nothing here touches a cloud account: there is no
-# apply, no plan against real providers, and no credential (ADR 0079). These checks are not required by the
+# apply, no plan against real providers, and no credential (ADR 0080). These checks are not required by the
 # branch rules, so the path filter never leaves a pull request waiting for them.
 on:
   pull_request:

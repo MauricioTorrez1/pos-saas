@@ -146,7 +146,7 @@ async function handleCatalogPage(request: IncomingMessage, response: ServerRespo
     return send(response, 403, { detail: 'owner_only' });
   }
   const photo = await readBody(request);
-  if (!['image/jpeg', 'image/png'].includes(request.headers['content-type'] ?? '') || photo.length === 0) {
+  if (!['image/jpeg', 'image/png', 'application/pdf'].includes(request.headers['content-type'] ?? '') || photo.length === 0) {
     return send(response, 415, { detail: 'photo_type' });
   }
   stats.pagesRead += 1;
