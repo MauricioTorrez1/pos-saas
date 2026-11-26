@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Starts a built core image the way production does (ADR 0080) and checks its health:
+# Starts a built core image the way production does (ADR 0081) and checks its health:
 #   1. PostgreSQL 17, the line Supabase gives new projects.
 #   2. Flyway from its own image, as the deploy workflow runs it, with the role that owns the tables.
 #   3. The password of pos_app set with ALTER ROLE, as the runbook does once.

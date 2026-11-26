@@ -4,6 +4,7 @@ import { cache } from 'react';
 import { createCoreApi, type CoreApi } from './catalog/core-api';
 import { loadConfig, type PanelConfig } from './config';
 import { fetchMe, type MeResult } from './core-client';
+import { createInvoicingApi, type InvoicingApi } from './invoicing/invoicing-api';
 import { readSession } from './session-cookies';
 import type { Session } from './session';
 
@@ -54,4 +55,14 @@ export const getMe = cache(async (): Promise<MeResult> => {
 export async function getCoreApi(): Promise<CoreApi> {
   const session = await requireSession();
   return createCoreApi(getConfig(), session.accessToken);
+}
+
+/**
+ * A client of the invoicing endpoints with the token of this request.
+ *
+ * @returns The client; it lives only on the server.
+ */
+export async function getInvoicingApi(): Promise<InvoicingApi> {
+  const session = await requireSession();
+  return createInvoicingApi(getConfig(), session.accessToken);
 }

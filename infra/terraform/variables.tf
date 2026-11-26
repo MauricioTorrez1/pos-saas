@@ -58,7 +58,7 @@ variable "core_memory" {
 }
 
 variable "oidc_issuer_uri" {
-  description = "Issuer of the Keycloak realm that signs the tokens of the panel. Empty keeps the default of the core until Keycloak has a home in production (ADR 0080)."
+  description = "Issuer of the Keycloak realm that signs the tokens of the panel. Empty keeps the default of the core until Keycloak has a home in production (ADR 0081)."
   type        = string
   default     = ""
 }

@@ -1,6 +1,6 @@
 # The core on Cloud Run: scales to zero, so an idle store costs nothing and the first request after a quiet
 # spell waits for a cold start. The register syncs in the background and sells offline, so that wait never
-# blocks a sale (ADR 0080).
+# blocks a sale (ADR 0081).
 
 locals {
   core_plain_env = merge(

@@ -1,4 +1,4 @@
-# ADR 0080: Núcleo en Cloud Run, base en Supabase y respaldos en R2, todo con Terraform
+# ADR 0081: Núcleo en Cloud Run, base en Supabase y respaldos en R2, todo con Terraform
 
 Estado: Aceptada · Fecha: 2026-11-25 · Concreta F0-24. Resuelve la condición de revisión del ADR 0013 y reemplaza la parte de servidor de `docs/plan/06-infraestructura.md` (un VPS con el stack completo).
 

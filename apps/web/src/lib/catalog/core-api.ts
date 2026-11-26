@@ -49,20 +49,25 @@ async function readProblem(response: Response): Promise<Record<string, unknown>>
   }
 }
 
+/** Options of one call to the core. */
+export interface CoreCallInit {
+  method?: string;
+  body?: string;
+  contentType?: string;
+  headers?: Record<string, string>;
+  timeoutMs?: number;
+}
+
 /**
- * Creates a client of the catalog endpoints. The token goes only from this server to the core, never to the browser.
- *
- * A network error or a timeout becomes `{ ok: false, status: 0 }`, so a screen can explain it instead of failing.
+ * Creates the function every client of the core uses: it adds the token, reads `application/problem+json` failures and
+ * turns a network error or a timeout into `{ ok: false, status: 0 }`. Server-side only.
  *
  * @param config - Panel settings; only `coreApiUrl` is used.
  * @param accessToken - Access token of the session.
  * @param fetcher - HTTP client; tests pass a fake.
  */
-export function createCoreApi(config: PanelConfig, accessToken: string, fetcher: typeof fetch = fetch): CoreApi {
-  async function call<T>(
-    path: string,
-    init: { method?: string; body?: string; contentType?: string; headers?: Record<string, string>; timeoutMs?: number } = {},
-  ): Promise<CoreResult<T>> {
+export function createCoreCaller(config: PanelConfig, accessToken: string, fetcher: typeof fetch = fetch) {
+  return async function call<T>(path: string, init: CoreCallInit = {}): Promise<CoreResult<T>> {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${accessToken}`,
       Accept: 'application/json',
@@ -95,7 +100,20 @@ export function createCoreApi(config: PanelConfig, accessToken: string, fetcher:
     } catch {
       return { ok: false, status: 0, detail: null, problem: {} };
     }
-  }
+  };
+}
+
+/**
+ * Creates a client of the catalog endpoints. The token goes only from this server to the core, never to the browser.
+ *
+ * A network error or a timeout becomes `{ ok: false, status: 0 }`, so a screen can explain it instead of failing.
+ *
+ * @param config - Panel settings; only `coreApiUrl` is used.
+ * @param accessToken - Access token of the session.
+ * @param fetcher - HTTP client; tests pass a fake.
+ */
+export function createCoreApi(config: PanelConfig, accessToken: string, fetcher: typeof fetch = fetch): CoreApi {
+  const call = createCoreCaller(config, accessToken, fetcher);
 
   const json = (method: string, body: unknown, headers?: Record<string, string>) => ({
     method,

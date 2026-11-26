@@ -1,6 +1,6 @@
 # Despliegue en la nube: guía paso a paso
 
-Esta guía pone el núcleo en internet con costo de $0 (ADR 0080): **Cloud Run** corre el núcleo, **Supabase** guarda PostgreSQL y **Cloudflare R2** guarda los respaldos cifrados. Terraform crea casi todo; tú creas las cuentas, verificas la facturación y guardas las llaves. Ninguna contraseña ni token se escribe en un archivo del repositorio.
+Esta guía pone el núcleo en internet con costo de $0 (ADR 0081): **Cloud Run** corre el núcleo, **Supabase** guarda PostgreSQL y **Cloudflare R2** guarda los respaldos cifrados. Terraform crea casi todo; tú creas las cuentas, verificas la facturación y guardas las llaves. Ninguna contraseña ni token se escribe en un archivo del repositorio.
 
 > Analogía: Terraform es el plano de la casa. Tú compras el terreno (las cuentas) y le das las llaves al albañil (los tokens en variables de entorno); él construye según el plano y anota en una libreta (el *state*, estado) qué construyó. Esa libreta tiene contraseñas, por eso nunca va a Git.
 

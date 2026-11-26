@@ -1,6 +1,6 @@
 # Terraform
 
-Production infrastructure of the core at $0 a month ([ADR 0080](../../docs/adr/0080-nucleo-en-cloud-run-y-base-en-supabase.md)): the core on **Google Cloud Run**, PostgreSQL on **Supabase** free, and encrypted backups on **Cloudflare R2**. The step-by-step guide for the owner, in Spanish, is [docs/despliegue-en-la-nube.md](../../docs/despliegue-en-la-nube.md).
+Production infrastructure of the core at $0 a month ([ADR 0081](../../docs/adr/0081-nucleo-en-cloud-run-y-base-en-supabase.md)): the core on **Google Cloud Run**, PostgreSQL on **Supabase** free, and encrypted backups on **Cloudflare R2**. The step-by-step guide for the owner, in Spanish, is [docs/despliegue-en-la-nube.md](../../docs/despliegue-en-la-nube.md).
 
 | File | What it declares |
 | --- | --- |

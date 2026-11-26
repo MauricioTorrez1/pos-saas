@@ -18,7 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
 /**
- * Starts the core with the production profile of Cloud Run (ADR 0080). The test database still needs its
+ * Starts the core with the production profile of Cloud Run (ADR 0081). The test database still needs its
  * schema, so this test turns Flyway back on; in production the deploy workflow migrates before rolling out.
  */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = "spring.flyway.enabled=true")
