@@ -1,6 +1,6 @@
 import { isUnit } from '@pos-saas/money';
 
-import { MAX_BARCODES_PER_PRODUCT, type NewProductRequest, type UpdateProductRequest } from '../../shared/product-admin';
+import { MAX_BARCODES_PER_PRODUCT, type NewProductRequest, type ReactivateProductRequest, type UpdateProductRequest } from '../../shared/product-admin';
 
 const MAX_PIN_LENGTH = 8;
 /** A text longer than this is not a name or a barcode, so it is refused before anything looks at it. */
@@ -127,6 +127,29 @@ export function parseNewProductRequest(value: unknown): NewProductRequest {
     barcodes: parseBarcodeList(request.barcodes),
     initialStockMilli: request.initialStockMilli === null ? null : requireInteger(request.initialStockMilli, 'the initial stock'),
     isActive: request.isActive,
+    ...(ownerPin === undefined ? {} : { ownerPin }),
+  };
+}
+
+/**
+ * Checks a reactivation that came over the bridge (E1-62). The service checks that the codes are the ones the product
+ * released and that nobody else uses them; this checks the shape.
+ *
+ * @param value what the screen sent
+ * @returns the request, with only the fields it knows
+ * @throws TypeError if something is missing or has the wrong type
+ */
+export function parseReactivateProductRequest(value: unknown): ReactivateProductRequest {
+  const request = asRecord(value, 'a reactivation');
+  if (typeof request.productId !== 'string' || !UUID_V7_TEXT.test(request.productId)) {
+    throw new TypeError('Expected the UUIDv7 of a product');
+  }
+  const ownerPin = parseOwnerPin(request.ownerPin);
+  return {
+    productId: request.productId,
+    expectedRevision: requireInteger(request.expectedRevision, 'the revision'),
+    name: requireText(request.name, 'the name'),
+    restoreCodes: parseBarcodeList(request.restoreCodes),
     ...(ownerPin === undefined ? {} : { ownerPin }),
   };
 }

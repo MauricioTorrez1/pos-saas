@@ -24,7 +24,7 @@ import { contractErrorsOfPushRequest } from '../sync/fakes/contract-validator';
 import { registerIdOf } from '../sync/register-identity';
 import { SyncOutbox } from '../sync/sync-outbox';
 import { uuidV7 } from '../uuid-v7';
-import { parseUpdateProductRequest } from './product-request';
+import { parseReactivateProductRequest, parseUpdateProductRequest } from './product-request';
 import { ProductReader } from './product-reader';
 import { ProductService } from './product-service';
 
@@ -161,7 +161,7 @@ describe('changing a product (E1-43)', () => {
   });
 
   it('queues product.updated in the same transaction, following the push contract, with the price left out', () => {
-    products.update(edit(tapeId, { name: 'Cinta de 8 m', isActive: false, barcodes: ['CINTA-8M'], unitCostE6: 1_000_000, taxRate: { factor: 'exempt', rateBp: 0 } }));
+    products.update(edit(tapeId, { name: 'Cinta de 8 m', barcodes: ['CINTA-8M'], unitCostE6: 1_000_000, taxRate: { factor: 'exempt', rateBp: 0 } }));
     const operations = new SyncOutbox(store, TENANT)
       .pending(100)
       .filter((operation) => operation.type === 'product.updated')
@@ -177,7 +177,6 @@ describe('changing a product (E1-43)', () => {
         name: { previous: 'Cinta métrica 5 m', new: 'Cinta de 8 m' },
         tax: { previous: { taxFactor: 'rate', taxRateBp: 1600 }, new: { taxFactor: 'exempt', taxRateBp: 0 } },
         unitCostE6: { previous: 52_250_000, new: 1_000_000 },
-        isActive: { previous: true, new: false },
         barcodesAdded: ['CINTA-8M'],
         barcodesRemoved: ['7501234567890'],
       },
@@ -388,10 +387,11 @@ describe('barcodes', () => {
     expect(catalog.findByCode('SIN-USO')).toBeNull();
   });
 
-  it('keeps the code of a product that was given up taken', () => {
+  it('lets another product use the code of a product that was given up (E1-62)', () => {
     products.update(edit(tapeId, { isActive: false }));
 
-    expect(products.update(edit(cableId, { barcodes: ['7501234567890'] }))).toMatchObject({ status: 'duplicate_code', productId: tapeId });
+    expect(updated(products.update(edit(cableId, { barcodes: ['7501234567890'] }))).barcodes).toEqual(['7501234567890']);
+    expect(catalog.findByCode('7501234567890')?.id).toBe(cableId);
   });
 
   it('does not tell the product off for a code it already has', () => {
@@ -432,10 +432,10 @@ describe('the unit', () => {
 });
 
 describe('giving a product up, and bringing it back', () => {
-  it('hides it from the sale without deleting anything, and keeps its history and its codes', () => {
+  it('hides it from the sale without deleting anything, keeps its history and releases its codes', () => {
     products.update(edit(tapeId, { isActive: false }));
 
-    expect(reader.detail(tapeId)).toMatchObject({ isActive: false, stockMilli: 12_000, barcodes: ['7501234567890'], movementCount: 1 });
+    expect(reader.detail(tapeId)).toMatchObject({ isActive: false, stockMilli: 12_000, barcodes: [], releasedCodes: ['7501234567890'], movementCount: 1 });
     expect(catalog.findById(tapeId)).toBeNull();
     expect(catalog.findByCode('7501234567890')).toBeNull();
     expect(catalog.search('cinta', 10)).toEqual([]);
@@ -449,8 +449,9 @@ describe('giving a product up, and bringing it back', () => {
     expect(products.find('cinta')).toEqual([{ id: tapeId, name: 'Cinta métrica 5 m', unit: 'piece', unitPriceE4: 895_000, isActive: false }]);
     expect(products.find('7501234567890').map(({ id }) => id)).toEqual([tapeId]);
 
-    expect(updated(products.update(edit(tapeId, { isActive: true }))).isActive).toBe(true);
+    expect(updated(products.update(edit(tapeId, { isActive: true, barcodes: ['7501234567890'] }))).isActive).toBe(true);
     expect(catalog.findByCode('7501234567890')?.id).toBe(tapeId);
+    expect(reader.detail(tapeId)?.releasedCodes).toEqual([]);
     const quantity = quantityOf(1000, 'piece');
     const total = saleTotals([lineTotals(895_000, quantity, SIXTEEN)]).totalCents;
     expect(pending.save({ idempotencyKey: uuidV7(), lines: [{ productId: tapeId, quantityMilli: 1000 }], expectedTotalCents: total }).status).toBe('saved');
@@ -542,5 +543,213 @@ describe('what a valid change is', () => {
     expect(() => parseUpdateProductRequest({ ...valid, unitCostE6: 'free' })).toThrow(TypeError);
     expect(() => parseUpdateProductRequest({ ...valid, ownerPin: '123456789' })).toThrow(TypeError);
     expect(() => parseUpdateProductRequest(null)).toThrow(TypeError);
+  });
+});
+
+describe('a given-up product frees its name and its codes (E1-62)', () => {
+  function giveUpTape(): void {
+    updated(products.update(edit(tapeId, { isActive: false })));
+  }
+
+  function newTape(barcodes: readonly string[], name = 'Cinta métrica 5 m'): string {
+    const result = products.create({
+      name,
+      unit: 'piece',
+      unitPriceE4: 990_000,
+      taxRate: { factor: 'rate', rateBp: 1600 },
+      unitCostE6: null,
+      barcodes,
+      initialStockMilli: null,
+      isActive: true,
+    });
+    if (result.status !== 'created') {
+      throw new Error(`Expected created, got ${result.status}`);
+    }
+    return result.product.id;
+  }
+
+  function history(): { code: string; product_id: string; released_by: string; restored_by: string | null }[] {
+    return store.prepare('SELECT code, product_id, released_by, restored_by FROM product_code_history ORDER BY released_at').all() as unknown as {
+      code: string;
+      product_id: string;
+      released_by: string;
+      restored_by: string | null;
+    }[];
+  }
+
+  it('moves the codes to the history in the same change, with who gave the product up and when', () => {
+    giveUpTape();
+
+    expect(history()).toEqual([{ code: '7501234567890', product_id: tapeId, released_by: owner.id, restored_by: null }]);
+    expect(count("SELECT count(*) AS total FROM product_barcode WHERE code = '7501234567890'")).toBe(0);
+    const row = store.prepare('SELECT given_up_at, given_up_by FROM product WHERE id = ?').get(tapeId) as unknown as { given_up_at: string; given_up_by: string };
+    expect(row.given_up_by).toBe(owner.id);
+    expect(Number.isNaN(Date.parse(row.given_up_at))).toBe(false);
+  });
+
+  it('tells the core that the codes left the product, following the push contract', () => {
+    giveUpTape();
+    const operations = new SyncOutbox(store, TENANT)
+      .pending(100)
+      .filter((operation) => operation.type === 'product.updated')
+      .map(({ attempts: _attempts, ...operation }) => operation);
+
+    expect(contractErrorsOfPushRequest({ registerId: registerIdOf(store, TENANT), operations })).toEqual([]);
+    expect(operations[0]?.payload.changes).toEqual({ isActive: { previous: true, new: false }, barcodesRemoved: ['7501234567890'] });
+    expect(store.prepare("SELECT detail FROM audit_log WHERE action = 'product.update'").get()).toEqual({
+      detail: expect.stringContaining('state active -> inactive; codes removed [7501234567890]'),
+    });
+  });
+
+  it('lets a new product take the same code and the same name, and the sale finds the new one', () => {
+    giveUpTape();
+    const newId = newTape(['7501234567890']);
+
+    expect(catalog.findByCode('7501234567890')).toMatchObject({ id: newId, unitPriceE4: 990_000 });
+    expect(catalog.search('cinta', 10).map(({ id }) => id)).toEqual([newId]);
+  });
+
+  it('still finds the given-up product in the panel by the code it released, next to the one that has it now', () => {
+    giveUpTape();
+    const newId = newTape(['7501234567890']);
+
+    expect(products.find('7501234567890').map(({ id, isActive }) => ({ id, isActive }))).toEqual(
+      expect.arrayContaining([
+        { id: tapeId, isActive: false },
+        { id: newId, isActive: true },
+      ]),
+    );
+    expect(catalog.productIdsThatHadCode(' 7501234567890 ').sort()).toEqual([tapeId, newId].sort());
+  });
+
+  it('refuses to give a product up with codes it did not have, because a given-up product holds none', () => {
+    expect(() => products.update(edit(tapeId, { isActive: false, barcodes: ['7501234567890', 'OTRO'] }))).toThrow(RangeError);
+    giveUpTape();
+    expect(() => products.update(edit(tapeId, { barcodes: ['OTRO'] }))).toThrow(RangeError);
+    expect(history()).toHaveLength(1);
+  });
+
+  it('reactivates with the released codes that are still free, and marks them restored in the history', () => {
+    giveUpTape();
+    const preview = products.previewReactivation(tapeId)!;
+    expect(preview).toMatchObject({ name: 'Cinta métrica 5 m', releasedCodes: [{ code: '7501234567890', takenBy: null }], nameTakenBy: null });
+
+    const result = products.reactivate({ productId: tapeId, expectedRevision: preview.revision, name: preview.name, restoreCodes: ['7501234567890'] });
+
+    expect(result).toMatchObject({ status: 'reactivated', product: { isActive: true, barcodes: ['7501234567890'], releasedCodes: [] } });
+    expect(catalog.findByCode('7501234567890')?.id).toBe(tapeId);
+    expect(history()).toEqual([{ code: '7501234567890', product_id: tapeId, released_by: owner.id, restored_by: owner.id }]);
+    expect(store.prepare('SELECT given_up_at FROM product WHERE id = ?').get(tapeId)).toEqual({ given_up_at: null });
+  });
+
+  it('never takes a code that another product uses now: it explains who has it and writes nothing', () => {
+    giveUpTape();
+    const newId = newTape(['7501234567890'], 'Flexómetro 5 m');
+    const preview = products.previewReactivation(tapeId)!;
+    expect(preview.releasedCodes).toEqual([{ code: '7501234567890', takenBy: { productId: newId, productName: 'Flexómetro 5 m' } }]);
+    const revision = preview.revision;
+
+    expect(products.reactivate({ productId: tapeId, expectedRevision: revision, name: preview.name, restoreCodes: ['7501234567890'] })).toEqual({
+      status: 'code_taken',
+      code: '7501234567890',
+      productId: newId,
+      productName: 'Flexómetro 5 m',
+    });
+    expect(reader.detail(tapeId)).toMatchObject({ isActive: false, revision });
+    expect(catalog.findByCode('7501234567890')?.id).toBe(newId);
+  });
+
+  it('reactivates without the taken code, which stays released and keeps finding its old sales', () => {
+    giveUpTape();
+    const newId = newTape(['7501234567890'], 'Flexómetro 5 m');
+    const preview = products.previewReactivation(tapeId)!;
+
+    const result = products.reactivate({ productId: tapeId, expectedRevision: preview.revision, name: preview.name, restoreCodes: [] });
+
+    expect(result).toMatchObject({ status: 'reactivated', product: { isActive: true, barcodes: [], releasedCodes: ['7501234567890'] } });
+    expect(catalog.findByCode('7501234567890')?.id).toBe(newId);
+    expect(catalog.productIdsThatHadCode('7501234567890').sort()).toEqual([tapeId, newId].sort());
+  });
+
+  it('asks for another name when an active product has the same one, ignoring the case', () => {
+    giveUpTape();
+    newTape([], 'CINTA MÉTRICA 5 m');
+    const preview = products.previewReactivation(tapeId)!;
+    expect(preview.nameTakenBy).toMatchObject({ productName: 'CINTA MÉTRICA 5 m' });
+
+    expect(products.reactivate({ productId: tapeId, expectedRevision: preview.revision, name: preview.name, restoreCodes: [] })).toMatchObject({ status: 'name_taken' });
+    expect(reader.detail(tapeId)?.isActive).toBe(false);
+
+    const result = products.reactivate({ productId: tapeId, expectedRevision: preview.revision, name: 'Cinta métrica 5 m (vieja)', restoreCodes: ['7501234567890'] });
+    expect(result).toMatchObject({ status: 'reactivated', product: { name: 'Cinta métrica 5 m (vieja)', barcodes: ['7501234567890'] } });
+  });
+
+  it('refuses a code the product never released, and answers for a product that is active, changed or missing', () => {
+    giveUpTape();
+    const { revision } = reader.detail(tapeId)!;
+    expect(() => products.reactivate({ productId: tapeId, expectedRevision: revision, name: 'Cinta', restoreCodes: ['AJENO'] })).toThrow(RangeError);
+    expect(products.reactivate({ productId: tapeId, expectedRevision: revision - 1, name: 'Cinta', restoreCodes: [] }).status).toBe('stale');
+    expect(products.reactivate({ productId: cableId, expectedRevision: 1, name: 'Cable THW', restoreCodes: [] }).status).toBe('already_active');
+    expect(products.reactivate({ productId: uuidV7(), expectedRevision: 1, name: 'X', restoreCodes: [] })).toEqual({ status: 'not_found' });
+    expect(products.previewReactivation(uuidV7())).toBeNull();
+  });
+
+  it('lets a cashier reactivate only with the PIN of an owner', () => {
+    giveUpTape();
+    const { revision } = reader.detail(tapeId)!;
+    asCashier();
+
+    expect(products.reactivate({ productId: tapeId, expectedRevision: revision, name: 'Cinta métrica 5 m', restoreCodes: [] })).toEqual({ status: 'authorization_required' });
+    expect(products.reactivate({ productId: tapeId, expectedRevision: revision, name: 'Cinta métrica 5 m', restoreCodes: [], ownerPin: '4321' }).status).toBe('reactivated');
+  });
+
+  it('lists the given-up products with who and when, last price and cost, the stock left and the released codes', () => {
+    giveUpTape();
+
+    expect(products.listGivenUp()).toEqual({
+      status: 'listed',
+      products: [
+        {
+          id: tapeId,
+          name: 'Cinta métrica 5 m',
+          unit: 'piece',
+          givenUpAt: expect.any(String),
+          givenUpByName: 'Mauricio',
+          unitPriceE4: 895_000,
+          effectiveCostE6: 52_250_000,
+          stockMilli: 12_000,
+          releasedCodes: ['7501234567890'],
+        },
+      ],
+    });
+  });
+
+  it('lists a product created as inactive too, and shows a cashier the list only with the PIN of an owner', () => {
+    newTape([], 'Pala cuadrada');
+    const created = products.create({
+      name: 'Pico',
+      unit: 'piece',
+      unitPriceE4: 100_000,
+      taxRate: { factor: 'rate', rateBp: 1600 },
+      unitCostE6: null,
+      barcodes: [],
+      initialStockMilli: null,
+      isActive: false,
+    });
+    expect(created.status).toBe('created');
+    asCashier();
+
+    expect(products.listGivenUp()).toEqual({ status: 'authorization_required' });
+    expect(actions('product.list_given_up_denied')).toEqual(['product.list_given_up_denied']);
+    const listed = products.listGivenUp('4321');
+    expect(listed.status === 'listed' ? listed.products.map(({ name, givenUpByName }) => ({ name, givenUpByName })) : []).toEqual([{ name: 'Pico', givenUpByName: 'Mauricio' }]);
+  });
+
+  it('checks the shape of a reactivation that crosses the bridge', () => {
+    const valid = { productId: tapeId, expectedRevision: 3, name: 'Cinta', restoreCodes: ['1'], ownerPin: '4321' };
+    expect(parseReactivateProductRequest(valid)).toEqual(valid);
+    expect(() => parseReactivateProductRequest({ ...valid, productId: 'x' })).toThrow(TypeError);
+    expect(() => parseReactivateProductRequest({ ...valid, restoreCodes: 'abc' })).toThrow(TypeError);
+    expect(() => parseReactivateProductRequest({ ...valid, ownerPin: 1234 })).toThrow(TypeError);
   });
 });

@@ -36,8 +36,10 @@ export interface ProductDetail {
   readonly isActive: boolean;
   /** Goes up by one with every change, so a screen can tell that the product changed while it was being edited. */
   readonly revision: number;
-  /** Every barcode of the product, sorted. */
+  /** Every barcode of the product, sorted. A product that was given up has none: they were released (ADR 0077). */
   readonly barcodes: readonly string[];
+  /** The codes the product released when it was given up and has not got back, sorted. Empty for an active product. */
+  readonly releasedCodes: readonly string[];
   /** The sum of the movements of the ledger, in thousandths of the unit. It is never edited, only calculated. */
   readonly stockMilli: number;
   /** How many movements the product has in the ledger. While it has any, its unit cannot change. */
@@ -129,6 +131,80 @@ export type UpdateProductResult =
   | { readonly status: 'wrong_pin'; readonly attemptsLeft: number }
   | { readonly status: 'locked'; readonly until: string };
 
+/** A product that was given up, as the screen of the given-up products lists it (E1-62, ADR 0077). */
+export interface GivenUpProduct {
+  /** UUIDv7 of the product. */
+  readonly id: string;
+  readonly name: string;
+  readonly unit: Unit;
+  /** When it was given up, or null if the register does not know (it arrived given up before E1-62). */
+  readonly givenUpAt: string | null;
+  /** The name of the person who gave it up, or null if the register does not know. */
+  readonly givenUpByName: string | null;
+  /** The last price it had, with VAT, in ten-thousandths of a peso. */
+  readonly unitPriceE4: number;
+  /** The cost the margin was worked out with, in millionths of a peso, or null if unknown. */
+  readonly effectiveCostE6: number | null;
+  /** What the ledger says is left, in thousandths of the unit. Anything but zero still counts in the inventory. */
+  readonly stockMilli: number;
+  /** The codes it released and has not got back, sorted. */
+  readonly releasedCodes: readonly string[];
+}
+
+/** How listing the given-up products ended. */
+export type GivenUpListResult =
+  | { readonly status: 'listed'; readonly products: readonly GivenUpProduct[] }
+  | { readonly status: 'authorization_required' }
+  | { readonly status: 'wrong_pin'; readonly attemptsLeft: number }
+  | { readonly status: 'locked'; readonly until: string };
+
+/** A code a given-up product released, and whether it can get it back. */
+export interface ReleasedCode {
+  readonly code: string;
+  /** The active product that uses the code now, or null if it is free to restore. */
+  readonly takenBy: { readonly productId: string; readonly productName: string } | null;
+}
+
+/** What reactivating a product would run into, so the screen can explain it before asking (ADR 0077). */
+export interface ReactivationPreview {
+  /** UUIDv7 of the product. */
+  readonly productId: string;
+  readonly name: string;
+  /** The revision of the product, which the reactivation must still find. */
+  readonly revision: number;
+  readonly releasedCodes: readonly ReleasedCode[];
+  /** Another active product with the same name, or null. Two active products with one name confuse the search of the sale. */
+  readonly nameTakenBy: { readonly productId: string; readonly productName: string } | null;
+}
+
+/** What the owner chose to reactivate a product with. */
+export interface ReactivateProductRequest {
+  readonly productId: string;
+  /** The revision the screen loaded. */
+  readonly expectedRevision: number;
+  /** The name it comes back with: its own, or a new one when an active product already has it. */
+  readonly name: string;
+  /** The released codes it gets back. Each one must be among its released codes and still free. */
+  readonly restoreCodes: readonly string[];
+  /** The PIN of an owner, when a cashier asks. */
+  readonly ownerPin?: string;
+}
+
+/** How reactivating a product ended. */
+export type ReactivateProductResult =
+  | { readonly status: 'reactivated'; readonly product: ProductPanelDetail }
+  | { readonly status: 'not_found' }
+  /** The product is already active. Nothing was written. */
+  | { readonly status: 'already_active'; readonly product: ProductPanelDetail }
+  | { readonly status: 'stale'; readonly product: ProductPanelDetail }
+  /** An active product uses one of the codes now. It is never taken from it. Nothing was written. */
+  | { readonly status: 'code_taken'; readonly code: string; readonly productId: string; readonly productName: string }
+  /** An active product has the same name. Nothing was written. */
+  | { readonly status: 'name_taken'; readonly productId: string; readonly productName: string }
+  | { readonly status: 'authorization_required' }
+  | { readonly status: 'wrong_pin'; readonly attemptsLeft: number }
+  | { readonly status: 'locked'; readonly until: string };
+
 /** What the screen can ask of the main process about the products of the catalog, besides selling them. */
 export interface ProductAdminApi {
   /**
@@ -165,6 +241,31 @@ export interface ProductAdminApi {
    * @returns the product as it is now, or why nothing was written
    */
   updateProduct(request: UpdateProductRequest): Promise<UpdateProductResult>;
+
+  /**
+   * Lists the products that were given up, the latest first (E1-62). Only the owner, or a cashier with the PIN of an owner.
+   *
+   * @param ownerPin the PIN of an owner, when a cashier asks
+   * @returns the products, or why they were not listed
+   */
+  listGivenUpProducts(ownerPin?: string): Promise<GivenUpListResult>;
+
+  /**
+   * Tells what reactivating a product would run into: which released codes are free and whether its name is taken.
+   *
+   * @param productId the UUIDv7 of the product
+   * @returns the preview, or null if the product does not exist
+   */
+  previewReactivation(productId: string): Promise<ReactivationPreview | null>;
+
+  /**
+   * Puts a given-up product on sale again with the released codes that are still free (E1-62). It never takes a code from
+   * another product. Only the owner, or a cashier with the PIN of an owner.
+   *
+   * @param request the product, its name and the codes to restore
+   * @returns the product as it is now, or why nothing was written
+   */
+  reactivateProduct(request: ReactivateProductRequest): Promise<ReactivateProductResult>;
 }
 
 /**

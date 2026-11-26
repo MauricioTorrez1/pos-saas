@@ -129,6 +129,7 @@ test('edits a product from the panel, gives it up so the sale cannot find it, an
   await expect(panel).toHaveCount(0);
   await expect(lookupBox(page)).toBeFocused();
   expect(await readRows(register, databasePath, "SELECT is_active FROM product WHERE name = 'Martillo de bola 16 oz'")).toEqual([{ is_active: 0 }]);
+  expect(await readRows(register, databasePath, `SELECT code FROM product_code_history ORDER BY code`)).toEqual([{ code: HAMMER_CODE }, { code: NEW_CODE }]);
 
   await page.keyboard.press('Delete');
   await expect(total(page)).toHaveText('$0.00');
@@ -145,7 +146,12 @@ test('edits a product from the panel, gives it up so the sale cannot find it, an
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Martillo de bola 16 oz' })).toBeVisible();
   await expect(panel).toContainText('Este producto está dado de baja');
+  // Its codes were released; reactivating offers them back because nobody else took them.
+  await expect(panel).toContainText(`Sus códigos quedaron libres: ${HAMMER_CODE}, ${NEW_CODE}.`);
   await page.getByRole('button', { name: 'Reactivar producto' }).click();
+  await expect(page.getByRole('checkbox', { name: `Recuperar ${NEW_CODE}` })).toBeChecked();
+  await page.keyboard.press('F2');
+  await expect(panel).toContainText(`Producto reactivado con ${HAMMER_CODE}, ${NEW_CODE}.`);
   await expect(panel).not.toContainText('Este producto está dado de baja');
   await page.keyboard.press('Escape');
   await expect(panel).toHaveCount(0);

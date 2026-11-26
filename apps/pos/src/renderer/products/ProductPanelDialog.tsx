@@ -14,8 +14,10 @@ import { Field, Message, useAction } from '../ui/form-parts';
 import { ModalDialog } from '../ui/ModalDialog';
 import { useWindowKeys } from '../ui/use-window-keys';
 import type { PurchasingApi } from '../../shared/supplier-order';
+import { GivenUpProductsDialog } from './GivenUpProductsDialog';
 import { ProductFields } from './ProductFields';
 import { ProductSuppliers } from './ProductSuppliers';
+import { ReactivateProductDialog } from './ReactivateProductDialog';
 import { StockAdjustDialog } from './StockAdjustDialog';
 import { formValuesOf, readEditForm, type ProductFormProblems, type ProductFormValues } from './product-form';
 
@@ -100,6 +102,8 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, purchasingA
   const [isChangingPrice, setIsChangingPrice] = useState(false);
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [isConfirmingRemoval, setIsConfirmingRemoval] = useState(false);
+  const [isReactivating, setIsReactivating] = useState(false);
+  const [isListingGivenUp, setIsListingGivenUp] = useState(false);
   const { isBusy, message, setMessage, run } = useAction();
 
   const show = (loaded: ProductPanelDetail): void => {
@@ -165,7 +169,7 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, purchasingA
   };
 
   /** Saves the form. `isActive` puts the product on or off sale whatever the form says, for the red button. */
-  const save = (isActive?: boolean): void => {
+  const save = (isActive?: false): void => {
     if (product === null || values === null) {
       return;
     }
@@ -191,10 +195,8 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, purchasingA
         show(result.product);
         setNote(
           isActive === false
-            ? 'Producto dado de baja. Ya no sale en la venta; sus ventas y movimientos se conservan y puedes reactivarlo cuando quieras.'
-            : isActive === true
-              ? 'Producto reactivado. Ya se puede vender otra vez.'
-              : 'Listo. Los cambios quedaron guardados con tu nombre y el valor anterior.',
+            ? 'Producto dado de baja. Ya no sale en la venta y sus códigos quedaron libres para otro producto; sus ventas y movimientos se conservan y puedes reactivarlo cuando quieras.'
+            : 'Listo. Los cambios quedaron guardados con tu nombre y el valor anterior.',
         );
         return;
       }
@@ -224,11 +226,12 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, purchasingA
 
   const openPriceChange = pricingApi === undefined || product === null || !product.isActive ? undefined : (): void => setIsChangingPrice(true);
   const openAdjust = product === null ? undefined : (): void => setIsAdjusting(true);
+  const openGivenUp = product === null ? (): void => setIsListingGivenUp(true) : undefined;
 
   // While a dialog opened from here is open it has the keyboard, so these keys wait.
   useWindowKeys(
-    { F2: product === null ? undefined : () => save(), F8: openPriceChange, F9: openAdjust, Escape: onClose },
-    isBusy || isChangingPrice || isAdjusting || isConfirmingRemoval,
+    { F2: product === null ? undefined : () => save(), F6: openGivenUp, F8: openPriceChange, F9: openAdjust, Escape: onClose },
+    isBusy || isChangingPrice || isAdjusting || isConfirmingRemoval || isReactivating || isListingGivenUp,
   );
 
   return (
@@ -263,6 +266,7 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, purchasingA
           {!product.isActive && (
             <p className="notice" role="status">
               Este producto está dado de baja: no se vende ni aparece en la venta. Usa «Reactivar producto» para venderlo otra vez.
+              {product.releasedCodes.length > 0 && ` Sus códigos quedaron libres: ${product.releasedCodes.join(', ')}.`}
             </p>
           )}
           <dl className="product-summary" aria-label="Resumen del producto">
@@ -315,6 +319,7 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, purchasingA
             findCodeOwner={findCodeOwner}
             showPrice={false}
             showStock={false}
+            showBarcodes={product.isActive}
             unitLockedReason={product.movementCount > 0 ? 'No se puede cambiar: el producto ya tiene movimientos de existencia.' : undefined}
             currentTaxRate={product.taxRate}
             currentPrice={unitCostText(product.unitPriceE4 * 100)}
@@ -358,15 +363,41 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, purchasingA
           onCancel={() => setIsAdjusting(false)}
         />
       )}
+      {isReactivating && product !== null && (
+        <ReactivateProductDialog
+          productApi={productApi}
+          productId={product.id}
+          isOwner={isOwner}
+          onReactivated={(reactivated) => {
+            setIsReactivating(false);
+            show(reactivated);
+            setNote(
+              reactivated.barcodes.length === 0
+                ? 'Producto reactivado sin códigos. Ya se puede vender otra vez; agrégale un código si lo necesitas.'
+                : `Producto reactivado con ${reactivated.barcodes.join(', ')}. Ya se puede vender otra vez.`,
+            );
+          }}
+          onCancel={() => setIsReactivating(false)}
+        />
+      )}
+      {isListingGivenUp && <GivenUpProductsDialog productApi={productApi} isOwner={isOwner} onClose={() => setIsListingGivenUp(false)} />}
       {isConfirmingRemoval && product !== null && (
         <ConfirmDialog title={`¿Dar de baja ${product.name}?`} confirmLabel="Sí, dar de baja" isDangerous onConfirm={() => save(false)} onCancel={() => setIsConfirmingRemoval(false)}>
-          <p>Deja de salir en la venta y en las búsquedas. No se borra nada: sus ventas, su existencia y su historial se conservan, y puedes reactivarlo después.</p>
+          <p>
+            Deja de salir en la venta y en las búsquedas, y sus códigos quedan libres para otro producto. No se borra nada: sus ventas, su
+            existencia y su historial se conservan, y puedes reactivarlo después.
+          </p>
         </ConfirmDialog>
       )}
       <div className="payment-actions">
         <button type="button" className="button" tabIndex={-1} onClick={onClose}>
           Cerrar <kbd>Esc</kbd>
         </button>
+        {openGivenUp !== undefined && (
+          <button type="button" className="button" tabIndex={-1} onClick={openGivenUp}>
+            Dados de baja <kbd>F6</kbd>
+          </button>
+        )}
         {openPriceChange !== undefined && (
           <button type="button" className="button" tabIndex={-1} onClick={openPriceChange}>
             Cambiar precio <kbd>F8</kbd>
@@ -383,7 +414,7 @@ export function ProductPanelDialog({ posApi, productApi, pricingApi, purchasingA
           </button>
         )}
         {product !== null && !product.isActive && (
-          <button type="button" className="button" tabIndex={-1} disabled={isBusy} onClick={() => save(true)}>
+          <button type="button" className="button" tabIndex={-1} disabled={isBusy} onClick={() => setIsReactivating(true)}>
             Reactivar producto
           </button>
         )}

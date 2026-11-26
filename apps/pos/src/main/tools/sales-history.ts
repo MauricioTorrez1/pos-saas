@@ -27,7 +27,8 @@ interface SaleRow {
 /** What the history needs of the catalog to turn a name or a code into products. */
 export interface ProductLookup {
   search(text: string, limit: number, options: { readonly includeInactive: boolean }): CatalogProduct[];
-  findByCode(code: string, options: { readonly includeInactive: boolean }): CatalogProduct | null;
+  /** Every product that has or ever had the code, so the code of a product that was given up still finds its sales. */
+  productIdsThatHadCode(code: string): string[];
 }
 
 const COLUMNS = `
@@ -101,8 +102,8 @@ export class SalesHistory {
       return [];
     }
     const byName = this.#catalog.search(text, PRODUCT_MATCH_LIMIT, { includeInactive: true }).map((product) => product.id);
-    const byCode = this.#catalog.findByCode(text, { includeInactive: true });
-    return byCode === null ? byName : [...new Set([byCode.id, ...byName])];
+    const byCode = this.#catalog.productIdsThatHadCode(text);
+    return [...new Set([...byCode, ...byName])];
   }
 }
 
