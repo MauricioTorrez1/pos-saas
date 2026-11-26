@@ -116,7 +116,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Fase 2 · Clientes, crédito, compras y reparaciones
 
-✅ 1 de 24 tareas hechas · ⚠️ 23 faltan (101 h)
+✅ 2 de 24 tareas hechas · ⚠️ 22 faltan (96 h)
 
 - ⚠️ **F2-01 · Portal de autofactura** (6 h): un cliente factura su ticket con folio y datos fiscales.
 - ⚠️ **F2-02 · Autofactura de una venta en global** (3 h): el sistema aplica el tratamiento validado con el contador.
@@ -124,7 +124,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ⚠️ **F2-04 · Clientes y aviso de privacidad** (5 h): se guardan datos fiscales con aviso de privacidad y acceso restringido.
 - ⚠️ **F2-05 · Historial del cliente** (2 h): se consultan compras y facturas de un cliente.
 - ⚠️ **F2-06 · Club de maestros** (5 h): un maestro compra con su lista y acumula puntos.
-- ⚠️ **F2-07 · Cotizaciones** (5 h): una cotización vigente se convierte en venta.
+- ✅ **F2-07 · Cotizaciones** (5 h) _(En revisión)_: una cotización vigente se convierte en venta, desde un panel propio que también la imprime, la duplica y la cancela.
 - ⚠️ **F2-08 · Apartados** (5 h): un anticipo reserva mercancía y registra el saldo.
 - ⚠️ **F2-09 · Crédito y límite** (6 h): se vende a crédito sin rebasar el límite.
 - ⚠️ **F2-10 · Abonos y cuentas por cobrar** (4 h): se aplican abonos y se ve la antigüedad de saldos.
@@ -217,4 +217,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 83 de 175 tareas hechas (353 h de 777 h) · ⚠️ 92 faltan (424 h).
+✅ 84 de 175 tareas hechas (358 h de 777 h) · ⚠️ 91 faltan (419 h).

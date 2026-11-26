@@ -60,7 +60,7 @@ pnpm check:repo
 ```
 
 ### Register
-The [desktop register](apps/pos/README.md) only opens a window for now, and sales arrive in upcoming tasks. This command builds and opens it. The first run also downloads Electron, about 150 MiB:
+The [desktop register](apps/pos/README.md) rings up and collects sales, and keeps quotes in a panel of their own (F2-07). This command builds and opens it. The first run also downloads Electron, about 150 MiB:
 
 ```bash
 pnpm --filter @pos-saas/pos start
@@ -125,7 +125,7 @@ docker compose run --rm dbt show --select daily_sales
 [`infra/compose`](infra/compose/README.md) lists the addresses and how to start over with empty data.
 
 ### Production
-The core runs on Google Cloud Run (scales to zero), PostgreSQL on Supabase free, and encrypted backups go to Cloudflare R2, all declared with Terraform in [`infra/terraform`](infra/terraform/README.md) at $0 a month ([ADR 0077](docs/adr/0077-nucleo-en-cloud-run-y-base-en-supabase.md)). The owner's step-by-step guide, in Spanish, is [docs/despliegue-en-la-nube.md](docs/despliegue-en-la-nube.md).
+The core runs on Google Cloud Run (scales to zero), PostgreSQL on Supabase free, and encrypted backups go to Cloudflare R2, all declared with Terraform in [`infra/terraform`](infra/terraform/README.md) at $0 a month ([ADR 0078](docs/adr/0078-nucleo-en-cloud-run-y-base-en-supabase.md)). The owner's step-by-step guide, in Spanish, is [docs/despliegue-en-la-nube.md](docs/despliegue-en-la-nube.md).
 
 ### Running the tests
 TypeScript, from the repository root:
@@ -245,7 +245,7 @@ pnpm check:repo
 ```
 
 ### Caja
-La [caja de escritorio](apps/pos/README.md) por ahora solo abre una ventana, y la venta llega en las siguientes tareas. Este comando la construye y la abre. La primera vez también descarga Electron, unos 150 MiB:
+La [caja de escritorio](apps/pos/README.md) registra y cobra ventas, y guarda las cotizaciones en un panel propio (F2-07). Este comando la construye y la abre. La primera vez también descarga Electron, unos 150 MiB:
 
 ```bash
 pnpm --filter @pos-saas/pos start
@@ -310,7 +310,7 @@ docker compose run --rm dbt show --select daily_sales
 [`infra/compose`](infra/compose/README.md) indica las direcciones y cómo empezar de nuevo con datos vacíos.
 
 ### Producción
-El núcleo corre en Google Cloud Run (escala a cero), PostgreSQL en Supabase Free y los respaldos cifrados van a Cloudflare R2, todo declarado con Terraform en [`infra/terraform`](infra/terraform/README.md) con $0 al mes ([ADR 0077](docs/adr/0077-nucleo-en-cloud-run-y-base-en-supabase.md)). La guía paso a paso del dueño está en [docs/despliegue-en-la-nube.md](docs/despliegue-en-la-nube.md).
+El núcleo corre en Google Cloud Run (escala a cero), PostgreSQL en Supabase Free y los respaldos cifrados van a Cloudflare R2, todo declarado con Terraform en [`infra/terraform`](infra/terraform/README.md) con $0 al mes ([ADR 0078](docs/adr/0078-nucleo-en-cloud-run-y-base-en-supabase.md)). La guía paso a paso del dueño está en [docs/despliegue-en-la-nube.md](docs/despliegue-en-la-nube.md).
 
 ### Cómo correr las pruebas
 TypeScript, desde la raíz del repositorio:

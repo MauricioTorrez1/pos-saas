@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Image of the core for Cloud Run (ADR 0077). Tests do not run here: the Java check of CI already ran them
+# Image of the core for Cloud Run (ADR 0078). Tests do not run here: the Java check of CI already ran them
 # on the same commit before it reached main.
 # Build from the repository root, since the jar embeds packages/contracts/schemas:
 #   docker build --file services/core/Dockerfile --tag pos-core .
