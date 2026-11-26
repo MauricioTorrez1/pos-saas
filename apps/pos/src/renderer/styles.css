@@ -2353,3 +2353,105 @@ kbd {
   color: var(--ink);
   font: inherit;
 }
+
+/* -- Cotizaciones (F2-07) --------------------------------------------------------------------------------------- */
+
+.quotes {
+  width: min(1040px, 96vw);
+}
+
+.quote-list,
+.quote-editor,
+.quote-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.quote-toolbar,
+.quote-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.quote-toolbar > :first-child,
+.quote-form-row > :first-child {
+  flex: 1 1 18rem;
+}
+
+.quote-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.quote-quantity {
+  width: 6rem;
+  text-align: right;
+}
+
+.quote-total {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.quote-detail-header h3,
+.quote-detail-header p,
+.quote-notes {
+  margin: 0;
+}
+
+.quote-detail-header p,
+.quote-history {
+  color: var(--ink-soft);
+}
+
+.quote-lines td[data-changed='true'] {
+  font-weight: 700;
+  color: var(--warn);
+}
+
+.quote-cancel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem;
+  background: var(--alert-surface);
+  border-radius: var(--radius-sm);
+}
+
+.quote-history h4 {
+  margin: 0 0 0.3rem;
+}
+
+.quote-history ol {
+  padding-left: 1.2rem;
+  margin: 0;
+}
+
+.badge[data-tone='expired'] {
+  color: var(--warn);
+  background: var(--warn-surface);
+}
+
+.badge[data-tone='converted'] {
+  color: var(--ink-soft);
+  background: var(--ground);
+}
+
+.quote-sale-banner {
+  align-self: flex-start;
+  padding: 0.2rem 0.75rem;
+  margin: 0;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--accent-soft);
+  border-radius: 999px;
+}

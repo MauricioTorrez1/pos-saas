@@ -144,3 +144,19 @@ describe('saleReducer', () => {
     expect(sale.lines).toHaveLength(2);
   });
 });
+
+describe('loading a quote (F2-07)', () => {
+  it('replaces the sale with the products of the quote, each at the price it is charged at', () => {
+    const sale = apply(
+      { type: 'add-product', product: SEEDS },
+      { type: 'load-quote', lines: [{ product: HAMMER, quantityMilli: 2000, chargedPriceE4: 1_000_000 }, { product: CABLE, quantityMilli: 3500, chargedPriceE4: CABLE.unitPriceE4 }] },
+    );
+
+    expect(sale.lines.map((line) => [line.product.id, line.quantity.milli, line.product.unitPriceE4, line.catalogPriceE4])).toEqual([
+      ['hammer', 2000, 1_000_000, HAMMER.unitPriceE4],
+      ['cable', 3500, CABLE.unitPriceE4, undefined],
+    ]);
+    expect(sale.totals.totalCents).toBe(20_000 + 4_375);
+    expect(sale.selectedProductId).toBe('hammer');
+  });
+});

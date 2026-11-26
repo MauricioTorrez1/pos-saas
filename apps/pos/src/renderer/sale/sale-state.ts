@@ -37,9 +37,20 @@ export type SaleAction =
   | { readonly type: 'remove-selected' }
   /** Charges the selected line at another price, for this sale only. The price of the catalog puts it back. */
   | { readonly type: 'set-line-price'; readonly unitPriceE4: number }
+  /** Replaces the sale with the products of a quote (F2-07), each at the price it is charged at. */
+  | { readonly type: 'load-quote'; readonly lines: readonly QuoteSaleLine[] }
   | { readonly type: 'clear' }
   | { readonly type: 'move-selection'; readonly offset: 1 | -1 }
   | { readonly type: 'select'; readonly productId: string };
+
+/** A product of a quote going onto the sale. */
+export interface QuoteSaleLine {
+  /** The product as the catalog has it today. */
+  readonly product: CatalogProduct;
+  readonly quantityMilli: number;
+  /** The price it is charged at: the quoted one while the quote is valid. Another price than today's is for this sale only. */
+  readonly chargedPriceE4: number;
+}
 
 /** A sale with nothing in it yet. */
 export const EMPTY_SALE: SaleState = {
@@ -68,6 +79,12 @@ export function saleReducer(sale: SaleState, action: SaleAction): SaleState {
       return removeSelected(sale);
     case 'set-line-price':
       return setSelectedPrice(sale, action.unitPriceE4);
+    case 'load-quote':
+      return withLines(EMPTY_SALE, action.lines[0]?.product.id ?? null, () =>
+        action.lines.map(({ product, quantityMilli, chargedPriceE4 }) =>
+          buildLine({ ...product, unitPriceE4: chargedPriceE4 }, quantityMilli, chargedPriceE4 === product.unitPriceE4 ? undefined : product.unitPriceE4),
+        ),
+      );
     case 'clear':
       return EMPTY_SALE;
     case 'move-selection':
