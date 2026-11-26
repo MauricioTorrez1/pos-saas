@@ -67,7 +67,7 @@ export class ProductCatalog {
     this.#findByCodeAny = store.prepare(byCode);
     this.#searchByName = store.prepare(`${byName} AND product.is_active = 1 ${nameOrder}`);
     this.#searchByNameAny = store.prepare(`${byName} ${nameOrder}`);
-    // The product that has the code now, and every product that released it when it was given up (ADR 0083).
+    // The product that has the code now, and every product that released it when it was given up (ADR 0084).
     this.#idsThatHadCode = store.prepare(`
       SELECT product_id FROM product_barcode WHERE tenant_id = ?1 AND code = ?2
       UNION

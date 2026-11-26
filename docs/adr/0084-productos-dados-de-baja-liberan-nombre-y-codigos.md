@@ -1,4 +1,4 @@
-# ADR 0083: Un producto dado de baja libera su nombre y sus códigos
+# ADR 0084: Un producto dado de baja libera su nombre y sus códigos
 
 Estado: Aceptada · Fecha: 2026-11-25 · Concreta E1-62. Se apoya en los ADR 0003 (inventario como libro de movimientos), 0035 (RLS), 0047 (`OwnerGate`), 0051 (catálogo, códigos y unidades del núcleo), 0057 (alta de productos en la caja), 0058 (panel de modificación) y 0067 (búsqueda de ventas con productos dados de baja).
 

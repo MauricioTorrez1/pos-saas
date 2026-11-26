@@ -297,7 +297,7 @@ class ProductCatalogApiTest extends SecuredApiTest {
 
         Reply renamed = call(owner, HttpMethod.PATCH, "/products/" + id, Map.of("status", "inactive"), null);
         assertThat(renamed.body().get("status").asString()).isEqualTo("inactive");
-        assertThat(renamed.body().get("codes")).as("an inactive product releases its codes (ADR 0083)").isEmpty();
+        assertThat(renamed.body().get("codes")).as("an inactive product releases its codes (ADR 0084)").isEmpty();
         assertThat(feedHead(tenant)).isGreaterThan(seq);
         assertThat(admin.queryForObject("SELECT count(*) FROM audit_log WHERE entity_id = ? AND action = 'product.updated'", Long.class, id)).isEqualTo(1L);
     }
@@ -348,7 +348,7 @@ class ProductCatalogApiTest extends SecuredApiTest {
         assertThat(call(owner, HttpMethod.DELETE, "/products/" + id, null, null).status()).as("deleting twice is harmless").isEqualTo(204);
         assertThat(call(owner, HttpMethod.DELETE, "/products/" + UUID.randomUUID(), null, null).status()).isEqualTo(404);
         assertThat(admin.queryForObject("SELECT deleted_at IS NOT NULL FROM product WHERE id = ?", Boolean.class, id)).isTrue();
-        // The code is free for another product, and the history still says the deleted one had it (ADR 0083).
+        // The code is free for another product, and the history still says the deleted one had it (ADR 0084).
         assertThat(admin.queryForObject("SELECT count(*) FROM product_code_history WHERE product_id = ? AND code = ?", Long.class, id, code)).isEqualTo(1L);
         createdId(create(owner, product(unique("Otro "), "piece", List.of(code(code, "barcode")), List.of())));
         assertThat(admin.queryForObject("SELECT count(*) FROM audit_log WHERE entity_id = ? AND action = 'product.deleted'", Long.class, id)).isEqualTo(1L);

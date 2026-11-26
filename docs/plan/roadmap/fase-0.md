@@ -263,6 +263,7 @@ Duración estimada: 108 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Claude / tú:** Claude escribe el despliegue y el respaldo. Tú restauras un respaldo en local.
 - **Pruebas:** prueba de humo tras desplegar y restauración documentada.
 - **Criterios:** cumple RNF-09, tiene monitoreo externo para RNF-04, y el panel responde en el dominio.
+- **Resolución (ADR 0083):** sin staging (un solo entorno de $0, con aprobación manual) y sin Caddy (Cloud Run da HTTPS). Despliegue con prueba de humo y regreso automático, respaldo diario cifrado con `age` en R2, restauración probada en CI y monitoreo externo cada hora.
 - **Depende de:** F0-24, F0-20, F0-11 · **Estimación:** 5 h
 - **Autoevaluación:** (1) ¿Qué son RPO y RTO? (2) ¿Por qué probar una restauración? (3) ¿Cómo renuevas un certificado?
 - **Entrevista:** (1) ¿Cómo despliegas sin tiempo fuera? (2) ¿Cómo diseñas una estrategia de respaldos?

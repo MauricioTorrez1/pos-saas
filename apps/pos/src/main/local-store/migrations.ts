@@ -1138,7 +1138,7 @@ export const MIGRATIONS: readonly Migration[] = [
   {
     version: 27,
     name: 'release_codes_of_given_up_products',
-    // A product that is given up frees its barcodes, so a new product can use them (E1-62, ADR 0083). They move to an
+    // A product that is given up frees its barcodes, so a new product can use them (E1-62, ADR 0084). They move to an
     // append-only history that still tells which products ever had a code, for the search of old sales and to reactivate.
     // A code may be released, restored and released again, so the moment is part of the key. Who and when gave the product
     // up lives on the product while it stays given up; the products given up before this migration take it from the audit log.

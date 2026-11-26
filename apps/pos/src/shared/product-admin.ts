@@ -36,7 +36,7 @@ export interface ProductDetail {
   readonly isActive: boolean;
   /** Goes up by one with every change, so a screen can tell that the product changed while it was being edited. */
   readonly revision: number;
-  /** Every barcode of the product, sorted. A product that was given up has none: they were released (ADR 0083). */
+  /** Every barcode of the product, sorted. A product that was given up has none: they were released (ADR 0084). */
   readonly barcodes: readonly string[];
   /** The codes the product released when it was given up and has not got back, sorted. Empty for an active product. */
   readonly releasedCodes: readonly string[];
@@ -131,7 +131,7 @@ export type UpdateProductResult =
   | { readonly status: 'wrong_pin'; readonly attemptsLeft: number }
   | { readonly status: 'locked'; readonly until: string };
 
-/** A product that was given up, as the screen of the given-up products lists it (E1-62, ADR 0083). */
+/** A product that was given up, as the screen of the given-up products lists it (E1-62, ADR 0084). */
 export interface GivenUpProduct {
   /** UUIDv7 of the product. */
   readonly id: string;
@@ -165,7 +165,7 @@ export interface ReleasedCode {
   readonly takenBy: { readonly productId: string; readonly productName: string } | null;
 }
 
-/** What reactivating a product would run into, so the screen can explain it before asking (ADR 0083). */
+/** What reactivating a product would run into, so the screen can explain it before asking (ADR 0084). */
 export interface ReactivationPreview {
   /** UUIDv7 of the product. */
   readonly productId: string;
