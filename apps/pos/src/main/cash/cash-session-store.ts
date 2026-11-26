@@ -3,6 +3,7 @@ import type { StatementSync } from 'node:sqlite';
 import type { CashTotals, ExpectedCut } from '../../shared/cash';
 import type { CashMovementKind } from '../../shared/cash-api';
 import type { LocalStore } from '../local-store/local-store';
+import { localDayOf } from '../reports/period';
 import { SyncOutbox } from '../sync/sync-outbox';
 import { uuidV7 } from '../uuid-v7';
 
@@ -16,6 +17,20 @@ export interface OpenSessionRow {
   readonly openingFloatCents: number;
   /** The past day it captures, or null when it sells today (E1-60). */
   readonly businessDay: string | null;
+  /** The day it belongs to: the day it captures, or the local day it opened (E1-61). */
+  readonly sessionDay: string;
+  /** The cut of its day that this supplementary capture amends, or null (E1-61). */
+  readonly amendsCutId: string | null;
+}
+
+/** A cut that was saved, as the database has it. */
+export interface SavedCut {
+  readonly id: string;
+  readonly sessionId: string;
+  readonly cutAt: string;
+  readonly cutByName: string;
+  readonly expected: ExpectedCut;
+  readonly counted: ExpectedCut;
 }
 
 /** What a cut saves. */
@@ -34,6 +49,69 @@ interface SessionRowSql {
   readonly opened_by: string;
   readonly opened_by_name: string;
   readonly business_day: string | null;
+  readonly session_day: string;
+  readonly amends_cut_id: string | null;
+}
+
+interface CutRowSql {
+  readonly id: string;
+  readonly session_id: string;
+  readonly cut_at: string;
+  readonly cut_by_name: string;
+  readonly expected_cash_cents: number;
+  readonly counted_cash_cents: number;
+  readonly expected_card_cents: number;
+  readonly counted_card_cents: number;
+  readonly expected_transfer_cents: number;
+  readonly counted_transfer_cents: number;
+}
+
+interface ClosedSessionSql {
+  readonly opened_at: string;
+  readonly business_day: string | null;
+  readonly session_day: string | null;
+  readonly cut_id: string;
+}
+
+const SESSION_COLUMNS = `
+  s.id, s.opened_at, s.opening_float_cents, s.opened_by, u.name AS opened_by_name, s.business_day, s.session_day, s.amends_cut_id
+`;
+
+const CUT_COLUMNS = `
+  c.id, c.session_id, c.cut_at, u.name AS cut_by_name, c.expected_cash_cents, c.counted_cash_cents, c.expected_card_cents,
+  c.counted_card_cents, c.expected_transfer_cents, c.counted_transfer_cents
+`;
+
+/** How far before the oldest day a closed session is read, because its opening is in UTC and its day is local. */
+const DAY_MARGIN_MS = 2 * 86_400_000;
+
+function toSession(row: SessionRowSql): OpenSessionRow {
+  return {
+    id: row.id,
+    openedById: row.opened_by,
+    openedByName: row.opened_by_name,
+    openedAt: row.opened_at,
+    openingFloatCents: row.opening_float_cents,
+    businessDay: row.business_day,
+    sessionDay: row.session_day,
+    amendsCutId: row.amends_cut_id,
+  };
+}
+
+function toCut(row: CutRowSql): SavedCut {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    cutAt: row.cut_at,
+    cutByName: row.cut_by_name,
+    expected: { cashCents: row.expected_cash_cents, cardCents: row.expected_card_cents, transferCents: row.expected_transfer_cents },
+    counted: { cashCents: row.counted_cash_cents, cardCents: row.counted_card_cents, transferCents: row.counted_transfer_cents },
+  };
+}
+
+/** A session closed before E1-61 has no stored day: its day is the one it captured or the local day it opened. */
+function dayOfClosed(row: ClosedSessionSql): string {
+  return row.session_day ?? row.business_day ?? localDayOf(Date.parse(row.opened_at));
 }
 
 interface TotalsRowSql {
@@ -61,6 +139,10 @@ export class CashSessionStore {
   readonly #store: LocalStore;
   readonly #tenantId: string;
   readonly #findOpen: StatementSync;
+  readonly #listOpen: StatementSync;
+  readonly #closedSince: StatementSync;
+  readonly #findCut: StatementSync;
+  readonly #now: () => Date;
   readonly #insertSession: StatementSync;
   readonly #salesTotals: StatementSync;
   readonly #movementTotals: StatementSync;
@@ -76,18 +158,38 @@ export class CashSessionStore {
   /**
    * @param store the open local database
    * @param tenantId the business whose sessions this store sees
+   * @param now the clock that says which day is today, so a test can move it
    */
-  constructor(store: LocalStore, tenantId: string) {
+  constructor(store: LocalStore, tenantId: string, now: () => Date = () => new Date()) {
     this.#store = store;
     this.#tenantId = tenantId;
+    this.#now = now;
     this.#outbox = new SyncOutbox(store, tenantId);
+    // The unfinished session of a day comes before a supplementary capture of it written under E1-60, so it is the one resumed.
     this.#findOpen = store.prepare(`
-      SELECT s.id, s.opened_at, s.opening_float_cents, s.opened_by, u.name AS opened_by_name, s.business_day
+      SELECT ${SESSION_COLUMNS}
       FROM cash_session s JOIN app_user u ON u.id = s.opened_by
-      WHERE s.tenant_id = ? AND s.closed_at IS NULL AND s.business_day IS ?
+      WHERE s.tenant_id = ? AND s.closed_at IS NULL AND s.session_day = ?
+      ORDER BY s.business_day IS NOT NULL, s.opened_at LIMIT 1
+    `);
+    this.#listOpen = store.prepare(`
+      SELECT ${SESSION_COLUMNS}
+      FROM cash_session s JOIN app_user u ON u.id = s.opened_by
+      WHERE s.tenant_id = ? AND s.closed_at IS NULL
+      ORDER BY s.session_day DESC, s.business_day IS NOT NULL, s.opened_at
+    `);
+    this.#closedSince = store.prepare(`
+      SELECT s.opened_at, s.business_day, s.session_day, c.id AS cut_id
+      FROM cash_session s JOIN cash_cut c ON c.session_id = s.id
+      WHERE s.tenant_id = ? AND s.closed_at IS NOT NULL AND (s.opened_at >= ? OR s.business_day >= ?)
+      ORDER BY c.cut_at
+    `);
+    this.#findCut = store.prepare(`
+      SELECT ${CUT_COLUMNS} FROM cash_cut c JOIN app_user u ON u.id = c.cut_by WHERE c.tenant_id = ? AND c.id = ?
     `);
     this.#insertSession = store.prepare(`
-      INSERT INTO cash_session (id, tenant_id, opened_by, opened_at, opening_float_cents, business_day) VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO cash_session (id, tenant_id, opened_by, opened_at, opening_float_cents, business_day, session_day, amends_cut_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     this.#salesTotals = store.prepare(`
       SELECT
@@ -131,25 +233,53 @@ export class CashSessionStore {
     `);
   }
 
+  /** @returns today in the time zone of the register */
+  today(): string {
+    return localDayOf(this.#now().getTime());
+  }
+
   /**
-   * Finds the session that is open for a day. Today's drawer and a backdated capture are separate sessions, so each sees
-   * only its own (E1-60).
+   * Finds the session that is open for a day. Each day has its own: today's drawer never sees the session a past day left
+   * without its cut, and signing in to that past day finds that very session to resume it (E1-60, E1-61).
    *
-   * @param businessDay the past day a backdated capture works on, or null for today's drawer
-   * @returns it, or null when that register is closed
+   * @param day the day, or null for today
+   * @returns it, or null when that day has no open session
    */
-  findOpen(businessDay: string | null = null): OpenSessionRow | null {
-    const row = this.#findOpen.get(this.#tenantId, businessDay) as unknown as SessionRowSql | undefined;
-    return row === undefined
-      ? null
-      : {
-          id: row.id,
-          openedById: row.opened_by,
-          openedByName: row.opened_by_name,
-          openedAt: row.opened_at,
-          openingFloatCents: row.opening_float_cents,
-          businessDay: row.business_day,
-        };
+  findOpen(day: string | null = null): OpenSessionRow | null {
+    const row = this.#findOpen.get(this.#tenantId, day ?? this.today()) as unknown as SessionRowSql | undefined;
+    return row === undefined ? null : toSession(row);
+  }
+
+  /** @returns every session left open, newest day first: today's drawer and the past days still without a cut */
+  listOpen(): OpenSessionRow[] {
+    return (this.#listOpen.all(this.#tenantId) as unknown as SessionRowSql[]).map(toSession);
+  }
+
+  /**
+   * Lists the cuts of each day from a day on.
+   *
+   * @param oldestDay `YYYY-MM-DD`, the oldest day wanted
+   * @returns the ids of the cuts by day, in the order they were made
+   */
+  cutsByDaySince(oldestDay: string): Map<string, string[]> {
+    const since = new Date(Date.parse(`${oldestDay}T00:00:00Z`) - DAY_MARGIN_MS).toISOString();
+    const cuts = new Map<string, string[]>();
+    for (const row of this.#closedSince.all(this.#tenantId, since, oldestDay) as unknown as ClosedSessionSql[]) {
+      const day = dayOfClosed(row);
+      cuts.set(day, [...(cuts.get(day) ?? []), row.cut_id]);
+    }
+    return cuts;
+  }
+
+  /**
+   * Reads a cut that was saved.
+   *
+   * @param cutId the cut
+   * @returns it, or null when there is none with that id
+   */
+  findCut(cutId: string): SavedCut | null {
+    const row = this.#findCut.get(this.#tenantId, cutId) as unknown as CutRowSql | undefined;
+    return row === undefined ? null : toCut(row);
   }
 
   /**
@@ -159,14 +289,21 @@ export class CashSessionStore {
    * @param openingFloatCents the cash they put in the drawer to start
    * @param alongWith work that must commit or roll back with the opening, such as its line in the audit log
    * @param businessDay the past day a backdated capture works on, or null for today's drawer (E1-60)
+   * @param amendsCutId the cut of that day a supplementary capture amends, or null (E1-61)
    * @returns the id of the new session
-   * @throws Error from SQLite if a session of the same day is already open, because there is only one at a time
+   * @throws Error from SQLite if a session of the same day and kind is already open, because there is only one at a time
    */
-  open(userId: string, openingFloatCents: number, alongWith?: (sessionId: string) => void, businessDay: string | null = null): string {
+  open(
+    userId: string,
+    openingFloatCents: number,
+    alongWith?: (sessionId: string) => void,
+    businessDay: string | null = null,
+    amendsCutId: string | null = null,
+  ): string {
     const id = uuidV7();
     this.#store.transaction(() => {
-      const openedAt = new Date().toISOString();
-      this.#insertSession.run(id, this.#tenantId, userId, openedAt, openingFloatCents, businessDay);
+      const openedAt = this.#now().toISOString();
+      this.#insertSession.run(id, this.#tenantId, userId, openedAt, openingFloatCents, businessDay, businessDay ?? this.today(), amendsCutId);
       this.#outbox.enqueue(
         'cash_session.opened',
         { sessionId: id, openedBy: userId, openingFloatCents, ...(businessDay === null ? {} : { businessDate: businessDay }) },

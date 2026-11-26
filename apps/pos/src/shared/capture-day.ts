@@ -11,6 +11,32 @@ export interface CaptureDayRequest {
   /** `YYYY-MM-DD`, one of the days the sign-in screen offers. */
   readonly day: string;
   readonly ownerPin?: string;
+  /**
+   * True when the person agreed to a supplementary capture of a day that was already cut (E1-61, ADR 0078). Without it, a
+   * cut day is refused with `day_already_cut`, so a new session never opens without the person knowing.
+   */
+  readonly supplementary?: boolean;
+}
+
+/** A cash session of a past day that was left without its cut, which signing in to that day resumes (E1-61). */
+export interface UnfinishedSession {
+  /** UUIDv7 of the session, which stays the same when it is resumed. */
+  readonly sessionId: string;
+  /** Who opened it, by name. */
+  readonly openedBy: string;
+  /** When it opened, in ISO 8601. */
+  readonly openedAt: string;
+  readonly openingFloatCents: number;
+}
+
+/** How a past day stands, so the sign-in can say what choosing it does (E1-61, ADR 0078). */
+export interface PastCaptureDay {
+  /** `YYYY-MM-DD`. */
+  readonly day: string;
+  /** The session of that day left without a cut, which choosing the day resumes; null when there is none. */
+  readonly unfinished: UnfinishedSession | null;
+  /** How many cuts that day already has. With no unfinished session, choosing it asks for a supplementary capture. */
+  readonly cutCount: number;
 }
 
 /** Why a past day was refused at the sign-in. Nobody is signed in when one is answered. */
@@ -20,7 +46,9 @@ export type CaptureDayRefusal =
   /** A cashier asked for a past day without the PIN of an owner. */
   | { readonly status: 'owner_pin_required' }
   | { readonly status: 'owner_wrong_pin'; readonly attemptsLeft: number }
-  | { readonly status: 'owner_locked'; readonly until: string };
+  | { readonly status: 'owner_locked'; readonly until: string }
+  /** The day was already cut and has no unfinished session; signing in again with `supplementary` adds to it (E1-61). */
+  | { readonly status: 'day_already_cut' };
 
 const DAY_LABEL = new Intl.DateTimeFormat('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 const DAY_TEXT = /^\d{4}-\d{2}-\d{2}$/;
