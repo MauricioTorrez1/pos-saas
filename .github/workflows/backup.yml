@@ -1,0 +1,95 @@
+name: Backups
+
+# Daily encrypted backup of Supabase to Cloudflare R2, and a restore test with the same tools (ADR 0083).
+# The backup is skipped, not failed, until the owner sets the repository variables and secrets and commits the
+# public age key (docs/despliegue-en-la-nube.md). The restore test needs nothing and always runs.
+on:
+  schedule:
+    # 03:17 in Mexico City, after the store closes and away from the top of the hour.
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - infra/backup/**
+      - services/core/src/main/resources/db/migration/**
+      - .github/workflows/backup.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  restore-test:
+    name: Backup restore test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Migrates a PostgreSQL 17, backs it up with a throwaway age key, restores it into a second one and
+      # compares rows, policies, migrations and RLS.
+      - name: Back up and restore a migrated database
+        run: bash infra/backup/test-round-trip.sh
+
+  backup:
+    name: Daily backup
+    if: >-
+      github.event_name != 'pull_request' && vars.SUPABASE_POOLER_HOST != '' &&
+      vars.SUPABASE_PROJECT_REF != '' && vars.R2_ACCOUNT_ID != '' && vars.R2_BUCKET != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the secrets and the public key
+        id: ready
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          missing=""
+          [ -n "$SUPABASE_DB_PASSWORD" ] || missing="$missing SUPABASE_DB_PASSWORD"
+          [ -n "$R2_ACCESS_KEY_ID" ] || missing="$missing R2_ACCESS_KEY_ID"
+          [ -n "$R2_SECRET_ACCESS_KEY" ] || missing="$missing R2_SECRET_ACCESS_KEY"
+          grep -q '^age1' infra/backup/age-recipients.txt || missing="$missing age1-key-in-infra/backup/age-recipients.txt"
+          if [ -n "$missing" ]; then
+            echo "::notice::Backup skipped until these exist:${missing}"
+            echo "ok=false" >>"$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the tools image
+        if: steps.ready.outputs.ok == 'true'
+        run: docker build --quiet --tag pos-backup-tools infra/backup
+
+      # The plain dump exists only inside the container; what reaches the runner disk is already encrypted.
+      - name: Dump and encrypt
+        if: steps.ready.outputs.ok == 'true'
+        env:
+          PGHOST: ${{ vars.SUPABASE_POOLER_HOST }}
+          PGUSER: postgres.${{ vars.SUPABASE_PROJECT_REF }}
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          mkdir -m 777 "$RUNNER_TEMP/backup"
+          docker run --rm --env PGHOST --env PGUSER --env PGPASSWORD \
+            --env PGPORT=5432 --env PGDATABASE=postgres --env PGSSLMODE=require \
+            --env AGE_RECIPIENTS_FILE=/recipients/age-recipients.txt \
+            --volume "$PWD/infra/backup:/recipients:ro" --volume "$RUNNER_TEMP/backup:/work" \
+            pos-backup-tools create-backup.sh /work/backup.dump.age
+
+      - name: Upload to R2
+        if: steps.ready.outputs.ok == 'true'
+        env:
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: bash infra/backup/upload-backup.sh "$RUNNER_TEMP/backup/backup.dump.age"

@@ -9,8 +9,8 @@
 set -euo pipefail
 
 readonly IMAGE="${1:?Usage: $0 <core image>}"
-readonly POSTGRES_IMAGE="postgres:17"
-readonly FLYWAY_IMAGE="flyway/flyway:12"
+readonly POSTGRES_IMAGE="postgres:17.12@sha256:87c8b42f423b45d5247e6aa8fdb2e7762fec164c68a50fe3eb07e7bfcaf4dbcf"
+readonly FLYWAY_IMAGE="flyway/flyway:12.11.0@sha256:455c23d438811c27415f2c28052d0cc4494665a313b6faa41a7ece5242c24f10"
 readonly NETWORK="pos-smoke-$$"
 readonly DB="pos-smoke-db-$$"
 readonly CORE="pos-smoke-core-$$"
