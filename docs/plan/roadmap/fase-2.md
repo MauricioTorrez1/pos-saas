@@ -69,11 +69,11 @@ Duración estimada: 104 horas, sin calendario todavía. Reparto: modo mentor; t�
 ## Hito F2-C: Cotizaciones, apartados y crédito
 
 ### F2-07 · Cotizaciones
-- **Objetivo:** una cotización vigente se convierte en venta.
-- **Conceptos:** [Máquina de estados]
-- **Claude / tú:** Claude da la plantilla imprimible. Tú escribes modelo y conversión.
-- **Pruebas:** vigencia, precios congelados y conversión.
-- **Criterios:** cumple RF-046.
+- **Objetivo:** una cotización vigente se convierte en venta. El dueño pidió «que exista un panel solo para cotizaciones»: «Cotizaciones» (Mayús+F12) crea, busca, edita mientras está abierta, duplica, imprime en la impresora de tickets, cancela y convierte en venta.
+- **Conceptos:** [Máquina de estados], [Copiar contra referenciar], [Estado calculado (vencida)], [Historial de solo agregar]
+- **Claude / tú:** en modo automático Claude escribe la migración, el modelo, la conversión, el panel, el ticket y las pruebas. Tú pruebas en la tienda cotizar, imprimir y vender una cotización.
+- **Pruebas:** Vitest de crear, editar el borrador, vencer, convertir, cancelar (con PIN del dueño para la de otra persona), búsqueda, ticket y que no mueve inventario; Playwright de crear, ver la impresión y convertir con el precio cotizado.
+- **Criterios:** cumple RF-046 y el ADR 0077; vigencia de 15 días por defecto; precio cotizado mientras esté vigente y el de hoy si venció; nunca mueve inventario ni cuenta como venta; la caja la usa sin internet.
 - **Depende de:** E1-38 · **Estimación:** 5 h
 - **Autoevaluación:** (1) ¿Se congela el precio? (2) ¿Qué pasa si vence? (3) ¿Reserva inventario?
 - **Entrevista:** (1) ¿Copiar o referenciar datos? (2) ¿Cómo modelas documentos con vigencia?
