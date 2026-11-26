@@ -137,7 +137,7 @@ export class AuthService {
    * one the policy offers, and needs the approval of an owner: the owner who signs in gives it, and a cashier types the PIN
    * of one. A past day left without its cut is resumed: the cash works on that very session. A day that was already cut
    * and has no unfinished session asks first, and only a sign-in that agrees to a supplementary capture goes on (E1-61,
-   * ADR 0077). Nobody is signed in when anything is refused.
+   * ADR 0078). Nobody is signed in when anything is refused.
    *
    * @param userId the person
    * @param pin what they typed

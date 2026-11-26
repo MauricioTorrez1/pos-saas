@@ -1,4 +1,4 @@
-# ADR 0077: Retomar la caja sin corte de un día atrasado
+# ADR 0078: Retomar la caja sin corte de un día atrasado
 
 Estado: Aceptada · Fecha: 2026-11-25 · Concreta E1-61. **Reemplaza** de la ADR 0076 las secciones «Una caja aparte para el día atrasado» y «Si ese día ya tuvo corte»; el resto de la 0076 sigue vigente. Se apoya en los ADR 0011 (dinero en enteros), 0029 (sesión de caja), 0030 (una venta nunca cambia), 0047 (`OwnerGate`), 0060 (zona horaria de la caja) y 0070 (fondo al entrar y corte al salir).
 
@@ -21,7 +21,7 @@ Con E1-60, elegir un día pasado al entrar abría **siempre una sesión nueva** 
 
 **Cajas sin corte viejas.** Un día con caja sin corte se ofrece **aunque sea más viejo que la ventana de 7 días**, porque esa caja necesita su corte.
 
-**Lo que pasa con lo de antes (migración local 24).** Las sesiones **abiertas** reciben su día al actualizar: el que capturan si son de E1-60, o el día local en que se abrieron (`date(opened_at, '-6 hours')`: America/Mexico_City no cambia de horario desde 2022, así que es exacto para cualquier sesión que siga abierta). Las cerradas se quedan sin día porque una sesión cerrada no cambia; su día se lee igual que en los reportes (el que capturan o el día local de apertura). Una caja que quedó abierta varios días antes de esta versión aparece como «caja sin corte» de su primer día: al retomarla se corta y su corte incluye lo que se vendió en ella esos días, como habría pasado antes. Una sesión atrasada de E1-60 que siga abierta se retoma igual que cualquier otra; las ya cortadas cuentan como cortes de su día.
+**Lo que pasa con lo de antes (migración local 25).** Las sesiones **abiertas** reciben su día al actualizar: el que capturan si son de E1-60, o el día local en que se abrieron (`date(opened_at, '-6 hours')`: America/Mexico_City no cambia de horario desde 2022, así que es exacto para cualquier sesión que siga abierta). Las cerradas se quedan sin día porque una sesión cerrada no cambia; su día se lee igual que en los reportes (el que capturan o el día local de apertura). Una caja que quedó abierta varios días antes de esta versión aparece como «caja sin corte» de su primer día: al retomarla se corta y su corte incluye lo que se vendió en ella esos días, como habría pasado antes. Una sesión atrasada de E1-60 que siga abierta se retoma igual que cualquier otra; las ya cortadas cuentan como cortes de su día.
 
 **Núcleo.** No cambia: la sesión retomada ya viajó como `cash_session.opened` sin `businessDate` y el núcleo le da el día local de su apertura, que es el mismo; sus ventas viajan con `businessDate`, y su corte no lo necesita.
 

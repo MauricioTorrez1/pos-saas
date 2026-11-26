@@ -86,7 +86,7 @@ export interface CashCut extends CutComparison {
   readonly amends?: AmendedCut | null;
 }
 
-/** The report of a supplementary cut: the cut of that day that it amends, and the day added up (E1-61, ADR 0077). */
+/** The report of a supplementary cut: the cut of that day that it amends, and the day added up (E1-61, ADR 0078). */
 export interface AmendedCut {
   /** UUIDv7 of the original cut. */
   readonly cutId: string;

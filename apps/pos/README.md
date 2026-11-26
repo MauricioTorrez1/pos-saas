@@ -177,6 +177,16 @@ Boxes for amounts, quantities and PINs take digits and one decimal point only (`
 - Anyone signed in edits the notes of an item. The owner marks it as «Ya lo vendemos», puts it back to pending, or deletes it with the red «Eliminar» after confirming. Each change goes to the audit log.
 - «Descargar PDF con gráficas» saves the log of the period with three SVG charts and every item.
 
+## Quotes
+**Cotizaciones** (`Shift+F12`, or the header button) is a panel of its own for quotes ([ADR 0077](../../docs/adr/0077-cotizaciones-en-la-caja.md)). Cashiers and owners create them with an optional customer name and phone, products by barcode or name, quantities in the unit of each product, notes, and a last valid day (15 days by default).
+
+- A quote lives in `quote`, `quote_line`, `quote_status` and `quote_print` (migration 24) and never writes stock, sales, payments or cash: it does not show in cuts, the summary or the inventory. Each line copies the name, unit, price (e4) and VAT rate at the time it was quoted; the price always comes from the catalog in the main process.
+- The status is an append-only history (`draft`, `converted`, `cancelled`) guarded by triggers. «Vencida» is worked out when it is read. An open quote is edited keeping its quoted prices; an expired one that is edited is quoted again at today's prices. «Duplicar» makes a new quote at today's prices.
+- The list searches by folio (`COT-000012`), customer, phone or product, without accents or capitals, and filters by status.
+- «Imprimir» shows a preview and prints on the ticket printer with the owner's ticket design, under «COTIZACIÓN», with its validity and a foot that says it is not a sale or a tax receipt. From the second print it says «REIMPRESIÓN».
+- «Convertir en venta» rings the quote up on an empty sale. While it is valid, each line goes at its quoted price (a «price for this sale only» when today's differs, with a warning); an expired quote goes at today's prices. Once that sale is collected, the quote becomes `converted` with the sale id.
+- Its author or an owner cancels a quote with a reason; a cashier cancels someone else's quote with the owner PIN. Every step goes to the audit log.
+
 ## Export the catalog
 In Administration, **F12 · Exportar catálogo** saves the whole catalog as a PDF (**F2**), an Excel workbook (**F3**) or a CSV (**F4**), one row per product: status, main and other barcodes, name, unit, suppliers with their codes, cost without and with VAT, price with VAT, VAT, stock from the ledger, gross and net margin, and where the cost comes from ([ADR 0071](../../docs/adr/0071-exportacion-del-catalogo-completo.md)). «Solo activos» (**F5**) starts on; turn it off to include the products that were given up.
 
@@ -248,7 +258,7 @@ Some days not every sale gets rung up. The next morning, the sign-in screen offe
 | --- | --- |
 | Who | A past day needs an owner: the owner who signs in approves it, and a cashier types the PIN of an owner too. A refusal signs nobody in. The sign-in is in the audit log (`session.backdated_capture`) |
 | Banner | The whole session shows «Capturando ventas del martes 17 de noviembre» in the warning color, so nobody rings up today's sales into it |
-| Day list | Each past day says «· caja sin corte» when its session was left without a cut, or «· ya tiene corte». A day with a cash without its cut is offered even past the 7 days ([ADR 0077](../../docs/adr/0077-retomar-la-caja-sin-corte-de-un-dia-atrasado.md)) |
+| Day list | Each past day says «· caja sin corte» when its session was left without a cut, or «· ya tiene corte». A day with a cash without its cut is offered even past the 7 days ([ADR 0078](../../docs/adr/0078-retomar-la-caja-sin-corte-de-un-dia-atrasado.md)) |
 | Resume | Choosing a day with a cash without its cut **resumes that same session**: same id, same float, no new float asked, `cash_session.resumed` in the audit log. Its sales are recorded under the person who rings them up, and finishing is its usual cut («Corte de caja del …»). Leaving again without a cut keeps it waiting |
 | Cut day | A day already cut opens nothing on its own: the sign-in explains it and asks to tick «Agregar una captura suplementaria». That session is tied to the last cut of the day (`amends_cut_id`), and its **supplementary cut** shows the original cut untouched and the whole day added up |
 | No cash that day | The capture opens a session of its own for that day, with its float and its cut, apart from today's drawer (both can be open). Returns and expenses paid from the drawer always use today's drawer |

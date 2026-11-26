@@ -254,7 +254,7 @@ describe('the sessions written before E1-61', () => {
   it('get their day when the register updates: the open ones from when they opened or what they capture', () => {
     store.close();
     const path = join(directory, 'old.db');
-    const oldStore = LocalStore.open({ path, appVersion: '1.0.0', migrations: MIGRATIONS.slice(0, 23) });
+    const oldStore = LocalStore.open({ path, appVersion: '1.0.0', migrations: MIGRATIONS.slice(0, 24) });
     const users = new UserStore(oldStore, TENANT);
     const ownerOfOld = new AuthService(users).setupOwner('Mauricio', '4321');
     const insert = oldStore.prepare('INSERT INTO cash_session (id, tenant_id, opened_by, opened_at, opening_float_cents, business_day) VALUES (?, ?, ?, ?, 0, ?)');

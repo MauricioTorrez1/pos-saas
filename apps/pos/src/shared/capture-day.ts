@@ -12,7 +12,7 @@ export interface CaptureDayRequest {
   readonly day: string;
   readonly ownerPin?: string;
   /**
-   * True when the person agreed to a supplementary capture of a day that was already cut (E1-61, ADR 0077). Without it, a
+   * True when the person agreed to a supplementary capture of a day that was already cut (E1-61, ADR 0078). Without it, a
    * cut day is refused with `day_already_cut`, so a new session never opens without the person knowing.
    */
   readonly supplementary?: boolean;
@@ -29,7 +29,7 @@ export interface UnfinishedSession {
   readonly openingFloatCents: number;
 }
 
-/** How a past day stands, so the sign-in can say what choosing it does (E1-61, ADR 0077). */
+/** How a past day stands, so the sign-in can say what choosing it does (E1-61, ADR 0078). */
 export interface PastCaptureDay {
   /** `YYYY-MM-DD`. */
   readonly day: string;

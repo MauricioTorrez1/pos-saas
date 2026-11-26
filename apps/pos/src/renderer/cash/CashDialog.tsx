@@ -453,7 +453,7 @@ function Differences({ comparison }: { readonly comparison: CutComparisonView })
   );
 }
 
-/** The cut of the day that a supplementary one amends, untouched, and the day added up (E1-61, ADR 0077). */
+/** The cut of the day that a supplementary one amends, untouched, and the day added up (E1-61, ADR 0078). */
 function AmendedReport({ amends }: { readonly amends: AmendedCut }): ReactElement {
   const rows = [
     ['Efectivo', 'cashCents'],

@@ -31,7 +31,7 @@ export function captureDaysFrom(today: string, firstDay: string | null, windowDa
  * Reads, from the local database and the clock, which days a session may capture (E1-60, ADR 0076). The window starts at
  * the first cash session rather than the first sale, so a register that started yesterday and could not sell then can still
  * capture that day; a sale always needs a session, so it never starts later than the first sale. A day whose session was
- * left without its cut is always offered, even past the window, because that session still needs its cut (E1-61, ADR 0077).
+ * left without its cut is always offered, even past the window, because that session still needs its cut (E1-61, ADR 0078).
  */
 export class CaptureDays {
   readonly #store: LocalStore;
