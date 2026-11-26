@@ -7,6 +7,7 @@ import type { PurchasingApi } from '../../shared/supplier-order';
 import type { PricingApi } from '../../shared/pricing';
 import { actionOf, comboLabel, DEFAULT_KEYMAP, type KeyAction, type Keymap, type ToolsApi } from '../../shared/register-tools';
 import type { ProductAdminApi, ProductDetail } from '../../shared/product-admin';
+import type { PrepareConversionResult } from '../../shared/quotes';
 import { CheckoutDialog } from '../checkout/CheckoutDialog';
 import { NewProductDialog } from '../products/NewProductDialog';
 import { ProductPanelDialog } from '../products/ProductPanelDialog';
@@ -93,6 +94,33 @@ interface SaleScreenProps {
   readonly onOpenSalesHistory?: () => void;
   /** Opens the log of missing items with what was looked for. Without it, its key does nothing. */
   readonly onOpenMissingItems?: (text: string) => void;
+  /** Opens the panel of the quotes (F2-07). Without it, its key does nothing. */
+  readonly onOpenQuotes?: () => void;
+  /** A quote the person chose to sell, to ring up in place of an empty sale. */
+  readonly incomingQuote?: Extract<PrepareConversionResult, { status: 'ready' }> | null;
+  /** Called once the incoming quote was rung up or refused, so it is not taken twice. */
+  readonly onIncomingQuoteTaken?: () => void;
+  /** Called after the sale of a quote was collected, to mark the quote as sold with its sale. */
+  readonly onQuoteSold?: (quoteId: string, saleId: string) => void;
+}
+
+const SALE_NOT_EMPTY_FOR_QUOTE = 'La venta en curso ya tiene productos. Cóbrala o cancélala y vuelve a convertir la cotización.';
+
+/** What the cashier is told when a quote lands on the sale. */
+function describeLoadedQuote(quote: Extract<PrepareConversionResult, { status: 'ready' }>): string {
+  const parts = [`Venta de la cotización ${quote.folio}.`];
+  if (quote.isExpired) {
+    parts.push('La cotización venció: se cobra con los precios de hoy.');
+  } else {
+    const changed = quote.lines.filter((line) => line.chargedPriceE4 !== line.product.unitPriceE4).length;
+    if (changed > 0) {
+      parts.push(`${changed === 1 ? 'Un precio de hoy es distinto' : `${String(changed)} precios de hoy son distintos`}: se respeta el precio cotizado.`);
+    }
+  }
+  if (quote.skipped.length > 0) {
+    parts.push(`Ya no se vende${quote.skipped.length === 1 ? '' : 'n'}: ${quote.skipped.join(', ')}.`);
+  }
+  return parts.join(' ');
 }
 
 /**
@@ -114,7 +142,7 @@ interface SaleScreenProps {
  * @param props.isCashOpen false while the cash is not open, so a sale cannot be charged
  * @returns the screen
  */
-export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onOpenDashboard, onOpenSupplierOrder, onCashChanged, isCashOpen = true, keymap = DEFAULT_KEYMAP, toolsApi, onOpenSettings, onOpenSalesHistory, onOpenMissingItems, purchasingApi }: SaleScreenProps): ReactElement {
+export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere, isOwner = false, onOpenAppearance, onSignOut, onOpenCash, onOpenReturns, onOpenAdmin, onOpenDashboard, onOpenSupplierOrder, onCashChanged, isCashOpen = true, keymap = DEFAULT_KEYMAP, toolsApi, onOpenSettings, onOpenSalesHistory, onOpenMissingItems, onOpenQuotes, incomingQuote = null, onIncomingQuoteTaken, onQuoteSold, purchasingApi }: SaleScreenProps): ReactElement {
   const [sale, dispatch] = useReducer(saleReducer, EMPTY_SALE);
   const [notice, setNotice] = useState<string | null>(null);
   const [detector] = useState(() => new ScanDetector());
@@ -132,12 +160,37 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
   const [productPanel, setProductPanel] = useState<{ readonly product: CatalogProduct | null } | null>(null);
   /** The form of a new product, with what is loaded in it. Null while it is closed. */
   const [newProduct, setNewProduct] = useState<{ readonly initial: ProductFormValues; readonly lookedFor: string | null } | null>(null);
+  /** The quote this sale comes from (F2-07), until it is collected or dropped. */
+  const [fromQuote, setFromQuote] = useState<{ readonly id: string; readonly folio: string } | null>(null);
   const isSaving = useRef(false);
   /** The PIN the owner typed for the miscellaneous items of this sale. It lives only until the sale is saved or cleared. */
   const ownerPin = useRef<string | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const showCatalogFailure = useCallback(() => setNotice(CATALOG_FAILURE), []);
+
+  useEffect(() => {
+    if (incomingQuote === null) {
+      return;
+    }
+    onIncomingQuoteTaken?.();
+    if (sale.lines.length > 0 || savedSale !== null) {
+      setNotice(SALE_NOT_EMPTY_FOR_QUOTE);
+      return;
+    }
+    dispatch({ type: 'load-quote', lines: incomingQuote.lines });
+    setFromQuote({ id: incomingQuote.quoteId, folio: incomingQuote.folio });
+    setNotice(null);
+    setInfo(describeLoadedQuote(incomingQuote));
+    // Only a new quote is taken; the sale it lands on is read as it was at that moment.
+  }, [incomingQuote]);
+
+  // A sale emptied by hand is no longer the sale of its quote.
+  useEffect(() => {
+    if (sale.lines.length === 0 && fromQuote !== null) {
+      setFromQuote(null);
+    }
+  }, [sale.lines.length, fromQuote]);
   const search = useProductSearch(posApi, showCatalogFailure);
 
   useEffect(() => {
@@ -267,6 +320,7 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
     toolsApi?.recordSaleCancelled({ lineCount: sale.lines.length, totalCents: sale.totals.totalCents }).catch(() => undefined);
     setIsCancelling(false);
     ownerPin.current = undefined;
+    setFromQuote(null);
     dispatch({ type: 'clear' });
     clearLookup();
     setNotice(null);
@@ -315,8 +369,13 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
   };
 
   const finishCheckout = (wasCollected: boolean): void => {
+    const collectedId = savedSale?.id;
     setSavedSale(null);
     if (wasCollected) {
+      if (fromQuote !== null && collectedId !== undefined) {
+        onQuoteSold?.(fromQuote.id, collectedId);
+      }
+      setFromQuote(null);
       ownerPin.current = undefined;
       dispatch({ type: 'clear' });
       setNotice(null);
@@ -444,6 +503,9 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
         return;
       case 'salesHistory':
         onOpenSalesHistory?.();
+        return;
+      case 'quotes':
+        onOpenQuotes?.();
         return;
       case 'missingItems':
         onOpenMissingItems?.(missing?.text ?? '');
@@ -593,6 +655,11 @@ export function SaleScreen({ posApi, pricingApi, productApi, isKeyboardElsewhere
                 Anotar como faltante <kbd>{comboLabel(keymap.missingItems)}</kbd>
               </button>
             )}
+          </p>
+        )}
+        {fromQuote !== null && (
+          <p className="quote-sale-banner" aria-label="Venta de cotización">
+            Cotización {fromQuote.folio}
           </p>
         )}
         {info !== null && (

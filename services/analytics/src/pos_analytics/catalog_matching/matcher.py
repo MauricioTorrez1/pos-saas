@@ -1,4 +1,4 @@
-"""Asks Claude which items of different supplier catalogs are the same product (E1-63, ADR 0077).
+"""Asks Claude which items of different supplier catalogs are the same product (E1-63, ADR 0078).
 
 The register sends only what its own rules could not group: descriptions, units and pieces, with each supplier as a
 letter. No costs and no supplier names travel. Claude proposes groups with a reason; this module keeps only the groups

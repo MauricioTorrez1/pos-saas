@@ -6,6 +6,7 @@ import { DASHBOARD_CHANNELS, type DashboardApi } from '../shared/dashboard-api';
 import { EXPENSE_CHANNELS, type ExpensesApi } from '../shared/expenses';
 import { MISSING_CHANNELS, type MissingItemsApi } from '../shared/missing-items';
 import { IPC_CHANNELS, type PosApi } from '../shared/pos-api';
+import { QUOTE_CHANNELS, type QuotesApi } from '../shared/quotes';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
 import { TOOLS_CHANNELS, type ToolsApi } from '../shared/register-tools';
@@ -92,6 +93,18 @@ const missingApi: MissingItemsApi = {
   exportPdf: (period) => ipcRenderer.invoke(MISSING_CHANNELS.exportPdf, period),
 };
 
+/** The quotes of the store (F2-07). */
+const quotesApi: QuotesApi = {
+  list: (search) => ipcRenderer.invoke(QUOTE_CHANNELS.list, search),
+  get: (quoteId) => ipcRenderer.invoke(QUOTE_CHANNELS.get, quoteId),
+  save: (request) => ipcRenderer.invoke(QUOTE_CHANNELS.save, request),
+  cancel: (request) => ipcRenderer.invoke(QUOTE_CHANNELS.cancel, request),
+  preview: (quoteId) => ipcRenderer.invoke(QUOTE_CHANNELS.preview, quoteId),
+  print: (quoteId) => ipcRenderer.invoke(QUOTE_CHANNELS.print, quoteId),
+  prepareConversion: (quoteId) => ipcRenderer.invoke(QUOTE_CHANNELS.prepareConversion, quoteId),
+  markConverted: (request) => ipcRenderer.invoke(QUOTE_CHANNELS.markConverted, request),
+};
+
 /** The operating expenses of the business (E1-56). */
 const expensesApi: ExpensesApi = {
   record: (request) => ipcRenderer.invoke(EXPENSE_CHANNELS.record, request),
@@ -165,3 +178,4 @@ contextBridge.exposeInMainWorld('purchasing', purchasingApi);
 contextBridge.exposeInMainWorld('missing', missingApi);
 contextBridge.exposeInMainWorld('catalogExport', catalogExportApi);
 contextBridge.exposeInMainWorld('expenses', expensesApi);
+contextBridge.exposeInMainWorld('quotes', quotesApi);

@@ -1,4 +1,4 @@
-"""HTTP endpoint that reads one photographed catalog page or a short scanned PDF (E1-53 and E1-63, ADR 0069 and 0077).
+"""HTTP endpoint that reads one photographed catalog page or a short scanned PDF (E1-53 and E1-63, ADR 0069 and 0078).
 
 The page arrives as the raw request body (`image/jpeg`, `image/png` or `application/pdf`), so it is never written to
 disk, and it is dropped when the request ends. Nothing is logged about its content.

@@ -928,8 +928,101 @@ export const MIGRATIONS: readonly Migration[] = [
   },
   {
     version: 24,
+    name: 'create_quotes',
+    // Quotes (F2-07, ADR 0077) live apart from sales: no stock_movement, no payment, no cut ever reads them. A quote keeps
+    // a copy of each product's name and price at the time it was quoted. Its lines change only while it is open; its
+    // status is an append-only history, and a sale becomes the sale of one quote at most.
+    sql: `
+      CREATE TABLE quote (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        folio INTEGER NOT NULL CHECK (folio >= 1),
+        idempotency_key TEXT NOT NULL,
+        customer_name TEXT CHECK (customer_name IS NULL OR length(customer_name) BETWEEN 1 AND 80),
+        customer_phone TEXT CHECK (customer_phone IS NULL OR length(customer_phone) BETWEEN 1 AND 20),
+        notes TEXT CHECK (notes IS NULL OR length(notes) BETWEEN 1 AND 300),
+        valid_until TEXT NOT NULL CHECK (valid_until GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (tenant_id, folio),
+        UNIQUE (tenant_id, idempotency_key)
+      ) STRICT;
+
+      CREATE TABLE quote_line (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        quote_id TEXT NOT NULL REFERENCES quote (id),
+        line_number INTEGER NOT NULL CHECK (line_number >= 1),
+        product_id TEXT NOT NULL,
+        product_name TEXT NOT NULL CHECK (length(trim(product_name)) > 0),
+        unit TEXT NOT NULL CHECK (unit IN ('piece', 'meter', 'kilogram', 'liter')),
+        quantity_milli INTEGER NOT NULL CHECK (quantity_milli > 0),
+        unit_price_e4 INTEGER NOT NULL CHECK (unit_price_e4 >= 0),
+        tax_factor TEXT NOT NULL CHECK (tax_factor IN ('rate', 'exempt')),
+        tax_rate_bp INTEGER NOT NULL CHECK (tax_rate_bp >= 0),
+        total_cents INTEGER NOT NULL CHECK (total_cents >= 0),
+        UNIQUE (quote_id, line_number)
+      ) STRICT;
+
+      CREATE TABLE quote_status (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        quote_id TEXT NOT NULL REFERENCES quote (id),
+        sequence INTEGER NOT NULL CHECK (sequence >= 1),
+        status TEXT NOT NULL CHECK (status IN ('draft', 'converted', 'cancelled')),
+        sale_id TEXT UNIQUE REFERENCES sale (id),
+        note TEXT CHECK (note IS NULL OR length(note) <= 120),
+        recorded_by TEXT NOT NULL,
+        recorded_at TEXT NOT NULL,
+        CHECK ((status = 'converted') = (sale_id IS NOT NULL)),
+        UNIQUE (quote_id, sequence)
+      ) STRICT;
+
+      CREATE TABLE quote_print (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        quote_id TEXT NOT NULL REFERENCES quote (id),
+        printed_by TEXT NOT NULL,
+        printed_at TEXT NOT NULL
+      ) STRICT;
+
+      CREATE TRIGGER quote_status_is_never_changed BEFORE UPDATE ON quote_status
+      BEGIN SELECT RAISE(ABORT, 'the history of a quote only grows'); END;
+
+      CREATE TRIGGER quote_status_is_never_deleted BEFORE DELETE ON quote_status
+      BEGIN SELECT RAISE(ABORT, 'the history of a quote only grows'); END;
+
+      CREATE TRIGGER quote_closes_once BEFORE INSERT ON quote_status
+      WHEN (SELECT status FROM quote_status WHERE quote_id = NEW.quote_id ORDER BY sequence DESC LIMIT 1) IN ('converted', 'cancelled')
+      BEGIN SELECT RAISE(ABORT, 'a sold or cancelled quote stays that way'); END;
+
+      CREATE TRIGGER quote_line_added_only_while_open BEFORE INSERT ON quote_line
+      WHEN (SELECT status FROM quote_status WHERE quote_id = NEW.quote_id ORDER BY sequence DESC LIMIT 1) IN ('converted', 'cancelled')
+      BEGIN SELECT RAISE(ABORT, 'only an open quote changes its products'); END;
+
+      CREATE TRIGGER quote_line_removed_only_while_open BEFORE DELETE ON quote_line
+      WHEN (SELECT status FROM quote_status WHERE quote_id = OLD.quote_id ORDER BY sequence DESC LIMIT 1) IN ('converted', 'cancelled')
+      BEGIN SELECT RAISE(ABORT, 'only an open quote changes its products'); END;
+
+      CREATE TRIGGER quote_line_is_replaced_not_changed BEFORE UPDATE ON quote_line
+      BEGIN SELECT RAISE(ABORT, 'a quote line is replaced, never changed'); END;
+
+      CREATE TRIGGER quote_keeps_its_identity BEFORE UPDATE OF id, tenant_id, folio, idempotency_key, created_by, created_at ON quote
+      BEGIN SELECT RAISE(ABORT, 'the folio and author of a quote never change'); END;
+
+      CREATE TRIGGER quote_changes_only_while_open BEFORE UPDATE ON quote
+      WHEN (SELECT status FROM quote_status WHERE quote_id = OLD.id ORDER BY sequence DESC LIMIT 1) IN ('converted', 'cancelled')
+      BEGIN SELECT RAISE(ABORT, 'only an open quote changes'); END;
+
+      CREATE TRIGGER quote_is_never_deleted BEFORE DELETE ON quote
+      BEGIN SELECT RAISE(ABORT, 'a quote is cancelled, never deleted'); END;
+    `,
+  },
+  {
+    version: 25,
     name: 'create_catalog_equivalences',
-    // Equivalent products across supplier catalogs (E1-63, ADR 0077). Every decision of the owner is a new row and none is
+    // Equivalent products across supplier catalogs (E1-63, ADR 0078). Every decision of the owner is a new row and none is
     // ever changed or deleted: an item joins or leaves a group, a pair is rejected so it is not proposed again, or a group
     // gets a name. An item is named by its supplier and its code, not by its row, because importing a list replaces the
     // rows; so the decisions are remembered on every future import. The current state is read from the last decision:

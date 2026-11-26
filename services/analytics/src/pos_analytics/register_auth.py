@@ -1,4 +1,4 @@
-"""Access for the register itself, besides the owner of the panel (E1-63, ADR 0077).
+"""Access for the register itself, besides the owner of the panel (E1-63, ADR 0078).
 
 The register has no session of the owner: it signs in with a token of its own, `Authorization: Device <token>`, the
 same scheme it uses with the core. The token lives only in the environment of both sides (`ANALYTICS_REGISTER_TOKEN`

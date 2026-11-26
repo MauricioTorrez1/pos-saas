@@ -1,6 +1,6 @@
 /**
  * Finds the items of different supplier catalogs that are the same product even when they are written differently, such
- * as «BROCAS HSS 1/4"» and «Broca de alta velocidad 6.35 mm» (E1-63, ADR 0077). Everything here is pure and works without
+ * as «BROCAS HSS 1/4"» and «Broca de alta velocidad 6.35 mm» (E1-63, ADR 0078). Everything here is pure and works without
  * internet: the text is normalized, the hardware synonyms are applied, the measures are read into integers, and each pair
  * of items gets a score from 0 to 100. Two items whose measures, materials or uses differ never match.
  */

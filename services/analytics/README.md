@@ -35,7 +35,7 @@ The tests use a fake client and never reach the network. [ADR 0069](../../docs/a
 | `ANALYTICS_REGISTER_TOKEN` | Device token of the register, compared in constant time. Without it the register is refused (503) |
 | `CATALOG_MATCHER_MODEL` | Model id, `claude-opus-5-5` by default |
 
-[ADR 0077](../../docs/adr/0077-productos-equivalentes-entre-catalogos.md) explains the rules, the veto and what never leaves the register.
+[ADR 0078](../../docs/adr/0078-productos-equivalentes-entre-catalogos.md) explains the rules, the veto and what never leaves the register.
 
 ## dbt project
 `seeds/sample_sales.csv` holds invented sales. `stg_sales` prepares them, and `daily_sales` adds them up by tenant and day. Money stays in integer cents, and every row has a `tenant_id`.
