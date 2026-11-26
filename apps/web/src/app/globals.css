@@ -645,10 +645,15 @@ textarea[aria-invalid='true'] {
   top: 1rem;
 }
 
-.paper-page__photo img {
+.paper-page__photo img,
+.paper-page__pdf {
   width: 100%;
   border-radius: var(--radius);
   border: 1px solid var(--border);
+}
+
+.paper-page__pdf {
+  min-height: 32rem;
 }
 
 .paper-row {

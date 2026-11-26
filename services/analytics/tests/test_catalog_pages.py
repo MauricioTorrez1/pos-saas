@@ -203,3 +203,38 @@ def core_answering(status: int, body: Any = None) -> CoreIdentityVerifier:
 )
 def test_core_verifier_trusts_only_an_owner_answer(status: int, body: Any, expected: str) -> None:
     assert core_answering(status, body).check("abc").status == expected
+
+
+def pdf(pages: int) -> bytes:
+    objects = b"".join(b"%d 0 obj << /Type /Page /Parent 1 0 R >> endobj\n" % (index + 2) for index in range(pages))
+    return b"%PDF-1.7\n1 0 obj << /Type /Pages /Count " + str(pages).encode() + b" >> endobj\n" + objects + b"%%EOF"
+
+
+def test_a_short_scanned_pdf_is_sent_as_a_document(client: TestClient) -> None:
+    reader, messages = fake_reader({"vat_statement": "excludes_vat", "lines": [line()]})
+    use(reader)
+
+    response = post(client, pdf(2), "application/pdf")
+
+    assert response.status_code == 200
+    block = messages.calls[0]["messages"][0]["content"][0]
+    assert block["type"] == "document"
+    assert block["source"]["media_type"] == "application/pdf"
+
+
+def test_a_pdf_of_more_than_four_pages_goes_in_parts(client: TestClient) -> None:
+    reader, messages = fake_reader({"vat_statement": "not_stated", "lines": []})
+    use(reader)
+
+    response = post(client, pdf(5), "application/pdf")
+
+    assert (response.status_code, response.json()["detail"]) == (413, "pdf_too_many_pages")
+    assert messages.calls == []
+
+
+def test_a_file_that_only_says_it_is_a_pdf_is_refused(client: TestClient) -> None:
+    use(fake_reader({"vat_statement": "not_stated", "lines": []})[0])
+
+    response = post(client, JPEG, "application/pdf")
+
+    assert (response.status_code, response.json()["detail"]) == (415, "photo_type")

@@ -5,10 +5,12 @@ from typing import Literal
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from pos_analytics.catalog_matching.api import router as catalog_matching_router
 from pos_analytics.catalog_pages.api import router as catalog_pages_router
 
 app = FastAPI(title="POS Analytics")
 app.include_router(catalog_pages_router)
+app.include_router(catalog_matching_router)
 
 
 class HealthResponse(BaseModel):

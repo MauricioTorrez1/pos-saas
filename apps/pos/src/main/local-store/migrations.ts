@@ -1066,4 +1066,73 @@ export const MIGRATIONS: readonly Migration[] = [
       BEGIN SELECT RAISE(ABORT, 'a sale captures the day of its cash session'); END;
     `,
   },
+  {
+    version: 26,
+    name: 'create_catalog_equivalences',
+    // Equivalent products across supplier catalogs (E1-63, ADR 0079). Every decision of the owner is a new row and none is
+    // ever changed or deleted: an item joins or leaves a group, a pair is rejected so it is not proposed again, or a group
+    // gets a name. An item is named by its supplier and its code, not by its row, because importing a list replaces the
+    // rows; so the decisions are remembered on every future import. The current state is read from the last decision:
+    // catalog_equivalence_member says which group each item is in now, and catalog_equivalence_name the name of each group.
+    // catalog_synonym holds the words the owner adds to the dictionary of the matcher («alta velocidad» = hss).
+    sql: `
+      CREATE TABLE catalog_match_decision (
+        seq INTEGER PRIMARY KEY,
+        id TEXT NOT NULL UNIQUE,
+        tenant_id TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('join', 'leave', 'reject', 'name')),
+        group_id TEXT,
+        supplier_id TEXT,
+        supplier_code TEXT COLLATE NOCASE,
+        other_supplier_id TEXT,
+        other_supplier_code TEXT COLLATE NOCASE,
+        name TEXT CHECK (name IS NULL OR length(trim(name)) BETWEEN 1 AND 80),
+        origin TEXT NOT NULL CHECK (origin IN ('rules', 'ai', 'manual')),
+        score INTEGER CHECK (score IS NULL OR score BETWEEN 0 AND 100),
+        reason TEXT CHECK (reason IS NULL OR length(reason) <= 300),
+        decided_by TEXT NOT NULL,
+        decided_at TEXT NOT NULL,
+        CHECK (kind NOT IN ('join', 'leave') OR (group_id IS NOT NULL AND supplier_id IS NOT NULL AND supplier_code IS NOT NULL)),
+        CHECK (kind <> 'reject' OR (supplier_id IS NOT NULL AND supplier_code IS NOT NULL AND other_supplier_id IS NOT NULL AND other_supplier_code IS NOT NULL)),
+        CHECK (kind <> 'name' OR (group_id IS NOT NULL AND name IS NOT NULL))
+      ) STRICT;
+
+      CREATE INDEX catalog_match_decision_by_item ON catalog_match_decision (tenant_id, supplier_id, supplier_code, kind);
+      CREATE INDEX catalog_match_decision_by_group ON catalog_match_decision (tenant_id, group_id, kind);
+
+      CREATE TRIGGER catalog_match_decision_never_changes BEFORE UPDATE ON catalog_match_decision
+      BEGIN SELECT RAISE(ABORT, 'a decision about equivalent products never changes: add a new one'); END;
+
+      CREATE TRIGGER catalog_match_decision_never_deleted BEFORE DELETE ON catalog_match_decision
+      BEGIN SELECT RAISE(ABORT, 'a decision about equivalent products is never deleted: add a new one'); END;
+
+      CREATE VIEW catalog_equivalence_member AS
+        SELECT decision.tenant_id, decision.group_id, decision.supplier_id, decision.supplier_code
+        FROM catalog_match_decision AS decision
+        WHERE decision.kind = 'join'
+          AND decision.seq = (
+            SELECT max(later.seq) FROM catalog_match_decision AS later
+            WHERE later.tenant_id = decision.tenant_id AND later.supplier_id = decision.supplier_id
+              AND later.supplier_code = decision.supplier_code AND later.kind IN ('join', 'leave')
+          );
+
+      CREATE VIEW catalog_equivalence_name AS
+        SELECT decision.tenant_id, decision.group_id, decision.name
+        FROM catalog_match_decision AS decision
+        WHERE decision.kind = 'name'
+          AND decision.seq = (
+            SELECT max(later.seq) FROM catalog_match_decision AS later
+            WHERE later.tenant_id = decision.tenant_id AND later.group_id = decision.group_id AND later.kind = 'name'
+          );
+
+      CREATE TABLE catalog_synonym (
+        tenant_id TEXT NOT NULL,
+        term TEXT NOT NULL CHECK (length(trim(term)) BETWEEN 1 AND 60),
+        canonical TEXT NOT NULL CHECK (length(trim(canonical)) BETWEEN 1 AND 60),
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, term)
+      ) STRICT, WITHOUT ROWID;
+    `,
+  },
 ];

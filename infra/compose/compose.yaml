@@ -261,6 +261,8 @@ services:
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       CATALOG_READER_MODEL: ${CATALOG_READER_MODEL:-}
+      CATALOG_MATCHER_MODEL: ${CATALOG_MATCHER_MODEL:-}
+      ANALYTICS_REGISTER_TOKEN: ${ANALYTICS_REGISTER_TOKEN:-}
       # The core runs on the host during development; the reader asks it who the token belongs to.
       ANALYTICS_CORE_API_URL: ${ANALYTICS_CORE_API_URL:-http://host.docker.internal:8080}
     extra_hosts:
