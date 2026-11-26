@@ -54,6 +54,8 @@ import { ReportReader } from './business-report/report-reader';
 import { printPagedPdf } from './reports/paged-pdf';
 import { OrderExporter } from './purchasing/order-exporter';
 import { PurchaseOrderService } from './purchasing/purchase-order-service';
+import { equivalenceAssistantFromEnvironment } from './purchasing/analytics-equivalence-assistant';
+import { CatalogEquivalenceService } from './purchasing/catalog-equivalence-service';
 import { SupplierCatalogService } from './purchasing/supplier-catalog-service';
 import { SupplierService } from './purchasing/supplier-service';
 import { ProductService } from './products/product-service';
@@ -243,6 +245,13 @@ async function start(): Promise<void> {
     supplierCatalog: {
       catalog: new SupplierCatalogService(store, LOCAL_TENANT_ID, new AuditLog(store, LOCAL_TENANT_ID), suppliers),
       pickFile: (title) => pickPath(['openFile'], title),
+      // Without POS_ANALYTICS_URL and POS_ANALYTICS_TOKEN the matcher works with its rules only, without internet.
+      equivalences: new CatalogEquivalenceService(
+        store,
+        LOCAL_TENANT_ID,
+        new AuditLog(store, LOCAL_TENANT_ID),
+        equivalenceAssistantFromEnvironment(process.env.POS_ANALYTICS_URL, process.env.POS_ANALYTICS_TOKEN),
+      ),
       orders,
       pickSavePath,
       renderPdf: printHtmlToPdf,

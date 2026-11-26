@@ -75,8 +75,9 @@ OUTPUT_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
-INSTRUCTIONS = """You read one photographed page of a printed supplier catalog for a hardware store in Mexico.
-Return one entry per product line printed on the page, in reading order. Skip headings, totals and ads.
+INSTRUCTIONS = """You read a printed supplier catalog for a hardware store in Mexico: one photographed page, or a PDF
+of up to a few scanned pages. Return one entry per product line printed on the pages, in reading order, page after page.
+Skip headings, totals and ads.
 
 Copy, never compute:
 - supplier_code: the supplier's code, model or part number exactly as printed; null if the line has none.
@@ -234,11 +235,11 @@ class CatalogPageReader:
         self._client = client
         self._model = model
 
-    def read(self, photo: bytes, media_type: Literal["image/jpeg", "image/png"]) -> PageReading:
-        """Read the product lines of one page.
+    def read(self, photo: bytes, media_type: Literal["image/jpeg", "image/png", "application/pdf"]) -> PageReading:
+        """Read the product lines of one page, or of every page of a short PDF.
 
         Args:
-            photo: The image bytes, already checked for type and size.
+            photo: The image or PDF bytes, already checked for type and size.
             media_type: Its type.
 
         Returns:
@@ -268,8 +269,9 @@ class CatalogPageReader:
         )
 
     def _send(self, photo: bytes, media_type: str) -> Any:
+        # A PDF goes as a document block and an image as an image block; Claude reads the pages of both the same way.
         image = {
-            "type": "image",
+            "type": "document" if media_type == "application/pdf" else "image",
             "source": {"type": "base64", "media_type": media_type, "data": base64.standard_b64encode(photo).decode()},
         }
         try:

@@ -151,6 +151,16 @@ In the suppliers, the owner picks a supplier and presses **F5** "Lista de precio
 | Cart | "Agregar" puts the product in the cart with its cheapest supplier; each line can switch supplier and quantity. The screen sends only product, quantity and chosen item; the main process reads the costs again. |
 | Orders | **F2** "Crear pedidos" makes one draft per supplier through the usual order save (same owner PIN rules, audit and folio), with the note "Armado en el comparador de precios". |
 | PDF | **F5** saves product code, product, quantity, chosen price and supplier, lowest price and its supplier, the total, the possible savings, and two SVG bar charts: products and spend per supplier. |
+## Equivalent products
+**F7** "Productos equivalentes" in the suppliers (owner only) finds the items of different suppliers that are the same product even when they are written differently and have other codes: «BROCAS HSS 1/4" P/METAL» and «Broca de alta velocidad 6.35 mm» ([ADR 0077](../../docs/adr/0077-productos-equivalentes-entre-catalogos.md)).
+
+| Rule | How it works |
+| --- | --- |
+| Offline rules | `shared/catalog-matching.ts` normalizes accents and plurals, swaps synonyms (built in, plus the owner's own in **F5** "Sinónimos"), reads measures as integers (1/4" = 6.35 mm, gauges, ml, mg, watts) and pack sizes ("c/100"), and scores each pair from 0 to 100. A different measure, material, use or tip scores 0. From 60 it is proposed, from 80 it says "Muy probable". |
+| Decisions | Approve, reject ("No son iguales"), rename or remove. Each decision is appended to `catalog_match_decision` (never updated nor deleted) by supplier and supplier code, so it survives re-importing the list, and goes to the audit log. |
+| AI help | **F4** "Pedir ayuda a la IA" appears only when `POS_ANALYTICS_URL` and `POS_ANALYTICS_TOKEN` are set. It sends up to 120 ungrouped items with descriptions, units and pieces only, and suppliers as letters: no costs, no supplier names. The rules veto any group they see as a conflict, and the owner still approves each one. |
+| Comparator | "Comparar precios" also searches with the synonyms and shows a group's items side by side per base unit. An unlinked item with no pieces but "c/100" in its description is priced per piece, and the table says so. Only items linked to the group's product go to the cart. |
+
 ## Settings, sales list and price for one sale
 Since [ADR 0061](../../docs/adr/0061-rediseno-de-la-caja-y-herramientas-del-dueno.md) the register has three more things on the sale screen. The keys below are the defaults; the owner changes them in the settings.
 

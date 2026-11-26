@@ -1,10 +1,11 @@
-"""HTTP endpoint that reads one photographed catalog page (E1-53, ADR 0069).
+"""HTTP endpoint that reads one photographed catalog page or a short scanned PDF (E1-53 and E1-63, ADR 0069 and 0077).
 
-The photo arrives as the raw request body (`image/jpeg` or `image/png`), so it is never written to disk, and it is
-dropped when the request ends. Nothing is logged about its content.
+The page arrives as the raw request body (`image/jpeg`, `image/png` or `application/pdf`), so it is never written to
+disk, and it is dropped when the request ends. Nothing is logged about its content.
 """
 
 import os
+import re
 from typing import Annotated, Literal
 
 import anthropic
@@ -15,10 +16,37 @@ from pos_analytics.owner_auth import CallerCheck, require_owner
 from .reader import DEFAULT_MODEL, CatalogPageReader, CatalogReadingError, PageReading
 
 MAX_PHOTO_BYTES = 5 * 1024 * 1024
+# A scanned page is about 1 MB; the request to Claude must stay under 32 MB once in base64.
+MAX_PDF_BYTES = 20 * 1024 * 1024
+# The answer of one request fits about this many pages of a dense catalog; a longer PDF goes in parts.
+MAX_PDF_PAGES = 4
 MODEL_VARIABLE = "CATALOG_READER_MODEL"
 API_KEY_VARIABLE = "ANTHROPIC_API_KEY"
 
-_SIGNATURES: dict[str, bytes] = {"image/jpeg": b"\xff\xd8\xff", "image/png": b"\x89PNG\r\n\x1a\n"}
+_SIGNATURES: dict[str, bytes] = {
+    "image/jpeg": b"\xff\xd8\xff",
+    "image/png": b"\x89PNG\r\n\x1a\n",
+    "application/pdf": b"%PDF-",
+}
+# Each page object of a PDF says "/Type /Page"; "/Type /Pages" is the tree that holds them.
+_PAGE_OBJECT = re.compile(rb"/Type\s*/Page(?![a-zA-Z])")
+
+type PageMediaType = Literal["image/jpeg", "image/png", "application/pdf"]
+
+
+def count_pdf_pages(document: bytes) -> int:
+    """Count the page objects a PDF declares, without parsing it.
+
+    Pages stored inside compressed object streams are not seen, so the count can be low but never high; Claude's own
+    limits still apply to those.
+
+    Args:
+        document: The bytes of the PDF.
+
+    Returns:
+        How many page objects were found.
+    """
+    return len(_PAGE_OBJECT.findall(document))
 
 router = APIRouter()
 _reader: CatalogPageReader | None = None
@@ -42,8 +70,8 @@ def get_reader() -> CatalogPageReader:
     return _reader
 
 
-async def read_photo(request: Request) -> tuple[bytes, Literal["image/jpeg", "image/png"]]:
-    """Read the body as one photo, refusing it as soon as it is too large.
+async def read_photo(request: Request) -> tuple[bytes, PageMediaType]:
+    """Read the body as one photo or one PDF, refusing it as soon as it is too large.
 
     Args:
         request: The incoming request.
@@ -52,22 +80,29 @@ async def read_photo(request: Request) -> tuple[bytes, Literal["image/jpeg", "im
         The bytes and their type.
 
     Raises:
-        HTTPException: 413 when larger than 5 MB, 415 when it is not a JPEG or PNG (by type and by its first bytes).
+        HTTPException: 413 when a photo is larger than 5 MB, a PDF larger than 20 MB or with more than 4 pages;
+            415 when it is not a JPEG, PNG or PDF (by type and by its first bytes).
     """
     media_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
     if media_type not in _SIGNATURES:
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="photo_type")
+    is_pdf = media_type == "application/pdf"
+    limit = MAX_PDF_BYTES if is_pdf else MAX_PHOTO_BYTES
+    too_large = "pdf_too_large" if is_pdf else "photo_too_large"
     declared = request.headers.get("content-length")
-    if declared and declared.isdigit() and int(declared) > MAX_PHOTO_BYTES:
-        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, detail="photo_too_large")
-    photo = bytearray()
+    if declared and declared.isdigit() and int(declared) > limit:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, detail=too_large)
+    body = bytearray()
     async for chunk in request.stream():
-        photo.extend(chunk)
-        if len(photo) > MAX_PHOTO_BYTES:
-            raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, detail="photo_too_large")
-    if not bytes(photo).startswith(_SIGNATURES[media_type]):
+        body.extend(chunk)
+        if len(body) > limit:
+            raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, detail=too_large)
+    page = bytes(body)
+    if not page.startswith(_SIGNATURES[media_type]):
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="photo_type")
-    return bytes(photo), media_type  # type: ignore[return-value]
+    if is_pdf and count_pdf_pages(page) > MAX_PDF_PAGES:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, detail="pdf_too_many_pages")
+    return page, media_type  # type: ignore[return-value]
 
 
 @router.post("/catalog-pages/read")
@@ -76,10 +111,10 @@ async def read_catalog_page(
     _owner: Annotated[CallerCheck, Depends(require_owner)],
     reader: Annotated[CatalogPageReader, Depends(get_reader)],
 ) -> PageReading:
-    """Propose the rows of one supplier catalog page. Only the owner may call it, because every call costs money.
+    """Propose the rows of a supplier catalog page or short PDF. Only the owner may call it, because it costs money.
 
     Args:
-        request: Its body is the photo.
+        request: Its body is the photo or the PDF.
         _owner: Proof that the caller is the owner.
         reader: The Claude reader.
 

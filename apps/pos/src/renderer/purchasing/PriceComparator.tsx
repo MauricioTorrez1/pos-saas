@@ -4,6 +4,7 @@ import { useState, type ReactElement } from 'react';
 import { formatUnitCost } from '../../shared/product-admin';
 import {
   MAX_CART_LINES,
+  milliText,
   percentText,
   type CartLineRequest,
   type ComparisonGroup,
@@ -58,6 +59,10 @@ function differenceText(option: ComparisonOption): string {
   return `+${formatUnitCost(option.differenceE6)}${option.differenceBp === null ? '' : ` (+${percentText(option.differenceBp)})`}`;
 }
 
+function titleOf(group: ComparisonGroup): string {
+  return group.productName ?? group.equivalenceName ?? 'Sin ligar a un producto';
+}
+
 function priceClass(option: ComparisonOption): string {
   return option.isCheapest ? 'price-cheapest' : option.isMostExpensive ? 'price-highest' : '';
 }
@@ -103,7 +108,9 @@ export function PriceComparator({ catalogApi, onBack }: PriceComparatorProps): R
   };
 
   const add = (group: ComparisonGroup): void => {
-    const cheapest = group.options[0];
+    // Only the items tied to the product can be ordered; an equivalent item of another supplier is compared but not ordered.
+    const orderable = group.options.filter((option) => option.item.productId === group.productId);
+    const cheapest = orderable[0];
     if (group.productId === null || group.productName === null || group.productUnit === null || cheapest === undefined) {
       return;
     }
@@ -117,7 +124,7 @@ export function PriceComparator({ catalogApi, onBack }: PriceComparatorProps): R
     }
     setMessage(null);
     setNote(null);
-    setCart((previous) => [...previous, { productId: group.productId!, productName: group.productName!, unit: group.productUnit!, quantityText: '1', itemId: cheapest.item.id, options: group.options }]);
+    setCart((previous) => [...previous, { productId: group.productId!, productName: group.productName!, unit: group.productUnit!, quantityText: '1', itemId: cheapest.item.id, options: orderable }]);
   };
 
   const change = (productId: string, patch: Partial<CartLine>): void =>
@@ -194,9 +201,12 @@ export function PriceComparator({ catalogApi, onBack }: PriceComparatorProps): R
       <Field label="Buscar en las listas" value={text} onChange={setText} autoFocus maxLength={100} onEnter={search} />
       {groups !== null && groups.length === 0 && <p>Ninguna lista tiene eso. Revisa la palabra o importa la lista del proveedor.</p>}
       {groups?.map((group) => (
-        <section key={group.productId ?? 'unlinked'} className="comparison-group" aria-label={group.productName ?? 'Sin ligar'}>
-          <h3>{group.productName ?? 'Sin ligar a un producto'}</h3>
-          <table className="order-lines" aria-label={`Precios de ${group.productName ?? 'artículos sin ligar'}`}>
+        <section key={group.productId ?? group.equivalenceGroupId ?? 'unlinked'} className="comparison-group" aria-label={titleOf(group)}>
+          <h3>
+            {titleOf(group)}
+            {group.equivalenceGroupId !== null && <small className="quantity-price"> · productos equivalentes{group.productName !== null && group.equivalenceName !== null ? ` («${group.equivalenceName}»)` : ''}</small>}
+          </h3>
+          <table className="order-lines" aria-label={`Precios de ${group.productName ?? group.equivalenceName ?? 'artículos sin ligar'}`}>
             <thead>
               <tr>
                 <th scope="col">Proveedor</th>
@@ -211,7 +221,10 @@ export function PriceComparator({ catalogApi, onBack }: PriceComparatorProps): R
                 <tr key={option.item.id} className={priceClass(option)}>
                   <td>{option.item.supplierName}</td>
                   <td>{option.item.supplierCode}</td>
-                  <td>{option.item.description}</td>
+                  <td>
+                    {option.item.description}
+                    {option.item.piecesFromDescription === true ? ` (${milliText(option.item.piecesPerUnitMilli)} piezas, según la descripción)` : ''}
+                  </td>
                   <td className="order-amount">{formatUnitCost(option.item.baseUnitCostE6)}</td>
                   <td>{differenceText(option)}</td>
                 </tr>

@@ -9,6 +9,7 @@ import { IPC_CHANNELS, type PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
 import { TOOLS_CHANNELS, type ToolsApi } from '../shared/register-tools';
+import { EQUIVALENCE_CHANNELS, type EquivalenceApi } from '../shared/catalog-equivalence';
 import { SUPPLIER_CATALOG_CHANNELS, type SupplierCatalogApi } from '../shared/supplier-catalog';
 import { PURCHASING_CHANNELS, type PurchasingApi } from '../shared/supplier-order';
 
@@ -118,6 +119,20 @@ const catalogExportApi: CatalogExportApi = {
   exportCatalog: (request) => ipcRenderer.invoke(CATALOG_EXPORT_CHANNELS.exportCatalog, request),
 };
 
+/** The equivalent products across supplier catalogs (E1-63), inside the bridge of the price lists. */
+const equivalenceApi: EquivalenceApi = {
+  proposeEquivalences: (text) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.proposeEquivalences, text),
+  askAiForEquivalences: (text) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.askAiForEquivalences, text),
+  aiAvailable: () => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.aiAvailable),
+  approveEquivalence: (request) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.approveEquivalence, request),
+  rejectEquivalence: (itemIds) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.rejectEquivalence, itemIds),
+  listEquivalenceGroups: (text) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.listEquivalenceGroups, text),
+  removeFromEquivalence: (request) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.removeFromEquivalence, request),
+  listSynonyms: () => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.listSynonyms),
+  addSynonym: (synonym) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.addSynonym, synonym),
+  removeSynonym: (term) => ipcRenderer.invoke(EQUIVALENCE_CHANNELS.removeSynonym, term),
+};
+
 const supplierCatalogApi: SupplierCatalogApi = {
   pickPriceList: (supplierId) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.pickPriceList, supplierId),
   importPriceList: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.importPriceList, request),
@@ -127,6 +142,7 @@ const supplierCatalogApi: SupplierCatalogApi = {
   compareItems: (text) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.compareItems, text),
   confirmCart: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.confirmCart, request),
   exportCartPdf: (request) => ipcRenderer.invoke(SUPPLIER_CATALOG_CHANNELS.exportCartPdf, request),
+  equivalences: equivalenceApi,
 };
 
 /** Closing the register with the cash still open (E1-54). The screen only hears about it and answers; main decides. */

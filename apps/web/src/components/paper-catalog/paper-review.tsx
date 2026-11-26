@@ -16,6 +16,7 @@ interface Photo {
   id: string;
   name: string;
   previewUrl: string;
+  isPdf: boolean;
   status: 'reading' | 'ready' | 'failed';
   error: string | null;
   vatStatement: string;
@@ -23,16 +24,20 @@ interface Photo {
 }
 
 const MAX_EDGE_PX = 2000;
+const PDF_TYPE = 'application/pdf';
 const VAT_NOTES: Record<string, string> = {
   includes_vat: 'La hoja dice que sus precios incluyen IVA: quítaselo antes de aprobar.',
   not_stated: 'La hoja no dice si sus precios incluyen IVA. Confírmalo con el proveedor.',
 };
 
 /**
- * Makes a phone photo small enough for the reader (under 5 MB) by redrawing it at most 2000 px on its long side.
+ * Makes a phone photo small enough (a PDF goes as it is) for the reader (under 5 MB) by redrawing it at most 2000 px on its long side.
  * Where the browser cannot redraw it, the original goes as it is and the service decides.
  */
 async function shrinkPhoto(file: File): Promise<Blob> {
+  if (file.type === PDF_TYPE) {
+    return file;
+  }
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, MAX_EDGE_PX / Math.max(bitmap.width, bitmap.height));
@@ -133,7 +138,7 @@ export function PaperReview({ configured }: { configured: boolean }) {
       const id = crypto.randomUUID();
       setPhotos((current) => [
         ...current,
-        { id, name: file.name, previewUrl: URL.createObjectURL(file), status: 'reading', error: null, vatStatement: '', rows: [] },
+        { id, name: file.name, previewUrl: URL.createObjectURL(file), isPdf: file.type === PDF_TYPE, status: 'reading', error: null, vatStatement: '', rows: [] },
       ]);
       const result = await readPhoto(file);
       updatePhoto(id, (photo) =>
@@ -175,28 +180,35 @@ export function PaperReview({ configured }: { configured: boolean }) {
       <section className="panel stack" aria-labelledby="paper-supplier-title">
         <h2 id="paper-supplier-title">1. Proveedor y fotos</h2>
         <p className="panel__detail">
-          Toma una foto por hoja, derecha y con buena luz. Claude propone las líneas; tú las revisas. Las fotos no se
-          guardan y cada hoja cuesta unos centavos de dólar.
+          Toma una foto por hoja, derecha y con buena luz, o sube el PDF escaneado del proveedor (hasta 4 hojas por
+          archivo). Claude propone las líneas; tú las revisas. Los archivos no se guardan y cada hoja cuesta unos
+          centavos de dólar.
         </p>
         <div className="field field--narrow">
           <label htmlFor="paper-supplier">Proveedor</label>
           <input id="paper-supplier" value={supplier} onChange={(event) => setSupplier(event.target.value)} />
         </div>
         <label className="file-picker">
-          <span className="button button--quiet">Elegir fotos</span>
-          <input type="file" accept="image/jpeg,image/png" multiple onChange={choose} aria-label="Fotos del catálogo" />
+          <span className="button button--quiet">Elegir fotos o PDF</span>
+          <input type="file" accept="image/jpeg,image/png,application/pdf" multiple onChange={choose} aria-label="Fotos del catálogo" />
         </label>
       </section>
 
       {photos.map((photo) => (
         <section key={photo.id} className="panel paper-page" aria-label={`Hoja ${photo.name}`}>
           <figure className="paper-page__photo">
-            {/* A plain img: the source is a local object URL, which next/image cannot optimize. */}
-            <img src={photo.previewUrl} alt={`Foto ${photo.name}`} />
+            {photo.isPdf ? (
+              <object data={photo.previewUrl} type={PDF_TYPE} aria-label={`PDF ${photo.name}`} className="paper-page__pdf">
+                <p>PDF {photo.name}</p>
+              </object>
+            ) : (
+              // A plain img: the source is a local object URL, which next/image cannot optimize.
+              <img src={photo.previewUrl} alt={`Foto ${photo.name}`} />
+            )}
             <figcaption>
               {photo.name}{' '}
               <button type="button" className="button button--quiet" onClick={() => removePhoto(photo)}>
-                Quitar foto
+                {photo.isPdf ? 'Quitar PDF' : 'Quitar foto'}
               </button>
             </figcaption>
           </figure>

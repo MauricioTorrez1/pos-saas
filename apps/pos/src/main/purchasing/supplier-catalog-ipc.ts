@@ -23,6 +23,8 @@ import {
 import { parseCsv } from '../import/eleventa-csv';
 import { readXlsxTable, WorkbookError } from '../import/xlsx-reader';
 import { parseProductId } from '../inventory/inventory-request';
+import { registerEquivalenceHandlers } from './catalog-equivalence-ipc';
+import type { CatalogEquivalenceService } from './catalog-equivalence-service';
 import { confirmCart, exportCartPdf, type CartDependencies } from './comparator-cart';
 import { parseUuid } from './purchasing-request';
 import type { SupplierCatalogService } from './supplier-catalog-service';
@@ -38,6 +40,8 @@ export interface SupplierCatalogServices extends Omit<CartDependencies, 'catalog
   readonly catalog: SupplierCatalogService;
   /** Opens the window of Windows to choose a file, or answers null when the person closes it. */
   readonly pickFile: (title: string) => Promise<string | null>;
+  /** The equivalent products across catalogs (E1-63). */
+  readonly equivalences?: CatalogEquivalenceService;
 }
 
 export type AnswerSignedInWithUser = <Result>(channel: string, respond: (argument: unknown, user: UserSummary) => Result) => void;
@@ -223,4 +227,7 @@ export function registerSupplierCatalogHandlers(answerSignedIn: AnswerSignedInWi
   answerOwner(SUPPLIER_CATALOG_CHANNELS.compareItems, (value): ComparisonGroup[] => catalog.compare(requireText(value, 'words to compare')));
   answerOwner(SUPPLIER_CATALOG_CHANNELS.confirmCart, (value): ConfirmCartResult => confirmCart(parseCartRequest(value).lines, services));
   answerOwner(SUPPLIER_CATALOG_CHANNELS.exportCartPdf, (value): Promise<ExportCartResult> => exportCartPdf(parseCartRequest(value).lines, services));
+  if (services.equivalences !== undefined) {
+    registerEquivalenceHandlers(answerSignedIn, refuse, services.equivalences);
+  }
 }
