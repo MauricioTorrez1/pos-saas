@@ -213,7 +213,9 @@ async function start(): Promise<void> {
     prices,
     products,
     // A return happens today, so its refund always leaves today's drawer, even during a backdated capture (E1-60).
-    returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, { openSessionId: () => cashStore.findOpen()?.id ?? null }),
+    returns: new ReturnService(new ReturnStore(store, LOCAL_TENANT_ID), auth, {
+      openSessionId: () => cashStore.findOpen(auth.captureDay() === null ? auth.workDay() : null)?.id ?? null,
+    }),
     admin,
     inventory,
     reports: new ReportService(store, LOCAL_TENANT_ID, auth),
@@ -277,7 +279,7 @@ async function start(): Promise<void> {
   guardWindowClose(
     registerWindow,
     new ExitGuard({
-      openSession: () => cashStore.findOpen(auth.captureDay()),
+      openSession: () => cashStore.findOpen(auth.workDay()),
       currentUserId: () => auth.currentUser()?.id ?? null,
       audit: new AuditLog(store, LOCAL_TENANT_ID),
       askScreen: () => {

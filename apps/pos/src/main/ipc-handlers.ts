@@ -154,6 +154,7 @@ export function registerIpcHandlers(
       current: auth.currentUser(),
       captureDay: auth.captureDay(),
       captureDays: auth.captureDayOptions(),
+      pastDays: auth.pastCaptureDays(),
     }),
   );
   answerScreen(IPC_CHANNELS.setupOwner, (request): UserSummary => {

@@ -2204,3 +2204,77 @@ describe('capturing the sales of a past day (E1-60)', () => {
     expect(screen.queryByLabelText('Captura atrasada')).toBeNull();
   });
 });
+
+describe('resuming a past day left without its cut (E1-61)', () => {
+  const ANA: UserSummary = { id: '019a5f2e-7c41-7b1a-9d2e-3f4a5b6c7d8f', name: 'Ana', role: 'cashier' };
+  const DAYS = ['2026-11-18', '2026-11-17', '2026-11-16'];
+  const PAST_DAYS = [
+    {
+      day: '2026-11-17',
+      unfinished: { sessionId: '019a5f2e-7c41-7b1a-9d2e-3f4a5b6c7d90', openedBy: 'Ana', openedAt: '2026-11-17T15:00:00.000Z', openingFloatCents: 50_000 },
+      cutCount: 0,
+    },
+    { day: '2026-11-16', unfinished: null, cutCount: 1 },
+  ];
+
+  function signedOut(): Pick<PosApi, 'getAuthState'> {
+    return {
+      getAuthState: () => Promise.resolve({ needsSetup: false, users: [OWNER, ANA], current: null, captureDay: null, captureDays: DAYS, pastDays: PAST_DAYS }),
+    };
+  }
+
+  function dayBox(): HTMLSelectElement {
+    return screen.getByRole<HTMLSelectElement>('combobox', { name: 'Día de captura' });
+  }
+
+  function submitWith(pin: string): void {
+    const box = screen.getByLabelText<HTMLInputElement>('PIN');
+    fireEvent.change(box, { target: { value: pin } });
+    fireEvent.submit(box.closest('form')!);
+  }
+
+  it('says on each past day whether it has a cash without its cut or was already cut', async () => {
+    render(<App posApi={fakePosApi(signedOut())} />);
+    await screen.findByRole('heading', { name: '¿Quién cobra?' });
+
+    expect([...dayBox().options].map((option) => option.textContent)).toEqual([
+      'Hoy, miércoles 18 de noviembre',
+      'Ayer, martes 17 de noviembre · caja sin corte',
+      'lunes 16 de noviembre · ya tiene corte',
+    ]);
+    expect(screen.getByRole('note', { name: 'Cajas sin corte' }).textContent).toContain('caja sin corte del martes 17 de noviembre');
+  });
+
+  it('resumes the unfinished cash with who opened it and its float, sending only the day', async () => {
+    const login = vi.fn<PosApi['login']>(() => Promise.resolve({ status: 'wrong_pin', attemptsLeft: 4 }));
+    render(<App posApi={fakePosApi({ ...signedOut(), login })} />);
+    await screen.findByRole('heading', { name: '¿Quién cobra?' });
+
+    fireEvent.change(dayBox(), { target: { value: '2026-11-17' } });
+    const notice = screen.getByRole('status').textContent;
+    expect(notice).toContain('retomar la caja sin corte del martes 17 de noviembre que abrió Ana');
+    expect(notice).toContain('$500.00');
+    expect(screen.getByRole('button', { name: /Retomar esa caja/ })).toBeTruthy();
+    submitWith('4321');
+
+    await waitFor(() => expect(login).toHaveBeenCalledExactlyOnceWith({ userId: OWNER.id, pin: '4321', capture: { day: '2026-11-17' } }));
+  });
+
+  it('explains a cut day, and asks for a supplementary capture only when the box is ticked', async () => {
+    const login = vi.fn<PosApi['login']>(() => Promise.resolve({ status: 'day_already_cut' }));
+    render(<App posApi={fakePosApi({ ...signedOut(), login })} />);
+    await screen.findByRole('heading', { name: '¿Quién cobra?' });
+
+    fireEvent.change(dayBox(), { target: { value: '2026-11-16' } });
+    expect(screen.getByRole('status').textContent).toContain('ya tiene corte y ese corte no se cambia');
+    submitWith('4321');
+    await waitFor(() => expect(login).toHaveBeenLastCalledWith({ userId: OWNER.id, pin: '4321', capture: { day: '2026-11-16' } }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Agregar una captura suplementaria');
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Agregar una captura suplementaria/ }));
+    submitWith('4321');
+    await waitFor(() =>
+      expect(login).toHaveBeenLastCalledWith({ userId: OWNER.id, pin: '4321', capture: { day: '2026-11-16', supplementary: true } }),
+    );
+  });
+});

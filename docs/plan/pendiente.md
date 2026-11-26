@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Actualizado el 2026-11-17 desde `docs/plan/progreso.md` y los roadmaps.
+Actualizado el 2026-11-25 desde `docs/plan/progreso.md` y los roadmaps.
 
 Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusionadas en `main`) · ⚠️ falta. Las horas son la estimación del plan.
 
@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 57 de 59 tareas hechas · ⚠️ 2 faltan (9 h)
+✅ 58 de 60 tareas hechas · ⚠️ 2 faltan (9 h)
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -99,6 +99,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-58 · Modificar y eliminar el proveedor de un producto** (3 h) _(En revisión)_: desde el panel del producto, «Modificar» (amarillo) cambia el proveedor, el código y el costo de lista en un paso, y «Eliminar» (rojo) quita al proveedor después de confirmar, sin tocar los pedidos enviados y avisando si está en un borrador.
 - ✅ **E1-59 · Preguntar si imprimir el ticket** (3 h) _(En revisión)_: después de cobrar, la caja pregunta «¿Imprimir ticket?» (Enter sí, Esc o N no) con el cambio a la vista; el dueño elige preguntar, imprimir siempre o nunca, y una venta sin ticket se imprime después desde «Reimprimir» o «Ventas».
 - ✅ **E1-60 · Capturar las ventas de un día atrasado** (6 h) _(En revisión)_: al entrar se elige el día; con la autorización de un dueño, las ventas que no se alcanzaron a registrar ayer cuentan en ayer, con su propio fondo y corte suplementario, y el ticket lo dice.
+- ✅ **E1-61 · Retomar la caja sin corte de un día atrasado** (5 h) _(En revisión)_: si ayer se salió sin corte, al entrar se elige ayer y se retoma esa misma caja con su fondo para agregar lo que faltó y hacer su corte; un día ya cortado ofrece una captura suplementaria que suma al corte sin cambiarlo.
 
 ## Entrega 2 · Terminal de tarjeta integrada
 
@@ -217,4 +218,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 82 de 175 tareas hechas (348 h de 777 h) · ⚠️ 93 faltan (429 h).
+✅ 83 de 176 tareas hechas (353 h de 782 h) · ⚠️ 93 faltan (429 h).
