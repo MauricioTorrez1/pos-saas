@@ -6,6 +6,7 @@ import type { MissingItemsApi } from '../shared/missing-items';
 import type { PosApi } from '../shared/pos-api';
 import type { PricingApi } from '../shared/pricing';
 import type { ProductAdminApi } from '../shared/product-admin';
+import type { QuotesApi } from '../shared/quotes';
 import type { ToolsApi } from '../shared/register-tools';
 import type { SupplierCatalogApi } from '../shared/supplier-catalog';
 import type { PurchasingApi } from '../shared/supplier-order';
@@ -28,5 +29,7 @@ declare global {
     readonly catalogExport: CatalogExportApi;
     /** Bridge for the operating expenses (E1-56). */
     readonly expenses: ExpensesApi;
+    /** Bridge for the quotes (F2-07). */
+    readonly quotes: QuotesApi;
   }
 }

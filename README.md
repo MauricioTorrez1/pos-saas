@@ -60,7 +60,7 @@ pnpm check:repo
 ```
 
 ### Register
-The [desktop register](apps/pos/README.md) only opens a window for now, and sales arrive in upcoming tasks. This command builds and opens it. The first run also downloads Electron, about 150 MiB:
+The [desktop register](apps/pos/README.md) rings up and collects sales, and keeps quotes in a panel of their own (F2-07). This command builds and opens it. The first run also downloads Electron, about 150 MiB:
 
 ```bash
 pnpm --filter @pos-saas/pos start
@@ -242,7 +242,7 @@ pnpm check:repo
 ```
 
 ### Caja
-La [caja de escritorio](apps/pos/README.md) por ahora solo abre una ventana, y la venta llega en las siguientes tareas. Este comando la construye y la abre. La primera vez también descarga Electron, unos 150 MiB:
+La [caja de escritorio](apps/pos/README.md) registra y cobra ventas, y guarda las cotizaciones en un panel propio (F2-07). Este comando la construye y la abre. La primera vez también descarga Electron, unos 150 MiB:
 
 ```bash
 pnpm --filter @pos-saas/pos start

@@ -3,7 +3,7 @@ package io.github.mauriciotorrez1.pos.core.invoicing;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Serializes the claims of the individual and the global invoices of one business (ADR 0077). Without it, a sale
+ * Serializes the claims of the individual and the global invoices of one business (ADR 0079). Without it, a sale
  * could be claimed by its own invoice and by a global at the same moment, each transaction seeing the sale free.
  */
 final class InvoicingLock {

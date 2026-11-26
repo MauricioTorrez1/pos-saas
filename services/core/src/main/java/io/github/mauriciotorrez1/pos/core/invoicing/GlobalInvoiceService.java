@@ -42,7 +42,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The global invoice to «Público en general» of the sales nobody asked to invoice (RF-036, ADR 0077).
+ * The global invoice to «Público en general» of the sales nobody asked to invoice (RF-036, ADR 0079).
  *
  * <p>It follows the same steps as the individual invoice (ADR 0050): the attempt and the sales it covers are
  * recorded and committed before calling the provider; no transaction stays open during the call; the invoice goes

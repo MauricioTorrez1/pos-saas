@@ -1,4 +1,4 @@
-# ADR 0077: Factura global mensual con vista previa, un periodo por global y una venta en una sola global
+# ADR 0079: Factura global mensual con vista previa, un periodo por global y una venta en una sola global
 
 Estado: Aceptada · Fecha: 2026-11-25 · Concreta E1-32 (RF-036). Usa los ADR 0012, 0038, 0041, 0042, 0050 y 0076.
 

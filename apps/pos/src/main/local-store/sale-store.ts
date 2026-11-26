@@ -14,7 +14,7 @@ import {
 } from '../checkout/sale-recorder';
 import { assertSaleTransition, InvalidSaleTransitionError, type SaleStatus } from '../checkout/sale-state-machine';
 import { INSERT_STOCK_MOVEMENT_SQL, postWith } from '../inventory/stock-store';
-import { momentOnDay } from '../reports/period';
+import { localDayOf, momentOnDay } from '../reports/period';
 import { SyncOutbox } from '../sync/sync-outbox';
 import { uuidV7 } from '../uuid-v7';
 import type { LocalStore } from './local-store';
@@ -120,7 +120,7 @@ export class SaleStore implements SaleRecorder {
     this.#outbox = new SyncOutbox(store, tenantId);
     this.#findTotals = store.prepare('SELECT id, idempotency_key, subtotal_cents, tax_cents, total_cents FROM sale WHERE tenant_id = ? AND id = ?');
     this.#sessionOf = store.prepare('SELECT cash_session_id, cashier_id, business_day FROM sale WHERE tenant_id = ? AND id = ?');
-    this.#sessionDay = store.prepare('SELECT business_day FROM cash_session WHERE tenant_id = ? AND id = ?');
+    this.#sessionDay = store.prepare('SELECT business_day, session_day FROM cash_session WHERE tenant_id = ? AND id = ?');
     this.#findState = store.prepare('SELECT status, total_cents FROM sale WHERE tenant_id = ? AND id = ?');
     this.#listPending = store.prepare(`
       SELECT id, occurred_at, total_cents FROM sale WHERE tenant_id = ? AND status = 'pending_payment' ORDER BY id
@@ -371,9 +371,8 @@ export class SaleStore implements SaleRecorder {
   #insert(sale: SaleToSave): void {
     const { saleId, idempotencyKey, subtotalCents, taxCents, totalCents } = sale;
     const occurredAt = new Date();
-    // A sale takes the day of its session: a backdated capture puts it on its day, at the hour it was rung up (E1-60).
-    const session = sale.cashSessionId === undefined ? undefined : (this.#sessionDay.get(this.#tenantId, sale.cashSessionId) as unknown as { business_day: string | null } | undefined);
-    const businessDay = session?.business_day ?? null;
+    const session = sale.cashSessionId === undefined ? undefined : (this.#sessionDay.get(this.#tenantId, sale.cashSessionId) as unknown as SessionDaySql | undefined);
+    const businessDay = session === undefined ? null : businessDayOf(session, occurredAt.getTime());
     this.#insertSale.run(
       saleId,
       this.#tenantId,
@@ -456,4 +455,25 @@ function toPendingSaleLine(row: PendingLineRow): PendingSaleLine {
     unitPriceE4: row.unit_price_e4,
     totalCents: row.line_total_cents,
   };
+}
+
+interface SessionDaySql {
+  readonly business_day: string | null;
+  readonly session_day: string | null;
+}
+
+/**
+ * The day a sale counts on: the day of its session. A backdated capture puts it on its day (E1-60), and so does a session
+ * of a past day that was resumed because it was left without its cut (E1-61). A sale rung up on the day its session opened
+ * has no business day, so it reads as every sale did before.
+ *
+ * @param session the day the session captures and the day it belongs to
+ * @param occurredAtMs when the sale was rung up
+ * @returns the past day, or null when the sale counts on the day it happened
+ */
+function businessDayOf(session: SessionDaySql, occurredAtMs: number): string | null {
+  if (session.business_day !== null) {
+    return session.business_day;
+  }
+  return session.session_day !== null && session.session_day !== localDayOf(occurredAtMs) ? session.session_day : null;
 }

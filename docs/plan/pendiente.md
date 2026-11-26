@@ -38,7 +38,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Entrega 1 · Reemplazar a Eleventa
 
-✅ 58 de 59 tareas hechas · ⚠️ 1 falta (4 h)
+✅ 59 de 60 tareas hechas · ⚠️ 1 falta (4 h)
 
 - ✅ **E1-01 · Esqueleto de la caja en Electron** (4 h): la caja abre con React y TypeScript, con la pantalla separada del proceso principal.
 - ✅ **E1-02 · SQLite local y migraciones** (4 h): la caja crea y actualiza su base local al arrancar.
@@ -99,6 +99,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ✅ **E1-58 · Modificar y eliminar el proveedor de un producto** (3 h) _(En revisión)_: desde el panel del producto, «Modificar» (amarillo) cambia el proveedor, el código y el costo de lista en un paso, y «Eliminar» (rojo) quita al proveedor después de confirmar, sin tocar los pedidos enviados y avisando si está en un borrador.
 - ✅ **E1-59 · Preguntar si imprimir el ticket** (3 h) _(En revisión)_: después de cobrar, la caja pregunta «¿Imprimir ticket?» (Enter sí, Esc o N no) con el cambio a la vista; el dueño elige preguntar, imprimir siempre o nunca, y una venta sin ticket se imprime después desde «Reimprimir» o «Ventas».
 - ✅ **E1-60 · Capturar las ventas de un día atrasado** (6 h) _(En revisión)_: al entrar se elige el día; con la autorización de un dueño, las ventas que no se alcanzaron a registrar ayer cuentan en ayer, con su propio fondo y corte suplementario, y el ticket lo dice.
+- ✅ **E1-61 · Retomar la caja sin corte de un día atrasado** (5 h) _(En revisión)_: si ayer se salió sin corte, al entrar se elige ayer y se retoma esa misma caja con su fondo para agregar lo que faltó y hacer su corte; un día ya cortado ofrece una captura suplementaria que suma al corte sin cambiarlo.
 
 ## Entrega 2 · Terminal de tarjeta integrada
 
@@ -116,7 +117,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Fase 2 · Clientes, crédito, compras y reparaciones
 
-✅ 1 de 24 tareas hechas · ⚠️ 23 faltan (101 h)
+✅ 2 de 24 tareas hechas · ⚠️ 22 faltan (96 h)
 
 - ⚠️ **F2-01 · Portal de autofactura** (6 h): un cliente factura su ticket con folio y datos fiscales.
 - ⚠️ **F2-02 · Autofactura de una venta en global** (3 h): el sistema aplica el tratamiento validado con el contador.
@@ -124,7 +125,7 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 - ⚠️ **F2-04 · Clientes y aviso de privacidad** (5 h): se guardan datos fiscales con aviso de privacidad y acceso restringido.
 - ⚠️ **F2-05 · Historial del cliente** (2 h): se consultan compras y facturas de un cliente.
 - ⚠️ **F2-06 · Club de maestros** (5 h): un maestro compra con su lista y acumula puntos.
-- ⚠️ **F2-07 · Cotizaciones** (5 h): una cotización vigente se convierte en venta.
+- ✅ **F2-07 · Cotizaciones** (5 h) _(En revisión)_: una cotización vigente se convierte en venta, desde un panel propio que también la imprime, la duplica y la cancela.
 - ⚠️ **F2-08 · Apartados** (5 h): un anticipo reserva mercancía y registra el saldo.
 - ⚠️ **F2-09 · Crédito y límite** (6 h): se vende a crédito sin rebasar el límite.
 - ⚠️ **F2-10 · Abonos y cuentas por cobrar** (4 h): se aplican abonos y se ve la antigüedad de saldos.
@@ -217,4 +218,4 @@ Leyenda: ✅ hecha (incluye las «en revisión» del modo automático, ya fusion
 
 ## Total
 
-✅ 83 de 175 tareas hechas (353 h de 777 h) · ⚠️ 92 faltan (424 h).
+✅ 85 de 176 tareas hechas (363 h de 782 h) · ⚠️ 91 faltan (419 h).

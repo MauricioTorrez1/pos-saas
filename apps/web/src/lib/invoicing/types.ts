@@ -1,4 +1,4 @@
-/** How often the global invoice is issued (ADR 0077). Monthly is the default until the accountant confirms it. */
+/** How often the global invoice is issued (ADR 0079). Monthly is the default until the accountant confirms it. */
 export const PERIODICITIES = ['monthly', 'biweekly', 'daily'] as const;
 export type Periodicity = (typeof PERIODICITIES)[number];
 

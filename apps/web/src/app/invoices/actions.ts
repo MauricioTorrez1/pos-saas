@@ -13,7 +13,7 @@ function field(data: FormData, name: string): string {
 }
 
 /**
- * Shows or stamps the global invoice of a period (ADR 0077).
+ * Shows or stamps the global invoice of a period (ADR 0079).
  *
  * `intent=preview` asks the core which sales the period holds. `intent=issue` stamps the period of that preview and
  * sends the count it showed; if the sales moved in between, the core answers 409, nothing is stamped and a fresh

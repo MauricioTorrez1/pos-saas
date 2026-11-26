@@ -143,7 +143,7 @@ public class IndividualInvoiceService {
     }
 
     /**
-     * A customer may still ask for the invoice of a sale that went into a global (ADR 0077). If that global is stamped,
+     * A customer may still ask for the invoice of a sale that went into a global (ADR 0079). If that global is stamped,
      * this invoice is issued and records it, so the global can be cancelled with SAT motive 04 and issued again
      * without the sale. If the global is being stamped right now, the request must wait.
      */

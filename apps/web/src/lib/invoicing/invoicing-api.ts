@@ -13,7 +13,7 @@ export interface InvoicingApi {
 }
 
 /**
- * Creates a client of the global invoice endpoints (ADR 0077).
+ * Creates a client of the global invoice endpoints (ADR 0079).
  *
  * @param config - Panel settings; only `coreApiUrl` is used.
  * @param accessToken - Access token of the session.
