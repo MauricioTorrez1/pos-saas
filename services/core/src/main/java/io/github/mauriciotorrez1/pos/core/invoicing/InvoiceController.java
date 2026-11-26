@@ -5,6 +5,7 @@ import io.github.mauriciotorrez1.pos.core.identity.UserDirectory;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.InvoiceInProgressException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.InvoiceNotIssuedException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.SaleAlreadyInvoicedException;
+import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.SaleInPendingGlobalException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.SaleNotFoundException;
 import java.util.List;
 import java.util.Map;
@@ -85,6 +86,14 @@ class InvoiceController {
     ProblemDetail inProgress(InvoiceInProgressException busy) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
                 "Another request is invoicing this sale right now. Wait a moment and check again.");
+    }
+
+    @ExceptionHandler(SaleInPendingGlobalException.class)
+    ProblemDetail inPendingGlobal(SaleInPendingGlobalException busy) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "The sale is in a global invoice that is being stamped. Wait until it ends and try again.");
+        problem.setProperty("code", "in_pending_global");
+        return problem;
     }
 
     @ExceptionHandler(InvoiceNotIssuedException.class)

@@ -12,6 +12,8 @@ import java.util.Objects;
  * @param unitPriceE4 unit price in ten-thousandths of a peso, VAT included
  * @param quantityMilli quantity in thousandths of a unit
  * @param taxRateBasisPoints VAT rate in basis points ({@code 1600} is 16%), or {@code null} when the line has no tax
+ * @param identification optional identification of the concept ({@code NoIdentificacion}), such as the ticket folio
+ *     of a global invoice; may be {@code null}
  */
 public record InvoiceLineDraft(
         String description,
@@ -20,7 +22,14 @@ public record InvoiceLineDraft(
         String unitName,
         long unitPriceE4,
         long quantityMilli,
-        Integer taxRateBasisPoints) {
+        Integer taxRateBasisPoints,
+        String identification) {
+
+    /** Creates a line without an identification. */
+    public InvoiceLineDraft(String description, String satProductKey, String satUnitKey, String unitName,
+            long unitPriceE4, long quantityMilli, Integer taxRateBasisPoints) {
+        this(description, satProductKey, satUnitKey, unitName, unitPriceE4, quantityMilli, taxRateBasisPoints, null);
+    }
 
     public InvoiceLineDraft {
         Objects.requireNonNull(description, "description");

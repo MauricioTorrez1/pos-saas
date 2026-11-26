@@ -41,6 +41,14 @@ public final class InvoiceFailures {
         }
     }
 
+    /** A global invoice that holds the sale is being stamped; the individual one waits until it ends. */
+    public static class SaleInPendingGlobalException extends RuntimeException {
+        /** @param saleId the sale */
+        public SaleInPendingGlobalException(UUID saleId) {
+            super("Sale " + saleId + " is in a global invoice that is being stamped");
+        }
+    }
+
     /** The provider could not stamp the invoice. */
     public static class InvoiceNotIssuedException extends RuntimeException {
 

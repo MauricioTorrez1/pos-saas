@@ -31,6 +31,9 @@ The tokens live only inside an encrypted (AES-256-GCM), `HttpOnly`, `SameSite=La
 
 Pages read with Server Components and write with Server Actions, so the access token never reaches the browser. Prices and quantities stay as text (`"12.3450"`) from the core to the screen; the panel never turns them into a `number`.
 
+## Invoicing screens
+`/invoices/global` (owner and manager, permission `invoice.issue`) issues the global invoice to the general public ([ADR 0080](../../docs/adr/0080-factura-global.md)): pick the periodicity (monthly by default) and a day of the period, check the preview (sales, totals per tax rate, sales left out because they have their own invoice, SAT deadline) and stamp it. Stamping sends the count of the preview; if the sales changed, nothing is stamped and a fresh preview appears. The list below flags a global whose sales were later invoiced on their own, which must be cancelled with motive 04.
+
 ## Layout
 | Path | Contents |
 | --- | --- |

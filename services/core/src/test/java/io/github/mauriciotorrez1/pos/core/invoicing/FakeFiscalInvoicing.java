@@ -34,6 +34,7 @@ class FakeFiscalInvoicing implements FiscalInvoicing {
     final AtomicInteger createCalls = new AtomicInteger();
     final AtomicInteger lookupCalls = new AtomicInteger();
     final List<InvoiceDraft> drafts = new CopyOnWriteArrayList<>();
+    final List<FiscalCustomerData> customers = new CopyOnWriteArrayList<>();
     private final Map<String, IssuedInvoice> stampedByExternalId = new ConcurrentHashMap<>();
     private final AtomicInteger sequence = new AtomicInteger();
 
@@ -45,12 +46,14 @@ class FakeFiscalInvoicing implements FiscalInvoicing {
         createCalls.set(0);
         lookupCalls.set(0);
         drafts.clear();
+        customers.clear();
         stampedByExternalId.clear();
     }
 
     @Override
     public FiscalCustomer createCustomer(FiscalCustomerData customer) {
         customerCalls.incrementAndGet();
+        customers.add(customer);
         if (mode == Mode.NOT_CONFIGURED) {
             throw new FacturapiNotConfiguredException("createCustomer");
         }
