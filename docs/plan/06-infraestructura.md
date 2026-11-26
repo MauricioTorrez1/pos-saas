@@ -4,10 +4,9 @@
 | Entorno | Dónde | Datos | Uso |
 | --- | --- | --- | --- |
 | Local | Docker Compose con perfiles | Sintéticos | Desarrollo |
-| Staging | Servidor con el stack completo o por perfiles | Sintéticos | Pruebas de integración y demostraciones |
-| Producción | Servidor con respaldos | Reales | Tienda |
+| Producción | Núcleo en Cloud Run, PostgreSQL en Supabase Free, respaldos en Cloudflare R2 ([ADR 0077](../adr/0077-nucleo-en-cloud-run-y-base-en-supabase.md)) | Reales | Tienda |
 
-Mientras el presupuesto no alcance para dos servidores, staging y producción comparten equipo con bases y dominios separados. Es un riesgo aceptado hasta tener un segundo negocio.
+Con costo de $0 no hay staging: el entorno `production` de GitHub, con aprobación manual, es el freno antes de cada despliegue. Es un riesgo aceptado hasta tener un segundo negocio. En producción solo corre el núcleo; el resto del stack sigue en Docker Compose local (ADR 0013).
 
 ## Perfiles de Docker Compose
 | Perfil | Servicios | Cuándo |
@@ -26,7 +25,7 @@ Tu PC tiene 16 GB de RAM: levanta solo lo que uses. Docker Desktop ve 7.6 GiB de
 4. **Migraciones:** corren con Flyway antes de arrancar la versión nueva y con el rol `app_migrator`.
 
 ## Terraform
-El repositorio define servidor, firewall y DNS en `infra/terraform`, con estado remoto cifrado fuera de Git. El proveedor se elige en la tarea F0-24.
+`infra/terraform` define Cloud Run, Artifact Registry, Secret Manager, la federación de identidades con GitHub, el proyecto de Supabase y el bucket R2 (ADR 0077). El estado vive fuera de Git: local o en un bucket de Cloud Storage con versiones. La guía del dueño está en [docs/despliegue-en-la-nube.md](../despliegue-en-la-nube.md).
 
 ## Observabilidad
 - **Trazas, métricas y logs:** OpenTelemetry hacia Tempo, Prometheus y Loki, con tableros en Grafana versionados en Git.
@@ -36,7 +35,7 @@ El repositorio define servidor, firewall y DNS en `infra/terraform`, con estado 
 
 ## Secretos
 - `.env.example` sin valores reales, y `.env` en `.gitignore`.
-- Secretos de CI en GitHub Actions. En el servidor, en archivos con permisos restringidos, fuera del repositorio.
+- Secretos de CI en GitHub Actions. En producción, en Secret Manager, legibles solo por la cuenta de servicio del núcleo.
 - Llaves de terceros por negocio, cifradas en la base con una llave maestra fuera de ella.
 - Rotación documentada, y revocación inmediata si hay una filtración.
 
@@ -51,30 +50,21 @@ El repositorio define servidor, firewall y DNS en `infra/terraform`, con estado 
 Se ensaya una restauración cada trimestre, porque un respaldo sin probar no es un respaldo.
 
 ## Costos mensuales estimados
-Cifras aproximadas en MXN. Deben confirmarse en la tarea F0-24.
+Cifras aproximadas en MXN, confirmadas en F0-24 (ADR 0077).
 
 | Concepto | Fase 0 | Entregas 1 y 2 | Fase 2 y 3 | Fase 4 y 5 |
 | --- | --- | --- | --- | --- |
-| Servidor | Ver alerta | Ver alerta | Ver alerta | Se recalcula al migrar |
-| Dominio | ~$25 | ~$25 | ~$25 | ~$25 |
-| Almacenamiento de respaldos | ~$20 | ~$50 | ~$100 | ~$200 |
+| Servidor (Cloud Run y Supabase) | $0 en nivel gratuito | $0 en nivel gratuito | Supabase Pro si pasa de 500 MB (~$500) | Se recalcula al migrar |
+| Dominio (opcional: Cloud Run da HTTPS en `*.run.app`) | $0 | ~$25 | ~$25 | ~$25 |
+| Almacenamiento de respaldos (R2, 10 GB gratis) | $0 | $0 | ~$20 | ~$100 |
 | Sentry y correo | $0 en nivel gratuito | $0 en nivel gratuito | Por revisar | Por revisar |
 | Facturapi, lo paga el negocio | $0 en modo de prueba | $299 + $0.60 por timbre | Igual | Sigue el modelo por negocio |
 | Comisiones de Mercado Pago | $0 | Por venta | Por venta | Por negocio |
 | WhatsApp, lo paga el negocio | $0 | $0 | Por mensaje | Por negocio |
 | API de Claude | $0 | $0 | $0 | Por uso, con límite |
 
-### Alerta: el servidor sigue sin resolverse
-Tu presupuesto de infraestructura es de $300 a $700 al mes. Las fuentes del servidor de 16 GB no coinciden:
-
-- Un agregador listaba un CPX42 en unos 26 USD al mes, con datos previos a un ajuste de precios de abril de 2026.
-- La [página oficial de Hetzner](https://www.hetzner.com/cloud/regular-performance/) muestra el CPX41 en €120.99 al mes y lo marca como no disponible.
-
-Si ese precio oficial es correcto, el stack completo en un solo servidor excede tu presupuesto varias veces. La tarea F0-24 no se cierra hasta elegir una de estas salidas:
-
-1. **Otro proveedor** con 16 GB dentro del presupuesto, revisando su confiabilidad.
-2. **Subir el presupuesto**, si el negocio lo aprueba.
-3. **Producción solo con `core`** en un servidor menor, y los demás perfiles en tu PC y en niveles gratuitos administrados. Sigue siendo stack completo para el portafolio.
+### Servidor: resuelto en F0-24
+El VPS de 16 GB excedía el presupuesto. El dueño eligió servicios administrados en nivel gratuito, con $0 al mes: Cloud Run para el núcleo, Supabase Free para PostgreSQL y Cloudflare R2 para los respaldos. Los límites y el camino de crecimiento están en el [ADR 0077](../adr/0077-nucleo-en-cloud-run-y-base-en-supabase.md).
 
 ## Requisitos de la PC de la tienda
 Mínimo: Windows 10 o 11 de 64 bits, 4 GB de RAM, 20 GB libres de disco, y USB para impresora y lector. Recomendado: 8 GB de RAM y SSD. Antes de instalar, hay que revisar sus especificaciones y que reciba actualizaciones de seguridad.

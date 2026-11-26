@@ -1,0 +1,48 @@
+# Production on Cloud Run with PostgreSQL in Supabase (ADR 0077). Active with SPRING_PROFILES_ACTIVE=prod.
+# Every connection value comes from the environment, filled by Cloud Run from Secret Manager; none has a
+# default, so a missing secret stops the start instead of pointing the core at a wrong database.
+spring:
+  datasource:
+    # jdbc:postgresql://<pooler host>:5432/postgres?sslmode=require, through Supavisor in session mode.
+    url: ${CORE_DB_URL}
+    username: ${CORE_DB_USER}
+    password: ${CORE_DB_PASSWORD}
+    hikari:
+      # Supavisor of a free project shares a small pool among every client. Up to 4 per instance, and
+      # none kept open while idle, so an instance that scales to zero leaves nothing behind.
+      maximum-pool-size: ${CORE_DB_POOL_SIZE:4}
+      minimum-idle: 0
+      idle-timeout: 60000
+      connection-timeout: 10000
+  flyway:
+    # Migrations run before each deployment from the deploy workflow, with the role that owns the tables.
+    # The running core never holds that password (ADR 0077).
+    enabled: false
+  lifecycle:
+    # Cloud Run sends SIGTERM and waits 10 s before killing the instance.
+    timeout-per-shutdown-phase: 8s
+server:
+  # Cloud Run tells the container its port through PORT.
+  port: ${PORT:8080}
+  shutdown: graceful
+  forward-headers-strategy: framework
+management:
+  endpoint:
+    health:
+      # /actuator/health/liveness and /actuator/health/readiness, the probes of the Cloud Run service.
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      probability: ${CORE_TRACING_SAMPLING:0.1}
+    # No collector in production yet: trace ids still reach the logs, nothing is exported.
+    export:
+      enabled: ${CORE_OTLP_EXPORT_ENABLED:false}
+  otlp:
+    metrics:
+      export:
+        enabled: ${CORE_OTLP_EXPORT_ENABLED:false}
+  logging:
+    export:
+      otlp:
+        enabled: ${CORE_OTLP_EXPORT_ENABLED:false}

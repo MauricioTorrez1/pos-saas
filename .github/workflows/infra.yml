@@ -1,0 +1,67 @@
+name: Infrastructure
+
+# Checks the Terraform code and that the core image builds. Nothing here touches a cloud account: there is no
+# apply, no plan against real providers, and no credential (ADR 0077). These checks are not required by the
+# branch rules, so the path filter never leaves a pull request waiting for them.
+on:
+  pull_request:
+    paths:
+      - infra/terraform/**
+      - services/core/**
+      - packages/contracts/schemas/**
+      - scripts/smoke-core-image.sh
+      - .github/workflows/infra.yml
+  push:
+    branches: [main]
+    paths:
+      - infra/terraform/**
+      - services/core/**
+      - packages/contracts/schemas/**
+      - scripts/smoke-core-image.sh
+      - .github/workflows/infra.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # The same Terraform the runbook asks the owner to install, pinned by digest.
+  TERRAFORM_IMAGE: hashicorp/terraform:1.14.9@sha256:1d10ec4073f4ddbdf34a28540a3b9250852ab500cb1c53f68c8bd17d82f474d8
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check formatting
+        run: docker run --rm -v "$PWD/infra/terraform:/tf" -w /tf "$TERRAFORM_IMAGE" fmt -check -recursive -diff
+      # -backend=false: validate never reads or writes a state. -lockfile=readonly: the providers must match
+      # the hashes committed in .terraform.lock.hcl.
+      - name: Download the pinned providers
+        run: >-
+          docker run --rm -v "$PWD/infra/terraform:/tf" -w /tf "$TERRAFORM_IMAGE"
+          init -backend=false -input=false -lockfile=readonly
+      - name: Validate
+        run: docker run --rm -v "$PWD/infra/terraform:/tf" -w /tf "$TERRAFORM_IMAGE" validate
+
+  core-image:
+    name: Core image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the image of the core
+        run: docker build --file services/core/Dockerfile --tag pos-core:ci .
+      - name: Check that the image runs as a non-root user
+        run: test "$(docker image inspect --format '{{.Config.User}}' pos-core:ci)" = "core"
+      - name: Start the image against a migrated database and check its health
+        run: bash scripts/smoke-core-image.sh pos-core:ci
