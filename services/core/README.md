@@ -196,6 +196,17 @@ Invoices a sale the core already received ([ADR 0050](../../docs/adr/0050-factur
 ```
 `paymentForm` and `satProductKeys` are optional: the payment form comes from the sale and the SAT product key from `invoicing.default-sat-product-key` until the catalog carries it. Answers: `201` stamped invoice (`fiscalUuid`, `providerInvoiceId`, `totalCents`), `404` unknown sale, `409` already invoiced or being invoiced, `422` invalid fiscal data (field and rule, never the value) or refused by the provider, `503` no API key or no answer from the provider. Sending the same request again is always safe: a doubtful stamping is looked up at the provider (`external_id`) before it is repeated, and the `invoice` table allows one invoice per sale. Only the receiver's RFC is stored; the PDF and XML are downloaded from the provider with `providerInvoiceId`.
 
+### Global invoice (`/invoices/global`)
+The sales nobody asked to invoice go into one CFDI to «Público en general» per period ([ADR 0080](../../docs/adr/0080-factura-global.md), RF-036). All three endpoints need `invoice.issue` (owner and manager).
+
+| Endpoint | What it does |
+| --- | --- |
+| `GET /invoices/global/preview?periodicity=monthly&day=2026-10-01` | The sales of the period not invoiced yet (net of returns), totals per tax rate, payment form, deadline and the live global of the period, if any. Stamps nothing |
+| `POST /invoices/global` | `{"periodicity":"monthly","day":"2026-10-01","expectedSaleCount":42}` stamps a closed period. `201` stamped, `409` `already_issued` / `in_progress` / `preview_stale`, `422` `period_not_closed` / `no_sales` / `invalid_request` / refused by the provider, `503` no key, no answer or no issuer ZIP code |
+| `GET /invoices/global` | The latest 24 globals, failed attempts included, with `overlappingInvoices` |
+
+`periodicity` is `monthly` (default), `biweekly` or `daily`. The receiver is `XAXX010101000` with regime 616 and the ZIP code of `INVOICING_ISSUER_ZIP_CODE`; each ticket and tax rate is one concept (`01010101`, `ACT`, the folio as identification). A sale is in at most one live global (partial unique index) and a period has at most one live global, so repeating a request after a timeout is safe: the provider is looked up by `external_id` first. A sale invoiced on its own after its global was stamped is still invoiced; the invoice records the global, which must be cancelled with SAT motive 04 and issued again.
+
 ## Observability
 The core sends traces, metrics and logs over OTLP to the collector of the `observability` profile and errors to Sentry ([ADR 0037](../../docs/adr/0037-observabilidad-del-nucleo.md)). Every log line shows `[service,traceId,spanId,tenant_id]`; spans carry `tenant.id`, and no metric uses it as a label. Never log names, phones, emails, PINs, tokens or card data, only ids.
 

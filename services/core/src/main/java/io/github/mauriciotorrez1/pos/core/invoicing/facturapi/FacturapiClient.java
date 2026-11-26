@@ -152,6 +152,9 @@ public class FacturapiClient implements FiscalInvoicing {
         product.put("unit_key", line.satUnitKey());
         product.put("unit_name", line.unitName());
         product.put("price", BigDecimal.valueOf(line.unitPriceE4()).divide(E4));
+        if (line.identification() != null) {
+            product.put("sku", line.identification());
+        }
         product.put("tax_included", true);
         product.put("taxes", taxes);
         return Map.of("quantity", BigDecimal.valueOf(line.quantityMilli()).divide(MILLI), "product", product);

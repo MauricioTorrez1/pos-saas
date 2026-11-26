@@ -154,7 +154,7 @@ export class ProductReader {
   }
 
   /**
-   * Lists the codes a product released when it was given up and has not got back (ADR 0080).
+   * Lists the codes a product released when it was given up and has not got back (ADR 0081).
    *
    * @param productId the UUIDv7 of the product
    * @returns the codes, sorted, each once
@@ -198,7 +198,7 @@ export class ProductReader {
   }
 
   /**
-   * Finds the product that uses a barcode now. A product that was given up released its codes (ADR 0080), so the owner is
+   * Finds the product that uses a barcode now. A product that was given up released its codes (ADR 0081), so the owner is
    * an active product, or a product that was made inactive from its creation and never sold.
    *
    * @param code the barcode, as typed or scanned. Spaces around it are ignored.
