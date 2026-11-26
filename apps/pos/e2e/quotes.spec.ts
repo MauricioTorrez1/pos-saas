@@ -127,6 +127,8 @@ test('creates a quote, previews its print, and sells it at the quoted price (F2-
   const rows = await readRows(register, databasePath);
   expect(rows.completedSales).toEqual([{ id: rows.statuses[1]!.sale_id, total_cents: 15_975 }]);
 
+  // The key is read by the lookup box, which takes the keyboard back a moment after the payment closes.
+  await expect(page.getByRole('combobox', { name: 'Buscar producto' })).toBeFocused();
   await page.keyboard.press('Shift+F12');
   await expect(panel(page).getByRole('row', { name: /COT-000001/ })).toContainText('Vendida');
 });
