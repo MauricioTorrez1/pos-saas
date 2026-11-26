@@ -41,7 +41,7 @@ interface ReactivateProductDialogProps {
 }
 
 /**
- * Puts a given-up product on sale again (E1-62, ADR 0082). It lists the codes the product released: the free ones come back
+ * Puts a given-up product on sale again (E1-62, ADR 0083). It lists the codes the product released: the free ones come back
  * ticked, and one that another product uses now is shown with its owner and cannot be ticked, because a code is never taken
  * from another product. When an active product already has the name, it asks for another one. F2 reactivates and Esc gives up.
  *

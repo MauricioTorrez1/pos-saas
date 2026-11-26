@@ -419,7 +419,7 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Conceptos:** [Cancelación CFDI]
 - **Claude / tú:** Claude escribe ambos flujos. Tú revisas los motivos con el contador.
 - **Pruebas:** estados de cancelación y egreso relacionado.
-- **Criterios:** cumple RF-037 y RF-038.
+- **Criterios:** cumple RF-037 y RF-038 y el ADR 0082.
 - **Depende de:** E1-31, E1-15 · **Estimación:** 4 h
 - **Autoevaluación:** (1) ¿Cancelar o nota de crédito? (2) ¿Por qué es asíncrono? (3) ¿Qué queda en la bitácora?
 - **Entrevista:** (1) ¿Cómo modelas estados de un proceso externo? (2) ¿Cómo manejas webhooks fallidos?
@@ -679,9 +679,9 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 ### E1-62 · Productos dados de baja liberan su nombre y sus códigos
 - **Objetivo:** al dar de baja un producto, sus códigos quedan libres para un producto nuevo (y el nombre también se puede repetir); una pantalla «Productos dados de baja» lista todo lo dado de baja con fecha, quién, último precio y costo, existencia y códigos liberados, y reactiva sin quitarle un código a otro producto.
 - **Conceptos:** [Historial de solo agregar], [Unicidad solo entre activos], [Conflicto al reactivar], [Rellenar datos en una migración], [RLS durante una migración]
-- **Claude / tú:** Claude escribe las migraciones (caja 27 y núcleo V18), la liberación y recuperación de códigos, la búsqueda por historial, el diálogo de reactivar, la pantalla, el núcleo y las pruebas. Tú das de baja un producto real con ventas, creas otro con su código y reactivas el viejo desde la lista.
+- **Claude / tú:** Claude escribe las migraciones (caja 27 y núcleo V19), la liberación y recuperación de códigos, la búsqueda por historial, el diálogo de reactivar, la pantalla, el núcleo y las pruebas. Tú das de baja un producto real con ventas, creas otro con su código y reactivas el viejo desde la lista.
 - **Pruebas:** Vitest de liberar códigos con bitácora y operación, reusar código y nombre, buscar en el panel por un código liberado, reactivar con códigos libres, conflicto de código y de nombre, PIN de la cajera, lista con sus datos, migración de lo ya dado de baja y historial inmutable, y búsqueda de ventas por un código liberado; Vitest de la pantalla y del diálogo; Java de liberar al inactivar y al borrar, no robar al reactivar, marcar recuperado e historial inmutable; Playwright de dar de baja, crear otro con el mismo código y nombre, y reactivar desde la lista.
-- **Criterios:** ADR 0082; nada se borra (historial de solo agregar); un código nunca se le quita a otro producto; contrato sin cambios; dueño o cajera con su PIN, con bitácora.
+- **Criterios:** ADR 0083; nada se borra (historial de solo agregar); un código nunca se le quita a otro producto; contrato sin cambios; dueño o cajera con su PIN, con bitácora.
 - **Depende de:** E1-43 · **Estimación:** 4 h
 - **Autoevaluación:** (modo automático: no aplica)
 - **Entrevista:** (1) ¿Por qué mover los códigos a un historial en lugar de usar un índice único parcial «solo activos»? (2) ¿Cómo evitas que reactivar un producto le quite en silencio un código a otro?

@@ -69,9 +69,12 @@ public final class GlobalInvoiceViews {
      * @param errorCode why the last attempt failed, without fiscal data
      * @param overlappingInvoices sales invoiced on their own after this global was stamped; above zero it must be
      *     cancelled with SAT motive 04 and issued again without them
+     * @param cancellationStatus {@code requested}, {@code pending}, {@code accepted}, {@code rejected} or {@code failed};
+     *     {@code null} when nobody asked to cancel it (ADR 0082)
+     * @param cancellationMotive the SAT motive of the cancellation, or {@code null}
      */
     public record Summary(UUID id, String periodicity, LocalDate periodStart, LocalDate periodEnd, String status,
             int saleCount, long expectedTotalCents, Long totalCents, UUID fiscalUuid, String providerInvoiceId,
-            String errorCode, long overlappingInvoices) {
+            String errorCode, long overlappingInvoices, String cancellationStatus, String cancellationMotive) {
     }
 }
