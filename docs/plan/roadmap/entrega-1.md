@@ -419,7 +419,7 @@ Duración estimada: 170 horas. Reparto: Claude escribe y explica; tú revisas, p
 - **Conceptos:** [Cancelación CFDI]
 - **Claude / tú:** Claude escribe ambos flujos. Tú revisas los motivos con el contador.
 - **Pruebas:** estados de cancelación y egreso relacionado.
-- **Criterios:** cumple RF-037 y RF-038.
+- **Criterios:** cumple RF-037 y RF-038 y el ADR 0081.
 - **Depende de:** E1-31, E1-15 · **Estimación:** 4 h
 - **Autoevaluación:** (1) ¿Cancelar o nota de crédito? (2) ¿Por qué es asíncrono? (3) ¿Qué queda en la bitácora?
 - **Entrevista:** (1) ¿Cómo modelas estados de un proceso externo? (2) ¿Cómo manejas webhooks fallidos?

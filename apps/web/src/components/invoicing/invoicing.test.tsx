@@ -41,6 +41,8 @@ const STAMPED: GlobalSummary = {
   providerInvoiceId: 'inv_1',
   errorCode: null,
   overlappingInvoices: 0,
+  cancellationStatus: null,
+  cancellationMotive: null,
 };
 
 function withPreview(overrides: Partial<GlobalPreview> = {}): GlobalInvoiceState {

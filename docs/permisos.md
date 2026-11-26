@@ -43,11 +43,18 @@ Cada fila es un endpoint de la API. «Sí» quiere decir que el rol puede llamar
 | `GET /quarantine` | `discrepancy.view` | Sí | Sí | — |
 | `GET /quarantine/{id}` | `discrepancy.view` | Sí | Sí | — |
 | `POST /quarantine/{id}/resolution` | `discrepancy.resolve` | Sí | Sí | — |
+| `GET /invoices` | `invoice.issue` | Sí | Sí | — |
 | `POST /invoices` | `invoice.issue` | Sí | Sí | — |
 | `GET /invoices/global` | `invoice.issue` | Sí | Sí | — |
 | `GET /invoices/global/preview` | `invoice.issue` | Sí | Sí | — |
 | `POST /invoices/global` | `invoice.issue` | Sí | Sí | — |
 | `POST /invoices/{id}/cancel` | `invoice.cancel` | Sí | — | — |
+| `POST /invoices/{id}/cancellation-refresh` | `invoice.cancel` | Sí | — | — |
+| `POST /invoices/global/{id}/cancel` | `invoice.cancel` | Sí | — | — |
+| `POST /invoices/global/{id}/cancellation-refresh` | `invoice.cancel` | Sí | — | — |
+| `GET /invoices/credit-notes` | `invoice.issue` | Sí | Sí | — |
+| `GET /invoices/credit-notes/candidates` | `invoice.issue` | Sí | Sí | — |
+| `POST /invoices/credit-notes` | `invoice.issue` | Sí | Sí | — |
 | `GET /reports/sales` | `report.view` | Sí | Sí | — |
 | `GET /reports/fiscal-pending` | `report.view` | Sí | Sí | — |
 <!-- matrix:end -->

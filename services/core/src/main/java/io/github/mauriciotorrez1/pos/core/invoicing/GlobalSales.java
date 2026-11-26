@@ -21,7 +21,7 @@ class GlobalSales {
 
     /** A sale may go into a global when nobody is invoicing it on its own and no live global holds it. */
     private static final String NOT_INVOICED = """
-            NOT EXISTS (SELECT 1 FROM invoice i WHERE i.sale_id = s.id AND i.status IN ('pending', 'stamped'))
+            NOT EXISTS (SELECT 1 FROM invoice i WHERE i.sale_id = s.id AND i.status IN ('pending', 'stamped') AND i.superseded_at IS NULL)
             AND NOT EXISTS (SELECT 1 FROM global_invoice_sale g WHERE g.sale_id = s.id AND g.released_at IS NULL)""";
 
     private static final String NET_GROUPS = """
@@ -55,7 +55,8 @@ class GlobalSales {
         String where = """
                 (%1$s BETWEEN ? AND ?
                  OR (%1$s < ? AND EXISTS (SELECT 1 FROM global_invoice gp
-                                         WHERE gp.status = 'stamped' AND %1$s BETWEEN gp.period_start AND gp.period_end)))
+                                         WHERE gp.status = 'stamped' AND gp.cancellation_status IS DISTINCT FROM 'accepted'
+                                           AND %1$s BETWEEN gp.period_start AND gp.period_end)))
                 AND """.formatted(BUSINESS_DATE) + " " + NOT_INVOICED;
         return collect(jdbc.queryForList(NET_GROUPS.formatted(BUSINESS_DATE, where), from, to, from));
     }
@@ -71,7 +72,7 @@ class GlobalSales {
         Long count = jdbc.queryForObject("""
                 SELECT count(*) FROM sale s
                 WHERE %s BETWEEN ? AND ?
-                  AND EXISTS (SELECT 1 FROM invoice i WHERE i.sale_id = s.id AND i.status IN ('pending', 'stamped'))
+                  AND EXISTS (SELECT 1 FROM invoice i WHERE i.sale_id = s.id AND i.status IN ('pending', 'stamped') AND i.superseded_at IS NULL)
                 """.formatted(BUSINESS_DATE), Long.class, from, to);
         return count == null ? 0 : count;
     }

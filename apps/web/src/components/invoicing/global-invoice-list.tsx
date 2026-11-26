@@ -1,5 +1,12 @@
-import { formatCents, formatDay, periodicityLabel } from '@/lib/invoicing/messages';
-import type { GlobalSummary } from '@/lib/invoicing/types';
+import { cancellationLabel, formatCents, formatDay, mayAskToCancel, periodicityLabel } from '@/lib/invoicing/messages';
+import type { CfdiActionState, GlobalSummary } from '@/lib/invoicing/types';
+import { CancelForm } from './cfdi-forms';
+
+interface GlobalInvoiceListProps {
+  globals: GlobalSummary[];
+  /** Given only to the owner, who holds `invoice.cancel` (ADR 0081): it adds the cancel form to each stamped global. */
+  cancelAction?: (previous: CfdiActionState, data: FormData) => Promise<CfdiActionState>;
+}
 
 const STATUS_LABELS: Record<GlobalSummary['status'], string> = {
   stamped: 'Timbrada',
@@ -11,7 +18,7 @@ const STATUS_LABELS: Record<GlobalSummary['status'], string> = {
  * The latest global invoices. One whose sales were later invoiced on their own is flagged: the SAT asks to cancel it
  * with motive 04 and issue it again without those sales.
  */
-export function GlobalInvoiceList({ globals }: { globals: GlobalSummary[] }) {
+export function GlobalInvoiceList({ globals, cancelAction }: GlobalInvoiceListProps) {
   if (globals.length === 0) {
     return <p>Todavía no hay facturas globales.</p>;
   }
@@ -24,6 +31,7 @@ export function GlobalInvoiceList({ globals }: { globals: GlobalSummary[] }) {
           <th scope="col">Ventas</th>
           <th scope="col">Total</th>
           <th scope="col">UUID</th>
+          {cancelAction && <th scope="col">Cancelación</th>}
         </tr>
       </thead>
       <tbody>
@@ -34,8 +42,10 @@ export function GlobalInvoiceList({ globals }: { globals: GlobalSummary[] }) {
             </td>
             <td>
               {STATUS_LABELS[global.status]}
+              {global.cancellationStatus && ` · ${cancellationLabel(global.cancellationStatus)}`}
+              {global.cancellationMotive && ` (motivo ${global.cancellationMotive})`}
               {global.status === 'pending' && global.errorCode && ' (Facturapi no respondió; vuelve a timbrar ese periodo)'}
-              {global.overlappingInvoices > 0 && (
+              {global.overlappingInvoices > 0 && global.cancellationStatus !== 'accepted' && (
                 <strong>
                   {' '}
                   · Por corregir: {global.overlappingInvoices}{' '}
@@ -47,6 +57,20 @@ export function GlobalInvoiceList({ globals }: { globals: GlobalSummary[] }) {
             <td>{global.saleCount}</td>
             <td>{formatCents(global.totalCents ?? global.expectedTotalCents)}</td>
             <td className="mono">{global.fiscalUuid ?? '—'}</td>
+            {cancelAction && (
+              <td>
+                {(mayAskToCancel(global.status === 'stamped', global.cancellationStatus) ||
+                  global.cancellationStatus === 'pending') && (
+                  <CancelForm
+                    action={cancelAction}
+                    kind="global"
+                    id={global.id}
+                    status={global.cancellationStatus}
+                    defaultMotive={global.overlappingInvoices > 0 ? '04' : '02'}
+                  />
+                )}
+              </td>
+            )}
           </tr>
         ))}
       </tbody>

@@ -3,6 +3,7 @@ package io.github.mauriciotorrez1.pos.core.invoicing;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.InvoiceInProgressException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.InvoiceNotIssuedException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.InvoiceNotIssuedException.Reason;
+import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.NotReplaceableException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.SaleAlreadyInvoicedException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.SaleInPendingGlobalException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.SaleNotFoundException;
@@ -76,6 +77,7 @@ public class IndividualInvoiceService {
      * @throws SaleAlreadyInvoicedException if the sale already has a stamped invoice
      * @throws InvoiceInProgressException if another request is stamping the sale right now
      * @throws SaleInPendingGlobalException if a global invoice that holds the sale is being stamped
+     * @throws NotReplaceableException if the invoice to replace is not a live, stamped invoice of the sale
      * @throws InvoiceNotIssuedException if the provider refused, is not configured or did not answer
      */
     public InvoiceResult issue(IssueInvoiceCommand command) {
@@ -88,39 +90,50 @@ public class IndividualInvoiceService {
             throw new InvalidFiscalDataException(errors);
         }
 
-        Claim claim = transaction.execute(status -> claim(sale, receiver, command.actorId()));
+        Claim claim = transaction.execute(status -> claim(sale, receiver, command.replacesInvoiceId(), command.actorId()));
         if (claim.recover()) {
             Optional<InvoiceResult> recovered = recover(claim.id(), sale, command.actorId());
             if (recovered.isPresent()) {
                 return recovered.get();
             }
         }
-        return stamp(claim.id(), sale, receiver, lines, paymentForm, command.actorId());
+        return stamp(claim.id(), sale, receiver, lines, paymentForm, claim.replacedFiscalUuid(), command.actorId());
     }
 
     // --- claiming the sale ------------------------------------------------------------------------------------
 
-    private record Claim(UUID id, boolean recover) {
+    private record Claim(UUID id, boolean recover, String replacedFiscalUuid) {
     }
 
-    private Claim claim(SaleView sale, Receiver receiver, UUID actorId) {
+    private static final String ATTEMPT_SELECT = """
+            SELECT id, status, error_code, fiscal_uuid, provider_invoice_id, total_cents,
+                   (attempt_started_at < now() - make_interval(secs => ?)) AS stale
+            FROM invoice""";
+
+    /**
+     * Claims the sale under the invoicing lock (ADR 0080). A sale has one live invoice: the newest one that no accepted
+     * cancellation superseded. A replacement (ADR 0081) is the one exception, claimed by the invoice it replaces.
+     */
+    private Claim claim(SaleView sale, Receiver receiver, UUID replacesInvoiceId, UUID actorId) {
         InvoicingLock.acquire(jdbc);
         UUID overlappedGlobal = stampedGlobalHolding(sale.id());
-        UUID id = Uuid7.next();
-        int inserted = jdbc.update("""
-                INSERT INTO invoice (id, sale_id, status, receiver_tax_id, requested_by, overlaps_global_invoice_id)
-                VALUES (?, ?, 'pending', ?, ?, ?)
-                ON CONFLICT ON CONSTRAINT invoice_one_per_sale DO NOTHING
-                """, id, sale.id(), receiver.taxId(), actorId, overlappedGlobal);
-        if (inserted == 1) {
-            return new Claim(id, false);
+        String replacedFiscalUuid = replacesInvoiceId == null ? null : replaceable(replacesInvoiceId, sale.id());
+        List<Map<String, Object>> live = replacesInvoiceId == null
+                ? jdbc.queryForList(ATTEMPT_SELECT + " WHERE sale_id = ? AND superseded_at IS NULL"
+                        + " AND (replaces_invoice_id IS NULL OR status = 'stamped') ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
+                        attemptLease.toSeconds(), sale.id())
+                : jdbc.queryForList(ATTEMPT_SELECT + " WHERE replaces_invoice_id = ? FOR UPDATE",
+                        attemptLease.toSeconds(), replacesInvoiceId);
+        if (live.isEmpty()) {
+            UUID id = Uuid7.next();
+            jdbc.update("""
+                    INSERT INTO invoice (id, sale_id, status, receiver_tax_id, requested_by, overlaps_global_invoice_id,
+                                         replaces_invoice_id)
+                    VALUES (?, ?, 'pending', ?, ?, ?, ?)
+                    """, id, sale.id(), receiver.taxId(), actorId, overlappedGlobal, replacesInvoiceId);
+            return new Claim(id, false, replacedFiscalUuid);
         }
-        // The row lock makes concurrent takeovers of the same failed or stale attempt take turns.
-        Map<String, Object> row = jdbc.queryForMap("""
-                SELECT id, status, error_code, fiscal_uuid, provider_invoice_id, total_cents,
-                       (attempt_started_at < now() - make_interval(secs => ?)) AS stale
-                FROM invoice WHERE sale_id = ? FOR UPDATE
-                """, attemptLease.toSeconds(), sale.id());
+        Map<String, Object> row = live.get(0);
         UUID existingId = (UUID) row.get("id");
         String state = (String) row.get("status");
         if ("stamped".equals(state)) {
@@ -139,7 +152,20 @@ public class IndividualInvoiceService {
                        overlaps_global_invoice_id = ?
                 WHERE id = ?
                 """, actorId, overlappedGlobal, existingId);
-        return new Claim(existingId, outcomeUnknown);
+        return new Claim(existingId, outcomeUnknown, replacedFiscalUuid);
+    }
+
+    /** The invoice to replace must be stamped, live and of the same sale, and not already being cancelled for good. */
+    private String replaceable(UUID invoiceId, UUID saleId) {
+        List<UUID> fiscalUuid = jdbc.queryForList("""
+                SELECT fiscal_uuid FROM invoice
+                WHERE id = ? AND sale_id = ? AND status = 'stamped' AND superseded_at IS NULL
+                  AND cancellation_status IS DISTINCT FROM 'accepted' AND cancellation_status IS DISTINCT FROM 'pending'
+                """, UUID.class, invoiceId, saleId);
+        if (fiscalUuid.isEmpty()) {
+            throw new NotReplaceableException(invoiceId);
+        }
+        return fiscalUuid.get(0).toString();
     }
 
     /**
@@ -183,19 +209,22 @@ public class IndividualInvoiceService {
             throw new InvoiceNotIssuedException(Reason.OUTCOME_UNKNOWN, invoiceId, null);
         }
         LOG.info("Invoice {} was already stamped at the provider; saving it instead of stamping again", invoiceId);
-        return Optional.of(saveStamped(invoiceId, sale, found.get(), fiscalUuid.get(), null, true, actorId));
+        return Optional.of(saveStamped(invoiceId, sale, found.get(), fiscalUuid.get(), null, null, true, actorId));
     }
 
     // --- stamping ---------------------------------------------------------------------------------------------
 
     private InvoiceResult stamp(UUID invoiceId, SaleView sale, Receiver receiver, List<InvoiceLineDraft> lines,
-            String paymentForm, UUID actorId) {
+            String paymentForm, String replacedFiscalUuid, UUID actorId) {
         IssuedInvoice issued;
+        String customerId;
         try {
             FiscalCustomer customer = provider.createCustomer(new FiscalCustomerData(receiver.legalName(),
                     receiver.taxId(), receiver.taxRegime(), receiver.zipCode(), receiver.email()));
+            customerId = customer.id();
+            List<String> related = replacedFiscalUuid == null ? List.of() : List.of(replacedFiscalUuid);
             issued = provider.createInvoice(new InvoiceDraft(customer.id(), lines, paymentForm, receiver.cfdiUse(),
-                    InvoiceType.INCOME, null, List.of(), invoiceId.toString()));
+                    InvoiceType.INCOME, null, related, invoiceId.toString(), replacedFiscalUuid == null ? null : "04"));
         } catch (FacturapiNotConfiguredException failure) {
             markFailed(invoiceId, sale, "provider_not_configured", null, actorId);
             throw new InvoiceNotIssuedException(Reason.PROVIDER_NOT_CONFIGURED, invoiceId, null);
@@ -213,7 +242,7 @@ public class IndividualInvoiceService {
             markUnknown(invoiceId, null);
             throw new InvoiceNotIssuedException(Reason.OUTCOME_UNKNOWN, invoiceId, null);
         }
-        return saveStamped(invoiceId, sale, issued, fiscalUuid.get(), receiver.taxId(), false, actorId);
+        return saveStamped(invoiceId, sale, issued, fiscalUuid.get(), receiver.taxId(), customerId, false, actorId);
     }
 
     private static Optional<UUID> fiscalUuidOf(IssuedInvoice issued) {
@@ -230,14 +259,15 @@ public class IndividualInvoiceService {
     // --- saving the outcome -----------------------------------------------------------------------------------
 
     private InvoiceResult saveStamped(UUID invoiceId, SaleView sale, IssuedInvoice issued, UUID fiscalUuid,
-            String receiverTaxId, boolean recovered, UUID actorId) {
+            String receiverTaxId, String customerId, boolean recovered, UUID actorId) {
         transaction.executeWithoutResult(status -> {
             jdbc.update("""
                     UPDATE invoice SET status = 'stamped', provider_invoice_id = ?, fiscal_uuid = ?, total_cents = ?,
                            error_code = NULL, provider_http_status = NULL, stamped_at = now(), updated_at = now(),
-                           receiver_tax_id = COALESCE(?, receiver_tax_id)
+                           receiver_tax_id = COALESCE(?, receiver_tax_id),
+                           provider_customer_id = COALESCE(?, provider_customer_id)
                     WHERE id = ?
-                    """, issued.id(), fiscalUuid, issued.totalCents(), receiverTaxId, invoiceId);
+                    """, issued.id(), fiscalUuid, issued.totalCents(), receiverTaxId, customerId, invoiceId);
             Map<String, Object> detail = new LinkedHashMap<>();
             detail.put("saleId", sale.id().toString());
             detail.put("providerInvoiceId", issued.id());

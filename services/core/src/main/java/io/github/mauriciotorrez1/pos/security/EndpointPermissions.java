@@ -47,11 +47,18 @@ public final class EndpointPermissions {
             requires(GET, "/quarantine", Permission.DISCREPANCY_VIEW),
             requires(GET, "/quarantine/{id}", Permission.DISCREPANCY_VIEW),
             requires(POST, "/quarantine/{id}/resolution", Permission.DISCREPANCY_RESOLVE),
+            requires(GET, "/invoices", Permission.INVOICE_ISSUE),
             requires(POST, "/invoices", Permission.INVOICE_ISSUE),
             requires(GET, "/invoices/global", Permission.INVOICE_ISSUE),
             requires(GET, "/invoices/global/preview", Permission.INVOICE_ISSUE),
             requires(POST, "/invoices/global", Permission.INVOICE_ISSUE),
             requires(POST, "/invoices/{id}/cancel", Permission.INVOICE_CANCEL),
+            requires(POST, "/invoices/{id}/cancellation-refresh", Permission.INVOICE_CANCEL),
+            requires(POST, "/invoices/global/{id}/cancel", Permission.INVOICE_CANCEL),
+            requires(POST, "/invoices/global/{id}/cancellation-refresh", Permission.INVOICE_CANCEL),
+            requires(GET, "/invoices/credit-notes", Permission.INVOICE_ISSUE),
+            requires(GET, "/invoices/credit-notes/candidates", Permission.INVOICE_ISSUE),
+            requires(POST, "/invoices/credit-notes", Permission.INVOICE_ISSUE),
             requires(GET, "/reports/sales", Permission.REPORT_VIEW),
             requires(GET, "/reports/fiscal-pending", Permission.REPORT_VIEW));
 

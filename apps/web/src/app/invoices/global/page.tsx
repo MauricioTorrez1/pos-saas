@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import { GlobalInvoiceList } from '@/components/invoicing/global-invoice-list';
 import { GlobalInvoicePanel } from '@/components/invoicing/global-invoice-panel';
 import { defaultGlobalDay, globalFailureMessage } from '@/lib/invoicing/messages';
-import { getInvoicingApi } from '@/lib/server';
+import { getInvoicingApi, getMe } from '@/lib/server';
+import { cancellationAction } from '../cfdi-actions';
 import { globalInvoiceAction } from '../actions';
 
 export const metadata: Metadata = { title: 'Factura global' };
@@ -10,8 +11,9 @@ export const dynamic = 'force-dynamic';
 
 /** The global invoice of the sales nobody asked to invoice (RF-036). The proxy and the core require `invoice.issue`. */
 export default async function GlobalInvoicePage() {
-  const api = await getInvoicingApi();
+  const [api, me] = await Promise.all([getInvoicingApi(), getMe()]);
   const globals = await api.listGlobals();
+  const isOwner = me.status === 'ok' && me.role === 'owner';
   return (
     <>
       <div className="shell__heading">
@@ -25,7 +27,7 @@ export default async function GlobalInvoicePage() {
       <section className="panel stack" aria-labelledby="globals-title">
         <h2 id="globals-title">Facturas globales recientes</h2>
         {globals.ok ? (
-          <GlobalInvoiceList globals={globals.data} />
+          <GlobalInvoiceList globals={globals.data} cancelAction={isOwner ? cancellationAction : undefined} />
         ) : (
           <p className="notice notice--danger">{globalFailureMessage(globals)}</p>
         )}

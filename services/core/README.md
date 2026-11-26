@@ -207,6 +207,21 @@ The sales nobody asked to invoice go into one CFDI to «Público en general» pe
 
 `periodicity` is `monthly` (default), `biweekly` or `daily`. The receiver is `XAXX010101000` with regime 616 and the ZIP code of `INVOICING_ISSUER_ZIP_CODE`; each ticket and tax rate is one concept (`01010101`, `ACT`, the folio as identification). A sale is in at most one live global (partial unique index) and a period has at most one live global, so repeating a request after a timeout is safe: the provider is looked up by `external_id` first. A sale invoiced on its own after its global was stamped is still invoiced; the invoice records the global, which must be cancelled with SAT motive 04 and issued again.
 
+### Cancellation and credit notes
+A stamped CFDI is never deleted: it is cancelled before the SAT with a motive ([ADR 0081](../../docs/adr/0081-cancelacion-y-nota-de-credito.md), RF-037, RF-038). Cancelling needs `invoice.cancel` (owner only); the rest `invoice.issue`.
+
+| Endpoint | What it does |
+| --- | --- |
+| `GET /invoices` | The latest individual invoices with their cancellation state, replacement and `superseded` flag |
+| `POST /invoices/{id}/cancel` | `{"motive":"02"}`; motive `01` also needs `substituteFiscalUuid`, the UUID of a replacement stamped with `POST /invoices` and `replacesInvoiceId` (SAT relation 04). Motives `01`–`03` |
+| `POST /invoices/global/{id}/cancel` | Same body, motives `02`–`04`. An accepted cancellation releases the sales, so the corrected global of the period can be issued |
+| `POST /invoices/{id}/cancellation-refresh`, `POST /invoices/global/{id}/cancellation-refresh` | Reads the CFDI at the provider and records whether the receiver accepted or refused |
+| `GET /invoices/credit-notes/candidates` | Returns of invoiced sales without a credit note |
+| `POST /invoices/credit-notes` | `{"returnId":"…"}` stamps the CFDI of type E related (relation 01) to the invoice of the sale or to the global stamped before the return. One per return |
+| `GET /invoices/credit-notes` | The latest credit notes |
+
+The cancellation state is `requested` (asked, outcome unknown), `pending` (the receiver must accept), `accepted`, `rejected` or `failed` (the provider refused the request). A request whose answer was lost is read at the provider before it is sent again. Every change goes to the audit log as `invoice.cancellation.<state>`.
+
 ## Observability
 The core sends traces, metrics and logs over OTLP to the collector of the `observability` profile and errors to Sentry ([ADR 0037](../../docs/adr/0037-observabilidad-del-nucleo.md)). Every log line shows `[service,traceId,spanId,tenant_id]`; spans carry `tenant.id`, and no metric uses it as a label. Never log names, phones, emails, PINs, tokens or card data, only ids.
 
