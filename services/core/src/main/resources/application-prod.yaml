@@ -1,4 +1,4 @@
-# Production on Cloud Run with PostgreSQL in Supabase (ADR 0078). Active with SPRING_PROFILES_ACTIVE=prod.
+# Production on Cloud Run with PostgreSQL in Supabase (ADR 0079). Active with SPRING_PROFILES_ACTIVE=prod.
 # Every connection value comes from the environment, filled by Cloud Run from Secret Manager; none has a
 # default, so a missing secret stops the start instead of pointing the core at a wrong database.
 spring:
@@ -16,7 +16,7 @@ spring:
       connection-timeout: 10000
   flyway:
     # Migrations run before each deployment from the deploy workflow, with the role that owns the tables.
-    # The running core never holds that password (ADR 0078).
+    # The running core never holds that password (ADR 0079).
     enabled: false
   lifecycle:
     # Cloud Run sends SIGTERM and waits 10 s before killing the instance.

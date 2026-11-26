@@ -4,7 +4,7 @@
 | Entorno | Dónde | Datos | Uso |
 | --- | --- | --- | --- |
 | Local | Docker Compose con perfiles | Sintéticos | Desarrollo |
-| Producción | Núcleo en Cloud Run, PostgreSQL en Supabase Free, respaldos en Cloudflare R2 ([ADR 0078](../adr/0078-nucleo-en-cloud-run-y-base-en-supabase.md)) | Reales | Tienda |
+| Producción | Núcleo en Cloud Run, PostgreSQL en Supabase Free, respaldos en Cloudflare R2 ([ADR 0079](../adr/0079-nucleo-en-cloud-run-y-base-en-supabase.md)) | Reales | Tienda |
 
 Con costo de $0 no hay staging: el entorno `production` de GitHub, con aprobación manual, es el freno antes de cada despliegue. Es un riesgo aceptado hasta tener un segundo negocio. En producción solo corre el núcleo; el resto del stack sigue en Docker Compose local (ADR 0013).
 
@@ -25,7 +25,7 @@ Tu PC tiene 16 GB de RAM: levanta solo lo que uses. Docker Desktop ve 7.6 GiB de
 4. **Migraciones:** corren con Flyway antes de arrancar la versión nueva y con el rol `app_migrator`.
 
 ## Terraform
-`infra/terraform` define Cloud Run, Artifact Registry, Secret Manager, la federación de identidades con GitHub, el proyecto de Supabase y el bucket R2 (ADR 0078). El estado vive fuera de Git: local o en un bucket de Cloud Storage con versiones. La guía del dueño está en [docs/despliegue-en-la-nube.md](../despliegue-en-la-nube.md).
+`infra/terraform` define Cloud Run, Artifact Registry, Secret Manager, la federación de identidades con GitHub, el proyecto de Supabase y el bucket R2 (ADR 0079). El estado vive fuera de Git: local o en un bucket de Cloud Storage con versiones. La guía del dueño está en [docs/despliegue-en-la-nube.md](../despliegue-en-la-nube.md).
 
 ## Observabilidad
 - **Trazas, métricas y logs:** OpenTelemetry hacia Tempo, Prometheus y Loki, con tableros en Grafana versionados en Git.
@@ -50,7 +50,7 @@ Tu PC tiene 16 GB de RAM: levanta solo lo que uses. Docker Desktop ve 7.6 GiB de
 Se ensaya una restauración cada trimestre, porque un respaldo sin probar no es un respaldo.
 
 ## Costos mensuales estimados
-Cifras aproximadas en MXN, confirmadas en F0-24 (ADR 0078).
+Cifras aproximadas en MXN, confirmadas en F0-24 (ADR 0079).
 
 | Concepto | Fase 0 | Entregas 1 y 2 | Fase 2 y 3 | Fase 4 y 5 |
 | --- | --- | --- | --- | --- |
@@ -64,7 +64,7 @@ Cifras aproximadas en MXN, confirmadas en F0-24 (ADR 0078).
 | API de Claude | $0 | $0 | $0 | Por uso, con límite |
 
 ### Servidor: resuelto en F0-24
-El VPS de 16 GB excedía el presupuesto. El dueño eligió servicios administrados en nivel gratuito, con $0 al mes: Cloud Run para el núcleo, Supabase Free para PostgreSQL y Cloudflare R2 para los respaldos. Los límites y el camino de crecimiento están en el [ADR 0078](../adr/0078-nucleo-en-cloud-run-y-base-en-supabase.md).
+El VPS de 16 GB excedía el presupuesto. El dueño eligió servicios administrados en nivel gratuito, con $0 al mes: Cloud Run para el núcleo, Supabase Free para PostgreSQL y Cloudflare R2 para los respaldos. Los límites y el camino de crecimiento están en el [ADR 0079](../adr/0079-nucleo-en-cloud-run-y-base-en-supabase.md).
 
 ## Requisitos de la PC de la tienda
 Mínimo: Windows 10 o 11 de 64 bits, 4 GB de RAM, 20 GB libres de disco, y USB para impresora y lector. Recomendado: 8 GB de RAM y SSD. Antes de instalar, hay que revisar sus especificaciones y que reciba actualizaciones de seguridad.

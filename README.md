@@ -125,7 +125,7 @@ docker compose run --rm dbt show --select daily_sales
 [`infra/compose`](infra/compose/README.md) lists the addresses and how to start over with empty data.
 
 ### Production
-The core runs on Google Cloud Run (scales to zero), PostgreSQL on Supabase free, and encrypted backups go to Cloudflare R2, all declared with Terraform in [`infra/terraform`](infra/terraform/README.md) at $0 a month ([ADR 0078](docs/adr/0078-nucleo-en-cloud-run-y-base-en-supabase.md)). The owner's step-by-step guide, in Spanish, is [docs/despliegue-en-la-nube.md](docs/despliegue-en-la-nube.md).
+The core runs on Google Cloud Run (scales to zero), PostgreSQL on Supabase free, and encrypted backups go to Cloudflare R2, all declared with Terraform in [`infra/terraform`](infra/terraform/README.md) at $0 a month ([ADR 0079](docs/adr/0079-nucleo-en-cloud-run-y-base-en-supabase.md)). The owner's step-by-step guide, in Spanish, is [docs/despliegue-en-la-nube.md](docs/despliegue-en-la-nube.md).
 
 ### Running the tests
 TypeScript, from the repository root:
@@ -310,7 +310,7 @@ docker compose run --rm dbt show --select daily_sales
 [`infra/compose`](infra/compose/README.md) indica las direcciones y cómo empezar de nuevo con datos vacíos.
 
 ### Producción
-El núcleo corre en Google Cloud Run (escala a cero), PostgreSQL en Supabase Free y los respaldos cifrados van a Cloudflare R2, todo declarado con Terraform en [`infra/terraform`](infra/terraform/README.md) con $0 al mes ([ADR 0078](docs/adr/0078-nucleo-en-cloud-run-y-base-en-supabase.md)). La guía paso a paso del dueño está en [docs/despliegue-en-la-nube.md](docs/despliegue-en-la-nube.md).
+El núcleo corre en Google Cloud Run (escala a cero), PostgreSQL en Supabase Free y los respaldos cifrados van a Cloudflare R2, todo declarado con Terraform en [`infra/terraform`](infra/terraform/README.md) con $0 al mes ([ADR 0079](docs/adr/0079-nucleo-en-cloud-run-y-base-en-supabase.md)). La guía paso a paso del dueño está en [docs/despliegue-en-la-nube.md](docs/despliegue-en-la-nube.md).
 
 ### Cómo correr las pruebas
 TypeScript, desde la raíz del repositorio:

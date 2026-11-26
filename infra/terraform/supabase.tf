@@ -1,4 +1,4 @@
-# PostgreSQL lives in Supabase free (ADR 0078). Terraform creates the project and both database passwords.
+# PostgreSQL lives in Supabase free (ADR 0079). Terraform creates the project and both database passwords.
 # Free plan: 500 MB of database, no instance size to choose, and the project pauses after a week without
 # requests; the daily backup and the uptime check of the core keep it active.
 
