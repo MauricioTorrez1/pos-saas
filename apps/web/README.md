@@ -32,12 +32,12 @@ The tokens live only inside an encrypted (AES-256-GCM), `HttpOnly`, `SameSite=La
 Pages read with Server Components and write with Server Actions, so the access token never reaches the browser. Prices and quantities stay as text (`"12.3450"`) from the core to the screen; the panel never turns them into a `number`.
 
 ## Invoicing screens
-`/invoices/global` (owner and manager, permission `invoice.issue`) issues the global invoice to the general public ([ADR 0079](../../docs/adr/0079-factura-global.md)): pick the periodicity (monthly by default) and a day of the period, check the preview (sales, totals per tax rate, sales left out because they have their own invoice, SAT deadline) and stamp it. Stamping sends the count of the preview; if the sales changed, nothing is stamped and a fresh preview appears. The list below flags a global whose sales were later invoiced on their own, which must be cancelled with motive 04.
+`/invoices/global` (owner and manager, permission `invoice.issue`) issues the global invoice to the general public ([ADR 0080](../../docs/adr/0080-factura-global.md)): pick the periodicity (monthly by default) and a day of the period, check the preview (sales, totals per tax rate, sales left out because they have their own invoice, SAT deadline) and stamp it. Stamping sends the count of the preview; if the sales changed, nothing is stamped and a fresh preview appears. The list below flags a global whose sales were later invoiced on their own, which must be cancelled with motive 04.
 
 ## Layout
 | Path | Contents |
 | --- | --- |
-| `src/app/` | Pages and Route Handlers (`auth/login`, `auth/callback`, `auth/logout`), the catalog pages and Server Actions (`catalog/`), shelf labels (`catalog/labels`, which downloads a PDF through `catalog/labels/pdf`), and the owner-only paper catalog review (`catalog/paper`, which sends each photo to the analytics service through `catalog/paper/read` and exports the approved rows as the register's supplier price-list CSV, ADR 0069) |
+| `src/app/` | Pages and Route Handlers (`auth/login`, `auth/callback`, `auth/logout`), the catalog pages and Server Actions (`catalog/`), shelf labels (`catalog/labels`, which downloads a PDF through `catalog/labels/pdf`), and the owner-only paper catalog review (`catalog/paper`, which sends each photo or short scanned PDF to the analytics service through `catalog/paper/read` and exports the approved rows as the register's supplier price-list CSV, ADR 0069) |
 | `src/proxy.ts` | Session check, role check, and token renewal for every protected route |
 | `src/lib/` | Settings, session sealing, cookies, OIDC calls, identity of the token, route rules, and the core client; `catalog/` holds the catalog client, form checks and decimal text helpers |
 | `src/components/` | Small presentational components; `catalog/` holds the table, forms, import and price change panels |

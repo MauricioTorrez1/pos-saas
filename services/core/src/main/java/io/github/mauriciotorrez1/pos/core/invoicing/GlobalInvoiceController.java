@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * The global invoice to the general public (RF-036, ADR 0079): a preview of the period, the stamping and the list.
+ * The global invoice to the general public (RF-036, ADR 0080): a preview of the period, the stamping and the list.
  * All three need {@code invoice.issue} (ADR 0042). Errors are {@code application/problem+json} with a {@code code}
  * the panel turns into a message.
  */

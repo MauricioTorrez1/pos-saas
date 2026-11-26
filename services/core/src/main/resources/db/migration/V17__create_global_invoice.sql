@@ -1,4 +1,4 @@
--- E1-32: the global invoice of the sales that nobody asked to invoice (ADR 0079).
+-- E1-32: the global invoice of the sales that nobody asked to invoice (ADR 0080).
 -- One CFDI to «Público en general» (RFC XAXX010101000) covers the sales of a closed period. Two tables:
 --   global_invoice      -> the attempt and its state machine, like invoice (ADR 0050): pending, stamped, failed;
 --   global_invoice_sale -> which sales the attempt covers. A partial unique index lets a sale be in at most one
@@ -73,7 +73,7 @@ CREATE POLICY global_invoice_sale_isolation ON global_invoice_sale
     WITH CHECK (tenant_id = current_tenant_id());
 
 -- A sale invoiced on its own after its global was stamped: the global must be cancelled with SAT motive 04 and
--- issued again without it (ADR 0079). The individual invoice records the global it overlaps.
+-- issued again without it (ADR 0080). The individual invoice records the global it overlaps.
 ALTER TABLE invoice ADD COLUMN overlaps_global_invoice_id uuid;
 
 -- Nothing here is ever deleted: a stamped CFDI exists at the SAT whatever we do.

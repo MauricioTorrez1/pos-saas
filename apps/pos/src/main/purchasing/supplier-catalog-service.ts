@@ -22,6 +22,7 @@ import {
   type PriceListSource,
   type PriceListSummary,
 } from '../../shared/supplier-catalog';
+import { buildSynonymIndex, extractFeatures, synonymSearchTexts, type SynonymIndex } from '../../shared/catalog-matching';
 import { MAX_ORDER_QUANTITY_MILLI, orderLineCents } from '../../shared/supplier-order';
 import type { AuditLog } from '../audit/audit-log';
 import type { LocalStore } from '../local-store/local-store';
@@ -70,7 +71,7 @@ export interface CartReport {
   readonly suppliers: readonly CartSupplierShare[];
 }
 
-interface ItemRow {
+export interface ItemRow {
   readonly id: string;
   readonly supplier_id: string;
   readonly supplier_name: string;
@@ -86,6 +87,8 @@ interface ItemRow {
   readonly link_origin: LinkOrigin | null;
   readonly list_date: string;
   readonly source: PriceListSource;
+  readonly equivalence_group_id: string | null;
+  readonly equivalence_name: string | null;
 }
 
 interface PendingFile {
@@ -95,14 +98,17 @@ interface PendingFile {
 }
 
 /** The columns every listing of items reads, joined to its supplier and its product. */
-const ITEM_SELECT = `
+export const ITEM_SELECT = `
   SELECT item.id, item.supplier_id, supplier.name AS supplier_name, item.supplier_code, item.description, item.purchase_unit,
     item.pieces_per_unit_milli, item.list_cost_e6, item.product_id, product.name AS product_name, product.base_unit AS product_unit,
     (SELECT code FROM product_barcode WHERE product_barcode.tenant_id = item.tenant_id AND product_barcode.product_id = item.product_id ORDER BY code LIMIT 1) AS product_barcode,
-    item.link_origin, item.list_date, item.source
+    item.link_origin, item.list_date, item.source, member.group_id AS equivalence_group_id, group_name.name AS equivalence_name
   FROM supplier_catalog_item AS item
   JOIN supplier ON supplier.id = item.supplier_id
   LEFT JOIN product ON product.id = item.product_id
+  LEFT JOIN catalog_equivalence_member AS member
+    ON member.tenant_id = item.tenant_id AND member.supplier_id = item.supplier_id AND member.supplier_code = item.supplier_code
+  LEFT JOIN catalog_equivalence_name AS group_name ON group_name.tenant_id = item.tenant_id AND group_name.group_id = member.group_id
 `;
 
 /**
@@ -129,7 +135,30 @@ export function toCatalogItem(row: ItemRow): CatalogItem {
     linkOrigin: row.product_id === null ? null : row.link_origin,
     listDate: row.list_date,
     source: row.source,
+    equivalenceGroupId: row.equivalence_group_id,
+    equivalenceName: row.equivalence_name,
   };
+}
+
+/**
+ * Works out the cost per base unit of an item not tied to a product with the pieces its description gives («caja c/100»),
+ * when its list said nothing about pieces (E1-63). Items tied to a product keep the pieces of the list, because the cart
+ * orders with those.
+ *
+ * @param item the item as the list has it
+ * @param index the synonyms, which do not change the pieces but are needed to read the description
+ * @returns the same item, or a copy with the pieces of its description
+ */
+export function withPiecesFromDescription(item: CatalogItem, index?: SynonymIndex): CatalogItem {
+  if (item.productId !== null || item.piecesPerUnitMilli !== 1000) {
+    return item;
+  }
+  const packCount = extractFeatures(item.description, index).packCount;
+  if (packCount === null || packCount * 1000 > 100_000_000) {
+    return item;
+  }
+  const piecesPerUnitMilli = packCount * 1000;
+  return { ...item, piecesPerUnitMilli, baseUnitCostE6: baseUnitCostE6(item.listCostE6, piecesPerUnitMilli), piecesFromDescription: true };
 }
 
 /**
@@ -161,6 +190,8 @@ export class SupplierCatalogService {
   readonly #deleteManualLink: StatementSync;
   readonly #searchAll: StatementSync;
   readonly #itemsOfProduct: StatementSync;
+  readonly #itemsOfGroup: StatementSync;
+  readonly #ownerSynonyms: StatementSync;
 
   /**
    * @param store the open local database
@@ -223,6 +254,17 @@ export class SupplierCatalogService {
       LIMIT ${COMPARE_LIMIT}
     `);
     this.#itemsOfProduct = store.prepare(`${ITEM_SELECT} WHERE item.tenant_id = ? AND item.product_id = ? AND supplier.is_active = 1`);
+    this.#itemsOfGroup = store.prepare(`${ITEM_SELECT} WHERE item.tenant_id = ? AND member.group_id = ? AND supplier.is_active = 1`);
+    this.#ownerSynonyms = store.prepare('SELECT term, canonical FROM catalog_synonym WHERE tenant_id = ? ORDER BY term');
+  }
+
+  /**
+   * The dictionary of the matcher: the synonyms of the register and the ones the owner added (E1-63).
+   *
+   * @returns the index to read descriptions with
+   */
+  synonymIndex(): SynonymIndex {
+    return buildSynonymIndex(this.#ownerSynonyms.all(this.#tenantId) as unknown as { term: string; canonical: string }[]);
   }
 
   /**
@@ -385,18 +427,24 @@ export class SupplierCatalogService {
   /**
    * Compares what every active supplier asks for the items that match the words (E1-52). A product that matched brings
    * every item tied to it, even the ones of another supplier described with other words, so the comparison is complete.
+   * Since E1-63 the words are also searched with their synonyms («alta velocidad» finds «HSS»), an item in a group of
+   * equivalent products brings the whole group, and an item without a product is compared with the pieces its description
+   * gives when its list gave none.
    *
    * @param text words of the description or the code, without caring about accents
-   * @returns the groups by product, the cheapest option first
+   * @returns the groups by product or by equivalent products, the cheapest option first
    */
   compare(text: string): ComparisonGroup[] {
-    const query = toPrefixQuery(text);
-    if (query === null) {
-      return [];
-    }
+    const index = this.synonymIndex();
     const found = new Map<string, CatalogItem>();
-    for (const row of this.#searchAll.all(this.#tenantId, query) as unknown as ItemRow[]) {
-      found.set(row.id, toCatalogItem(row));
+    for (const words of [text, ...synonymSearchTexts(text, index)]) {
+      const query = toPrefixQuery(words);
+      if (query === null) {
+        continue;
+      }
+      for (const row of this.#searchAll.all(this.#tenantId, query) as unknown as ItemRow[]) {
+        found.set(row.id, toCatalogItem(row));
+      }
     }
     const products = new Set([...found.values()].map((item) => item.productId).filter((id): id is string => id !== null));
     for (const productId of products) {
@@ -404,7 +452,13 @@ export class SupplierCatalogService {
         found.set(item.id, item);
       }
     }
-    return compareCatalogItems([...found.values()]);
+    const groups = new Set([...found.values()].map((item) => item.equivalenceGroupId ?? null).filter((id): id is string => id !== null));
+    for (const groupId of groups) {
+      for (const row of this.#itemsOfGroup.all(this.#tenantId, groupId) as unknown as ItemRow[]) {
+        found.set(row.id, toCatalogItem(row));
+      }
+    }
+    return compareCatalogItems([...found.values()].map((item) => withPiecesFromDescription(item, index)));
   }
 
   /**

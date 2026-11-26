@@ -10,7 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * Reads the sales a global invoice covers (ADR 0079). Every amount is net of the returns the core received, and
+ * Reads the sales a global invoice covers (ADR 0080). Every amount is net of the returns the core received, and
  * row-level security keeps the reads inside the current business.
  */
 @Component

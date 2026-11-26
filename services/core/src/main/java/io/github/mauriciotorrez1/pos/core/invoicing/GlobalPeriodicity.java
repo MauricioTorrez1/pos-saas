@@ -5,7 +5,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * How often the business issues its global invoice (ADR 0079). Monthly is the default until the accountant says
+ * How often the business issues its global invoice (ADR 0080). Monthly is the default until the accountant says
  * otherwise; daily and biweekly are offered because the SAT allows them and the change is only a setting.
  */
 public enum GlobalPeriodicity {

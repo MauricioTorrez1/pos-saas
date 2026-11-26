@@ -14,7 +14,7 @@ Probabilidad e impacto: A (alto), M (medio), B (bajo).
 | Impresora o cajón no funcionan como se espera en Windows 10 | M | M | Interfaces con falsos y prueba física apenas llegue el hardware |
 | La caja, construida antes que el servidor, no encaja al conectarlos | B | M | Casos compartidos desde F0-23, UUIDv7 e idempotencia desde la primera venta local, y prueba de punta a punta en E1-20 |
 | Spring Modulith incompatible con Spring Boot 4.1 | Resuelto | M | Confirmado en F0-07: Modulith 2.1.2 está compilado contra Boot 4.1.2 y las pruebas pasan |
-| El objeto `global` de Facturapi no funciona sin e-receipts | M | M | E1-32 lo implementa con un falso (ADR 0079); falta probarlo con la llave de prueba real; se actualiza el ADR 0012 si falla |
+| El objeto `global` de Facturapi no funciona sin e-receipts | M | M | E1-32 lo implementa con un falso (ADR 0080); falta probarlo con la llave de prueba real; se actualiza el ADR 0012 si falla |
 | PC de un negocio sin actualizaciones de seguridad | M | M | Revisar el soporte de su Windows antes de instalar, y migrar si hace falta |
 | La actualización de la caja rompe la tienda | B | A | Actualización con reversión, migraciones probadas y plan de regreso |
 

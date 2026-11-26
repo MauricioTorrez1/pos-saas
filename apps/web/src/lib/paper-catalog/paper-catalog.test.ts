@@ -97,6 +97,23 @@ describe('readCatalogPage', () => {
     expect(result).toEqual({ status: 'error', httpStatus: 413, message: 'La foto pesa más de 5 MB. Tómala de nuevo o recórtala.' });
   });
 
+  it('forwards a scanned PDF as it is and explains when it has too many pages', async () => {
+    let seen: Request | undefined;
+    const fetcher = (async (url: URL, init: RequestInit) => {
+      seen = new Request(url, init);
+      return Response.json({ detail: 'pdf_too_many_pages' }, { status: 413 });
+    }) as unknown as typeof fetch;
+
+    const result = await readCatalogPage(config, 't', new ArrayBuffer(8), 'application/pdf', fetcher);
+
+    expect(seen?.headers.get('content-type')).toBe('application/pdf');
+    expect(result).toEqual({
+      status: 'error',
+      httpStatus: 413,
+      message: 'El PDF tiene más de 4 hojas. Mándalo por partes de hasta 4 hojas.',
+    });
+  });
+
   it('refuses when the service is not configured', async () => {
     const result = await readCatalogPage({ analyticsApiUrl: null } as PanelConfig, 't', new ArrayBuffer(1), 'image/png');
     expect(result.status).toBe('error');

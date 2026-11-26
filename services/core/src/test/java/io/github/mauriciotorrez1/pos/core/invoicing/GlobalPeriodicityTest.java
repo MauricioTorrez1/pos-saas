@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** The periods, the concepts and the per-rate totals of a global invoice, without a database (ADR 0079). */
+/** The periods, the concepts and the per-rate totals of a global invoice, without a database (ADR 0080). */
 class GlobalPeriodicityTest {
 
     @Test

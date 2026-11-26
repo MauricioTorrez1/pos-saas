@@ -197,7 +197,7 @@ Invoices a sale the core already received ([ADR 0050](../../docs/adr/0050-factur
 `paymentForm` and `satProductKeys` are optional: the payment form comes from the sale and the SAT product key from `invoicing.default-sat-product-key` until the catalog carries it. Answers: `201` stamped invoice (`fiscalUuid`, `providerInvoiceId`, `totalCents`), `404` unknown sale, `409` already invoiced or being invoiced, `422` invalid fiscal data (field and rule, never the value) or refused by the provider, `503` no API key or no answer from the provider. Sending the same request again is always safe: a doubtful stamping is looked up at the provider (`external_id`) before it is repeated, and the `invoice` table allows one invoice per sale. Only the receiver's RFC is stored; the PDF and XML are downloaded from the provider with `providerInvoiceId`.
 
 ### Global invoice (`/invoices/global`)
-The sales nobody asked to invoice go into one CFDI to «Público en general» per period ([ADR 0079](../../docs/adr/0079-factura-global.md), RF-036). All three endpoints need `invoice.issue` (owner and manager).
+The sales nobody asked to invoice go into one CFDI to «Público en general» per period ([ADR 0080](../../docs/adr/0080-factura-global.md), RF-036). All three endpoints need `invoice.issue` (owner and manager).
 
 | Endpoint | What it does |
 | --- | --- |

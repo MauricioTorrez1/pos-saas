@@ -1,5 +1,6 @@
 import type { Unit } from '@pos-saas/money';
 
+import type { EquivalenceApi } from './catalog-equivalence';
 import { readUnitCost } from './product-admin';
 import type { OwnerRefusalResult } from './supplier-order';
 
@@ -124,6 +125,14 @@ export interface CatalogItem {
   readonly linkOrigin: LinkOrigin | null;
   readonly listDate: string;
   readonly source: PriceListSource;
+  /** The approved group of equivalent products of other suppliers it belongs to (E1-63), if any. */
+  readonly equivalenceGroupId?: string | null;
+  readonly equivalenceName?: string | null;
+  /**
+   * True when the list said nothing about pieces but the description did («caja c/100»), so the cost per base unit was
+   * worked out with the pieces of the description. Only for items not tied to a product, which cannot be ordered.
+   */
+  readonly piecesFromDescription?: boolean;
 }
 
 /** The current list of a supplier. */
@@ -166,11 +175,18 @@ export interface ComparisonOption {
   readonly differenceBp: number | null;
 }
 
-/** The offers for one product, the cheapest first. The items without a product form one group of their own. */
+/**
+ * The offers for one product, the cheapest first. Items tied to the same product, or approved as equivalent products
+ * (E1-63), compare together; the items without either form one group of their own.
+ */
 export interface ComparisonGroup {
+  /** The product of the store the group can be ordered as; null when no item of it is tied to a product. */
   readonly productId: string | null;
   readonly productName: string | null;
   readonly productUnit: Unit | null;
+  /** The approved group of equivalent products, when the group comes from one. */
+  readonly equivalenceGroupId: string | null;
+  readonly equivalenceName: string | null;
   readonly options: readonly ComparisonOption[];
 }
 
@@ -229,6 +245,8 @@ export interface SupplierCatalogApi {
   confirmCart(request: CartRequest): Promise<ConfirmCartResult>;
   /** Saves the PDF of the cart with the cheapest option of each line and two charts. */
   exportCartPdf(request: CartRequest): Promise<ExportCartResult>;
+  /** The equivalent products across catalogs (E1-63), when the register offers them. */
+  readonly equivalences?: EquivalenceApi;
 }
 
 export const SUPPLIER_CATALOG_CHANNELS = {
@@ -262,29 +280,83 @@ function optionsOf(items: readonly CatalogItem[]): ComparisonOption[] {
   });
 }
 
+/** The key that puts together the items of one comparison group: their equivalence group, else their product. */
+function groupingKeys(items: readonly CatalogItem[]): Map<string, string> {
+  const parent = new Map<string, string>();
+  const find = (key: string): string => {
+    const next = parent.get(key) ?? key;
+    if (next === key) {
+      return key;
+    }
+    const root = find(next);
+    parent.set(key, root);
+    return root;
+  };
+  const union = (left: string, right: string): void => {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+    if (leftRoot !== rightRoot) {
+      parent.set(rightRoot, leftRoot);
+    }
+  };
+  for (const item of items) {
+    const own = `i:${item.id}`;
+    if (item.productId !== null) {
+      union(`p:${item.productId}`, own);
+    }
+    if (item.equivalenceGroupId !== undefined && item.equivalenceGroupId !== null) {
+      union(`g:${item.equivalenceGroupId}`, own);
+    }
+  }
+  return new Map(items.map((item) => [item.id, item.productId === null && (item.equivalenceGroupId ?? null) === null ? 'unlinked' : find(`i:${item.id}`)]));
+}
+
+/** The product a group is ordered as: the one most of its items are tied to. */
+function mainProductOf(group: readonly CatalogItem[]): CatalogItem | undefined {
+  const counts = new Map<string, number>();
+  for (const item of group) {
+    if (item.productId !== null) {
+      counts.set(item.productId, (counts.get(item.productId) ?? 0) + 1);
+    }
+  }
+  const best = [...counts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0];
+  return group.find((item) => item.productId === best);
+}
+
 /**
- * Groups the items of several suppliers by the product they are tied to and compares them in its base unit, so a box of 12
- * and a single piece compare per piece. The cheapest is marked, and so is the most expensive, only when the prices differ.
- * The items without a product form the last group, compared among themselves.
+ * Groups the items of several suppliers by the product they are tied to, or by the group of equivalent products the owner
+ * approved (E1-63), and compares them in the base unit, so a box of 12 and a single piece compare per piece. The cheapest
+ * is marked, and so is the most expensive, only when the prices differ. The items without a product or a group form the
+ * last group, compared among themselves.
  *
  * @param items the items found
- * @returns the groups by product name, each one with the cheapest option first
+ * @returns the groups by name, each one with the cheapest option first
  */
 export function compareCatalogItems(items: readonly CatalogItem[]): ComparisonGroup[] {
-  const byProduct = new Map<string | null, CatalogItem[]>();
+  const keys = groupingKeys(items);
+  const byKey = new Map<string, CatalogItem[]>();
   for (const item of items) {
-    const group = byProduct.get(item.productId) ?? [];
-    group.push(item);
-    byProduct.set(item.productId, group);
+    const key = keys.get(item.id) ?? 'unlinked';
+    byKey.set(key, [...(byKey.get(key) ?? []), item]);
   }
-  return [...byProduct.entries()]
-    .map(([productId, group]) => ({
-      productId,
-      productName: group[0]?.productName ?? null,
-      productUnit: group[0]?.productUnit ?? null,
-      options: optionsOf(group),
-    }))
-    .sort((left, right) => Number(left.productId === null) - Number(right.productId === null) || (left.productName ?? '').localeCompare(right.productName ?? ''));
+  return [...byKey.entries()]
+    .map(([key, group]) => {
+      const product = key === 'unlinked' ? undefined : mainProductOf(group);
+      const equivalent = group.find((item) => (item.equivalenceGroupId ?? null) !== null);
+      return {
+        productId: product?.productId ?? null,
+        productName: product?.productName ?? null,
+        productUnit: product?.productUnit ?? null,
+        equivalenceGroupId: equivalent?.equivalenceGroupId ?? null,
+        equivalenceName: equivalent?.equivalenceName ?? null,
+        options: optionsOf(group),
+      };
+    })
+    .sort((left, right) => {
+      const leftUnlinked = left.productId === null && left.equivalenceGroupId === null;
+      const rightUnlinked = right.productId === null && right.equivalenceGroupId === null;
+      return Number(leftUnlinked) - Number(rightUnlinked) || (left.productName ?? left.equivalenceName ?? '').localeCompare(right.productName ?? right.equivalenceName ?? '');
+    });
 }
 
 /**

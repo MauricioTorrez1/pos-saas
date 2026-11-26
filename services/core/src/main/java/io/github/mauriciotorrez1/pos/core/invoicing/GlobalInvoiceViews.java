@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/** What the global invoice endpoints answer (ADR 0079). Money is in cents. */
+/** What the global invoice endpoints answer (ADR 0080). Money is in cents. */
 public final class GlobalInvoiceViews {
 
     private GlobalInvoiceViews() {
