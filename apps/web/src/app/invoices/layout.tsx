@@ -11,6 +11,7 @@ export default function InvoicesLayout({ children }: { children: ReactNode }) {
           <Brand />
         </Link>
         <nav className="shell__nav" aria-label="Facturación">
+          <Link href="/invoices">Facturas</Link>
           <Link href="/invoices/global">Factura global</Link>
           <Link href="/catalog">Catálogo</Link>
         </nav>

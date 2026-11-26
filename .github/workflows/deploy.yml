@@ -1,7 +1,7 @@
 name: Deploy
 
 # A merge to main that touches the core builds its image, migrates Supabase with Flyway and rolls out a new
-# Cloud Run revision, after a manual approval in the production environment (ADR 0082). Until the owner sets
+# Cloud Run revision, after a manual approval in the production environment (ADR 0083). Until the owner sets
 # the repository variables of docs/despliegue-en-la-nube.md, the job is skipped, not failed.
 on:
   push:

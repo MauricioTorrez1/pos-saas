@@ -15,6 +15,8 @@ import java.util.Objects;
  * @param relatedInvoiceUuids fiscal UUIDs of the invoices a credit note refers to; empty otherwise
  * @param externalId our own reference, sent to the provider as {@code external_id} so an invoice whose stamping
  *     had an unknown outcome can be found again with {@link FiscalInvoicing#findByExternalId}; may be {@code null}
+ * @param relationship SAT relation type of {@code relatedInvoiceUuids}: {@code 01} for a credit note, {@code 04} for
+ *     a replacement; {@code null} means {@code 01}
  */
 public record InvoiceDraft(
         String customerId,
@@ -24,12 +26,19 @@ public record InvoiceDraft(
         InvoiceType type,
         GlobalPeriod globalPeriod,
         List<String> relatedInvoiceUuids,
-        String externalId) {
+        String externalId,
+        String relationship) {
+
+    /** Creates a draft whose related documents, if any, are credited (relation {@code 01}). */
+    public InvoiceDraft(String customerId, List<InvoiceLineDraft> lines, String paymentForm, String cfdiUse,
+            InvoiceType type, GlobalPeriod globalPeriod, List<String> relatedInvoiceUuids, String externalId) {
+        this(customerId, lines, paymentForm, cfdiUse, type, globalPeriod, relatedInvoiceUuids, externalId, null);
+    }
 
     /** Creates a draft without an external reference. */
     public InvoiceDraft(String customerId, List<InvoiceLineDraft> lines, String paymentForm, String cfdiUse,
             InvoiceType type, GlobalPeriod globalPeriod, List<String> relatedInvoiceUuids) {
-        this(customerId, lines, paymentForm, cfdiUse, type, globalPeriod, relatedInvoiceUuids, null);
+        this(customerId, lines, paymentForm, cfdiUse, type, globalPeriod, relatedInvoiceUuids, null, null);
     }
 
     public InvoiceDraft {
@@ -39,6 +48,7 @@ public record InvoiceDraft(
         Objects.requireNonNull(type, "type");
         lines = List.copyOf(Objects.requireNonNull(lines, "lines"));
         relatedInvoiceUuids = relatedInvoiceUuids == null ? List.of() : List.copyOf(relatedInvoiceUuids);
+        relationship = relationship == null ? "01" : relationship;
         if (lines.isEmpty()) {
             throw new IllegalArgumentException("an invoice needs at least one line");
         }

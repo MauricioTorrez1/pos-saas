@@ -1,6 +1,6 @@
 # Backups
 
-Daily encrypted backups of the Supabase database to Cloudflare R2, and the scripts to restore them ([ADR 0082](../../docs/adr/0082-despliegue-automatico-y-respaldos-cifrados.md)). The owner's steps, in Spanish, are in [docs/despliegue-en-la-nube.md](../../docs/despliegue-en-la-nube.md), sections 10 to 13.
+Daily encrypted backups of the Supabase database to Cloudflare R2, and the scripts to restore them ([ADR 0083](../../docs/adr/0083-despliegue-automatico-y-respaldos-cifrados.md)). The owner's steps, in Spanish, are in [docs/despliegue-en-la-nube.md](../../docs/despliegue-en-la-nube.md), sections 10 to 13.
 
 | File | Purpose |
 | --- | --- |

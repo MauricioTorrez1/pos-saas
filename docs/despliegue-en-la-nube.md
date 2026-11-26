@@ -152,7 +152,7 @@ Comprueba que `postgres` puede respaldar tablas con RLS forzada (debe responder 
 - Billing > Budgets muestra la alerta “pos-saas: any spend”, si diste la cuenta de facturación.
 
 ## 10. Llave de cifrado de los respaldos (`age`)
-Los respaldos se cifran con una llave pública que vive en el repositorio. Solo la llave privada, que **nunca** sube a Git ni a GitHub, puede abrirlos (ADR 0082).
+Los respaldos se cifran con una llave pública que vive en el repositorio. Solo la llave privada, que **nunca** sube a Git ni a GitHub, puede abrirlos (ADR 0083).
 
 > Analogía: la llave pública es un buzón con ranura: cualquiera puede meter cartas, nadie puede sacarlas. La privada es la única llave del buzón.
 

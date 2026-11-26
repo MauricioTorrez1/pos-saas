@@ -135,7 +135,7 @@ public class FacturapiClient implements FiscalInvoicing {
             body.put("global", Map.of("periodicity", period.periodicity(), "months", period.months(), "year", period.year()));
         }
         if (!draft.relatedInvoiceUuids().isEmpty()) {
-            body.put("related_documents", List.of(Map.of("relationship", "01", "documents", draft.relatedInvoiceUuids())));
+            body.put("related_documents", List.of(Map.of("relationship", draft.relationship(), "documents", draft.relatedInvoiceUuids())));
         }
         return body;
     }

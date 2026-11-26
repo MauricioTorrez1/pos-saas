@@ -1,6 +1,6 @@
 name: Uptime
 
-# External monitoring of the core (RNF-04, ADR 0082): every hour GitHub asks the public health of the core.
+# External monitoring of the core (RNF-04, ADR 0083): every hour GitHub asks the public health of the core.
 # A failed run e-mails the owner, at $0. The health touches the database, so it also keeps Supabase free from
 # pausing after a week without activity. Skipped until the repository variable CORE_URL exists.
 on:

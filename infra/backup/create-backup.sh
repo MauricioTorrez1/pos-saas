@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dumps the public schema of the database and encrypts it with age for every recipient (ADR 0082).
+# Dumps the public schema of the database and encrypts it with age for every recipient (ADR 0083).
 # Usage: create-backup.sh <output file>
 # Connection: the standard libpq variables (PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD, PGSSLMODE).
 # Needs pg_dump and pg_restore 17 or newer (Supabase runs 17) and age on PATH.

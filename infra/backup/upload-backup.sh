@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Uploads an encrypted backup to Cloudflare R2 under daily/ and, on the first day of the month, also under
-# monthly/ (ADR 0082). The lifecycle rules of the bucket (infra/terraform/r2.tf) delete daily/ after 30 days
+# monthly/ (ADR 0083). The lifecycle rules of the bucket (infra/terraform/r2.tf) delete daily/ after 30 days
 # and monthly/ after 365, so this script never deletes anything.
 # Usage: upload-backup.sh <encrypted file>
 # Variables: R2_ACCOUNT_ID, R2_BUCKET, AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (an R2 token limited to the

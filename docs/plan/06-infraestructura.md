@@ -20,7 +20,7 @@ Tu PC tiene 16 GB de RAM: levanta solo lo que uses. Docker Desktop ve 7.6 GiB de
 
 ## CI/CD con GitHub Actions
 1. **Cada PR:** compila, formatea, corre pruebas (JUnit y Testcontainers, Vitest, pytest), verifica módulos, corre casos compartidos, y escanea secretos y dependencias.
-2. **Merge a `main` que toque el núcleo:** el workflow `Deploy` construye la imagen, la sube a Artifact Registry, migra con Flyway y despliega en Cloud Run tras la aprobación manual del entorno `production`; si la prueba de humo falla, regresa el tráfico a la revisión anterior ([ADR 0082](../adr/0082-despliegue-automatico-y-respaldos-cifrados.md)).
+2. **Merge a `main` que toque el núcleo:** el workflow `Deploy` construye la imagen, la sube a Artifact Registry, migra con Flyway y despliega en Cloud Run tras la aprobación manual del entorno `production`; si la prueba de humo falla, regresa el tráfico a la revisión anterior ([ADR 0083](../adr/0083-despliegue-automatico-y-respaldos-cifrados.md)).
 3. **Etiqueta de versión:** publica el instalador de la caja.
 4. **Migraciones:** corren con Flyway antes de arrancar la versión nueva y con el rol `app_migrator`.
 

@@ -4,6 +4,7 @@ import io.github.mauriciotorrez1.pos.core.identity.AppUser;
 import io.github.mauriciotorrez1.pos.core.identity.UserDirectory;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.InvoiceInProgressException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.InvoiceNotIssuedException;
+import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.NotReplaceableException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.SaleAlreadyInvoicedException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.SaleInPendingGlobalException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.SaleNotFoundException;
@@ -58,7 +59,7 @@ class InvoiceController {
                 request.receiver().taxRegime(), request.receiver().cfdiUse(), request.receiver().zipCode(),
                 request.receiver().email());
         InvoiceResult result = service.issue(new IssueInvoiceCommand(request.saleId(), receiver, request.paymentForm(),
-                request.satProductKeys(), actor.id()));
+                request.satProductKeys(), actor.id(), request.replacesInvoiceId()));
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
@@ -86,6 +87,14 @@ class InvoiceController {
     ProblemDetail inProgress(InvoiceInProgressException busy) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
                 "Another request is invoicing this sale right now. Wait a moment and check again.");
+    }
+
+    @ExceptionHandler(NotReplaceableException.class)
+    ProblemDetail notReplaceable(NotReplaceableException wrong) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT,
+                "Only a stamped, live invoice of the same sale can be replaced. Nothing was sent.");
+        problem.setProperty("code", "not_replaceable");
+        return problem;
     }
 
     @ExceptionHandler(SaleInPendingGlobalException.class)
@@ -125,8 +134,10 @@ class InvoiceController {
      * @param receiver fiscal data of the customer
      * @param paymentForm optional SAT payment form; derived from the sale when absent
      * @param satProductKeys optional SAT product key per sale line id
+     * @param replacesInvoiceId optional stamped invoice of the same sale this one replaces (motive 01, ADR 0082)
      */
-    record IssueInvoiceRequest(UUID saleId, ReceiverRequest receiver, String paymentForm, Map<UUID, String> satProductKeys) {
+    record IssueInvoiceRequest(UUID saleId, ReceiverRequest receiver, String paymentForm, Map<UUID, String> satProductKeys,
+            UUID replacesInvoiceId) {
     }
 
     /**

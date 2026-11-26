@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Asks a deployed core for /actuator/health until it answers UP (ADR 0082). The core scales to zero, so the
+# Asks a deployed core for /actuator/health until it answers UP (ADR 0083). The core scales to zero, so the
 # first answer may wait for a cold start; three minutes cover it. The health includes the database, so an UP
 # also proves the connection to Supabase (and keeps the free project from pausing).
 # Usage: scripts/check-core-health.sh <base url of the core>

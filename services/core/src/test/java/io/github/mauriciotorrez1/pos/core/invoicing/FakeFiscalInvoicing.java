@@ -27,7 +27,35 @@ class FakeFiscalInvoicing implements FiscalInvoicing {
         NOT_CONFIGURED
     }
 
+    /** What the next {@link #cancelInvoice} does. */
+    enum CancelMode {
+        /** The SAT cancels it at once (no acceptance needed). */
+        ACCEPT,
+        /** The receiver must accept: the cancellation stays pending. */
+        PENDING,
+        /** Answers 4xx without cancelling. */
+        REJECT,
+        /** Cancels, but the answer is lost (timeout). */
+        ACCEPT_THEN_TIME_OUT,
+        /** No API key. */
+        NOT_CONFIGURED
+    }
+
+    /**
+     * A cancellation the fake received.
+     *
+     * @param invoiceId provider id of the cancelled CFDI
+     * @param motive the SAT motive
+     * @param substituteInvoiceId provider id of the replacement, or {@code null}
+     */
+    record CancelCall(String invoiceId, CancellationMotive motive, String substituteInvoiceId) {
+    }
+
     volatile Mode mode = Mode.SUCCEED;
+    volatile CancelMode cancelMode = CancelMode.ACCEPT;
+    final List<CancelCall> cancelCalls = new CopyOnWriteArrayList<>();
+    final AtomicInteger getCalls = new AtomicInteger();
+    private final Map<String, IssuedInvoice> byProviderId = new ConcurrentHashMap<>();
     volatile boolean lookupFails;
     volatile long createDelayMillis;
     final AtomicInteger customerCalls = new AtomicInteger();
@@ -48,6 +76,32 @@ class FakeFiscalInvoicing implements FiscalInvoicing {
         drafts.clear();
         customers.clear();
         stampedByExternalId.clear();
+        cancelMode = CancelMode.ACCEPT;
+        cancelCalls.clear();
+        getCalls.set(0);
+        byProviderId.clear();
+    }
+
+    /**
+     * Makes the provider know a CFDI stamped outside the fake (seeded by a test).
+     *
+     * @param providerId provider id
+     * @param fiscalUuid its UUID
+     */
+    void knows(String providerId, UUID fiscalUuid) {
+        byProviderId.put(providerId, new IssuedInvoice(providerId, fiscalUuid.toString(), "valid", "none", 0));
+    }
+
+    /**
+     * Moves a pending cancellation as the receiver would.
+     *
+     * @param providerId provider id
+     * @param accepted whether the receiver accepted it
+     */
+    void receiverAnswers(String providerId, boolean accepted) {
+        IssuedInvoice current = byProviderId.get(providerId);
+        byProviderId.put(providerId, new IssuedInvoice(providerId, current.uuid(), accepted ? "canceled" : "valid",
+                accepted ? "accepted" : "rejected", current.totalCents()));
     }
 
     @Override
@@ -81,6 +135,7 @@ class FakeFiscalInvoicing implements FiscalInvoicing {
         IssuedInvoice stamped = new IssuedInvoice("inv_" + sequence.incrementAndGet(), UUID.randomUUID().toString(),
                 "valid", "none", totalCents(draft));
         stampedByExternalId.put(draft.externalId(), stamped);
+        byProviderId.put(stamped.id(), stamped);
         if (mode == Mode.STAMP_THEN_TIME_OUT) {
             throw new FacturapiUnavailableException("createInvoice", 0, new java.net.SocketTimeoutException("read timed out"));
         }
@@ -98,12 +153,35 @@ class FakeFiscalInvoicing implements FiscalInvoicing {
 
     @Override
     public IssuedInvoice getInvoice(String invoiceId) {
-        throw new UnsupportedOperationException();
+        getCalls.incrementAndGet();
+        if (lookupFails) {
+            throw new FacturapiUnavailableException("getInvoice", 503, null);
+        }
+        IssuedInvoice found = byProviderId.get(invoiceId);
+        if (found == null) {
+            throw new FacturapiRejectedException("getInvoice", 404, "No existe la factura");
+        }
+        return found;
     }
 
     @Override
     public IssuedInvoice cancelInvoice(String invoiceId, CancellationMotive motive, String substituteInvoiceId) {
-        throw new UnsupportedOperationException();
+        cancelCalls.add(new CancelCall(invoiceId, motive, substituteInvoiceId));
+        switch (cancelMode) {
+            case REJECT -> throw new FacturapiRejectedException("cancelInvoice", 400, "La factura no se puede cancelar");
+            case NOT_CONFIGURED -> throw new FacturapiNotConfiguredException("cancelInvoice");
+            default -> {
+            }
+        }
+        IssuedInvoice current = byProviderId.get(invoiceId);
+        boolean pending = cancelMode == CancelMode.PENDING;
+        IssuedInvoice answer = new IssuedInvoice(invoiceId, current == null ? null : current.uuid(),
+                pending ? "valid" : "canceled", pending ? "pending" : "accepted", current == null ? 0 : current.totalCents());
+        byProviderId.put(invoiceId, answer);
+        if (cancelMode == CancelMode.ACCEPT_THEN_TIME_OUT) {
+            throw new FacturapiUnavailableException("cancelInvoice", 0, new java.net.SocketTimeoutException("read timed out"));
+        }
+        return answer;
     }
 
     @Override

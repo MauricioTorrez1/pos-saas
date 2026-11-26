@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Proves that a backup can be restored (ADR 0082), with the same tools image the daily backup uses:
+# Proves that a backup can be restored (ADR 0083), with the same tools image the daily backup uses:
 #   1. A source PostgreSQL 17 migrated by Flyway and seeded with a business, a branch and a register.
 #   2. create-backup.sh with a throwaway age key.
 #   3. restore-backup.sh into a second, empty PostgreSQL 17.

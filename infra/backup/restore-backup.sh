@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Decrypts a backup made by create-backup.sh and restores it into an EMPTY database (ADR 0082).
+# Decrypts a backup made by create-backup.sh and restores it into an EMPTY database (ADR 0083).
 # Usage: restore-backup.sh <encrypted file>
 # Target: the standard libpq variables (PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD, PGSSLMODE).
 # Variables: AGE_IDENTITY_FILE, the private key of age (never committed; the owner keeps it offline).

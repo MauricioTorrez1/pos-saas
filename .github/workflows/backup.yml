@@ -1,6 +1,6 @@
 name: Backups
 
-# Daily encrypted backup of Supabase to Cloudflare R2, and a restore test with the same tools (ADR 0082).
+# Daily encrypted backup of Supabase to Cloudflare R2, and a restore test with the same tools (ADR 0083).
 # The backup is skipped, not failed, until the owner sets the repository variables and secrets and commits the
 # public age key (docs/despliegue-en-la-nube.md). The restore test needs nothing and always runs.
 on:

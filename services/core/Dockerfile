@@ -12,10 +12,11 @@ RUN apt-get update \
     && apt-get install --yes --no-install-recommends unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Dependencies first, so a change in src/ reuses this layer.
+# Dependencies first, so a change in src/ reuses this layer. Maven Central sometimes refuses a request from a
+# CI runner, and the wrapper tries only once, so the download gets five tries with a growing pause.
 COPY services/core/.mvn .mvn
 COPY services/core/mvnw services/core/pom.xml ./
-RUN --mount=type=cache,target=/root/.m2 ./mvnw --batch-mode --no-transfer-progress dependency:go-offline
+RUN --mount=type=cache,target=/root/.m2     for attempt in 1 2 3 4 5; do       ./mvnw --batch-mode --no-transfer-progress dependency:go-offline && exit 0;       echo "Download failed (attempt ${attempt}); retrying." >&2; sleep $((attempt * 10));     done; exit 1
 
 COPY packages/contracts/schemas /workspace/packages/contracts/schemas
 COPY services/core/src/main src/main

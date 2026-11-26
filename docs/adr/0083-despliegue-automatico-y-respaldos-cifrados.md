@@ -1,4 +1,4 @@
-# ADR 0082: Despliegue automático con aprobación, respaldos cifrados en R2 y monitoreo externo
+# ADR 0083: Despliegue automático con aprobación, respaldos cifrados en R2 y monitoreo externo
 
 Estado: Aceptada · Fecha: 2026-11-26 · Concreta F0-25. Se apoya en el ADR 0081 (Cloud Run, Supabase y R2) y en el ADR 0034 (migraciones que solo agregan).
 

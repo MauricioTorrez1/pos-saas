@@ -49,6 +49,14 @@ public final class InvoiceFailures {
         }
     }
 
+    /** The invoice to replace is not a stamped, live invoice of the same sale. Nothing was sent. */
+    public static class NotReplaceableException extends RuntimeException {
+        /** @param invoiceId the invoice asked to be replaced */
+        public NotReplaceableException(UUID invoiceId) {
+            super("Invoice " + invoiceId + " cannot be replaced");
+        }
+    }
+
     /** The provider could not stamp the invoice. */
     public static class InvoiceNotIssuedException extends RuntimeException {
 
