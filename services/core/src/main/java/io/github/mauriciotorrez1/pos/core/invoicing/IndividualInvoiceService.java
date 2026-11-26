@@ -4,6 +4,7 @@ import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.InvoiceInPro
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.InvoiceNotIssuedException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.InvoiceNotIssuedException.Reason;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.SaleAlreadyInvoicedException;
+import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.SaleInPendingGlobalException;
 import io.github.mauriciotorrez1.pos.core.invoicing.InvoiceFailures.SaleNotFoundException;
 import io.github.mauriciotorrez1.pos.core.reporting.AuditEntry;
 import io.github.mauriciotorrez1.pos.core.reporting.AuditLog;
@@ -74,6 +75,7 @@ public class IndividualInvoiceService {
      * @throws SaleNotFoundException if the core has no such sale
      * @throws SaleAlreadyInvoicedException if the sale already has a stamped invoice
      * @throws InvoiceInProgressException if another request is stamping the sale right now
+     * @throws SaleInPendingGlobalException if a global invoice that holds the sale is being stamped
      * @throws InvoiceNotIssuedException if the provider refused, is not configured or did not answer
      */
     public InvoiceResult issue(IssueInvoiceCommand command) {
@@ -102,12 +104,14 @@ public class IndividualInvoiceService {
     }
 
     private Claim claim(SaleView sale, Receiver receiver, UUID actorId) {
+        InvoicingLock.acquire(jdbc);
+        UUID overlappedGlobal = stampedGlobalHolding(sale.id());
         UUID id = Uuid7.next();
         int inserted = jdbc.update("""
-                INSERT INTO invoice (id, sale_id, status, receiver_tax_id, requested_by)
-                VALUES (?, ?, 'pending', ?, ?)
+                INSERT INTO invoice (id, sale_id, status, receiver_tax_id, requested_by, overlaps_global_invoice_id)
+                VALUES (?, ?, 'pending', ?, ?, ?)
                 ON CONFLICT ON CONSTRAINT invoice_one_per_sale DO NOTHING
-                """, id, sale.id(), receiver.taxId(), actorId);
+                """, id, sale.id(), receiver.taxId(), actorId, overlappedGlobal);
         if (inserted == 1) {
             return new Claim(id, false);
         }
@@ -131,10 +135,31 @@ public class IndividualInvoiceService {
         }
         jdbc.update("""
                 UPDATE invoice SET status = 'pending', error_code = NULL, provider_http_status = NULL,
-                       attempts = attempts + 1, attempt_started_at = now(), updated_at = now(), requested_by = ?
+                       attempts = attempts + 1, attempt_started_at = now(), updated_at = now(), requested_by = ?,
+                       overlaps_global_invoice_id = ?
                 WHERE id = ?
-                """, actorId, existingId);
+                """, actorId, overlappedGlobal, existingId);
         return new Claim(existingId, outcomeUnknown);
+    }
+
+    /**
+     * A customer may still ask for the invoice of a sale that went into a global (ADR 0077). If that global is stamped,
+     * this invoice is issued and records it, so the global can be cancelled with SAT motive 04 and issued again
+     * without the sale. If the global is being stamped right now, the request must wait.
+     */
+    private UUID stampedGlobalHolding(UUID saleId) {
+        List<Map<String, Object>> holding = jdbc.queryForList("""
+                SELECT g.id, g.status FROM global_invoice_sale l
+                JOIN global_invoice g ON g.tenant_id = l.tenant_id AND g.id = l.global_invoice_id
+                WHERE l.sale_id = ? AND l.released_at IS NULL
+                """, saleId);
+        if (holding.isEmpty()) {
+            return null;
+        }
+        if (!"stamped".equals(holding.get(0).get("status"))) {
+            throw new SaleInPendingGlobalException(saleId);
+        }
+        return (UUID) holding.get(0).get("id");
     }
 
     // --- resolving an attempt of unknown outcome --------------------------------------------------------------
@@ -220,6 +245,10 @@ public class IndividualInvoiceService {
             detail.put("totalCents", issued.totalCents());
             detail.put("totalMatchesSale", issued.totalCents() == sale.totalCents());
             detail.put("recovered", recovered);
+            UUID overlapped = jdbc.queryForObject("SELECT overlaps_global_invoice_id FROM invoice WHERE id = ?", UUID.class, invoiceId);
+            if (overlapped != null) {
+                detail.put("overlapsGlobalInvoiceId", overlapped.toString());
+            }
             auditLog.record(new AuditEntry(actorId, "invoice.stamped", "invoice", invoiceId, null, json(detail)));
         });
         LOG.info("Invoice {} stamped for sale {}", invoiceId, sale.id());

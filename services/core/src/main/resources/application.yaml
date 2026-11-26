@@ -63,6 +63,9 @@ sentry:
 facturapi:
   # The key comes only from the environment, never from a file (ADR 0041). Empty means no call is made.
   api-key: ${FACTURAPI_API_KEY:}
+invoicing:
+  # ZIP code of the place of issue, the address of the generic receiver of the global invoice (ADR 0077). Not secret.
+  issuer-zip-code: ${INVOICING_ISSUER_ZIP_CODE:}
 resend:
   # E-mail provider of the cash cut reports (ADR 0052). The key comes only from the environment; without it
   # the core starts and the reports are skipped with a warning.
